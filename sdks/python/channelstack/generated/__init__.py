@@ -17,7 +17,7 @@ from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationFailedError", "connect"]
 
 VERSION = "0.1.1"
 
@@ -35,6 +35,10 @@ class AlreadyInChannelError(ChannelstackError):
 
 
 class AlreadyReactedError(ChannelstackError):
+    pass
+
+
+class CannotDmBotError(ChannelstackError):
     pass
 
 
@@ -147,6 +151,7 @@ _ERRORS: dict[str, type[ChannelstackError]] = {
     "action_requires": ActionRequiresError,
     "already_in_channel": AlreadyInChannelError,
     "already_reacted": AlreadyReactedError,
+    "cannot_dm_bot": CannotDmBotError,
     "cant_delete_message": CantDeleteMessageError,
     "cant_update_message": CantUpdateMessageError,
     "cross_workspace_credential": CrossWorkspaceCredentialError,
@@ -355,10 +360,7 @@ class SlackTeam:
         )
 
 
-type SlackUsers = list[SlackUser]
-
-
-type SlackConversations = list[SlackConversation]
+type SlackApps = list[SlackApp]
 
 
 @dataclass(frozen=True)
@@ -420,6 +422,12 @@ class SlackMessageMetadata:
             event_type=data["event_type"],
             event_payload=data["event_payload"],
         )
+
+
+type SlackUsers = list[SlackUser]
+
+
+type SlackConversations = list[SlackConversation]
 
 
 @dataclass(frozen=True)
@@ -1249,10 +1257,10 @@ class Channelstack(ClientBase):
         ctx = self._ctx
         await ctx.transport.request("POST", f"/reset")
 
-    async def env(self, *, proxy: bool | None = None) -> Env:
+    async def env(self, *, proxy: bool | None = None, app: str | None = None, channel: str | None = None) -> Env:
         """Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints). With `proxy`, the proxy and the CA instead of the API URLs."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/env", query={"proxy": proxy})
+        data = await ctx.transport.request("GET", f"/env", query={"proxy": proxy, "app": app, "channel": channel})
         return data
 
     async def ui_login_link(self) -> UiLoginLink:
@@ -1422,6 +1430,18 @@ class SlackFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users")
         return [SlackUser(ctx, item) for item in data]
 
+    async def create_app(self, *, name: str, scopes: list[str] | None = None, bot_events: list[str] | None = None) -> SlackApp:
+        """Make another app in the workspace, with its own bot user, tokens and signing secret (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_SLACK_APP_<NAME>_WEBHOOK_URL, or over its own Socket Mode connection. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps", body={"name": name, "scopes": scopes, "botEvents": bot_events})
+        return SlackApp(ctx, data)
+
+    async def apps(self) -> SlackApps:
+        """The workspace's apps: the built-in one first, then the others in the order they were made. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps")
+        return [SlackApp(ctx, item) for item in data]
+
     async def conversations(self) -> SlackConversations:
         """The session's conversations, the one with the newest message last. Experimental."""
         ctx = self._ctx
@@ -1446,10 +1466,10 @@ class SlackFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/calls", query={"operation": operation, "error": error})
         return [SlackApiCall._from_wire(ctx, item) for item in data]
 
-    async def uninstall_app(self) -> SlackUninstallDeliveries:
-        """The workspace uninstalls the app. Undone when this session closes; run such tests on their own. Experimental."""
+    async def uninstall_app(self, *, app: SlackApp | None = None) -> SlackUninstallDeliveries:
+        """The workspace uninstalls an app: the built-in one, or the one given. Undone when this session closes; run such tests on their own. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/uninstall")
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/uninstall", body={"app": None if app is None else app.id})
         return [SlackDelivery(ctx, item) for item in data]
 
     async def fault(self, *, type: Literal["rate_limit", "latency", "error", "drop_socket"], operation: str | None = None, retry_after: Duration | None = None, delay: Duration | None = None, after: Duration | None = None, error: str | None = None, times: int | None = None) -> SlackFault:
@@ -1475,6 +1495,30 @@ class SlackApp:
         self.app_token: str = data["appToken"]
         self.signing_secret: str = data["signingSecret"]
         self.scopes: list[str] = data["scopes"]
+
+    async def say(self, message: str | SlackMessageInput, *, channel: SlackConversation | None = None, to: SlackUser | SlackApp | list[SlackUser | SlackApp] | None = None) -> SlackMessage:
+        """An app a test made writes a top-level message, as its own chat.postMessage would: in a conversation it is a member of, or in a DM with the people in `to`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps/{quote(str(self.id), safe='')}/say", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "channel": None if channel is None else channel.id, "to": None if to is None else [item.id for item in (to if isinstance(to, list) else [to])]})
+        return SlackMessage(ctx, data)
+
+    async def reply(self, message: str | SlackMessageInput, *, thread: SlackThread | SlackMessage) -> SlackMessage:
+        """An app a test made replies in a thread: pass the message that starts it, or any reply in it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps/{quote(str(self.id), safe='')}/reply", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "thread": {"channel": thread.channel, "ts": thread.ts}})
+        return SlackMessage(ctx, data)
+
+    async def react(self, emoji: str, *, message: SlackMessage) -> SlackDelivery | None:
+        """An app a test made reacts to a message. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps/{quote(str(self.id), safe='')}/react", body={"emoji": emoji, "message": {"channel": message.channel, "ts": message.ts}})
+        return (None if data is None else SlackDelivery(ctx, data))
+
+    async def unreact(self, emoji: str, *, message: SlackMessage) -> SlackDelivery | None:
+        """An app a test made takes its reaction back. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps/{quote(str(self.id), safe='')}/unreact", body={"emoji": emoji, "message": {"channel": message.channel, "ts": message.ts}})
+        return (None if data is None else SlackDelivery(ctx, data))
 
 
 class SlackUser:
@@ -1607,43 +1651,6 @@ class SlackUser:
         return await wait_for_next(self._seen, "waitForModal", self.modals, lambda item: text_matches(item.title, title) and item.open is True, "an open modal from the agent", timeout=timeout)
 
 
-class SlackConversation:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self._seen: dict[str, int] = {}
-        self.id: str = data["id"]
-        self.kind: Literal["channel", "private_channel", "im", "mpim"] = data["kind"]
-        self.name: str | None = data.get("name")
-
-    async def latest_message(self) -> SlackMessage:
-        """The newest message of a conversation, replies included. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/latest")
-        return SlackMessage(ctx, data)
-
-    async def messages(self) -> SlackMessages:
-        """Top-level messages of a conversation, oldest first. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/messages")
-        return [SlackMessage(ctx, item) for item in data]
-
-    async def members(self) -> SlackMembers:
-        """The people and apps in a conversation. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/members")
-        return [SlackUser(ctx, item) if item["kind"] == "user" else SlackApp(ctx, item) for item in data]
-
-    async def transcript(self, *, as_: SlackUser | SlackApp | None = None) -> SlackTranscript:
-        """The conversation as a person would read it, threads included. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
-        return SlackTranscript._from_wire(ctx, data)
-
-    async def wait_for_message(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration | None = None) -> SlackMessage:
-        """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
-
-
 class SlackMessage:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
@@ -1679,11 +1686,54 @@ class SlackMessage:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.channel), safe='')}/messages/{quote(str(self.ts), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
         return SlackTranscript._from_wire(ctx, data)
 
+    async def delivery_for(self, app: SlackApp) -> SlackDelivery | None:
+        """The first delivery this message caused to this app (decision 0027), or nothing when it wasn't told. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.channel), safe='')}/messages/{quote(str(self.ts), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else SlackDelivery(ctx, data))
+
     async def deliveries(self) -> SlackMessageDeliveries:
         """Every delivery this message caused to the agent. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.channel), safe='')}/messages/{quote(str(self.ts), safe='')}/deliveries")
         return [SlackDelivery(ctx, item) for item in data]
+
+
+class SlackConversation:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.kind: Literal["channel", "private_channel", "im", "mpim"] = data["kind"]
+        self.name: str | None = data.get("name")
+
+    async def latest_message(self) -> SlackMessage:
+        """The newest message of a conversation, replies included. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/latest")
+        return SlackMessage(ctx, data)
+
+    async def messages(self) -> SlackMessages:
+        """Top-level messages of a conversation, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/messages")
+        return [SlackMessage(ctx, item) for item in data]
+
+    async def members(self) -> SlackMembers:
+        """The people and apps in a conversation. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/members")
+        return [SlackUser(ctx, item) if item["kind"] == "user" else SlackApp(ctx, item) for item in data]
+
+    async def transcript(self, *, as_: SlackUser | SlackApp | None = None) -> SlackTranscript:
+        """The conversation as a person would read it, threads included. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
+        return SlackTranscript._from_wire(ctx, data)
+
+    async def wait_for_message(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration | None = None) -> SlackMessage:
+        """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
 
 
 class SlackThread:
@@ -1739,6 +1789,7 @@ class SlackDelivery:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["slack"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.event_type: str | None = data.get("eventType")
         self.event_id: str | None = data.get("eventId")

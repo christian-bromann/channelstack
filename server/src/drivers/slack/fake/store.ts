@@ -1,3 +1,4 @@
+import { AppRoster } from "../../../core/apps/index.ts";
 import type { Collection, Registry } from "../../../core/registry/index.ts";
 import type {
   SlackAppRecord,
@@ -55,12 +56,13 @@ export class SlackStore {
   readonly views = new Map<string, SlackViewRecord>();
   /** Conversation ids in creation order: the registry has no listing, and Slack lists conversations. */
   readonly #known: string[] = [];
-  /** The session that uninstalled the app, so closing it installs the app again. */
-  uninstalledBy: string | undefined;
+  /** The session that uninstalled each app, by app name, so closing it installs the app again. */
+  readonly uninstalledBy = new Map<string, string>();
   /** Faults sessions injected into the Web API. They apply to every caller until removed. */
   readonly faults: SlackFault[] = [];
   #team: SlackTeam | undefined;
-  #app: SlackAppRecord | undefined;
+  /** The built-in app and the ones tests made (decision 0027), installed in the one workspace. */
+  readonly apps = new AppRoster<SlackAppRecord>("Slack");
 
   constructor(registry: Registry) {
     this.users = registry.collection<SlackUserRecord>("slack", "user");
@@ -72,9 +74,19 @@ export class SlackStore {
     return this.#team;
   }
 
+  /** The built-in app, `my-agent`. */
   get app(): SlackAppRecord {
-    if (!this.#app) throw new Error("The Slack fake hasn't been seeded");
-    return this.#app;
+    return this.apps.builtIn;
+  }
+
+  /** The app whose bot user, app id or bot id this is, if any. */
+  appOf(id: string): SlackAppRecord | undefined {
+    return this.apps.all().find((app) => app.botUserId === id || app.id === id || app.botId === id);
+  }
+
+  /** Every app's bot user id: who writes as an app. */
+  isAppUser(id: string): boolean {
+    return this.apps.all().some((app) => app.botUserId === id);
   }
 
   seed(team: SlackTeam, app: SlackAppRecord): void {
@@ -83,9 +95,10 @@ export class SlackStore {
     this.#known.length = 0;
     this.#people.clear();
     this.faults.length = 0;
-    this.uninstalledBy = undefined;
+    this.uninstalledBy.clear();
     this.#team = team;
-    this.#app = app;
+    this.apps.seed(app);
+    for (const other of this.apps.extra()) other.installed = true;
   }
 
   /** Every message of a conversation, in the order they were posted (replies included). */
@@ -160,9 +173,11 @@ export class SlackStore {
    */
   release(session: string): SlackUserRecord[] {
     // What a session changed for the whole workspace is undone with it (decision 0006).
-    if (this.uninstalledBy === session) {
-      this.app.installed = true;
-      this.uninstalledBy = undefined;
+    for (const [name, by] of [...this.uninstalledBy]) {
+      if (by !== session) continue;
+      const app = this.apps.named(name);
+      if (app) app.installed = true;
+      this.uninstalledBy.delete(name);
     }
     for (const fault of [...this.faults])
       if (fault.session === session) this.faults.splice(this.faults.indexOf(fault), 1);

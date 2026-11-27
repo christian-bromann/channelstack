@@ -1,3 +1,4 @@
+import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { createSlackFake } from "./fake/index.ts";
 import { SLACK_IDS } from "./ids.ts";
@@ -69,7 +70,7 @@ export const slack: DriverDefinition = {
           reality: () => (live ? "live" : "fake"),
           events: context.events,
           apiUrl: context.apiUrl,
-          secret: context.secret,
+          secret: (name, app) => context.apps.secret(app ?? BUILT_IN_APP, name),
         }),
       capabilities: () => ({}),
       // A stream the app started and hasn't stopped is work in progress.
@@ -78,17 +79,25 @@ export const slack: DriverDefinition = {
           .conversationsOf(session)
           .flatMap((conversation) => fake.store.messagesIn(conversation.id))
           .filter((message) => message.stream?.state === "open")
-          .map((message) => `a stream ${fake.store.app.name} started and never stopped: "${excerpt(message.text)}"`),
+          .map(
+            (message) =>
+              `a stream ${fake.store.appOf(message.user)?.name ?? fake.store.app.name} started and never stopped: "${excerpt(message.text)}"`,
+          ),
       // Live, the agent talks to Slack with its own configuration, and live credentials never leave the server.
-      env: () =>
-        live
-          ? {}
-          : {
-              SLACK_API_URL: `${context.apiUrl()}/api/`,
-              SLACK_BOT_TOKEN: context.secret("botToken"),
-              SLACK_APP_TOKEN: context.secret("appToken"),
-              SLACK_SIGNING_SECRET: context.secret("signingSecret"),
-            },
+      env: (app) => {
+        if (live) return {};
+        // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same shape.
+        const name =
+          app === undefined
+            ? BUILT_IN_APP
+            : (fake.store.apps.named(app) ?? fake.world.createApp(undefined, { name: app })).name;
+        return {
+          SLACK_API_URL: `${context.apiUrl()}/api/`,
+          SLACK_BOT_TOKEN: context.apps.secret(name, "botToken"),
+          SLACK_APP_TOKEN: context.apps.secret(name, "appToken"),
+          SLACK_SIGNING_SECRET: context.apps.secret(name, "signingSecret"),
+        };
+      },
     };
   },
 };

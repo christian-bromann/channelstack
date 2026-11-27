@@ -14,6 +14,7 @@ export class AccountInactiveError extends ChannelstackError {}
 export class ActionRequiresError extends ChannelstackError {}
 export class AlreadyInChannelError extends ChannelstackError {}
 export class AlreadyReactedError extends ChannelstackError {}
+export class CannotDmBotError extends ChannelstackError {}
 export class CantDeleteMessageError extends ChannelstackError {}
 export class CantUpdateMessageError extends ChannelstackError {}
 export class CrossWorkspaceCredentialError extends ChannelstackError {}
@@ -46,6 +47,7 @@ const ERRORS: ErrorClasses = {
   action_requires: ActionRequiresError,
   already_in_channel: AlreadyInChannelError,
   already_reacted: AlreadyReactedError,
+  cannot_dm_bot: CannotDmBotError,
   cant_delete_message: CantDeleteMessageError,
   cant_update_message: CantUpdateMessageError,
   cross_workspace_credential: CrossWorkspaceCredentialError,
@@ -148,20 +150,12 @@ export interface SlackTeam {
   name: string;
 }
 
-export type SlackUsers = SlackUser[];
+export type SlackApps = SlackApp[];
 
-export type SlackUsersWire = SlackUserData[];
+export type SlackAppsWire = SlackAppData[];
 
-function decodeSlackUsers(ctx: HandleContext, data: SlackUsersWire): SlackUsers {
-  return data.map((item) => new SlackUser(ctx, item));
-}
-
-export type SlackConversations = SlackConversation[];
-
-export type SlackConversationsWire = SlackConversationData[];
-
-function decodeSlackConversations(ctx: HandleContext, data: SlackConversationsWire): SlackConversations {
-  return data.map((item) => new SlackConversation(ctx, item));
+function decodeSlackApps(ctx: HandleContext, data: SlackAppsWire): SlackApps {
+  return data.map((item) => new SlackApp(ctx, item));
 }
 
 export interface DeliveryAttempt {
@@ -186,6 +180,22 @@ export interface SlackMessageInput {
 export interface SlackMessageMetadata {
   event_type: string;
   event_payload: Record<string, unknown>;
+}
+
+export type SlackUsers = SlackUser[];
+
+export type SlackUsersWire = SlackUserData[];
+
+function decodeSlackUsers(ctx: HandleContext, data: SlackUsersWire): SlackUsers {
+  return data.map((item) => new SlackUser(ctx, item));
+}
+
+export type SlackConversations = SlackConversation[];
+
+export type SlackConversationsWire = SlackConversationData[];
+
+function decodeSlackConversations(ctx: HandleContext, data: SlackConversationsWire): SlackConversations {
+  return data.map((item) => new SlackConversation(ctx, item));
 }
 
 export interface SlackButtonRef {
@@ -936,9 +946,9 @@ export class Channelstack extends ClientBase {
   }
 
   /** Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints). With `proxy`, the proxy and the CA instead of the API URLs. */
-  async env(options: { proxy?: boolean } = {}): Promise<Env> {
+  async env(options: { proxy?: boolean; app?: string; channel?: string } = {}): Promise<Env> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/env`, { query: { proxy: options.proxy } })) as Env;
+    const data = (await ctx.transport.request("GET", `/env`, { query: { proxy: options.proxy, app: options.app, channel: options.channel } })) as Env;
     return data;
   }
 
@@ -1233,6 +1243,20 @@ export class SlackFixture {
     return decodeSlackUsers(ctx, data);
   }
 
+  /** Make another app in the workspace, with its own bot user, tokens and signing secret (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_SLACK_APP_<NAME>_WEBHOOK_URL, or over its own Socket Mode connection. Experimental. */
+  async createApp(options: { name: string; scopes?: string[]; botEvents?: string[] }): Promise<SlackApp> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/apps`, { body: { name: options.name, scopes: options.scopes, botEvents: options.botEvents } })) as SlackAppData;
+    return new SlackApp(ctx, data);
+  }
+
+  /** The workspace's apps: the built-in one first, then the others in the order they were made. Experimental. */
+  async apps(): Promise<SlackApps> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/apps`)) as SlackAppsWire;
+    return decodeSlackApps(ctx, data);
+  }
+
   /** The session's conversations, the one with the newest message last. Experimental. */
   async conversations(): Promise<SlackConversations> {
     const ctx = this.#ctx;
@@ -1261,10 +1285,10 @@ export class SlackFixture {
     return data;
   }
 
-  /** The workspace uninstalls the app. Undone when this session closes; run such tests on their own. Experimental. */
-  async uninstallApp(): Promise<SlackUninstallDeliveries> {
+  /** The workspace uninstalls an app: the built-in one, or the one given. Undone when this session closes; run such tests on their own. Experimental. */
+  async uninstallApp(options: { app?: SlackApp } = {}): Promise<SlackUninstallDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/uninstall`)) as SlackUninstallDeliveriesWire;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/uninstall`, { body: { app: options.app === undefined ? undefined : options.app.id } })) as SlackUninstallDeliveriesWire;
     return decodeSlackUninstallDeliveries(ctx, data);
   }
 
@@ -1323,6 +1347,34 @@ export class SlackApp {
     this.appToken = data.appToken;
     this.signingSecret = data.signingSecret;
     this.scopes = data.scopes;
+  }
+
+  /** An app a test made writes a top-level message, as its own chat.postMessage would: in a conversation it is a member of, or in a DM with the people in `to`. Experimental. */
+  async say(message: string | SlackMessageInput, options: { channel?: SlackConversation; to?: SlackUser | SlackApp | Array<SlackUser | SlackApp> } = {}): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/apps/${segment(this.id)}/say`, { body: { message: typeof message === "string" ? { text: message } : message, channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : [options.to].flat().map((item) => item.id) } })) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** An app a test made replies in a thread: pass the message that starts it, or any reply in it. Experimental. */
+  async reply(message: string | SlackMessageInput, options: { thread: SlackThread | SlackMessage }): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/apps/${segment(this.id)}/reply`, { body: { message: typeof message === "string" ? { text: message } : message, thread: { channel: options.thread.channel, ts: options.thread.ts } } })) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** An app a test made reacts to a message. Experimental. */
+  async react(emoji: string, options: { message: SlackMessage }): Promise<SlackDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/apps/${segment(this.id)}/react`, { body: { emoji, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData | null;
+    return (data === null ? undefined : new SlackDelivery(ctx, data));
+  }
+
+  /** An app a test made takes its reaction back. Experimental. */
+  async unreact(emoji: string, options: { message: SlackMessage }): Promise<SlackDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/apps/${segment(this.id)}/unreact`, { body: { emoji, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData | null;
+    return (data === null ? undefined : new SlackDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -1510,67 +1562,6 @@ export class SlackUser {
   }
 }
 
-/** Wire data of a {@link SlackConversation}. */
-export interface SlackConversationData {
-  id: string;
-  kind: "channel" | "private_channel" | "im" | "mpim";
-  name?: string;
-}
-
-export class SlackConversation {
-  readonly id: string;
-  readonly kind: "channel" | "private_channel" | "im" | "mpim";
-  readonly name: string | undefined;
-  readonly #ctx: HandleContext;
-  readonly #seen = new Map<string, number>();
-
-  /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: SlackConversationData) {
-    this.#ctx = ctx;
-    this.id = data.id;
-    this.kind = data.kind;
-    this.name = data.name;
-  }
-
-  /** The newest message of a conversation, replies included. Experimental. */
-  async latestMessage(): Promise<SlackMessage> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/latest`)) as SlackMessageData;
-    return new SlackMessage(ctx, data);
-  }
-
-  /** Top-level messages of a conversation, oldest first. Experimental. */
-  async messages(): Promise<SlackMessages> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/messages`)) as SlackMessagesWire;
-    return decodeSlackMessages(ctx, data);
-  }
-
-  /** The people and apps in a conversation. Experimental. */
-  async members(): Promise<SlackMembers> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/members`)) as SlackMembersWire;
-    return decodeSlackMembers(ctx, data);
-  }
-
-  /** The conversation as a person would read it, threads included. Experimental. */
-  async transcript(options: { as?: SlackUser | SlackApp } = {}): Promise<SlackTranscript> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as SlackTranscriptWire;
-    return decodeSlackTranscript(ctx, data);
-  }
-
-  /** Wait for the next new message matching `from` (anyone if omitted), after the last one this handle saw. */
-  async waitForMessage(options: { from?: SlackUser | SlackApp | string } & WaitOptions = {}): Promise<SlackMessage> {
-    return waitForNext(this.#seen, "waitForMessage", () => this.messages(), (item) => fromMatches(item.author, options.from), describeWait("a message", options.from), options);
-  }
-
-  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
-  [QUIET](): Promise<QuietState> {
-    return quietOf(this.#ctx);
-  }
-}
-
 /** Wire data of a {@link SlackMessage}. */
 export interface SlackMessageData {
   channel: string;
@@ -1643,11 +1634,79 @@ export class SlackMessage {
     return decodeSlackTranscript(ctx, data);
   }
 
+  /** The first delivery this message caused to this app (decision 0027), or nothing when it wasn't told. Experimental. */
+  async deliveryFor(app: SlackApp): Promise<SlackDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/messages/${segment(this.ts)}/delivery-for`, { query: { app: app.id } })) as SlackDeliveryData | null;
+    return (data === null ? undefined : new SlackDelivery(ctx, data));
+  }
+
   /** Every delivery this message caused to the agent. Experimental. */
   async deliveries(): Promise<SlackMessageDeliveries> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/messages/${segment(this.ts)}/deliveries`)) as SlackMessageDeliveriesWire;
     return decodeSlackMessageDeliveries(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link SlackConversation}. */
+export interface SlackConversationData {
+  id: string;
+  kind: "channel" | "private_channel" | "im" | "mpim";
+  name?: string;
+}
+
+export class SlackConversation {
+  readonly id: string;
+  readonly kind: "channel" | "private_channel" | "im" | "mpim";
+  readonly name: string | undefined;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: SlackConversationData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.kind = data.kind;
+    this.name = data.name;
+  }
+
+  /** The newest message of a conversation, replies included. Experimental. */
+  async latestMessage(): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/latest`)) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** Top-level messages of a conversation, oldest first. Experimental. */
+  async messages(): Promise<SlackMessages> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/messages`)) as SlackMessagesWire;
+    return decodeSlackMessages(ctx, data);
+  }
+
+  /** The people and apps in a conversation. Experimental. */
+  async members(): Promise<SlackMembers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/members`)) as SlackMembersWire;
+    return decodeSlackMembers(ctx, data);
+  }
+
+  /** The conversation as a person would read it, threads included. Experimental. */
+  async transcript(options: { as?: SlackUser | SlackApp } = {}): Promise<SlackTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as SlackTranscriptWire;
+    return decodeSlackTranscript(ctx, data);
+  }
+
+  /** Wait for the next new message matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForMessage(options: { from?: SlackUser | SlackApp | string } & WaitOptions = {}): Promise<SlackMessage> {
+    return waitForNext(this.#seen, "waitForMessage", () => this.messages(), (item) => fromMatches(item.author, options.from), describeWait("a message", options.from), options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -1734,6 +1793,7 @@ export class SlackThread {
 export interface SlackDeliveryData {
   id: string;
   channel: "slack";
+  app: string;
   type: string;
   eventType?: string;
   eventId?: string;
@@ -1745,6 +1805,7 @@ export interface SlackDeliveryData {
 export class SlackDelivery {
   readonly id: string;
   readonly channel: "slack";
+  readonly app: string;
   readonly type: string;
   readonly eventType: string | undefined;
   readonly eventId: string | undefined;
@@ -1758,6 +1819,7 @@ export class SlackDelivery {
     this.#ctx = ctx;
     this.id = data.id;
     this.channel = data.channel;
+    this.app = data.app;
     this.type = data.type;
     this.eventType = data.eventType;
     this.eventId = data.eventId;

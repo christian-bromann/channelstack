@@ -62,7 +62,10 @@ export interface InteractionKit {
   transport(): DeliveryTransport | undefined;
   /** Would the app be told about this kind of event in this conversation? It must be installed, subscribed and a member. */
   hears(conversation: SlackConversationRecord | "dm", subscription: string): boolean;
-  /** Send an event about a conversation to the app, if it is subscribed, installed and a member. */
+  /**
+   * Send an event about a conversation to the built-in app, if it is subscribed, installed and a
+   * member: Stop and the agent split view are a person's, and belong to the app they are for.
+   */
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
 }
 

@@ -1,3 +1,4 @@
+import { BUILT_IN_APP, checkNameFree } from "../../../core/apps/index.ts";
 import { delay } from "../../../core/clock/index.ts";
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
 import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
@@ -22,6 +23,7 @@ import {
 import { signSlackRequest } from "../signing.ts";
 import {
   type Immediate,
+  type SlackAppRecord,
   type SlackConversationKind,
   type SlackConversationRecord,
   type SlackFileRecord,
@@ -32,7 +34,7 @@ import {
   type SlackWorld,
 } from "../world.ts";
 import { createInteractions, type InteractionKit } from "./interactions.ts";
-import type { SocketMode } from "./socket.ts";
+import type { SocketModes } from "./socket.ts";
 import type { SlackFault, SlackStore } from "./store.ts";
 import { createViews } from "./views.ts";
 
@@ -65,6 +67,8 @@ export interface FakeSlackWorld extends Immediate<SlackWorld> {
       files?: readonly SlackFileRecord[] | undefined;
       broadcast?: boolean | undefined;
     },
+    /** The app that posts: the built-in one unless another app's token made the call. */
+    app?: SlackAppRecord,
   ): SlackMessageRecord;
   /**
    * What happens to a message once the caller has decided the author may do it. People (the
@@ -93,8 +97,8 @@ export interface FakeSlackWorld extends Immediate<SlackWorld> {
   updateView(viewId: string, hash: string | undefined, view: unknown): Record<string, unknown>;
   /** The app answers an interaction through its `response_url`. False when the URL is unknown, used up or expired. */
   respond(key: string, body: Record<string, unknown>): boolean;
-  /** Send an event about a conversation to the agent, if the app is subscribed, installed and a member. */
-  emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
+  /** Send an event about a conversation to every app that is subscribed, installed and a member. */
+  emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): Sent[];
   /**
    * Someone joins a channel, invited by `inviter` or by themselves (`conversations.join`). The app
    * hears `member_joined_channel`, then the `channel_join` message Slack posts in the channel. The
@@ -106,10 +110,42 @@ export interface FakeSlackWorld extends Immediate<SlackWorld> {
   /** The user a name in a test's text refers to, in this session. */
   resolveName(session: string, name: string): string | undefined;
   /**
-   * The workspace uninstalls the app: it gets `app_uninstalled` and `tokens_revoked`, then nothing
-   * more, and its token stops working. Undone when the session that did it closes (decision 0006).
+   * The workspace uninstalls an app (the built-in one unless named): it gets `app_uninstalled` and
+   * `tokens_revoked`, then nothing more, and its token stops working. Undone when the session that
+   * did it closes (decision 0006).
    */
-  uninstallApp(session: string): string[];
+  uninstallApp(session: string, app?: string): string[];
+  /** The apps of the workspace, the built-in one first. */
+  apps(): SlackAppRecord[];
+  /** Make an app by name, or return the one made with the same settings (decision 0027). */
+  createApp(
+    session: string | undefined,
+    options: { name: string; scopes?: readonly string[] | undefined; botEvents?: readonly string[] | undefined },
+  ): SlackAppRecord;
+  /** An app a test made writes, as its own `chat.postMessage` would: a top-level message, or in a DM. */
+  sayAsApp(
+    session: string,
+    app: string,
+    input: SlackMessageInput,
+    where: { channel: string } | { to: string[] },
+  ): SlackMessageRecord;
+  /** An app a test made replies in a thread. */
+  replyAsApp(
+    session: string,
+    app: string,
+    input: SlackMessageInput,
+    thread: { channel: string; ts: string },
+  ): SlackMessageRecord;
+  /** An app a test made reacts to a message, or takes its reaction back. */
+  reactAsApp(
+    session: string,
+    app: string,
+    emoji: string,
+    target: { channel: string; ts: string },
+    direction: "add" | "remove",
+  ): string | undefined;
+  /** The app whose bot user, id or bot id this is. */
+  appOf(id: string): SlackAppRecord | undefined;
 
   deliveries(session: string): DeliveryRecord[];
   delivery(session: string, id: string): DeliveryRecord;
@@ -143,7 +179,22 @@ const SLACK_RETRIES = fixedRetries(RETRY_DELAYS_MS, (attempt, retries, responseH
   return { "x-slack-retry-num": String(retries + 1), "x-slack-retry-reason": reason };
 });
 
-export function createFakeWorld(context: DriverContext, store: SlackStore, socket: SocketMode): FakeSlackWorld {
+/** A delivery an event caused, and the app it went to. */
+export interface Sent {
+  readonly app: string;
+  readonly id: string;
+}
+
+/** The built-in app's delivery among those an event caused: what a message's `delivery` is. */
+export const builtInDelivery = (sent: readonly Sent[]): string | undefined =>
+  sent.find((one) => one.app === BUILT_IN_APP)?.id;
+
+export function createFakeWorld(
+  context: DriverContext,
+  store: SlackStore,
+  socket: SocketModes,
+  defaults: { scopes: readonly string[]; botEvents: readonly string[] },
+): FakeSlackWorld {
   const { ids, clock, events } = context;
   /** Slack's deliveries: signed with the signing secret over the timestamp and the exact body. Events retry; interactions don't. */
   const deliveries = deliveryKit(context, {
@@ -158,43 +209,50 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
   const author = (id: string): SlackUserRecord | undefined => store.users.find(id);
 
   const resolveName = (session: string, name: string): string | undefined => {
-    if (name === store.app.name) return store.app.botUserId;
+    const app = store.apps.named(name);
+    if (app) return app.botUserId;
     const wanted = name.toLowerCase();
     return store
       .usersOf(session)
       .find((user) => user.name.toLowerCase() === wanted || user.displayName.toLowerCase() === wanted)?.id;
   };
 
-  /** Sign an event and hand it to the delivery queue, for the session whose action caused it. */
-  const deliver = (session: string, event: Record<string, unknown>): string | undefined => {
+  /** Sign an event and hand it to the delivery queue for one app, for the session whose action caused it. */
+  const deliver = (session: string, event: Record<string, unknown>, app: SlackAppRecord): string | undefined => {
     // The app is reached at its request URL, or over the connection it opened (Socket Mode). With neither, nothing is sent.
-    if (context.webhookUrl === undefined && socket.transport() === undefined) return undefined;
+    const url = context.apps.webhookUrl(app.name);
+    const mode = socket.of(app);
+    if (url === undefined && mode.transport() === undefined) return undefined;
     const eventId = ids.next(SLACK_IDS.event);
     const payload = eventCallback({
       event,
       eventId,
       atMs: clock(),
       team: store.team,
-      app: store.app,
-      verificationToken: context.secret("verificationToken"),
+      app,
+      verificationToken: context.apps.secret(app.name, "verificationToken"),
     });
     deliveries.send({
       id: eventId,
       session,
+      app: app.name,
       type: "event_callback",
-      url: context.webhookUrl ?? "",
-      transport: socket.transport,
+      url: url ?? "",
+      transport: mode.transport,
       body: JSON.stringify(payload),
       meta: { eventType: event.type, payload },
     });
     return eventId;
   };
 
-  /** Would the app be told about this kind of event in this conversation? */
-  const hears = (conversation: SlackConversationRecord | "dm", subscription: string): boolean => {
-    const { app } = store;
+  /** Would the app (the built-in one unless named) be told about this kind of event in this conversation? */
+  const hears = (
+    conversation: SlackConversationRecord | "dm",
+    subscription: string,
+    app: SlackAppRecord = store.app,
+  ): boolean => {
     // Reachable at all: at its request URL, or over the socket it opened.
-    const reachable = context.webhookUrl !== undefined || socket.transport() !== undefined;
+    const reachable = context.apps.webhookUrl(app.name) !== undefined || socket.of(app).transport() !== undefined;
     return (
       reachable &&
       app.installed &&
@@ -204,11 +262,23 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     );
   };
 
-  const emit: FakeSlackWorld["emit"] = (conversation, subscription, event) => {
+  /** Send an event to one app, if it hears it. */
+  const emitTo = (
+    conversation: SlackConversationRecord,
+    subscription: string,
+    event: Record<string, unknown>,
+    app: SlackAppRecord,
+  ): Sent[] => {
     const session = store.conversations.owner(conversation.id);
-    if (session === undefined || !hears(conversation, subscription)) return undefined;
-    return deliver(session, event);
+    if (session === undefined || !hears(conversation, subscription, app)) return [];
+    const id = deliver(session, event, app);
+    return id === undefined ? [] : [{ app: app.name, id }];
   };
+
+  // Every app in the conversation hears what happens in it, whoever did it: Slack sends one app's
+  // messages to the others as it sends a person's (decision 0027). Each gets its own delivery.
+  const emit: FakeSlackWorld["emit"] = (conversation, subscription, event) =>
+    store.apps.all().flatMap((app) => emitTo(conversation, subscription, event, app));
 
   const member = (session: string, userId: string, conversation: SlackConversationRecord): SlackUserRecord => {
     const user = store.users.get(session, userId);
@@ -222,7 +292,8 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
   };
 
   const participant = (session: string, id: string): string => {
-    if (id === store.app.id || id === store.app.botUserId) return store.app.botUserId;
+    const app = store.appOf(id);
+    if (app) return app.botUserId;
     return store.users.get(session, id).id;
   };
 
@@ -311,18 +382,22 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     store.messagesIn(conversation.id).push(message);
     // An ephemeral message exists only for its recipient: Slack sends no event for it.
     if (message.ephemeralFor !== undefined) return message;
-    const { app, team } = store;
+    const { team } = store;
+    const apps = store.apps.all();
+    const mentions = mentionedUsers(message.text);
     // Slack doesn't send `app_mention` for a DM with the app, mentioned or not: that arrives as `message.im` only.
-    const mentioned =
-      conversation.kind !== "im" && userId !== app.botUserId && mentionedUsers(message.text).includes(app.botUserId);
+    // Each app a message mentions gets its own; another app's message mentions it like a person's does, with its `bot_id`.
+    const mentioned = apps.filter(
+      (app) => conversation.kind !== "im" && userId !== app.botUserId && mentions.includes(app.botUserId),
+    );
+    const botId = author(userId)?.botId ?? store.appOf(userId)?.botId;
     // The mention comes first: when a message causes both, `app_mention` is the one tests look at.
-    for (const [subscription, event] of [
-      ...(mentioned ? ([["app_mention", appMentionEvent(message, conversation, author(userId), team)]] as const) : []),
-      [messageSubscription(conversation), messageEvent(message, conversation, author(userId), team, app)] as const,
-    ]) {
-      const id = emit(conversation, subscription, event);
-      if (id !== undefined) message.deliveries.push(id);
+    for (const app of mentioned) {
+      for (const sent of emitTo(conversation, "app_mention", appMentionEvent(message, conversation, botId, team), app))
+        message.deliveries.push(sent.id);
     }
+    const event = messageEvent(message, conversation, author(userId), team, apps);
+    for (const sent of emit(conversation, messageSubscription(conversation), event)) message.deliveries.push(sent.id);
     return message;
   };
 
@@ -365,17 +440,122 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
   const action = (session: string, name: string, data: Record<string, unknown>) =>
     events.append(session, "slack", "action", { action: name, ...data });
 
+  /** An app a test made and acts as: never the built-in one, which the agent under test acts as. */
+  const scripted = (id: string): SlackAppRecord => {
+    const app = store.appOf(id) ?? store.apps.named(id);
+    if (!app) throw new ProtocolError("not_found", `There is no Slack app "${id}"`, { app: id });
+    if (app === store.app) {
+      throw new ProtocolError(
+        "invalid_argument",
+        `${app.name} is the built-in app, which the agent under test acts as: script another app`,
+        { app: app.id },
+      );
+    }
+    if (!app.installed) throw refuse("account_inactive", `${app.name} is uninstalled`);
+    return app;
+  };
+
+  /** An app writes only where it is a member, as Slack refuses with `not_in_channel`. */
+  const appMember = (app: SlackAppRecord, conversation: SlackConversationRecord): void => {
+    if (!conversation.members.has(app.botUserId)) {
+      throw refuse("not_in_channel", `${app.name} is not a member of ${conversation.id}`, {
+        app: app.id,
+        channel: conversation.id,
+      });
+    }
+  };
+
+  /** An app's DM with people. A bot can't DM another bot: Slack refuses `conversations.open` with `cannot_dm_bot`. */
+  const openForApp = (session: string, app: SlackAppRecord, to: readonly string[]): SlackConversationRecord => {
+    const others = to.map((id) => participant(session, id));
+    if (others.some((id) => store.isAppUser(id) || store.users.find(id)?.isBot === true)) {
+      throw refuse("cannot_dm_bot", "A bot can't open a DM with another bot");
+    }
+    return open(session, app.botUserId, others);
+  };
+
   const world: Omit<
     FakeSlackWorld,
     keyof ReturnType<typeof createInteractions> | keyof ReturnType<typeof createViews>
   > = {
     team: () => store.team,
     app: () => store.app,
+    apps: () => store.apps.all(),
+    appOf: (id) => store.appOf(id),
     emit,
     resolveName,
 
-    uninstallApp(session) {
-      const { app, team } = store;
+    createApp(session, options) {
+      if (session !== undefined) {
+        checkNameFree(
+          options.name,
+          store.usersOf(session).map((user) => user.name),
+          "app",
+        );
+      }
+      const scopes = [...(options.scopes ?? defaults.scopes)];
+      const botEvents = [...(options.botEvents ?? defaults.botEvents)];
+      const app = store.apps.make(options.name, { scopes, botEvents }, () => {
+        const appIds = context.apps.ids(options.name);
+        return {
+          id: appIds.next(SLACK_IDS.app),
+          name: options.name,
+          botId: appIds.next(SLACK_IDS.bot),
+          botUserId: appIds.next(SLACK_IDS.user),
+          scopes,
+          botEvents,
+          installed: true,
+          updated: Math.floor(clock() / 1000),
+        };
+      });
+      if (session !== undefined) action(session, "createApp", { app: app.id });
+      return app;
+    },
+
+    sayAsApp(session, name, input, where) {
+      const app = scripted(name);
+      const conversation =
+        "channel" in where ? store.conversations.get(session, where.channel) : openForApp(session, app, where.to);
+      appMember(app, conversation);
+      const message = world.postAsApp(conversation, content(session, input), {}, app);
+      action(session, "say", { app: app.id, channel: conversation.id, ts: message.ts });
+      return message;
+    },
+
+    replyAsApp(session, name, input, thread) {
+      const app = scripted(name);
+      const conversation = store.conversations.get(session, thread.channel);
+      appMember(app, conversation);
+      const root = requireMessage(conversation, thread.ts);
+      const message = world.postAsApp(
+        conversation,
+        content(session, input),
+        { threadTs: root.threadTs ?? root.ts },
+        app,
+      );
+      action(session, "reply", { app: app.id, channel: conversation.id, ts: message.ts });
+      return message;
+    },
+
+    reactAsApp(session, name, emoji, target, direction) {
+      const app = scripted(name);
+      const conversation = store.conversations.get(session, target.channel);
+      appMember(app, conversation);
+      const message = requireMessage(conversation, target.ts);
+      const delivery = world.react(conversation, message, app.botUserId, emoji, direction);
+      action(session, direction === "add" ? "react" : "unreact", {
+        app: app.id,
+        channel: conversation.id,
+        ts: message.ts,
+        emoji: emojiName(emoji),
+      });
+      return delivery;
+    },
+
+    uninstallApp(session, name = BUILT_IN_APP) {
+      const { team } = store;
+      const app = store.apps.named(name);
+      if (!app) throw new ProtocolError("not_found", `There is no Slack app "${name}"`, { app: name });
       if (!app.installed) throw refuse("account_inactive", "The app is already uninstalled");
       const eventTs = Math.floor(clock() / 1000).toString();
       const sent = [
@@ -383,15 +563,20 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
         ["tokens_revoked", { type: "tokens_revoked", tokens: { oauth: [], bot: [app.botUserId] }, event_ts: eventTs }],
       ]
         .filter(([subscription]) => app.botEvents.includes(subscription as string))
-        .map(([, event]) => deliver(session, { ...(event as Record<string, unknown>), team_id: team.id }))
+        .map(([, event]) => deliver(session, { ...(event as Record<string, unknown>), team_id: team.id }, app))
         .filter((id): id is string => id !== undefined);
       app.installed = false;
-      store.uninstalledBy = session;
-      action(session, "uninstallApp", {});
+      store.uninstalledBy.set(app.name, session);
+      action(session, "uninstallApp", { app: app.id });
       return sent;
     },
 
     createUser(session, options) {
+      checkNameFree(
+        options.name,
+        store.apps.all().map((app) => app.name),
+        "person",
+      );
       // A fixed id must be free in the whole world: the agent can't tell two of them apart (decision 0006).
       const id = options.id === undefined ? ids.next(SLACK_IDS.user) : ids.reserve(SLACK_IDS.user, options.id);
       const user: SlackUserRecord = {
@@ -478,11 +663,11 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       return message;
     },
 
-    postAsApp(conversation, input, options) {
+    postAsApp(conversation, input, options, app = store.app) {
       const text = input.text ?? "";
       return post(
         conversation,
-        store.app.botUserId,
+        app.botUserId,
         // Slack gives what the app posts as text a `rich_text` block of it, as it does a person's message.
         { text, blocks: blocksOf(text, input.blocks) },
         { ...options, metadata: input.metadata },
@@ -492,23 +677,24 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     checkContent,
 
     edit(conversation, message, body) {
-      const { app, team } = store;
-      const previous = messageObject(message, author(message.user), team, app);
+      const { team } = store;
+      const apps = store.apps.all();
+      const previous = messageObject(message, author(message.user), team, apps);
       Object.assign(message, { text: body.text, blocks: identified(body.blocks, () => ids.next(SLACK_IDS.block)) });
       const eventTs = slackTs(ids);
       message.edited = eventTs;
-      const current = messageObject(message, author(message.user), team, app);
-      const id = emit(
+      const current = messageObject(message, author(message.user), team, apps);
+      const sent = emit(
         conversation,
         messageSubscription(conversation),
         messageChangedEvent(current, previous, conversation, eventTs),
       );
-      if (id !== undefined) message.deliveries.push(id);
-      return id;
+      for (const one of sent) message.deliveries.push(one.id);
+      return builtInDelivery(sent);
     },
 
     remove(conversation, message) {
-      const previous = messageObject(message, author(message.user), store.team, store.app);
+      const previous = messageObject(message, author(message.user), store.team, store.apps.all());
       store.removeMessage(conversation.id, message.ts);
       emit(conversation, messageSubscription(conversation), messageDeletedEvent(previous, conversation, slackTs(ids)));
     },
@@ -527,10 +713,12 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
         reaction.users.splice(reaction.users.indexOf(userId), 1);
         if (reaction.users.length === 0) message.reactions.splice(message.reactions.indexOf(reaction), 1);
       }
-      return emit(
-        conversation,
-        direction === "add" ? "reaction_added" : "reaction_removed",
-        reactionEvent(direction, { user: userId, reaction: name, message, eventTs: slackTs(ids) }),
+      return builtInDelivery(
+        emit(
+          conversation,
+          direction === "add" ? "reaction_added" : "reaction_removed",
+          reactionEvent(direction, { user: userId, reaction: name, message, eventTs: slackTs(ids) }),
+        ),
       );
     },
 
@@ -621,7 +809,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
         team: store.team,
         eventTs: slackTs(ids),
       });
-      if (id !== store.app.botUserId) conversation.members.delete(id);
+      if (!store.isAppUser(id)) conversation.members.delete(id);
       emit(conversation, "member_left_channel", event);
       conversation.members.delete(id);
       action(session, "kick", { user: kicker.id, channel: conversation.id, kicked: id });
@@ -689,7 +877,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
 
     resend: (session, id, options) => deliveries.resend(session, id, options),
 
-    socketConnections: () => socket.connections(),
+    socketConnections: () => socket.of(store.app).connections(),
 
     addFault(session, fault) {
       const id = `fault_${store.faults.length + 1}_${ids.next(SLACK_IDS.block)}`;
@@ -699,10 +887,10 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
           // A drop that is still to come is called off with its fault, and with its session.
           const cancel = context.timers.after(fault.delayMs, () => {
             store.pendingDrops.delete(id);
-            socket.drop();
+            for (const app of store.apps.all()) socket.of(app).drop();
           });
           store.pendingDrops.set(id, { session, cancel });
-        } else socket.drop();
+        } else for (const app of store.apps.all()) socket.of(app).drop();
       }
       if (fault.type !== "drop_socket") store.faults.push({ id, session, ...fault, type: fault.type });
       action(session, "fault", { fault: id, type: fault.type });
@@ -727,14 +915,14 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     refuse,
     member,
     requireMessage,
-    messageObject: (message) => messageObject(message, author(message.user), store.team, store.app),
+    messageObject: (message) => messageObject(message, author(message.user), store.team, store.apps.all()),
     postAsApp: world.postAsApp,
     edit: world.edit,
     remove: world.remove,
     action,
     hears,
-    emit,
-    transport: socket.transport,
+    emit: (conversation, subscription, event) => builtInDelivery(emitTo(conversation, subscription, event, store.app)),
+    transport: () => socket.of(store.app).transport(),
     directMessage: (session, userId) => open(session, userId, [store.app.botUserId]),
     replyAsUser: (...args) => world.replyAsUser(...args),
   };

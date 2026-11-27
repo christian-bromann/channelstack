@@ -135,7 +135,15 @@ The Slack fake refuses with it where the platform refuses the same request.
 
 SDK class: `AlreadyReactedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::ALREADY_REACTED`.
 
-Raised by [`SlackUser.react()`](/docs/reference/api/slack#react).
+Raised by [`SlackApp.react()`](/docs/reference/api/slack#react), [`SlackUser.react()`](/docs/reference/api/slack#react-1).
+
+### cannot_dm_bot
+
+The Slack fake refuses with it where the platform refuses the same request.
+
+SDK class: `CannotDmBotError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::CANNOT_DM_BOT`.
+
+Raised by [`SlackApp.say()`](/docs/reference/api/slack#say).
 
 ### cant_delete_message
 
@@ -183,7 +191,7 @@ The Slack fake refuses with it where the platform refuses the same request.
 
 SDK class: `MsgTooLongError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::MSG_TOO_LONG`.
 
-Raised by [`SlackUser.say()`](/docs/reference/api/slack#say), [`SlackUser.reply()`](/docs/reference/api/slack#reply).
+Raised by [`SlackApp.say()`](/docs/reference/api/slack#say), [`SlackApp.reply()`](/docs/reference/api/slack#reply), [`SlackUser.say()`](/docs/reference/api/slack#say-1), [`SlackUser.reply()`](/docs/reference/api/slack#reply-1).
 
 ### name_taken
 
@@ -199,7 +207,7 @@ The Slack fake refuses with it where the platform refuses the same request.
 
 SDK class: `NoReactionError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NO_REACTION`.
 
-Raised by [`SlackUser.unreact()`](/docs/reference/api/slack#unreact).
+Raised by [`SlackApp.unreact()`](/docs/reference/api/slack#unreact), [`SlackUser.unreact()`](/docs/reference/api/slack#unreact-1).
 
 ### no_text
 
@@ -207,7 +215,7 @@ The Slack fake refuses with it where the platform refuses the same request.
 
 SDK class: `NoTextError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NO_TEXT`.
 
-Raised by [`SlackUser.say()`](/docs/reference/api/slack#say), [`SlackUser.reply()`](/docs/reference/api/slack#reply), [`SlackUser.edit()`](/docs/reference/api/slack#edit).
+Raised by [`SlackApp.say()`](/docs/reference/api/slack#say), [`SlackApp.reply()`](/docs/reference/api/slack#reply), [`SlackUser.say()`](/docs/reference/api/slack#say-1), [`SlackUser.reply()`](/docs/reference/api/slack#reply-1), [`SlackUser.edit()`](/docs/reference/api/slack#edit).
 
 ### not_allowed
 
@@ -223,7 +231,7 @@ The Slack fake refuses with it where the platform refuses the same request.
 
 SDK class: `NotInChannelError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NOT_IN_CHANNEL`.
 
-Raised by [`SlackUser.say()`](/docs/reference/api/slack#say), [`SlackUser.reply()`](/docs/reference/api/slack#reply), [`SlackUser.edit()`](/docs/reference/api/slack#edit), [`SlackUser.delete()`](/docs/reference/api/slack#delete), [`SlackUser.click()`](/docs/reference/api/slack#click), [`SlackUser.select()`](/docs/reference/api/slack#select), [`SlackUser.shortcut()`](/docs/reference/api/slack#shortcut), [`SlackUser.runCommand()`](/docs/reference/api/slack#runcommand), [`SlackUser.stop()`](/docs/reference/api/slack#stop), [`SlackUser.pickPrompt()`](/docs/reference/api/slack#pickprompt), [`SlackUser.switchContext()`](/docs/reference/api/slack#switchcontext), [`SlackUser.react()`](/docs/reference/api/slack#react), and 3 more.
+Raised by [`SlackApp.say()`](/docs/reference/api/slack#say), [`SlackApp.reply()`](/docs/reference/api/slack#reply), [`SlackApp.react()`](/docs/reference/api/slack#react), [`SlackApp.unreact()`](/docs/reference/api/slack#unreact), [`SlackUser.say()`](/docs/reference/api/slack#say-1), [`SlackUser.reply()`](/docs/reference/api/slack#reply-1), [`SlackUser.edit()`](/docs/reference/api/slack#edit), [`SlackUser.delete()`](/docs/reference/api/slack#delete), [`SlackUser.click()`](/docs/reference/api/slack#click), [`SlackUser.select()`](/docs/reference/api/slack#select), [`SlackUser.shortcut()`](/docs/reference/api/slack#shortcut), [`SlackUser.runCommand()`](/docs/reference/api/slack#runcommand), and 7 more.
 
 ### split_view_unavailable
 

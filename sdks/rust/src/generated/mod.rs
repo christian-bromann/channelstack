@@ -37,6 +37,7 @@ pub mod codes {
     pub const ACTION_REQUIRES: &str = "action_requires";
     pub const ALREADY_IN_CHANNEL: &str = "already_in_channel";
     pub const ALREADY_REACTED: &str = "already_reacted";
+    pub const CANNOT_DM_BOT: &str = "cannot_dm_bot";
     pub const CANT_DELETE_MESSAGE: &str = "cant_delete_message";
     pub const CANT_UPDATE_MESSAGE: &str = "cant_update_message";
     pub const CROSS_WORKSPACE_CREDENTIAL: &str = "cross_workspace_credential";
@@ -131,6 +132,8 @@ fn run_channelstack_env<'a>(
         let _ = (&me, &options);
         let mut args = args.into_iter();
         let p_proxy = options.get("proxy").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
+        let p_channel = options.get("channel").cloned().unwrap_or(Value::Null);
         let path = format!("/env");
         send(
             ctx,
@@ -140,6 +143,8 @@ fn run_channelstack_env<'a>(
             Some({
                 let mut wire = Map::new();
                 wire.insert("proxy".into(), p_proxy.clone());
+                wire.insert("app".into(), p_app.clone());
+                wire.insert("channel".into(), p_channel.clone());
                 wire
             }),
             false,
@@ -571,6 +576,52 @@ fn run_slack_fixture_users<'a>(
     })
 }
 
+fn run_slack_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_scopes = options.get("scopes").cloned().unwrap_or(Value::Null);
+        let p_bot_events = options.get("botEvents").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/slack/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("scopes".into(), p_scopes.clone());
+                wire.insert("botEvents".into(), p_bot_events.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/slack/apps", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_slack_fixture_conversations<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -690,11 +741,28 @@ fn run_slack_fixture_uninstall_app<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/uninstall",
             encode_segment(ctx.session()?)
         );
-        send(ctx, "POST", path, None, None, false, &[]).await
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -731,6 +799,167 @@ fn run_slack_fixture_fault<'a>(
                 wire.insert("after".into(), (&|v: &Value| enc::duration(v))(&p_after)?);
                 wire.insert("error".into(), p_error.clone());
                 wire.insert("times".into(), p_times.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_app_say<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_message = args.next().unwrap_or(Value::Null);
+        let p_channel = options.get("channel").cloned().unwrap_or(Value::Null);
+        let p_to = options.get("to").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/apps/{}/say",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "message".into(),
+                    enc::shorthand(&p_message, "text", &|v: &Value| enc::plain(v))?,
+                );
+                wire.insert(
+                    "channel".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_channel)?,
+                );
+                wire.insert(
+                    "to".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_to,
+                    )?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_app_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_message = args.next().unwrap_or(Value::Null);
+        let p_thread = options.get("thread").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "message".into(),
+                    enc::shorthand(&p_message, "text", &|v: &Value| enc::plain(v))?,
+                );
+                wire.insert(
+                    "thread".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channel", "ts"]))(&p_thread)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_app_react<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_emoji = args.next().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/apps/{}/react",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("emoji".into(), p_emoji.clone());
+                wire.insert(
+                    "message".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channel", "ts"]))(&p_message)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_app_unreact<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_emoji = args.next().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/apps/{}/unreact",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("emoji".into(), p_emoji.clone());
+                wire.insert(
+                    "message".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channel", "ts"]))(&p_message)?,
+                );
                 wire
             }),
             None,
@@ -1463,6 +1692,132 @@ fn run_slack_user_ephemeral<'a>(
     })
 }
 
+fn run_slack_message_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/slack/conversations/{}/messages/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["ts"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_slack_message_reactions<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/slack/conversations/{}/messages/{}/reactions",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["ts"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_slack_message_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_as = options.get("as").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/conversations/{}/messages/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["ts"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("as".into(), (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_as)?);
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_message_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/conversations/{}/messages/{}/delivery-for",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["ts"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_message_deliveries<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/slack/conversations/{}/messages/{}/deliveries",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["ts"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_slack_conversation_latest_message<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -1546,96 +1901,6 @@ fn run_slack_conversation_transcript<'a>(
             &[],
         )
         .await
-    })
-}
-
-fn run_slack_message_refresh<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/slack/conversations/{}/messages/{}",
-            encode_segment(ctx.session()?),
-            path_value(&me["channel"])?,
-            path_value(&me["ts"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_slack_message_reactions<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/slack/conversations/{}/messages/{}/reactions",
-            encode_segment(ctx.session()?),
-            path_value(&me["channel"])?,
-            path_value(&me["ts"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_slack_message_transcript<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_as = options.get("as").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/slack/conversations/{}/messages/{}/transcript",
-            encode_segment(ctx.session()?),
-            path_value(&me["channel"])?,
-            path_value(&me["ts"])?
-        );
-        send(
-            ctx,
-            "GET",
-            path,
-            None,
-            Some({
-                let mut wire = Map::new();
-                wire.insert("as".into(), (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_as)?);
-                wire
-            }),
-            false,
-            &[],
-        )
-        .await
-    })
-}
-
-fn run_slack_message_deliveries<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/slack/conversations/{}/messages/{}/deliveries",
-            encode_segment(ctx.session()?),
-            path_value(&me["channel"])?,
-            path_value(&me["ts"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
     })
 }
 
@@ -6898,6 +7163,14 @@ impl ChannelstackEnv {
     pub fn proxy(self, value: impl IntoArg) -> Self {
         Self(self.0.option("proxy", value))
     }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
+    /// `channel`.
+    pub fn channel(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("channel", value))
+    }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
         self.0.send().await
@@ -7627,6 +7900,28 @@ impl SlackFixture {
         )
     }
 
+    /// Make another app in the workspace, with its own bot user, tokens and signing secret (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_SLACK_APP_<NAME>_WEBHOOK_URL, or over its own Socket Mode connection. Experimental.
+    pub fn create_app(&self) -> SlackFixtureCreateApp {
+        SlackFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_fixture_create_app,
+            SlackApp::wrap,
+        ))
+    }
+
+    /// The workspace's apps: the built-in one first, then the others in the order they were made. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_fixture_apps,
+            as_value,
+        )
+    }
+
     /// The session's conversations, the one with the newest message last. Experimental.
     pub fn conversations(&self) -> Call<Value> {
         Call::new(
@@ -7671,15 +7966,15 @@ impl SlackFixture {
         ))
     }
 
-    /// The workspace uninstalls the app. Undone when this session closes; run such tests on their own. Experimental.
-    pub fn uninstall_app(&self) -> Call<Value> {
-        Call::new(
+    /// The workspace uninstalls an app: the built-in one, or the one given. Undone when this session closes; run such tests on their own. Experimental.
+    pub fn uninstall_app(&self) -> SlackFixtureUninstallApp {
+        SlackFixtureUninstallApp(Call::new(
             &self.ctx,
             &self.data,
             vec![],
             run_slack_fixture_uninstall_app,
             as_value,
-        )
+        ))
     }
 
     /// Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once. Experimental.
@@ -7770,6 +8065,36 @@ impl IntoFuture for SlackFixtureCreateUser {
     }
 }
 
+/// The options of [`SlackFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackFixtureCreateApp(Call<SlackApp>);
+
+impl SlackFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `scopes`.
+    pub fn scopes(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("scopes", value))
+    }
+    /// `botEvents`.
+    pub fn bot_events(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("botEvents", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<SlackApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackFixtureCreateApp {
+    type Output = Result<SlackApp>;
+    type IntoFuture = BoxFuture<'static, Result<SlackApp>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
 /// The options of [`SlackFixture::create_channel`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct SlackFixtureCreateChannel(Call<SlackConversation>);
 
@@ -7831,6 +8156,28 @@ impl SlackFixtureCalls {
 }
 
 impl IntoFuture for SlackFixtureCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`SlackFixture::uninstall_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackFixtureUninstallApp(Call<Value>);
+
+impl SlackFixtureUninstallApp {
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackFixtureUninstallApp {
     type Output = Result<Value>;
     type IntoFuture = BoxFuture<'static, Result<Value>>;
     fn into_future(self) -> Self::IntoFuture {
@@ -8058,6 +8405,142 @@ impl SlackApp {
     /// `scopes`.
     pub fn scopes(&self) -> &Value {
         self.data.get("scopes").unwrap_or(&Value::Null)
+    }
+
+    /// An app a test made writes a top-level message, as its own chat.postMessage would: in a conversation it is a member of, or in a DM with the people in `to`. Experimental.
+    pub fn say(&self, message: impl IntoArg) -> SlackAppSay {
+        SlackAppSay(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![message.into_arg()],
+            run_slack_app_say,
+            SlackMessage::wrap,
+        ))
+    }
+
+    /// An app a test made replies in a thread: pass the message that starts it, or any reply in it. Experimental.
+    pub fn reply(&self, message: impl IntoArg) -> SlackAppReply {
+        SlackAppReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![message.into_arg()],
+            run_slack_app_reply,
+            SlackMessage::wrap,
+        ))
+    }
+
+    /// An app a test made reacts to a message. Experimental.
+    pub fn react(&self, emoji: impl IntoArg) -> SlackAppReact {
+        SlackAppReact(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![emoji.into_arg()],
+            run_slack_app_react,
+            SlackDelivery::wrap_opt,
+        ))
+    }
+
+    /// An app a test made takes its reaction back. Experimental.
+    pub fn unreact(&self, emoji: impl IntoArg) -> SlackAppUnreact {
+        SlackAppUnreact(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![emoji.into_arg()],
+            run_slack_app_unreact,
+            SlackDelivery::wrap_opt,
+        ))
+    }
+}
+
+/// The options of [`SlackApp::say`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackAppSay(Call<SlackMessage>);
+
+impl SlackAppSay {
+    /// `channel`.
+    pub fn channel(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("channel", value))
+    }
+    /// `to`.
+    pub fn to(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("to", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<SlackMessage> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackAppSay {
+    type Output = Result<SlackMessage>;
+    type IntoFuture = BoxFuture<'static, Result<SlackMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`SlackApp::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackAppReply(Call<SlackMessage>);
+
+impl SlackAppReply {
+    /// `thread`.
+    pub fn thread(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("thread", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<SlackMessage> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackAppReply {
+    type Output = Result<SlackMessage>;
+    type IntoFuture = BoxFuture<'static, Result<SlackMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`SlackApp::react`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackAppReact(Call<Option<SlackDelivery>>);
+
+impl SlackAppReact {
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<SlackDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackAppReact {
+    type Output = Result<Option<SlackDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<SlackDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`SlackApp::unreact`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackAppUnreact(Call<Option<SlackDelivery>>);
+
+impl SlackAppUnreact {
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<SlackDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackAppUnreact {
+    type Output = Result<Option<SlackDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<SlackDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
     }
 }
 
@@ -8831,6 +9314,222 @@ impl IntoFuture for SlackUserWaitForModal {
     }
 }
 
+/// A handle: `SlackMessage`.
+#[derive(Clone)]
+pub struct SlackMessage {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for SlackMessage {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl SlackMessage {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `ts`.
+    pub fn ts(&self) -> String {
+        self.data
+            .get("ts")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `conversation`.
+    pub fn conversation(&self) -> SlackConversation {
+        SlackConversation::from_wire_in(
+            &self.ctx,
+            self.data
+                .get("conversation")
+                .cloned()
+                .unwrap_or(Value::Null),
+            self.seen.field("conversation"),
+        )
+    }
+    /// `author`.
+    pub fn author(&self) -> &Value {
+        self.data.get("author").unwrap_or(&Value::Null)
+    }
+    /// `text`.
+    pub fn text(&self) -> String {
+        self.data
+            .get("text")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `blocks`.
+    pub fn blocks(&self) -> &Value {
+        self.data.get("blocks").unwrap_or(&Value::Null)
+    }
+    /// `postedAt`.
+    pub fn posted_at(&self) -> String {
+        self.data
+            .get("postedAt")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `threadTs`.
+    pub fn thread_ts(&self) -> Option<String> {
+        self.data
+            .get("threadTs")
+            .and_then(|v| v.as_str().map(str::to_owned))
+    }
+    /// `edited`.
+    pub fn edited(&self) -> bool {
+        self.data
+            .get("edited")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+    /// `visibleTo`.
+    pub fn visible_to(&self) -> Option<SlackUser> {
+        self.data
+            .get("visibleTo")
+            .filter(|v| !v.is_null())
+            .map(|v| SlackUser::from_wire_in(&self.ctx, v.clone(), self.seen.field("visibleTo")))
+    }
+    /// `thread`.
+    pub fn thread(&self) -> SlackThread {
+        SlackThread::from_wire_in(
+            &self.ctx,
+            self.data.get("thread").cloned().unwrap_or(Value::Null),
+            self.seen.field("thread"),
+        )
+    }
+    /// `delivery`.
+    pub fn delivery(&self) -> Option<SlackDelivery> {
+        self.data
+            .get("delivery")
+            .filter(|v| !v.is_null())
+            .map(|v| SlackDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery")))
+    }
+    /// `stream`.
+    pub fn stream(&self) -> Option<SlackStream> {
+        self.data
+            .get("stream")
+            .filter(|v| !v.is_null())
+            .map(|v| SlackStream::from_wire_in(&self.ctx, v.clone(), self.seen.field("stream")))
+    }
+
+    /// Re-read a message: its latest text, edits and deliveries. Experimental.
+    pub fn refresh(&self) -> Call<SlackMessage> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_message_refresh,
+            SlackMessage::wrap,
+        )
+    }
+
+    /// The reactions on a message, and who added each. Experimental.
+    pub fn reactions(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_message_reactions,
+            as_value,
+        )
+    }
+
+    /// A message and the replies under it as a person would read them. Experimental.
+    pub fn transcript(&self) -> SlackMessageTranscript {
+        SlackMessageTranscript(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_message_transcript,
+            as_value,
+        ))
+    }
+
+    /// The first delivery this message caused to this app (decision 0027), or nothing when it wasn't told. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<SlackDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_slack_message_delivery_for,
+            SlackDelivery::wrap_opt,
+        )
+    }
+
+    /// Every delivery this message caused to the agent. Experimental.
+    pub fn deliveries(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_message_deliveries,
+            as_value,
+        )
+    }
+}
+
+/// The options of [`SlackMessage::transcript`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackMessageTranscript(Call<Value>);
+
+impl SlackMessageTranscript {
+    /// `as`.
+    pub fn r#as(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("as", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackMessageTranscript {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
 /// A handle: `SlackConversation`.
 #[derive(Clone)]
 pub struct SlackConversation {
@@ -9042,211 +9741,6 @@ impl IntoFuture for SlackConversationWaitForMessage {
     type IntoFuture = BoxFuture<'static, Result<SlackMessage>>;
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(self.send())
-    }
-}
-
-/// A handle: `SlackMessage`.
-#[derive(Clone)]
-pub struct SlackMessage {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for SlackMessage {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl SlackMessage {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> String {
-        self.data
-            .get("channel")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `ts`.
-    pub fn ts(&self) -> String {
-        self.data
-            .get("ts")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `conversation`.
-    pub fn conversation(&self) -> SlackConversation {
-        SlackConversation::from_wire_in(
-            &self.ctx,
-            self.data
-                .get("conversation")
-                .cloned()
-                .unwrap_or(Value::Null),
-            self.seen.field("conversation"),
-        )
-    }
-    /// `author`.
-    pub fn author(&self) -> &Value {
-        self.data.get("author").unwrap_or(&Value::Null)
-    }
-    /// `text`.
-    pub fn text(&self) -> String {
-        self.data
-            .get("text")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `blocks`.
-    pub fn blocks(&self) -> &Value {
-        self.data.get("blocks").unwrap_or(&Value::Null)
-    }
-    /// `postedAt`.
-    pub fn posted_at(&self) -> String {
-        self.data
-            .get("postedAt")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `threadTs`.
-    pub fn thread_ts(&self) -> Option<String> {
-        self.data
-            .get("threadTs")
-            .and_then(|v| v.as_str().map(str::to_owned))
-    }
-    /// `edited`.
-    pub fn edited(&self) -> bool {
-        self.data
-            .get("edited")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-    }
-    /// `visibleTo`.
-    pub fn visible_to(&self) -> Option<SlackUser> {
-        self.data
-            .get("visibleTo")
-            .filter(|v| !v.is_null())
-            .map(|v| SlackUser::from_wire_in(&self.ctx, v.clone(), self.seen.field("visibleTo")))
-    }
-    /// `thread`.
-    pub fn thread(&self) -> SlackThread {
-        SlackThread::from_wire_in(
-            &self.ctx,
-            self.data.get("thread").cloned().unwrap_or(Value::Null),
-            self.seen.field("thread"),
-        )
-    }
-    /// `delivery`.
-    pub fn delivery(&self) -> Option<SlackDelivery> {
-        self.data
-            .get("delivery")
-            .filter(|v| !v.is_null())
-            .map(|v| SlackDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery")))
-    }
-    /// `stream`.
-    pub fn stream(&self) -> Option<SlackStream> {
-        self.data
-            .get("stream")
-            .filter(|v| !v.is_null())
-            .map(|v| SlackStream::from_wire_in(&self.ctx, v.clone(), self.seen.field("stream")))
-    }
-
-    /// Re-read a message: its latest text, edits and deliveries. Experimental.
-    pub fn refresh(&self) -> Call<SlackMessage> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_slack_message_refresh,
-            SlackMessage::wrap,
-        )
-    }
-
-    /// The reactions on a message, and who added each. Experimental.
-    pub fn reactions(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_slack_message_reactions,
-            as_value,
-        )
-    }
-
-    /// A message and the replies under it as a person would read them. Experimental.
-    pub fn transcript(&self) -> SlackMessageTranscript {
-        SlackMessageTranscript(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_slack_message_transcript,
-            as_value,
-        ))
-    }
-
-    /// Every delivery this message caused to the agent. Experimental.
-    pub fn deliveries(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_slack_message_deliveries,
-            as_value,
-        )
-    }
-}
-
-/// The options of [`SlackMessage::transcript`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct SlackMessageTranscript(Call<Value>);
-
-impl SlackMessageTranscript {
-    /// `as`.
-    pub fn r#as(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("as", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for SlackMessageTranscript {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
     }
 }
 
@@ -9625,6 +10119,13 @@ impl SlackDelivery {
     pub fn channel(&self) -> String {
         self.data
             .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `app`.
+    pub fn app(&self) -> String {
+        self.data
+            .get("app")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
@@ -19772,6 +20273,12 @@ pub async fn call_by_name(
         ("SlackFixture", "users") => {
             run_slack_fixture_users(&target.ctx, &target.data, args, options).await?
         }
+        ("SlackFixture", "createApp") => {
+            run_slack_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackFixture", "apps") => {
+            run_slack_fixture_apps(&target.ctx, &target.data, args, options).await?
+        }
         ("SlackFixture", "conversations") => {
             run_slack_fixture_conversations(&target.ctx, &target.data, args, options).await?
         }
@@ -19789,6 +20296,16 @@ pub async fn call_by_name(
         }
         ("SlackFixture", "fault") => {
             run_slack_fixture_fault(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackApp", "say") => run_slack_app_say(&target.ctx, &target.data, args, options).await?,
+        ("SlackApp", "reply") => {
+            run_slack_app_reply(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackApp", "react") => {
+            run_slack_app_react(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackApp", "unreact") => {
+            run_slack_app_unreact(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "say") => {
             run_slack_user_say(&target.ctx, &target.data, args, options).await?
@@ -19847,6 +20364,21 @@ pub async fn call_by_name(
         ("SlackUser", "ephemeral") => {
             run_slack_user_ephemeral(&target.ctx, &target.data, args, options).await?
         }
+        ("SlackMessage", "refresh") => {
+            run_slack_message_refresh(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackMessage", "reactions") => {
+            run_slack_message_reactions(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackMessage", "transcript") => {
+            run_slack_message_transcript(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackMessage", "deliveryFor") => {
+            run_slack_message_delivery_for(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackMessage", "deliveries") => {
+            run_slack_message_deliveries(&target.ctx, &target.data, args, options).await?
+        }
         ("SlackConversation", "latestMessage") => {
             run_slack_conversation_latest_message(&target.ctx, &target.data, args, options).await?
         }
@@ -19858,18 +20390,6 @@ pub async fn call_by_name(
         }
         ("SlackConversation", "transcript") => {
             run_slack_conversation_transcript(&target.ctx, &target.data, args, options).await?
-        }
-        ("SlackMessage", "refresh") => {
-            run_slack_message_refresh(&target.ctx, &target.data, args, options).await?
-        }
-        ("SlackMessage", "reactions") => {
-            run_slack_message_reactions(&target.ctx, &target.data, args, options).await?
-        }
-        ("SlackMessage", "transcript") => {
-            run_slack_message_transcript(&target.ctx, &target.data, args, options).await?
-        }
-        ("SlackMessage", "deliveries") => {
-            run_slack_message_deliveries(&target.ctx, &target.data, args, options).await?
         }
         ("SlackThread", "suggestedPrompts") => {
             run_slack_thread_suggested_prompts(&target.ctx, &target.data, args, options).await?
@@ -20476,6 +20996,11 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("SlackFixture", "createApp") => Dyn {
+            resource: Some("SlackApp"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("SlackFixture", "createChannel") => Dyn {
             resource: Some("SlackConversation"),
             ctx: target.ctx.clone(),
@@ -20483,6 +21008,16 @@ pub async fn call_by_name(
         },
         ("SlackFixture", "fault") => Dyn {
             resource: Some("SlackFault"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("SlackApp", "say") => Dyn {
+            resource: Some("SlackMessage"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("SlackApp", "reply") => Dyn {
+            resource: Some("SlackMessage"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -20541,12 +21076,12 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
-        ("SlackConversation", "latestMessage") => Dyn {
+        ("SlackMessage", "refresh") => Dyn {
             resource: Some("SlackMessage"),
             ctx: target.ctx.clone(),
             data,
         },
-        ("SlackMessage", "refresh") => Dyn {
+        ("SlackConversation", "latestMessage") => Dyn {
             resource: Some("SlackMessage"),
             ctx: target.ctx.clone(),
             data,

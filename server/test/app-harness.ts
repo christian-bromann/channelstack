@@ -77,7 +77,11 @@ export interface Harness {
  */
 export function harness(
   webhooks: Readonly<Record<string, string | undefined>> = {},
-  options: { live?: LiveOptions; urls?: () => ServerUrls } = {},
+  options: {
+    live?: LiveOptions;
+    urls?: () => ServerUrls;
+    appWebhooks?: (driver: string, app: string) => string | undefined;
+  } = {},
 ): Harness {
   const secrets = Secrets.ephemeral(secretSpecs());
   const redactor = new Redactor(TOKEN_PATTERNS);
@@ -99,6 +103,7 @@ export function harness(
     timers,
     clock: () => Date.now() + ahead,
     ...(options.live ? { live: options.live } : {}),
+    ...(options.appWebhooks ? { appWebhooks: options.appWebhooks } : {}),
   });
   const send = async (
     url: string,

@@ -102,6 +102,22 @@
               },
               "optional": true,
               "in": "query"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "channel",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
             }
           ],
           "returns": {
@@ -112,7 +128,8 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "action_requires"
+            "action_requires",
+            "not_found"
           ],
           "dispose": false
         },
@@ -1093,6 +1110,107 @@
           "dispose": false
         },
         {
+          "name": "createApp",
+          "kind": "factory",
+          "summary": "Make another app in the workspace, with its own bot user, tokens and signing secret (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_SLACK_APP_<NAME>_WEBHOOK_URL, or over its own Socket Mode connection",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/apps",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "scopes",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "botEvents",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackApp"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "apps",
+          "kind": "method",
+          "summary": "The workspace's apps: the built-in one first, then the others in the order they were made",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/apps",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackApps"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
           "name": "conversations",
           "kind": "method",
           "summary": "The session's conversations, the one with the newest message last",
@@ -1327,7 +1445,7 @@
         {
           "name": "uninstallApp",
           "kind": "method",
-          "summary": "The workspace uninstalls the app. Undone when this session closes; run such tests on their own",
+          "summary": "The workspace uninstalls an app: the built-in one, or the one given. Undone when this session closes; run such tests on their own",
           "stability": "experimental",
           "http": {
             "verb": "POST",
@@ -1340,7 +1458,19 @@
             ]
           },
           "args": [],
-          "options": [],
+          "options": [
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackApp"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
           "returns": {
             "kind": "named",
             "name": "SlackUninstallDeliveries"
@@ -1356,7 +1486,8 @@
             "live_not_allowlisted",
             "fake_actor_in_live_world",
             "cross_workspace_credential",
-            "account_inactive"
+            "account_inactive",
+            "not_found"
           ],
           "dispose": false,
           "live": {
@@ -1555,7 +1686,294 @@
           "optional": false
         }
       ],
-      "methods": []
+      "methods": [
+        {
+          "name": "say",
+          "kind": "method",
+          "summary": "An app a test made writes a top-level message, as its own chat.postMessage would: in a conversation it is a member of, or in a DM with the people in `to`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/apps/{app}/say",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "named",
+                "name": "SlackMessageInput"
+              },
+              "optional": false,
+              "in": "body",
+              "shorthand": "text"
+            }
+          ],
+          "options": [
+            {
+              "name": "channel",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "to",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "SlackUser",
+                    "SlackApp"
+                  ]
+                },
+                "oneOrMany": true
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "not_in_channel",
+            "cannot_dm_bot",
+            "no_text",
+            "msg_too_long"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reply",
+          "kind": "method",
+          "summary": "An app a test made replies in a thread: pass the message that starts it, or any reply in it",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/apps/{app}/reply",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "named",
+                "name": "SlackMessageInput"
+              },
+              "optional": false,
+              "in": "body",
+              "shorthand": "text"
+            }
+          ],
+          "options": [
+            {
+              "name": "thread",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackThread",
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "not_in_channel",
+            "no_text",
+            "msg_too_long"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "react",
+          "kind": "method",
+          "summary": "An app a test made reacts to a message",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/apps/{app}/react",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "emoji",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "SlackDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "not_in_channel",
+            "already_reacted"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "unreact",
+          "kind": "method",
+          "summary": "An app a test made takes its reaction back",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/apps/{app}/unreact",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "emoji",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "SlackDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "not_in_channel",
+            "no_reaction"
+          ],
+          "dispose": false
+        }
+      ]
     },
     {
       "name": "SlackUser",
@@ -2931,234 +3349,6 @@
       ]
     },
     {
-      "name": "SlackConversation",
-      "idFields": [
-        "id"
-      ],
-      "role": "resource",
-      "fields": [
-        {
-          "name": "id",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "kind",
-          "type": {
-            "kind": "enum",
-            "values": [
-              "channel",
-              "private_channel",
-              "im",
-              "mpim"
-            ]
-          },
-          "optional": false
-        },
-        {
-          "name": "name",
-          "type": {
-            "kind": "string"
-          },
-          "optional": true
-        }
-      ],
-      "methods": [
-        {
-          "name": "latestMessage",
-          "kind": "method",
-          "summary": "The newest message of a conversation, replies included",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/slack/conversations/{channel}/latest",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "channel",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "resource",
-            "name": "SlackMessage"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        },
-        {
-          "name": "messages",
-          "kind": "method",
-          "summary": "Top-level messages of a conversation, oldest first",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/slack/conversations/{channel}/messages",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "channel",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "SlackMessages"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        },
-        {
-          "name": "members",
-          "kind": "method",
-          "summary": "The people and apps in a conversation",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/slack/conversations/{channel}/members",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "channel",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "SlackMembers"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        },
-        {
-          "name": "transcript",
-          "kind": "method",
-          "summary": "The conversation as a person would read it, threads included",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/slack/conversations/{channel}/transcript",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "channel",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [
-            {
-              "name": "as",
-              "type": {
-                "kind": "ref",
-                "resources": [
-                  "SlackUser",
-                  "SlackApp"
-                ]
-              },
-              "optional": true,
-              "in": "query"
-            }
-          ],
-          "returns": {
-            "kind": "named",
-            "name": "SlackTranscript"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        }
-      ],
-      "waits": [
-        {
-          "name": "waitForMessage",
-          "mode": "next",
-          "read": "messages",
-          "item": {
-            "kind": "resource",
-            "name": "SlackMessage"
-          },
-          "from": "author",
-          "what": "a message"
-        }
-      ]
-    },
-    {
       "name": "SlackMessage",
       "idFields": [
         "channel",
@@ -3429,6 +3619,70 @@
           "dispose": false
         },
         {
+          "name": "deliveryFor",
+          "kind": "method",
+          "summary": "The first delivery this message caused to this app (decision 0027), or nothing when it wasn't told",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/delivery-for",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackApp"
+                ]
+              },
+              "optional": false,
+              "in": "query"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "SlackDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        },
+        {
           "name": "deliveries",
           "kind": "method",
           "summary": "Every delivery this message caused to the agent",
@@ -3476,6 +3730,234 @@
           "live": {
             "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
           }
+        }
+      ]
+    },
+    {
+      "name": "SlackConversation",
+      "idFields": [
+        "id"
+      ],
+      "role": "resource",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "channel",
+              "private_channel",
+              "im",
+              "mpim"
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "latestMessage",
+          "kind": "method",
+          "summary": "The newest message of a conversation, replies included",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/latest",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "messages",
+          "kind": "method",
+          "summary": "Top-level messages of a conversation, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/messages",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackMessages"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "members",
+          "kind": "method",
+          "summary": "The people and apps in a conversation",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/members",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackMembers"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "The conversation as a person would read it, threads included",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "as",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackUser",
+                  "SlackApp"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "SlackTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForMessage",
+          "mode": "next",
+          "read": "messages",
+          "item": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "from": "author",
+          "what": "a message"
         }
       ]
     },
@@ -3806,6 +4288,13 @@
           "type": {
             "kind": "literal",
             "value": "slack"
+          },
+          "optional": false
+        },
+        {
+          "name": "app",
+          "type": {
+            "kind": "string"
           },
           "optional": false
         },
@@ -17185,22 +17674,12 @@
       }
     },
     {
-      "name": "SlackUsers",
+      "name": "SlackApps",
       "type": {
         "kind": "array",
         "items": {
           "kind": "resource",
-          "name": "SlackUser"
-        }
-      }
-    },
-    {
-      "name": "SlackConversations",
-      "type": {
-        "kind": "array",
-        "items": {
-          "kind": "resource",
-          "name": "SlackConversation"
+          "name": "SlackApp"
         }
       }
     },
@@ -17353,6 +17832,26 @@
             "optional": false
           }
         ]
+      }
+    },
+    {
+      "name": "SlackUsers",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackUser"
+        }
+      }
+    },
+    {
+      "name": "SlackConversations",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackConversation"
+        }
       }
     },
     {
@@ -19704,6 +20203,7 @@
     "action_requires",
     "already_in_channel",
     "already_reacted",
+    "cannot_dm_bot",
     "cant_delete_message",
     "cant_update_message",
     "cross_workspace_credential",
