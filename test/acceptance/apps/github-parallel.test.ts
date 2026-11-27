@@ -7,6 +7,7 @@ const COPIES = 20;
 describe(`${COPIES} copies of a two-App repository in parallel`, () => {
   test.concurrent.for(Array.from({ length: COPIES }, (_, index) => index + 1))(
     "copy %i gets its own answer from the App it asked, and sees nothing of the others",
+    { timeout: 90_000 },
     async (copy, { github }) => {
       const coder = await github.createApp({ name: "coder" });
       const ana = await github.createUser({ login: "ana" });
@@ -15,7 +16,9 @@ describe(`${COPIES} copies of a two-App repository in parallel`, () => {
 
       await ana.comment(`@coder can you triage this? (copy ${copy})`, { issue });
 
-      await expect(issue).toHaveCommentFrom(coder);
+      // Probot spaces an installation's writes about a second apart, as it does against GitHub, so twenty
+      // answers from one App take it tens of seconds.
+      await expect(issue).toHaveCommentFrom(coder, { timeout: "75s" });
       await expect(issue).not.toHaveCommentFrom(github.app);
       const deliveries = await github.deliveries();
       expect(deliveries.length).toBeGreaterThan(0);

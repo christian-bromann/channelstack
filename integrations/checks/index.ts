@@ -70,20 +70,19 @@ interface MailPeer<Email, Agent> {
  */
 async function autoMailLoop<
   Agent extends { readonly id: string },
-  Email extends { readonly thread: { replies(): Promise<Array<{ readonly author: { readonly id: string } }>> } },
+  Email extends { readonly author: { readonly id: string }; readonly thread: { replies(): Promise<Email[]> } },
 >(agent: Agent, peer: MailPeer<Email, Agent>, turns: number, wait: { timeout?: Duration }): Promise<void> {
   const auto = { "Auto-Submitted": "auto-replied" };
   const first = await peer.send({ to: [agent], subject: "Build report", text: "The build passed.", headers: auto });
+  const answers = async () => (await first.thread.replies()).filter((one) => one.author.id === agent.id);
   let seen = 0;
   for (let turn = 0; turn <= turns; turn++) {
-    const now = await answersAgain(
-      async () => (await first.thread.replies()).filter((one) => one.author.id === agent.id).length,
-      seen,
-      wait,
-    );
+    const now = await answersAgain(async () => (await answers()).length, seen, wait);
     if (now === seen) break;
     seen = now;
-    await peer.reply(first, { text: "Noted, thanks.", headers: auto });
+    // The peer answers the agent's latest answer, so the agent gets it, marked as sent by a program again.
+    const latest = (await answers()).at(-1) ?? first;
+    await peer.reply(latest, { text: "Noted, thanks.", headers: auto });
   }
   expect(seen, "times it answered mail another program sent on its own").toBeLessThanOrEqual(turns);
 }

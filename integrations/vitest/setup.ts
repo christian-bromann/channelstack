@@ -12,6 +12,7 @@ import {
   type Session,
   setFilesRoot,
   setWaitDefaults,
+  unreportedRefusals,
   untilQuiet,
 } from "../../sdks/typescript/client.ts";
 import { type MatcherName, matchers, type MatcherState } from "../matchers-core/index.ts";
@@ -93,7 +94,8 @@ const auto = { auto: true } as const;
 async function failOnLoops(session: Session): Promise<void> {
   let loops: string[] | undefined;
   try {
-    loops = (await session.quiet()).loops;
+    // Unreported: a refusal here must not turn the test into a skip with the wrong reason.
+    loops = (await unreportedRefusals(() => session.quiet())).loops;
   } catch (error) {
     if (error instanceof ChannelstackError) return;
     throw error;
