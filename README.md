@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  A test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail.
+  A test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord.
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 
 ---
 
-channelstack runs fake versions of Slack, GitHub, Linear, Notion, Resend and Gmail on your machine. It's for anyone whose code talks to those platforms' APIs and reacts to their events: a Slack bot, a GitHub App or Probot app, a Linear or Notion integration, an agent people email, a notification bot, or an AI agent. Tests script the people, your app answers through its real code path, and you assert on what a person would see:
+channelstack runs fake versions of Slack, GitHub, Linear, Notion, Resend, Gmail and Discord on your machine. It's for anyone whose code talks to those platforms' APIs and reacts to their events: a Slack or Discord bot, a GitHub App or Probot app, a Linear or Notion integration, an agent people email, a notification bot, or an AI agent. Tests script the people, your app answers through its real code path, and you assert on what a person would see:
 
 ```ts
 test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
@@ -100,6 +100,7 @@ Each channel is a fixture your test receives by name (`async ({ slack, github })
 | Notion  | `notion` | Pages and databases, comments and discussions, connections and webhooks          |
 | Resend  | `resend` | Email to the agent and its answers in the thread, the receiving API, Svix-signed webhooks |
 | Google  | `google` | A Gmail mailbox: messages, threads, labels, history and watch, Pub/Sub pushes with OIDC tokens |
+| Discord | `discord` | A guild with a bot: the Gateway, mentions, DMs and threads, slash commands and buttons, Ed25519-signed interactions |
 
 The same tests can also run against the real platforms in sandbox workspaces ([live mode](docs/live-mode.md)).
 
@@ -152,7 +153,7 @@ cargo add --dev tokio --features macros,rt-multi-thread
 The Python and Rust SDKs use the same server, from npm or the
 [GitHub releases](https://github.com/christian-bromann/channelstack/releases).
 
-There is no config file. Each fake has a built-in app named `my-agent`, and where it sends events comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` (`SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND`, `GOOGLE`) in the server's environment. [docs/devx.md](docs/devx.md) covers the CLI, Vitest and pytest, proxy mode and CI.
+There is no config file. Each fake has a built-in app named `my-agent`, and where it sends events comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` (`SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND`, `GOOGLE`, `DISCORD`) in the server's environment. [docs/devx.md](docs/devx.md) covers the CLI, Vitest and pytest, proxy mode and CI.
 
 ## Status
 
@@ -171,4 +172,4 @@ There is no config file. Each fake has a built-in app named `my-agent`, and wher
 
 ## License
 
-[MIT](LICENSE). channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub, Linear, Notion, Resend or Google.
+[MIT](LICENSE). channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub, Linear, Notion, Resend, Google or Discord.

@@ -37,15 +37,16 @@ A channel is live when **all** of its app credentials are set in the server's en
 | Notion  | `CHANNELSTACK_NOTION_TOKEN` (the integration's token)                 | `CHANNELSTACK_LIVE_NOTION_WORKSPACES` | `CHANNELSTACK_NOTION_USER_ANA_TOKEN` (personal access token) |
 | Resend  | `CHANNELSTACK_RESEND_API_KEY` (the agent's team's key)                | `CHANNELSTACK_LIVE_RESEND_DOMAINS`    | `CHANNELSTACK_RESEND_USER_ANA_TOKEN` (her own team's key)    |
 | Google  | `CHANNELSTACK_GOOGLE_CLIENT_ID`, `CHANNELSTACK_GOOGLE_CLIENT_SECRET`, `CHANNELSTACK_GOOGLE_REFRESH_TOKEN` (the agent's OAuth client and mailbox) | `CHANNELSTACK_LIVE_GOOGLE_ADDRESSES` | `CHANNELSTACK_GOOGLE_USER_ANA_TOKEN` (her own Gmail account's refresh token) |
+| Discord | `CHANNELSTACK_DISCORD_BOT_TOKEN` (the agent's bot) | `CHANNELSTACK_LIVE_DISCORD_GUILDS` | `CHANNELSTACK_DISCORD_USER_ANA_TOKEN` (a second application's bot, which acts as her through the API; her messages carry `author.bot`) |
 
-- **App credentials and allowlists** are read by the server when it starts. Allowlists are comma-separated workspace, org or team ids; Resend's are domains, Google's addresses.
+- **App credentials and allowlists** are read by the server when it starts. Allowlists are comma-separated workspace, org or team ids; Resend's are domains, Google's addresses, Discord's guild ids.
 - **People's tokens** are read by the SDK in the test process: `createUser({ name: "Ana" })` reads `CHANNELSTACK_SLACK_USER_ANA_TOKEN` when the test passes no `token`. The name is upper-cased with every other character turned into `_`, so `ana-smith` reads `..._USER_ANA_SMITH_TOKEN`. On GitHub it's the account's login.
 - **On Slack,** a person's token comes from a separate Slack app for the sandbox's people, never from your app's own app.
 - **On Notion,** a session's pages go under the one top-level page the integration is connected to, or under `CHANNELSTACK_NOTION_PAGE`.
 - **On Resend,** each person is a Resend team of their own, with a verified domain that receives email, and the agent's answers are read back from their received mail. `CHANNELSTACK_RESEND_ADDRESS` sets the agent's address when its team has more than one domain. Sent email can't be taken back, so every recipient must be at an allowlisted domain (or a `@resend.dev` test address), checked before anything is sent.
 - **On Google,** each person is a Gmail account of their own, with a refresh token from the agent's OAuth client, and the agent's answers are read back from their mail. Every recipient, and every mailbox, must be an address in `CHANNELSTACK_LIVE_GOOGLE_ADDRESSES`, checked before anything is sent. Gmail pushes to the agent through the agent's own Pub/Sub topic and subscription.
 
-Each platform page lists what its sandbox needs: [Slack](/docs/platforms/slack), [GitHub](/docs/platforms/github), [Linear](/docs/platforms/linear), [Notion](/docs/platforms/notion), [Resend](/docs/platforms/resend), [Google](/docs/platforms/google).
+Each platform page lists what its sandbox needs: [Slack](/docs/platforms/slack), [GitHub](/docs/platforms/github), [Linear](/docs/platforms/linear), [Notion](/docs/platforms/notion), [Resend](/docs/platforms/resend), [Google](/docs/platforms/google), [Discord](/docs/platforms/discord).
 
 > [!WARNING]
 > Some of a channel's app credentials set and not all is an error, not a fallback: every action on that channel fails with `live_misconfigured`, naming what is missing. A typo in a variable name must not run silently fake.

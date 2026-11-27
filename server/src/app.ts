@@ -427,7 +427,10 @@ export function createApp(options: AppOptions): App {
     sdkMethod: { on: "Channelstack", name: "env", options: ["proxy"] },
     stability: "stable",
     handler: ({ query }) => {
-      const env: Record<string, string> = Object.assign({}, ...drivers.map((driver) => driver.env()));
+      // A live channel prints nothing: the agent talks to the platform with its own configuration, and
+      // live credentials never leave the server.
+      const fake = drivers.filter((driver) => realities.get(driver.name)?.mode !== "live");
+      const env: Record<string, string> = Object.assign({}, ...fake.map((driver) => driver.env()));
       if (query.proxy !== true) return env;
       const proxy = options.urls().proxy;
       if (!proxy) {

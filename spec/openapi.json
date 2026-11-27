@@ -7291,6 +7291,1046 @@
           "responseStatus"
         ]
       },
+      "DiscordFixture": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/DiscordApp"
+          },
+          "apiUrl": {
+            "type": "string",
+            "description": "Where the agent's REST client goes: discord.js's `rest.api`."
+          },
+          "guild": {
+            "$ref": "#/components/schemas/DiscordGuild"
+          },
+          "gatewayConnections": {
+            "type": "integer",
+            "description": "How many Gateway connections the bot holds open."
+          }
+        },
+        "required": [
+          "app",
+          "apiUrl",
+          "guild",
+          "gatewayConnections"
+        ],
+        "x-channelstack-resource": {}
+      },
+      "DiscordApp": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The application's id, which is also its bot user's."
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "app"
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "discord"
+            ]
+          },
+          "botUserId": {
+            "type": "string"
+          },
+          "botToken": {
+            "type": "string",
+            "description": "The bot token the agent logs in with. Empty live: it stays on the server."
+          },
+          "publicKey": {
+            "type": "string",
+            "description": "The application's public key, which interactions are verified with."
+          },
+          "guildId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "channel",
+          "botUserId",
+          "botToken",
+          "publicKey",
+          "guildId"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "app"
+        }
+      },
+      "DiscordGuild": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "DiscordUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user"
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "discord"
+            ]
+          },
+          "username": {
+            "type": "string"
+          },
+          "isAdmin": {
+            "type": "boolean"
+          },
+          "isBot": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "channel",
+          "username",
+          "isAdmin",
+          "isBot"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "user"
+        }
+      },
+      "DiscordUserOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A fixed user id (a snowflake), for agents that allowlist people by id. Fake only: live, the person has their bot's id."
+          },
+          "admin": {
+            "type": "boolean",
+            "description": "Has the guild's Admin role (`ADMINISTRATOR`)."
+          },
+          "bot": {
+            "type": "boolean",
+            "description": "Another bot, not the agent's: what it writes carries `author.bot`."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Live: the bot token of a second application in the sandbox guild, which acts as this person through Discord's API (Discord has no API that acts as a person). What it writes carries `author.bot`. Read from CHANNELSTACK_DISCORD_USER_<NAME>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_DISCORD_USER_{name}_TOKEN"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "DiscordUsers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordUser"
+        }
+      },
+      "DiscordChannel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "dm",
+              "public_thread"
+            ],
+            "description": "A guild text channel, a DM, or a thread."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "discord"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Without `#`. Undefined for a DM."
+          },
+          "parentId": {
+            "type": "string",
+            "description": "For a thread: the channel it is in."
+          },
+          "starterId": {
+            "type": "string",
+            "description": "For a thread started from a message: that message."
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "channel"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "resource"
+        }
+      },
+      "DiscordChannelOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "DiscordUser",
+                "DiscordApp"
+              ]
+            },
+            "default": []
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "Everyone reads; only admins write."
+          },
+          "topic": {
+            "type": "string"
+          }
+        }
+      },
+      "DiscordChannels": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordChannel"
+        }
+      },
+      "DiscordMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channelId": {
+            "type": "string"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/DiscordChannel"
+          },
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DiscordUser"
+              },
+              {
+                "$ref": "#/components/schemas/DiscordApp"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "user": "#/components/schemas/DiscordUser",
+                "app": "#/components/schemas/DiscordApp"
+              }
+            }
+          },
+          "text": {
+            "type": "string",
+            "description": "What a person reads: mentions as `@name`, embeds' text below."
+          },
+          "content": {
+            "type": "string",
+            "description": "The message's `content` as Discord keeps it, mentions as `<@id>`."
+          },
+          "embeds": {
+            "type": "array",
+            "items": {}
+          },
+          "components": {
+            "type": "array",
+            "items": {}
+          },
+          "postedAt": {
+            "type": "string"
+          },
+          "edited": {
+            "type": "boolean"
+          },
+          "replyTo": {
+            "type": "string",
+            "description": "The message this one replies to."
+          },
+          "thread": {
+            "$ref": "#/components/schemas/DiscordChannel"
+          },
+          "visibleTo": {
+            "$ref": "#/components/schemas/DiscordUser"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/DiscordDelivery"
+          }
+        },
+        "required": [
+          "id",
+          "channelId",
+          "channel",
+          "author",
+          "text",
+          "content",
+          "embeds",
+          "components",
+          "postedAt",
+          "edited"
+        ],
+        "x-channelstack-resource": {
+          "id": [
+            "channelId",
+            "id"
+          ]
+        }
+      },
+      "DiscordDelivery": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "discord"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "The Gateway event (`MESSAGE_CREATE`, `INTERACTION_CREATE`, …), or `PING`."
+          },
+          "payload": {
+            "description": "The dispatch's `d`, or the interaction's body."
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryAttempt"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "type",
+          "attempts",
+          "status"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "DiscordSayBody": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "$ref": "#/components/schemas/DiscordMessageInput"
+          },
+          "channel": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "DiscordChannel"
+            ]
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "DiscordUser",
+                "DiscordApp"
+              ]
+            },
+            "minItems": 1,
+            "x-channelstack-one-or-many": true
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "DiscordMessageInput": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "embeds": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "x-channelstack-shorthand": "content"
+      },
+      "DiscordReplyBody": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "$ref": "#/components/schemas/DiscordMessageInput"
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channelId",
+              "id"
+            ],
+            "x-channelstack-ref": [
+              "DiscordMessage"
+            ]
+          }
+        },
+        "required": [
+          "text",
+          "message"
+        ]
+      },
+      "DiscordEditBody": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "$ref": "#/components/schemas/DiscordMessageInput"
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channelId",
+              "id"
+            ],
+            "x-channelstack-ref": [
+              "DiscordMessage"
+            ]
+          }
+        },
+        "required": [
+          "text",
+          "message"
+        ]
+      },
+      "DiscordDeleteBody": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channelId",
+              "id"
+            ],
+            "x-channelstack-ref": [
+              "DiscordMessage"
+            ]
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "DiscordReactBody": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channelId",
+              "id"
+            ],
+            "x-channelstack-ref": [
+              "DiscordMessage"
+            ]
+          }
+        },
+        "required": [
+          "emoji",
+          "message"
+        ]
+      },
+      "DiscordUnreactBody": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channelId",
+              "id"
+            ],
+            "x-channelstack-ref": [
+              "DiscordMessage"
+            ]
+          }
+        },
+        "required": [
+          "emoji",
+          "message"
+        ]
+      },
+      "DiscordStartThreadBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channelId",
+              "id"
+            ],
+            "x-channelstack-ref": [
+              "DiscordMessage"
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "DiscordChannel"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "DiscordOpenDmBody": {
+        "type": "object",
+        "properties": {
+          "participant": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "DiscordUser",
+              "DiscordApp"
+            ]
+          }
+        },
+        "required": [
+          "participant"
+        ]
+      },
+      "DiscordInviteBody": {
+        "type": "object",
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "DiscordUser",
+                "DiscordApp"
+              ]
+            },
+            "minItems": 1,
+            "x-channelstack-one-or-many": true
+          },
+          "channel": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "DiscordChannel"
+            ]
+          }
+        },
+        "required": [
+          "participants",
+          "channel"
+        ]
+      },
+      "DiscordCommandBody": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "pattern": "^\\/\\S"
+          },
+          "channel": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "DiscordChannel"
+            ]
+          }
+        },
+        "required": [
+          "command",
+          "channel"
+        ]
+      },
+      "DiscordClickBody": {
+        "type": "object",
+        "properties": {
+          "button": {
+            "$ref": "#/components/schemas/DiscordButtonRef"
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channelId",
+              "id"
+            ],
+            "x-channelstack-ref": [
+              "DiscordMessage"
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "DiscordChannel"
+            ]
+          }
+        },
+        "required": [
+          "button"
+        ]
+      },
+      "DiscordButtonRef": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "customId": {
+            "type": "string"
+          }
+        },
+        "x-channelstack-shorthand": "label"
+      },
+      "DiscordEphemeralMessages": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordMessage"
+        }
+      },
+      "DiscordMessages": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordMessage"
+        }
+      },
+      "DiscordMembers": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/DiscordUser"
+            },
+            {
+              "$ref": "#/components/schemas/DiscordApp"
+            }
+          ],
+          "discriminator": {
+            "propertyName": "kind",
+            "mapping": {
+              "user": "#/components/schemas/DiscordUser",
+              "app": "#/components/schemas/DiscordApp"
+            }
+          }
+        }
+      },
+      "DiscordThreads": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordChannel"
+        }
+      },
+      "DiscordTranscript": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscordTranscriptEntry"
+            }
+          },
+          "text": {
+            "type": "string",
+            "description": "The transcript as plain text, one entry per line."
+          }
+        },
+        "required": [
+          "entries",
+          "text"
+        ],
+        "x-channelstack-string": "text"
+      },
+      "DiscordTranscriptEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/DiscordPrincipal"
+          },
+          "at": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "edited": {
+            "type": "boolean"
+          },
+          "depth": {
+            "type": "integer"
+          },
+          "replyTo": {
+            "type": "string",
+            "description": "Whose message this one replies to."
+          },
+          "streaming": {
+            "type": "string",
+            "enum": [
+              "open"
+            ],
+            "description": "A deferred response: the app is still thinking."
+          },
+          "visibleTo": {
+            "$ref": "#/components/schemas/DiscordPrincipal"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "at",
+          "text",
+          "controls",
+          "edited",
+          "depth"
+        ]
+      },
+      "DiscordPrincipal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "app"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ]
+      },
+      "DiscordReplies": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordMessage"
+        }
+      },
+      "DiscordReactions": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordReaction"
+        }
+      },
+      "DiscordReaction": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string"
+          },
+          "by": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/DiscordUser"
+                },
+                {
+                  "$ref": "#/components/schemas/DiscordApp"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "user": "#/components/schemas/DiscordUser",
+                  "app": "#/components/schemas/DiscordApp"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "emoji",
+          "by"
+        ]
+      },
+      "DiscordMessageDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordDelivery"
+        }
+      },
+      "DiscordEndpointCheck": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the endpoint got wrong, in Discord's terms."
+          },
+          "deliveries": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "valid",
+          "problems",
+          "deliveries"
+        ]
+      },
+      "DiscordDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordDelivery"
+        }
+      },
+      "DiscordResendBody": {
+        "type": "object",
+        "properties": {
+          "badSignature": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "DiscordApiCalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordApiCall"
+        }
+      },
+      "DiscordApiCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "discord"
+            ]
+          },
+          "operation": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "request": {},
+          "responseStatus": {
+            "type": "integer"
+          },
+          "response": {},
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "operation",
+          "method",
+          "path",
+          "at",
+          "durationMs",
+          "responseStatus"
+        ]
+      },
+      "DiscordFault": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "DiscordFaultBody": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "rate_limit",
+              "drop_gateway"
+            ]
+          },
+          "route": {
+            "type": "string",
+            "description": "For rate_limit: only this route, e.g. `POST /channels/{channel.id}/messages`."
+          },
+          "retryAfter": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 1000,
+            "description": "For rate_limit: what `retry_after` says.",
+            "x-channelstack-duration": true
+          },
+          "times": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "Places": {
         "type": "array",
         "items": {
@@ -26640,9 +27680,2770 @@
         }
       }
     },
+    "/sessions/{session}/discord": {
+      "get": {
+        "summary": "The Discord fixture: the agent's app, the guild, and where the agent reaches the fake",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "Session",
+          "name": "discord"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordFixture"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users": {
+      "post": {
+        "summary": "Create a person in the guild",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "DiscordFixture",
+          "name": "createUser",
+          "options": [
+            "name",
+            "id",
+            "admin",
+            "bot",
+            "token"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordUserOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordUser"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "The people this session created",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordFixture",
+          "name": "users"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordUsers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/channels": {
+      "post": {
+        "summary": "Create a text channel. Only the listed participants see it (a private channel); include the app for the bot to hear it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "DiscordFixture",
+          "name": "createChannel",
+          "options": [
+            "name",
+            "participants",
+            "readOnly",
+            "topic"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordChannelOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordChannel"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "The session's channels, threads and DMs",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordFixture",
+          "name": "channels"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordChannels"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/say": {
+      "post": {
+        "summary": "Write a message in a channel or thread, or in a DM with the person or app in `to`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "say",
+          "args": [
+            "text"
+          ],
+          "options": [
+            "channel",
+            "to"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_access",
+          "empty_message",
+          "missing_permissions",
+          "invalid_form_body"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordSayBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/reply": {
+      "post": {
+        "summary": "Reply to a message: Discord's reply, in the message's channel, which quotes it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "reply",
+          "args": [
+            "text"
+          ],
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_access",
+          "empty_message",
+          "missing_permissions",
+          "invalid_form_body"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordReplyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/edit": {
+      "post": {
+        "summary": "Edit one of this person's own messages",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "edit",
+          "args": [
+            "text"
+          ],
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "cannot_edit_others_message",
+          "empty_message",
+          "invalid_form_body"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordEditBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/delete": {
+      "post": {
+        "summary": "Delete a message: this person's own, or anyone's for an admin",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "delete",
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_permissions"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordDeleteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/react": {
+      "post": {
+        "summary": "React to a message with an emoji",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "react",
+          "args": [
+            "emoji"
+          ],
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_permissions"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordReactBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DiscordDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/unreact": {
+      "post": {
+        "summary": "Take this person's reaction off a message",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "unreact",
+          "args": [
+            "emoji"
+          ],
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_permissions"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordUnreactBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DiscordDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/threads": {
+      "post": {
+        "summary": "Start a thread: from a message, or in a channel",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "startThread",
+          "args": [
+            "name"
+          ],
+          "options": [
+            "message",
+            "channel"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_permissions",
+          "thread_already_created"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordStartThreadBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordChannel"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/open-dm": {
+      "post": {
+        "summary": "Open (or reuse) a DM with the app or another person",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "openDM",
+          "args": [
+            "participant"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "live, a person is a bot of their own, and Discord lets no bot write to another bot in a DM"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordOpenDmBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordChannel"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/invite": {
+      "post": {
+        "summary": "Let people or the app see a channel. The person must be an admin",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "invite",
+          "args": [
+            "participants"
+          ],
+          "options": [
+            "channel"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_permissions"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordInviteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/commands": {
+      "post": {
+        "summary": "Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "runCommand",
+          "args": [
+            "command"
+          ],
+          "options": [
+            "channel"
+          ],
+          "retryWhile": [
+            "not_found"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_permissions"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "live, a person is a bot of their own, and Discord lets no bot run another app's command or press its button"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordCommandBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DiscordDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/click": {
+      "post": {
+        "summary": "Press a button, found by its label or custom_id: on a message, or on the app's newest message in a channel or thread that has it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "click",
+          "args": [
+            "button"
+          ],
+          "options": [
+            "message",
+            "channel"
+          ],
+          "retryWhile": [
+            "not_found"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "live, a person is a bot of their own, and Discord lets no bot run another app's command or press its button"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordClickBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DiscordDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/users/{user}/ephemeral": {
+      "get": {
+        "summary": "Messages only this person sees: the app's ephemeral responses, and \"This interaction failed\"",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordUser",
+          "name": "ephemeral",
+          "onceQuiet": true
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "Discord shows an ephemeral message to its person alone, and no bot API reads it back; proxy mode sees the agent's own calls"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordEphemeralMessages"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/channels/{channel}/messages": {
+      "get": {
+        "summary": "A channel's or thread's messages, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordChannel",
+          "name": "messages"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForMessage",
+            "mode": "next",
+            "from": "author",
+            "what": "a message"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordMessages"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/channels/{channel}/members": {
+      "get": {
+        "summary": "Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordChannel",
+          "name": "members"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordMembers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/channels/{channel}/threads": {
+      "get": {
+        "summary": "The threads in a channel",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordChannel",
+          "name": "threads"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordThreads"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/channels/{channel}/transcript": {
+      "get": {
+        "summary": "A channel or thread as a person reads it, each thread under the message that starts it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordChannel",
+          "name": "transcript",
+          "options": [
+            "as"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "DiscordUser",
+                "DiscordApp"
+              ]
+            },
+            "required": false,
+            "name": "as",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/channels/{channel}/messages/{message}": {
+      "get": {
+        "summary": "Re-read a message: its latest text, edits and thread",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordMessage",
+          "name": "refresh",
+          "bind": {
+            "channel": "channelId",
+            "message": "id"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "message",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/channels/{channel}/messages/{message}/replies": {
+      "get": {
+        "summary": "What answers a message, oldest first: Discord's replies to it, and the messages of the thread started from it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordMessage",
+          "name": "replies",
+          "bind": {
+            "channel": "channelId",
+            "message": "id"
+          }
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForReply",
+            "mode": "next",
+            "from": "author",
+            "what": "a reply"
+          },
+          {
+            "name": "latestReply",
+            "mode": "latest",
+            "from": "author",
+            "what": "a reply"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "message",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordReplies"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/channels/{channel}/messages/{message}/transcript": {
+      "get": {
+        "summary": "A message and what answers it, as a person reads them",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordMessage",
+          "name": "transcript",
+          "options": [
+            "as"
+          ],
+          "bind": {
+            "channel": "channelId",
+            "message": "id"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "message",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "DiscordUser",
+                "DiscordApp"
+              ]
+            },
+            "required": false,
+            "name": "as",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/channels/{channel}/messages/{message}/reactions": {
+      "get": {
+        "summary": "The reactions on a message, and who added each",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordMessage",
+          "name": "reactions",
+          "bind": {
+            "channel": "channelId",
+            "message": "id"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "message",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordReactions"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/channels/{channel}/messages/{message}/deliveries": {
+      "get": {
+        "summary": "Every Gateway dispatch this message caused to the bot",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordMessage",
+          "name": "deliveries",
+          "bind": {
+            "channel": "channelId",
+            "message": "id"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "message",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordMessageDeliveries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/verify-endpoint": {
+      "post": {
+        "summary": "Discord's check of the app's interactions endpoint, as when it is saved in the developer portal: a PING it must answer with a PONG, and one with a bad signature it must refuse with 401",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordFixture",
+          "name": "verifyEndpoint"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Discord checks an interactions endpoint when it is saved in the developer portal, which no API does"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordEndpointCheck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/deliveries": {
+      "get": {
+        "summary": "Every Gateway dispatch and interaction channelstack sent the bot for this session, with every attempt",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordFixture",
+          "name": "deliveries",
+          "options": [
+            "type",
+            "resource"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only this event, e.g. `MESSAGE_CREATE` or `INTERACTION_CREATE`."
+            },
+            "required": false,
+            "description": "Only this event, e.g. `MESSAGE_CREATE` or `INTERACTION_CREATE`.",
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only deliveries about this channel or thread.",
+              "x-channelstack-ref": [
+                "DiscordChannel"
+              ]
+            },
+            "required": false,
+            "description": "Only deliveries about this channel or thread.",
+            "name": "resource",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordDeliveries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/deliveries/{delivery}": {
+      "get": {
+        "summary": "Re-read a delivery: its attempts and status",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordDelivery",
+          "name": "refresh"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "settled",
+            "mode": "until",
+            "field": "status",
+            "not": [
+              "pending"
+            ],
+            "what": "the delivery to settle"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/deliveries/{delivery}/redeliver": {
+      "post": {
+        "summary": "Dispatch the same event to the bot again, as a replay after a RESUME would",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordDelivery",
+          "name": "redeliver"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Discord dispatches an event once a session, and has no API to send one again"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAttempt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/deliveries/{delivery}/resend": {
+      "post": {
+        "summary": "Send an interaction again, forged: signed with a key that isn't the app's, which its endpoint must refuse with 401",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordDelivery",
+          "name": "resend",
+          "options": [
+            "badSignature"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordResendBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAttempt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/calls": {
+      "get": {
+        "summary": "The REST calls the bot made about this session's channels, messages and interactions, by route (`POST /channels/{channel.id}/messages`). Calls about nothing a session owns (`GET /gateway/bot`) are in no session",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordFixture",
+          "name": "calls",
+          "options": [
+            "operation",
+            "error"
+          ]
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForCall",
+            "mode": "next",
+            "filter": true,
+            "what": "an API call from the agent"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "Discord shows an ephemeral message to its person alone, and no bot API reads it back; proxy mode sees the agent's own calls"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "operation",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "`true` for any error, or one error code"
+            },
+            "required": false,
+            "description": "`true` for any error, or one error code",
+            "name": "error",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordApiCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/faults": {
+      "post": {
+        "summary": "Inject a fault: rate-limit the bot's calls of a route (removed when this session closes), or drop its Gateway connection just before the next dispatch",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordFixture",
+          "name": "fault",
+          "options": [
+            "type",
+            "route",
+            "retryAfter",
+            "times"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "a fault changes what the bot's calls and its Gateway connection get, and live nothing sits between the bot and Discord: its Gateway doesn't go through the proxy"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordFaultBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordFault"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/faults/{fault}": {
+      "delete": {
+        "summary": "Remove a fault",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordFault",
+          "name": "undo",
+          "dispose": true
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "a fault changes what the bot's calls and its Gateway connection get, and live nothing sits between the bot and Discord: its Gateway doesn't go through the proxy"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "fault",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session}/places": {
       "get": {
-        "summary": "Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last",
+        "summary": "Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread, a Discord channel), the most recently active last",
         "security": [
           {
             "bearer": []
@@ -26892,6 +30693,10 @@
     {
       "name": "google",
       "title": "Google"
+    },
+    {
+      "name": "discord",
+      "title": "Discord"
     }
   ]
 }

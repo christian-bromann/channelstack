@@ -67,9 +67,12 @@ export class GoogleRestClient {
       { access_token?: string; expires_in?: number; error?: string; error_description?: string } | undefined;
     if (!response.ok || typeof answer?.access_token !== "string") {
       const reason = answer?.error ?? `http_${response.status}`;
-      throw new GoogleRefusal(reason, `Google refused the refresh token: ${answer?.error_description ?? reason}`, {
-        path: "/token",
-      });
+      throw new GoogleRefusal(
+        reason,
+        `Google refused the refresh token: ${answer?.error_description ?? reason}`,
+        { path: "/token" },
+        response.status,
+      );
     }
     this.#access.set(credential, { token: answer.access_token, until: Date.now() + (answer.expires_in ?? 0) * 1000 });
     return answer.access_token;
@@ -102,9 +105,12 @@ export class GoogleRestClient {
         const reason = answer?.error?.errors?.[0]?.reason ?? `http_${response.status}`;
         // The path without its query: a query names addresses (`q=from:`).
         const where = path.split("?")[0];
-        throw new GoogleRefusal(reason, `Gmail refused ${method} ${where}: ${answer?.error?.message ?? reason}`, {
-          path: where,
-        });
+        throw new GoogleRefusal(
+          reason,
+          `Gmail refused ${method} ${where}: ${answer?.error?.message ?? reason}`,
+          { path: where },
+          response.status,
+        );
       }
       return answer as T;
     }

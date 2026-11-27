@@ -1,5 +1,6 @@
 import { type ComponentType, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
+import discordRs from "../../examples/rust/src/home_discord.rs?sample";
 import githubRs from "../../examples/rust/src/home_github.rs?sample";
 import gmailRs from "../../examples/rust/src/home_gmail.rs?sample";
 import linearRs from "../../examples/rust/src/home_linear.rs?sample";
@@ -7,11 +8,13 @@ import notionRs from "../../examples/rust/src/home_notion.rs?sample";
 import resendRs from "../../examples/rust/src/home_resend.rs?sample";
 import slackRs from "../../examples/rust/src/home_slack.rs?sample";
 import type { Sample } from "../../plugins/samples-plugin";
+import discord from "../../samples/discord.test.ts?sample";
 import github from "../../samples/github.test.ts?sample";
 import gmail from "../../samples/gmail.test.ts?sample";
 import slack from "../../samples/hero.test.ts?sample";
 import linear from "../../samples/linear.test.ts?sample";
 import notion from "../../samples/notion.test.ts?sample";
+import discordPy from "../../samples/python/test_build.py?sample";
 import notionPy from "../../samples/python/test_comments.py?sample";
 import slackPy from "../../samples/python/test_deploy.py?sample";
 import gmailPy from "../../samples/python/test_invoice.py?sample";
@@ -22,7 +25,16 @@ import resend from "../../samples/resend.test.ts?sample";
 import { prefersReducedMotion, useInView } from "../lib/hooks";
 import { CopyButton } from "./Code";
 import { Check, Pause, Play, Replay } from "./Icons";
-import { GitHubMock, GmailMock, LinearMock, type MockProps, NotionMock, ResendMock, SlackMock } from "./Mocks";
+import {
+  DiscordMock,
+  GitHubMock,
+  GmailMock,
+  LinearMock,
+  type MockProps,
+  NotionMock,
+  ResendMock,
+  SlackMock,
+} from "./Mocks";
 
 type Lang = "ts" | "py" | "rs";
 /** The language switch: each language's name, shortened on narrow screens, and its colour on GitHub. */
@@ -189,6 +201,28 @@ const EXAMPLES: Example[] = [
       <>
         Threads <code>messages.send</code> by <code>threadId</code> and <code>In-Reply-To</code>
       </>,
+    ],
+  },
+  {
+    id: "discord",
+    label: "Discord",
+    host: "discord.localhost",
+    code: {
+      ts: { file: "build.test.ts", sample: discord },
+      py: { file: "test_build.py", sample: discordPy },
+      rs: { file: "build.rs", sample: discordRs },
+    },
+    Mock: DiscordMock,
+    checks: [
+      { step: 3, text: "my-agent’s answer is Discord’s reply to Ana’s message" },
+      { step: 4, text: "exactly one answer from my-agent" },
+    ],
+    notes: [
+      <>
+        Dispatches <code>MESSAGE_CREATE</code> over the Gateway, with its content under <code>MESSAGE_CONTENT</code>
+      </>,
+      <>Serves REST v10 as discord.js calls it, with Discord’s rate limits and error codes</>,
+      <>Signs slash commands with Ed25519, and gives up on them after 3 seconds</>,
     ],
   },
 ];

@@ -55,7 +55,7 @@ from those titles, so the title is a [Conventional Commit](https://www.conventio
 - **Type:** `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `ci`, `build` or `chore`. The
   changelog lists `feat`, `fix` and `perf`.
 - **Scope,** one or more separated by commas (`fix(slack,github): …`):
-  - the fakes: `slack`, `github`, `linear`, `notion`, `resend`, `gmail`;
+  - the fakes: `slack`, `github`, `linear`, `notion`, `resend`, `gmail`, `discord`;
   - the packages: `server`, `sdk-ts`, `sdk-python`, `pytest`, `sdk-rust`;
   - internal, left out of the changelog: `docs`, `ci`, `codegen`, `deps`.
 - **`!`** marks a breaking change, which the changelog lists whatever its type.

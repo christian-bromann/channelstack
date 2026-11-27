@@ -38,7 +38,14 @@ import {
 import { compareShapes, readShapes } from "../conformance/shapes.ts";
 import { SECRET_FIELD } from "../scenarios/runners/typescript/secrets.ts";
 import { DRIVERS } from "../server/src/drivers/index.ts";
-import { AGENTS, HARNESS_CHANNELS, type HarnessChannel, referenceOf } from "./lib/channels.ts";
+import {
+  AGENTS,
+  type ChannelHarness,
+  HARNESS,
+  HARNESS_CHANNELS,
+  type HarnessChannel,
+  referenceOf,
+} from "./lib/channels.ts";
 import { ROOT } from "./lib/generate.ts";
 import { withLiveStack } from "./lib/live-stack.ts";
 import { binaryPath } from "./lib/packages.ts";
@@ -125,6 +132,13 @@ try {
     if (files.length === 0) continue;
     const name = REFERENCE[channel];
     const agent = join(ROOT, "examples", "agents", name, "agent.ts");
+    const harness: ChannelHarness = HARNESS[channel];
+    const unproxied = harness.unproxied !== undefined;
+    if (unproxied && harness.tap === undefined) {
+      throw new Error(
+        `scripts/lib/channels.ts: ${channel} is unproxied but has no tap to record what the fake sends it`,
+      );
+    }
     // The fake half is fake whatever credentials are in the environment.
     const fake = { CHANNELSTACK_REALITY: "fake" };
     // In proxy mode with the recorder: the agent calls the platform's own hosts, and every
@@ -135,8 +149,16 @@ try {
         agent,
         webhook: { driver: channel, path: AGENTS[name]?.path ?? "" },
         serverEnv: fake,
-        proxy: true,
-        record: join(work, `fake-${channel}`),
+        ...(unproxied
+          ? // The agent can't be put behind the proxy: its tap records what the fake sends it instead.
+            {
+              agent: join(ROOT, harness.tap ?? ""),
+              agentEnv: {
+                [`CHANNELSTACK_${channel.toUpperCase()}_TAP_AGENT`]: agent,
+                [`CHANNELSTACK_${channel.toUpperCase()}_TAP_RECORD`]: join(work, `fake-${channel}`),
+              },
+            }
+          : { proxy: true, record: join(work, `fake-${channel}`) }),
       },
       async ({ env }) => {
         for (const file of files) {

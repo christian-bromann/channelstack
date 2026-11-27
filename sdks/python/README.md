@@ -1,6 +1,6 @@
 # channelstack for Python
 
-The Python SDK of [channelstack](https://channelstack.dev), a test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail. channelstack runs fake versions of those platforms on your machine. Your code scripts the people, your app answers through its real code path, and you check what a person would see.
+The Python SDK of [channelstack](https://channelstack.dev), a test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord. channelstack runs fake versions of those platforms on your machine. Your code scripts the people, your app answers through its real code path, and you check what a person would see.
 
 For tests, use [pytest-channelstack](https://pypi.org/project/pytest-channelstack/), which is built on this SDK.
 

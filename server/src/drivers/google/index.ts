@@ -80,9 +80,8 @@ export const google: DriverDefinition = {
       capabilities: () => ({}),
       openWork: () => [],
       // What the agent needs: `googleapis` takes `rootUrl` per API, `google-auth-library` its endpoints.
-      // Live, the agent talks to Gmail with its own configuration, and live credentials never leave the server.
+      // Live, `channelstack env` prints nothing for Gmail (app.ts): the agent talks to it with its own configuration.
       env: () => {
-        if (live) return {};
         const url = context.apiUrl();
         return {
           // `googleapis` drops a `rootUrl`'s path: the root of the fake's host (rootPaths).

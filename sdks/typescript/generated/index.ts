@@ -14,17 +14,22 @@ export class AccountInactiveError extends ChannelstackError {}
 export class ActionRequiresError extends ChannelstackError {}
 export class AlreadyInChannelError extends ChannelstackError {}
 export class AlreadyReactedError extends ChannelstackError {}
+export class CannotEditOthersMessageError extends ChannelstackError {}
 export class CantDeleteMessageError extends ChannelstackError {}
 export class CantUpdateMessageError extends ChannelstackError {}
 export class CrossWorkspaceCredentialError extends ChannelstackError {}
 export class DispatchFailedError extends ChannelstackError {}
+export class EmptyMessageError extends ChannelstackError {}
 export class FakeActorInLiveWorldError extends ChannelstackError {}
 export class ForbiddenError extends ChannelstackError {}
 export class InternalError extends ChannelstackError {}
 export class InvalidArgumentError extends ChannelstackError {}
 export class InvalidAuthError extends ChannelstackError {}
+export class InvalidFormBodyError extends ChannelstackError {}
 export class LiveMisconfiguredError extends ChannelstackError {}
 export class LiveNotAllowlistedError extends ChannelstackError {}
+export class MissingAccessError extends ChannelstackError {}
+export class MissingPermissionsError extends ChannelstackError {}
 export class MsgTooLongError extends ChannelstackError {}
 export class NameTakenError extends ChannelstackError {}
 export class NoReactionError extends ChannelstackError {}
@@ -36,6 +41,7 @@ export class NotInRoomError extends ChannelstackError {}
 export class SessionNotFoundError extends ChannelstackError {}
 export class SplitViewUnavailableError extends ChannelstackError {}
 export class StopUnavailableError extends ChannelstackError {}
+export class ThreadAlreadyCreatedError extends ChannelstackError {}
 export class UnauthorizedError extends ChannelstackError {}
 export class UnsupportedInFakeError extends ChannelstackError {}
 export class UnsupportedInLiveError extends ChannelstackError {}
@@ -46,17 +52,22 @@ const ERRORS: ErrorClasses = {
   action_requires: ActionRequiresError,
   already_in_channel: AlreadyInChannelError,
   already_reacted: AlreadyReactedError,
+  cannot_edit_others_message: CannotEditOthersMessageError,
   cant_delete_message: CantDeleteMessageError,
   cant_update_message: CantUpdateMessageError,
   cross_workspace_credential: CrossWorkspaceCredentialError,
   dispatch_failed: DispatchFailedError,
+  empty_message: EmptyMessageError,
   fake_actor_in_live_world: FakeActorInLiveWorldError,
   forbidden: ForbiddenError,
   internal: InternalError,
   invalid_argument: InvalidArgumentError,
   invalid_auth: InvalidAuthError,
+  invalid_form_body: InvalidFormBodyError,
   live_misconfigured: LiveMisconfiguredError,
   live_not_allowlisted: LiveNotAllowlistedError,
+  missing_access: MissingAccessError,
+  missing_permissions: MissingPermissionsError,
   msg_too_long: MsgTooLongError,
   name_taken: NameTakenError,
   no_reaction: NoReactionError,
@@ -68,6 +79,7 @@ const ERRORS: ErrorClasses = {
   session_not_found: SessionNotFoundError,
   split_view_unavailable: SplitViewUnavailableError,
   stop_unavailable: StopUnavailableError,
+  thread_already_created: ThreadAlreadyCreatedError,
   unauthorized: UnauthorizedError,
   unsupported_in_fake: UnsupportedInFakeError,
   unsupported_in_live: UnsupportedInLiveError,
@@ -1030,6 +1042,171 @@ export interface GoogleApiCall {
   error?: string;
 }
 
+export interface DiscordGuild {
+  id: string;
+  name: string;
+}
+
+export type DiscordUsers = DiscordUser[];
+
+export type DiscordUsersWire = DiscordUserData[];
+
+function decodeDiscordUsers(ctx: HandleContext, data: DiscordUsersWire): DiscordUsers {
+  return data.map((item) => new DiscordUser(ctx, item));
+}
+
+export type DiscordChannels = DiscordChannel[];
+
+export type DiscordChannelsWire = DiscordChannelData[];
+
+function decodeDiscordChannels(ctx: HandleContext, data: DiscordChannelsWire): DiscordChannels {
+  return data.map((item) => new DiscordChannel(ctx, item));
+}
+
+export interface DiscordMessageInput {
+  content?: string;
+  embeds?: unknown[];
+}
+
+export interface DiscordButtonRef {
+  label?: string;
+  customId?: string;
+}
+
+export type DiscordEphemeralMessages = DiscordMessage[];
+
+export type DiscordEphemeralMessagesWire = DiscordMessageData[];
+
+function decodeDiscordEphemeralMessages(ctx: HandleContext, data: DiscordEphemeralMessagesWire): DiscordEphemeralMessages {
+  return data.map((item) => new DiscordMessage(ctx, item));
+}
+
+export type DiscordMessages = DiscordMessage[];
+
+export type DiscordMessagesWire = DiscordMessageData[];
+
+function decodeDiscordMessages(ctx: HandleContext, data: DiscordMessagesWire): DiscordMessages {
+  return data.map((item) => new DiscordMessage(ctx, item));
+}
+
+export type DiscordMembers = Array<DiscordUser | DiscordApp>;
+
+export type DiscordMembersWire = Array<DiscordUserData | DiscordAppData>;
+
+function decodeDiscordMembers(ctx: HandleContext, data: DiscordMembersWire): DiscordMembers {
+  return data.map((item) => item.kind === "user" ? new DiscordUser(ctx, item) : new DiscordApp(ctx, item));
+}
+
+export type DiscordThreads = DiscordChannel[];
+
+export type DiscordThreadsWire = DiscordChannelData[];
+
+function decodeDiscordThreads(ctx: HandleContext, data: DiscordThreadsWire): DiscordThreads {
+  return data.map((item) => new DiscordChannel(ctx, item));
+}
+
+export interface DiscordTranscript {
+  entries: DiscordTranscriptEntry[];
+  text: string;
+  toString(): string;
+}
+
+export interface DiscordTranscriptWire {
+  entries: DiscordTranscriptEntry[];
+  text: string;
+}
+
+function decodeDiscordTranscript(_ctx: HandleContext, data: DiscordTranscriptWire): DiscordTranscript {
+  return printsAs({ ...data }, data.text);
+}
+
+export interface DiscordTranscriptEntry {
+  id: string;
+  author: DiscordPrincipal;
+  at: string;
+  text: string;
+  controls: string[];
+  edited: boolean;
+  depth: number;
+  replyTo?: string;
+  streaming?: "open";
+  visibleTo?: DiscordPrincipal;
+}
+
+export interface DiscordPrincipal {
+  id: string;
+  name: string;
+  kind: "user" | "app";
+}
+
+export type DiscordReplies = DiscordMessage[];
+
+export type DiscordRepliesWire = DiscordMessageData[];
+
+function decodeDiscordReplies(ctx: HandleContext, data: DiscordRepliesWire): DiscordReplies {
+  return data.map((item) => new DiscordMessage(ctx, item));
+}
+
+export type DiscordReactions = DiscordReaction[];
+
+export type DiscordReactionsWire = DiscordReactionWire[];
+
+function decodeDiscordReactions(ctx: HandleContext, data: DiscordReactionsWire): DiscordReactions {
+  return data.map((item) => decodeDiscordReaction(ctx, item));
+}
+
+export interface DiscordReaction {
+  emoji: string;
+  by: Array<DiscordUser | DiscordApp>;
+}
+
+export interface DiscordReactionWire {
+  emoji: string;
+  by: Array<DiscordUserData | DiscordAppData>;
+}
+
+function decodeDiscordReaction(ctx: HandleContext, data: DiscordReactionWire): DiscordReaction {
+  return { ...data, by: data.by.map((item) => item.kind === "user" ? new DiscordUser(ctx, item) : new DiscordApp(ctx, item)) };
+}
+
+export type DiscordMessageDeliveries = DiscordDelivery[];
+
+export type DiscordMessageDeliveriesWire = DiscordDeliveryData[];
+
+function decodeDiscordMessageDeliveries(ctx: HandleContext, data: DiscordMessageDeliveriesWire): DiscordMessageDeliveries {
+  return data.map((item) => new DiscordDelivery(ctx, item));
+}
+
+export interface DiscordEndpointCheck {
+  valid: boolean;
+  problems: string[];
+  deliveries: string[];
+}
+
+export type DiscordDeliveries = DiscordDelivery[];
+
+export type DiscordDeliveriesWire = DiscordDeliveryData[];
+
+function decodeDiscordDeliveries(ctx: HandleContext, data: DiscordDeliveriesWire): DiscordDeliveries {
+  return data.map((item) => new DiscordDelivery(ctx, item));
+}
+
+export type DiscordApiCalls = DiscordApiCall[];
+
+export interface DiscordApiCall {
+  id: string;
+  channel: "discord";
+  operation: string;
+  method: string;
+  path: string;
+  at: string;
+  durationMs: number;
+  request?: unknown;
+  responseStatus: number;
+  response?: unknown;
+  error?: string;
+}
+
 export type Places = Place[];
 
 export type PlacesWire = PlaceData[];
@@ -1210,7 +1387,14 @@ export class Session implements AsyncDisposable {
     return new GoogleFixture(ctx, data);
   }
 
-  /** Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last. Experimental. */
+  /** The Discord fixture: the agent's app, the guild, and where the agent reaches the fake. Experimental. */
+  async discord(): Promise<DiscordFixture> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord`)) as DiscordFixtureData;
+    return new DiscordFixture(ctx, data);
+  }
+
+  /** Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread, a Discord channel), the most recently active last. Experimental. */
   async places(): Promise<Places> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/places`)) as PlacesWire;
@@ -4825,6 +5009,534 @@ export class GoogleDelivery {
       const value = await this.refresh();
       return value.status === "pending" ? undefined : value;
     }, options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link DiscordFixture}. */
+export interface DiscordFixtureData {
+  app: DiscordAppData;
+  apiUrl: string;
+  guild: DiscordGuild;
+  gatewayConnections: number;
+}
+
+export class DiscordFixture {
+  readonly app: DiscordApp;
+  readonly apiUrl: string;
+  readonly guild: DiscordGuild;
+  readonly gatewayConnections: number;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: DiscordFixtureData) {
+    this.#ctx = ctx;
+    this.app = new DiscordApp(ctx, data.app);
+    this.apiUrl = data.apiUrl;
+    this.guild = data.guild;
+    this.gatewayConnections = data.gatewayConnections;
+  }
+
+  /** Create a person in the guild. Experimental. */
+  async createUser(options: { name: string; id?: string; admin?: boolean; bot?: boolean; token?: string }): Promise<DiscordUser> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users`, { body: { name: options.name, id: options.id, admin: options.admin, bot: options.bot, token: options.token ?? credential("CHANNELSTACK_DISCORD_USER_{name}_TOKEN", { name: options.name }) } })) as DiscordUserData;
+    return new DiscordUser(ctx, data);
+  }
+
+  /** The people this session created. Experimental. */
+  async users(): Promise<DiscordUsers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/users`)) as DiscordUsersWire;
+    return decodeDiscordUsers(ctx, data);
+  }
+
+  /** Create a text channel. Only the listed participants see it (a private channel); include the app for the bot to hear it. Experimental. */
+  async createChannel(options: { name?: string; participants?: Array<DiscordUser | DiscordApp>; readOnly?: boolean; topic?: string } = {}): Promise<DiscordChannel> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/channels`, { body: { name: options.name, participants: options.participants === undefined ? undefined : options.participants.map((item) => item.id), readOnly: options.readOnly, topic: options.topic } })) as DiscordChannelData;
+    return new DiscordChannel(ctx, data);
+  }
+
+  /** The session's channels, threads and DMs. Experimental. */
+  async channels(): Promise<DiscordChannels> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels`)) as DiscordChannelsWire;
+    return decodeDiscordChannels(ctx, data);
+  }
+
+  /** Discord's check of the app's interactions endpoint, as when it is saved in the developer portal: a PING it must answer with a PONG, and one with a bad signature it must refuse with 401. Experimental. */
+  async verifyEndpoint(): Promise<DiscordEndpointCheck> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/verify-endpoint`)) as DiscordEndpointCheck;
+    return data;
+  }
+
+  /** Every Gateway dispatch and interaction channelstack sent the bot for this session, with every attempt. Experimental. */
+  async deliveries(options: { type?: string; resource?: DiscordChannel } = {}): Promise<DiscordDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as DiscordDeliveriesWire;
+    return decodeDiscordDeliveries(ctx, data);
+  }
+
+  /** The REST calls the bot made about this session's channels, messages and interactions, by route (`POST /channels/{channel.id}/messages`). Calls about nothing a session owns (`GET /gateway/bot`) are in no session. Experimental. */
+  async calls(options: { operation?: string; error?: true | string } = {}): Promise<DiscordApiCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/calls`, { query: { operation: options.operation, error: options.error } })) as DiscordApiCalls;
+    return data;
+  }
+
+  /** Inject a fault: rate-limit the bot's calls of a route (removed when this session closes), or drop its Gateway connection just before the next dispatch. Experimental. */
+  async fault(options: { type: "rate_limit" | "drop_gateway"; route?: string; retryAfter?: Duration; times?: number }): Promise<DiscordFault> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/faults`, { body: { type: options.type, route: options.route, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), times: options.times } })) as DiscordFaultData;
+    return new DiscordFault(ctx, data);
+  }
+
+  /** Wait for the next new API call from the agent, after the last one this handle saw. */
+  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<DiscordApiCall> {
+    return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link DiscordApp}. */
+export interface DiscordAppData {
+  id: string;
+  name: string;
+  kind: "app";
+  channel: "discord";
+  botUserId: string;
+  botToken: string;
+  publicKey: string;
+  guildId: string;
+}
+
+export class DiscordApp {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "app";
+  readonly channel: "discord";
+  readonly botUserId: string;
+  readonly botToken: string;
+  readonly publicKey: string;
+  readonly guildId: string;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: DiscordAppData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.name = data.name;
+    this.kind = data.kind;
+    this.channel = data.channel;
+    this.botUserId = data.botUserId;
+    this.botToken = data.botToken;
+    this.publicKey = data.publicKey;
+    this.guildId = data.guildId;
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link DiscordUser}. */
+export interface DiscordUserData {
+  id: string;
+  name: string;
+  kind: "user";
+  channel: "discord";
+  username: string;
+  isAdmin: boolean;
+  isBot: boolean;
+}
+
+export class DiscordUser {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "user";
+  readonly channel: "discord";
+  readonly username: string;
+  readonly isAdmin: boolean;
+  readonly isBot: boolean;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: DiscordUserData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.name = data.name;
+    this.kind = data.kind;
+    this.channel = data.channel;
+    this.username = data.username;
+    this.isAdmin = data.isAdmin;
+    this.isBot = data.isBot;
+  }
+
+  /** Write a message in a channel or thread, or in a DM with the person or app in `to`. Experimental. */
+  async say(text: string | DiscordMessageInput, options: { channel?: DiscordChannel; to?: DiscordUser | DiscordApp | Array<DiscordUser | DiscordApp> } = {}): Promise<DiscordMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/say`, { body: { text: typeof text === "string" ? { content: text } : text, channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : [options.to].flat().map((item) => item.id) } })) as DiscordMessageData;
+    return new DiscordMessage(ctx, data);
+  }
+
+  /** Reply to a message: Discord's reply, in the message's channel, which quotes it. Experimental. */
+  async reply(text: string | DiscordMessageInput, options: { message: DiscordMessage }): Promise<DiscordMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/reply`, { body: { text: typeof text === "string" ? { content: text } : text, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordMessageData;
+    return new DiscordMessage(ctx, data);
+  }
+
+  /** Edit one of this person's own messages. Experimental. */
+  async edit(text: string | DiscordMessageInput, options: { message: DiscordMessage }): Promise<DiscordMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/edit`, { body: { text: typeof text === "string" ? { content: text } : text, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordMessageData;
+    return new DiscordMessage(ctx, data);
+  }
+
+  /** Delete a message: this person's own, or anyone's for an admin. Experimental. */
+  async delete(options: { message: DiscordMessage }): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/delete`, { body: { message: { channelId: options.message.channelId, id: options.message.id } } });
+  }
+
+  /** React to a message with an emoji. Experimental. */
+  async react(emoji: string, options: { message: DiscordMessage }): Promise<DiscordDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/react`, { body: { emoji, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordDeliveryData | null;
+    return (data === null ? undefined : new DiscordDelivery(ctx, data));
+  }
+
+  /** Take this person's reaction off a message. Experimental. */
+  async unreact(emoji: string, options: { message: DiscordMessage }): Promise<DiscordDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/unreact`, { body: { emoji, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordDeliveryData | null;
+    return (data === null ? undefined : new DiscordDelivery(ctx, data));
+  }
+
+  /** Start a thread: from a message, or in a channel. Experimental. */
+  async startThread(name: string, options: { message?: DiscordMessage; channel?: DiscordChannel } = {}): Promise<DiscordChannel> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/threads`, { body: { name, message: options.message === undefined ? undefined : { channelId: options.message.channelId, id: options.message.id }, channel: options.channel === undefined ? undefined : options.channel.id } })) as DiscordChannelData;
+    return new DiscordChannel(ctx, data);
+  }
+
+  /** Open (or reuse) a DM with the app or another person. Experimental. */
+  async openDM(participant: DiscordUser | DiscordApp): Promise<DiscordChannel> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/open-dm`, { body: { participant: participant.id } })) as DiscordChannelData;
+    return new DiscordChannel(ctx, data);
+  }
+
+  /** Let people or the app see a channel. The person must be an admin. Experimental. */
+  async invite(participants: DiscordUser | DiscordApp | Array<DiscordUser | DiscordApp>, options: { channel: DiscordChannel }): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/invite`, { body: { participants: [participants].flat().map((item) => item.id), channel: options.channel.id } });
+  }
+
+  /** Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`. Experimental. */
+  async runCommand(command: string, options: { channel: DiscordChannel }): Promise<DiscordDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id } }))) as DiscordDeliveryData | null;
+    return (data === null ? undefined : new DiscordDelivery(ctx, data));
+  }
+
+  /** Press a button, found by its label or custom_id: on a message, or on the app's newest message in a channel or thread that has it. Experimental. */
+  async click(button: string | DiscordButtonRef, options: { message?: DiscordMessage; channel?: DiscordChannel } = {}): Promise<DiscordDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/click`, { body: { button: typeof button === "string" ? { label: button } : button, message: options.message === undefined ? undefined : { channelId: options.message.channelId, id: options.message.id }, channel: options.channel === undefined ? undefined : options.channel.id } }))) as DiscordDeliveryData | null;
+    return (data === null ? undefined : new DiscordDelivery(ctx, data));
+  }
+
+  /** Messages only this person sees: the app's ephemeral responses, and "This interaction failed". Experimental. */
+  async ephemeral(): Promise<DiscordEphemeralMessages> {
+    const ctx = this.#ctx;
+    await untilQuiet(() => quietOf(ctx));
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/ephemeral`)) as DiscordEphemeralMessagesWire;
+    return decodeDiscordEphemeralMessages(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link DiscordChannel}. */
+export interface DiscordChannelData {
+  id: string;
+  kind: "text" | "dm" | "public_thread";
+  channel: "discord";
+  name?: string;
+  parentId?: string;
+  starterId?: string;
+}
+
+export class DiscordChannel {
+  readonly id: string;
+  readonly kind: "text" | "dm" | "public_thread";
+  readonly channel: "discord";
+  readonly name: string | undefined;
+  readonly parentId: string | undefined;
+  readonly starterId: string | undefined;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: DiscordChannelData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.kind = data.kind;
+    this.channel = data.channel;
+    this.name = data.name;
+    this.parentId = data.parentId;
+    this.starterId = data.starterId;
+  }
+
+  /** A channel's or thread's messages, oldest first. Experimental. */
+  async messages(): Promise<DiscordMessages> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/messages`)) as DiscordMessagesWire;
+    return decodeDiscordMessages(ctx, data);
+  }
+
+  /** Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed. Experimental. */
+  async members(): Promise<DiscordMembers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/members`)) as DiscordMembersWire;
+    return decodeDiscordMembers(ctx, data);
+  }
+
+  /** The threads in a channel. Experimental. */
+  async threads(): Promise<DiscordThreads> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/threads`)) as DiscordThreadsWire;
+    return decodeDiscordThreads(ctx, data);
+  }
+
+  /** A channel or thread as a person reads it, each thread under the message that starts it. Experimental. */
+  async transcript(options: { as?: DiscordUser | DiscordApp } = {}): Promise<DiscordTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as DiscordTranscriptWire;
+    return decodeDiscordTranscript(ctx, data);
+  }
+
+  /** Wait for the next new message matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForMessage(options: { from?: DiscordUser | DiscordApp | string } & WaitOptions = {}): Promise<DiscordMessage> {
+    return waitForNext(this.#seen, "waitForMessage", () => this.messages(), (item) => fromMatches(item.author, options.from), describeWait("a message", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link DiscordMessage}. */
+export interface DiscordMessageData {
+  id: string;
+  channelId: string;
+  channel: DiscordChannelData;
+  author: DiscordUserData | DiscordAppData;
+  text: string;
+  content: string;
+  embeds: unknown[];
+  components: unknown[];
+  postedAt: string;
+  edited: boolean;
+  replyTo?: string;
+  thread?: DiscordChannelData;
+  visibleTo?: DiscordUserData;
+  delivery?: DiscordDeliveryData;
+}
+
+export class DiscordMessage {
+  readonly id: string;
+  readonly channelId: string;
+  readonly channel: DiscordChannel;
+  readonly author: DiscordUser | DiscordApp;
+  readonly text: string;
+  readonly content: string;
+  readonly embeds: unknown[];
+  readonly components: unknown[];
+  readonly postedAt: string;
+  readonly edited: boolean;
+  readonly replyTo: string | undefined;
+  readonly thread: DiscordChannel | undefined;
+  readonly visibleTo: DiscordUser | undefined;
+  readonly delivery: DiscordDelivery | undefined;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: DiscordMessageData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channelId = data.channelId;
+    this.channel = new DiscordChannel(ctx, data.channel);
+    this.author = data.author.kind === "user" ? new DiscordUser(ctx, data.author) : new DiscordApp(ctx, data.author);
+    this.text = data.text;
+    this.content = data.content;
+    this.embeds = data.embeds;
+    this.components = data.components;
+    this.postedAt = data.postedAt;
+    this.edited = data.edited;
+    this.replyTo = data.replyTo;
+    this.thread = data.thread === undefined ? undefined : new DiscordChannel(ctx, data.thread);
+    this.visibleTo = data.visibleTo === undefined ? undefined : new DiscordUser(ctx, data.visibleTo);
+    this.delivery = data.delivery === undefined ? undefined : new DiscordDelivery(ctx, data.delivery);
+  }
+
+  /** Re-read a message: its latest text, edits and thread. Experimental. */
+  async refresh(): Promise<DiscordMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.channelId)}/messages/${segment(this.id)}`)) as DiscordMessageData;
+    return new DiscordMessage(ctx, data);
+  }
+
+  /** What answers a message, oldest first: Discord's replies to it, and the messages of the thread started from it. Experimental. */
+  async replies(): Promise<DiscordReplies> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.channelId)}/messages/${segment(this.id)}/replies`)) as DiscordRepliesWire;
+    return decodeDiscordReplies(ctx, data);
+  }
+
+  /** A message and what answers it, as a person reads them. Experimental. */
+  async transcript(options: { as?: DiscordUser | DiscordApp } = {}): Promise<DiscordTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.channelId)}/messages/${segment(this.id)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as DiscordTranscriptWire;
+    return decodeDiscordTranscript(ctx, data);
+  }
+
+  /** The reactions on a message, and who added each. Experimental. */
+  async reactions(): Promise<DiscordReactions> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.channelId)}/messages/${segment(this.id)}/reactions`)) as DiscordReactionsWire;
+    return decodeDiscordReactions(ctx, data);
+  }
+
+  /** Every Gateway dispatch this message caused to the bot. Experimental. */
+  async deliveries(): Promise<DiscordMessageDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.channelId)}/messages/${segment(this.id)}/deliveries`)) as DiscordMessageDeliveriesWire;
+    return decodeDiscordMessageDeliveries(ctx, data);
+  }
+
+  /** Wait for the next new reply matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForReply(options: { from?: DiscordUser | DiscordApp | string } & WaitOptions = {}): Promise<DiscordMessage> {
+    return waitForNext(this.#seen, "waitForReply", () => this.replies(), (item) => fromMatches(item.author, options.from), describeWait("a reply", options.from), options);
+  }
+
+  /** The latest reply matching `from`, once the agent is quiet. Waits for at least one. */
+  async latestReply(options: { from?: DiscordUser | DiscordApp | string } & QuietOptions = {}): Promise<DiscordMessage> {
+    return latestOnceQuiet(() => this.replies(), (item) => fromMatches(item.author, options.from), () => quietOf(this.#ctx), describeWait("a reply", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link DiscordDelivery}. */
+export interface DiscordDeliveryData {
+  id: string;
+  channel: "discord";
+  type: string;
+  payload?: unknown;
+  attempts: DeliveryAttempt[];
+  status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+}
+
+export class DiscordDelivery {
+  readonly id: string;
+  readonly channel: "discord";
+  readonly type: string;
+  readonly payload: unknown | undefined;
+  readonly attempts: DeliveryAttempt[];
+  readonly status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: DiscordDeliveryData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.type = data.type;
+    this.payload = data.payload;
+    this.attempts = data.attempts;
+    this.status = data.status;
+  }
+
+  /** Re-read a delivery: its attempts and status. Experimental. */
+  async refresh(): Promise<DiscordDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/deliveries/${segment(this.id)}`)) as DiscordDeliveryData;
+    return new DiscordDelivery(ctx, data);
+  }
+
+  /** Dispatch the same event to the bot again, as a replay after a RESUME would. Experimental. */
+  async redeliver(): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/deliveries/${segment(this.id)}/redeliver`)) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Send an interaction again, forged: signed with a key that isn't the app's, which its endpoint must refuse with 401. Experimental. */
+  async resend(options: { badSignature?: boolean } = {}): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature } })) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Wait for the delivery to settle, and resolve with the value as it is then. */
+  async settled(options: WaitOptions = {}): Promise<DiscordDelivery> {
+    return waitFor("the delivery to settle", async () => {
+      const value = await this.refresh();
+      return value.status === "pending" ? undefined : value;
+    }, options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link DiscordFault}. */
+export interface DiscordFaultData {
+  id: string;
+}
+
+export class DiscordFault implements AsyncDisposable {
+  readonly id: string;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: DiscordFaultData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+  }
+
+  /** Remove a fault. Experimental. */
+  async undo(): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("DELETE", `/sessions/${segment(sessionOf(ctx))}/discord/faults/${segment(this.id)}`);
+  }
+
+  async [Symbol.asyncDispose](): Promise<void> {
+    await disposeQuietly(() => this.undo());
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

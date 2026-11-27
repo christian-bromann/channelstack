@@ -1612,3 +1612,137 @@ html:not(.js) .lang {
     padding-left: 0;
   }
 }
+
+/* ---------- Discord: its layout and colours, no Discord artwork ---------- */
+
+.app-discord {
+  --bg: light-dark(#ffffff, #313338);
+  --fg: light-dark(#313338, #dbdee1);
+  --strong: light-dark(#060607, #f2f3f5);
+  --dim: light-dark(#5c5e66, #949ba4);
+  --rule: light-dark(#e1e2e4, #26282c);
+  --field: light-dark(#ebedef, #383a40);
+  --mention-bg: light-dark(rgba(88, 101, 242, 0.15), rgba(88, 101, 242, 0.3));
+  --mention-fg: light-dark(#505cdc, #c9cdfb);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 15px;
+}
+
+.dc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--strong);
+}
+
+.dc-hash {
+  color: var(--dim);
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.dc-body {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  flex: 1;
+  padding: 16px;
+}
+
+.dc-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.dc-avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #2c7a9e;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dc-avatar.bot {
+  background: #10141b;
+  color: #f5a83c;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.dc-who b {
+  color: var(--strong);
+  font-weight: 600;
+}
+
+.dc-who small {
+  margin-left: 4px;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.dc-app {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #5865f2;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+.app-discord .mention {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--mention-bg);
+  color: var(--mention-fg);
+  font-weight: 500;
+}
+
+/* Discord's reply: the message it answers, one line above, joined by a bent line to the avatar. */
+.dc-quote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px 20px;
+  overflow: hidden;
+  color: var(--dim);
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dc-quote b {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.dc-quote-line {
+  width: 30px;
+  height: 10px;
+  margin-top: 8px;
+  border-top: 2px solid var(--dim);
+  border-left: 2px solid var(--dim);
+  border-top-left-radius: 6px;
+  opacity: 0.6;
+}
+
+.dc-msg.is-replied .dc-quote b {
+  color: var(--mention-fg);
+}
+
+.dc-composer {
+  margin: 0 16px 16px;
+  padding: 11px 16px;
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--dim);
+  font-size: 14px;
+}

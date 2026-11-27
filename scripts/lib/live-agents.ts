@@ -17,7 +17,9 @@ import { Octokit } from "@octokit/rest";
 import SmeeClient from "smee-client";
 
 import { type StorageState, writeStorageState } from "../../server/src/core/browser/index.ts";
+import { personVariables } from "../../server/src/core/maintenance/index.ts";
 import type { Recorder } from "../../server/src/core/proxy/record.ts";
+import { botIdOf } from "../../server/src/drivers/discord/secrets.ts";
 import { AGENTS, HARNESS_CHANNELS, type HarnessChannel, referenceOf } from "./channels.ts";
 import { ROOT } from "./generate.ts";
 import { freePort } from "./process.ts";
@@ -348,6 +350,60 @@ const LIVE_AGENTS: Readonly<Partial<Record<HarnessChannel, LiveAgent>>> = {
       },
       stops,
     );
+  },
+
+  // Discord: the reference agent connects to Discord's Gateway itself. With an interactions
+  // endpoint set in the developer portal, Discord posts interactions to CHANNELSTACK_DISCORD_RELAY_URL,
+  // relayed to the agent; without one, they come over its Gateway connection.
+  async discord(env, stops, { dir, path }) {
+    const token = env.CHANNELSTACK_DISCORD_BOT_TOKEN;
+    const guild = env.CHANNELSTACK_LIVE_DISCORD_GUILDS?.split(",")[0]?.trim();
+    const publicKey = env.CHANNELSTACK_DISCORD_PUBLIC_KEY;
+    if (!(token && guild && publicKey)) {
+      if (token)
+        say("Discord: no CHANNELSTACK_LIVE_DISCORD_GUILDS and CHANNELSTACK_DISCORD_PUBLIC_KEY, so no agent runs here");
+      return;
+    }
+    // A bot token's first part is its bot's id, which is its application's.
+    const applicationId = botIdOf(token);
+    if (applicationId === undefined) {
+      say("Discord: CHANNELSTACK_DISCORD_BOT_TOKEN isn't a bot token, so no agent runs here");
+      return;
+    }
+    // Live, each person is a second bot (decision 0026): the agent takes those bots as people.
+    const people = personVariables(env, "discord")
+      .map(({ variable }) => botIdOf(env[variable] as string))
+      .filter((id) => id !== undefined);
+    const agentEnv = {
+      DISCORD_TOKEN: token,
+      DISCORD_APPLICATION_ID: applicationId,
+      DISCORD_PUBLIC_KEY: publicKey,
+      DISCORD_GUILD_ID: guild,
+      DISCORD_PEOPLE_BOTS: people.join(","),
+    };
+    // When recording, each dispatch Discord sends the agent goes to the recorder first (`discord-event-tap.ts`).
+    const recorder = tap;
+    const port = await freePort();
+    const agent = spawnAgent(
+      dir,
+      { ...agentEnv, PORT: String(port) },
+      stops,
+      "ignore",
+      recorder && {
+        entry: join(ROOT, "scripts", "lib", "discord-event-tap.ts"),
+        onMessage: (message) => {
+          const event = (message as { discordEvent?: { t: string; d: unknown } } | null)?.discordEvent;
+          if (event) recorder.webhook("discord", event.t, JSON.stringify(event.d));
+        },
+      },
+    );
+    // The agent listens on its port once it is ready on Discord's Gateway.
+    await listening("Discord", agent, port);
+    const source = env.CHANNELSTACK_DISCORD_RELAY_URL;
+    if (isRelay(source)) {
+      await relay("Discord", source as string, `http://127.0.0.1:${port}${path}`, stops);
+      say("Discord: the reference agent hears the Gateway itself, and takes interactions through its relay channel");
+    } else say("Discord: the reference agent hears the Gateway itself, interactions included");
   },
 };
 

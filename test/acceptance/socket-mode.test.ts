@@ -34,7 +34,8 @@ test("the DM, modal and reconnect examples pass against the Bolt agent in Socket
           "run",
           "--config",
           "test/acceptance/vitest.config.ts",
-          "test/acceptance/examples",
+          // Slack's examples only: other channels have blocks of the same names ("direct messages").
+          "test/acceptance/examples/slack.test.ts",
           "-t",
           `^(${EXAMPLES.join("|")})`,
         ],

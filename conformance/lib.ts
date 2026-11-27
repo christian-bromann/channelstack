@@ -12,10 +12,11 @@ import { SECRET_FIELD } from "../scenarios/runners/typescript/secrets.ts";
 /**
  * Keys whose values differ between any two runs by design: ids, times, links, and the names a
  * sandbox gives its accounts (the agent's app is "my-agent" in the fake and whatever the sandbox
- * app is called live), and how the sandbox app is set up (its scopes). The comparison keeps structure, order and text, and drops these.
+ * app is called live), and how the sandbox app is set up (its scopes, Discord's public key). The comparison keeps
+ * structure, order and text, and drops these.
  */
 const NOISE =
-  /^(id|numericId|ts|threadTs|channel|number|identifier|url|htmlUrl|postedAt|createdAt|updatedAt|editedAt|at|key|name|login|displayName|realName|email|botUserId|botLogin|installationId|appId|clientId|repoId|slug|owner|fullName|admin|isAdmin|isOwner|block_id|scopes)$/;
+  /^(id|numericId|ts|threadTs|channel|number|identifier|url|htmlUrl|postedAt|createdAt|updatedAt|editedAt|at|key|name|login|displayName|realName|email|botUserId|botLogin|installationId|appId|clientId|repoId|slug|owner|fullName|admin|isAdmin|isOwner|block_id|scopes|publicKey)$/;
 /**
  * Fields the contract says only the fake has (`delivery`: live, the platform delivers to the agent
  * itself). Their absence live is the contract, not drift.
@@ -35,6 +36,8 @@ const IN_TEXT: ReadonlyArray<[RegExp, string]> = [
   [/<@[UW][A-Z0-9]{6,}>/g, "<@id>"],
   [/\b[UCBTDGW][A-Z0-9]{8,}\b/g, "<id>"],
   [/channelstack-run-[a-z0-9-]+/g, "<tagged>"],
+  // Discord's snowflakes, alone or in a mention (`<@…>`, `<#…>`): 17 to 20 digits.
+  [/\b\d{17,20}\b/g, "<id>"],
   // A person's email, which a platform may put in a text: a result file never holds one.
   [/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, "<email>"],
   // An issue's key (`ENG-1`): a team's key differs per run.

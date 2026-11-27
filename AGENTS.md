@@ -4,7 +4,7 @@ Instructions for coding agents implementing channelstack. Read this first.
 
 ## What channelstack is
 
-A test harness for AI agents that live in Slack, GitHub, Linear, Notion and email (Resend and Gmail). One server fakes those platforms in memory. Tests script people (`ana.say("@my-agent hi", { channel })`) and assert on what a person would see (`expect(thread).toHaveReplyFrom("my-agent")`). The same API can also act on the real platforms (live mode).
+A test harness for AI agents that live in Slack, GitHub, Linear, Notion, email (Resend and Gmail) and Discord. One server fakes those platforms in memory. Tests script people (`ana.say("@my-agent hi", { channel })`) and assert on what a person would see (`expect(thread).toHaveReplyFrom("my-agent")`). The same API can also act on the real platforms (live mode).
 
 ## Reading order
 
@@ -93,8 +93,8 @@ Don't reopen these without asking.
 
 | Area | Decision |
 |---|---|
-| Channels | Slack, GitHub, Linear, Notion, and email: Resend and Google (Gmail), [decision 0021](docs/decisions/0021-email-channels.md). No Teams for now |
-| Addresses | portless names: `https://channelstack.localhost` (UI and control API at `/_channelstack`), `slack.localhost`, `github.localhost`, `linear.localhost`, `notion.localhost`, `resend.localhost`, `google.localhost` |
+| Channels | Slack, GitHub, Linear, Notion, email (Resend and Google (Gmail), [decision 0021](docs/decisions/0021-email-channels.md)), and Discord ([decision 0026](docs/decisions/0026-discord.md), reopened on the maintainer's instruction). No Teams for now |
+| Addresses | portless names: `https://channelstack.localhost` (UI and control API at `/_channelstack`), `slack.localhost`, `github.localhost`, `linear.localhost`, `notion.localhost`, `resend.localhost`, `google.localhost`, `discord.localhost` |
 | World | One shared fake world per channel per server: the workspace, org or guild every app of the channel is installed in (for Resend, the teams; for Twilio, the account and its numbers). Sessions are scopes inside it, not separate worlds |
 | State | In memory. A restart starts fresh |
 | The agent | channelstack never starts or wraps it. `channelstack env` prints what it needs |

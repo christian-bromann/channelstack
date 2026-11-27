@@ -113,7 +113,7 @@ The smaller ones (Mastra, Flue, Pi) only mock, or have nothing.
 |---|---|
 | **Enterprise platform and QA teams** building internal Slack or Teams agents | Many need Teams, SSO and on-prem CI images. Teams isn't planned yet, so serve the Slack-first ones now. |
 | **Provider developer relations** (Linear, Slack) | Partners, not users. Linear's demo agents have no tests and say "try it in a real workspace", so an official "test your agent locally" guide is a natural fit. |
-| **Telegram and Discord hobby-bot authors** | The largest by count, but they rarely test or pay attention to tooling. Serve them once the core works. |
+| **Telegram hobby-bot authors** | The largest by count, but they rarely test or pay attention to tooling. Serve them once the core works. (Discord's bot authors are served since phase 11, [decision 0026](decisions/0026-discord.md).) |
 
 ## Not the audience
 

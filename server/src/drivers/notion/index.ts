@@ -59,15 +59,12 @@ export const notion: DriverDefinition = {
         fake.world
           .pendingContent(session)
           .map((page) => `a page.content_updated for "${fake.world.titleOf(page)}" that Notion is still batching`),
-      // Live, the agent talks to Notion with its own configuration, and live credentials never leave the server.
-      env: () =>
-        live
-          ? {}
-          : {
-              NOTION_BASE_URL: context.apiUrl(),
-              NOTION_TOKEN: context.secret("token"),
-              NOTION_VERIFICATION_TOKEN: context.secret("verificationToken"),
-            },
+      // Live, `channelstack env` prints nothing for Notion (app.ts): the agent talks to it with its own configuration.
+      env: () => ({
+        NOTION_BASE_URL: context.apiUrl(),
+        NOTION_TOKEN: context.secret("token"),
+        NOTION_VERIFICATION_TOKEN: context.secret("verificationToken"),
+      }),
     };
   },
 };

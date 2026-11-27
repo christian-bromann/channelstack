@@ -1,7 +1,7 @@
 {
   "name": "channelstack",
   "version": "0.1.1",
-  "description": "Test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail: fake platforms on localhost, the TypeScript SDK, Vitest fixtures and matchers.",
+  "description": "Test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord: fake platforms on localhost, the TypeScript SDK, Vitest fixtures and matchers.",
   "keywords": [
     "testing",
     "test-harness",
