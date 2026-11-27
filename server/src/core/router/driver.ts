@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 
+import type { AppsContext } from "../apps/index.ts";
 import type { BrowserActors } from "../browser/index.ts";
 import type { Clock, Timers } from "../clock/index.ts";
 import type { DeliveryQueue } from "../delivery/index.ts";
@@ -169,6 +170,8 @@ export interface DriverContext {
   apiUrl(): string;
   /** Where the agent receives this driver's events, if it has an endpoint. */
   readonly webhookUrl: string | undefined;
+  /** The channel's extra apps (decision 0027): their endpoints, secrets and ids. */
+  readonly apps: AppsContext;
   readonly live: LiveContext;
 }
 
@@ -180,8 +183,8 @@ export interface Driver {
   /** The live backend, for a driver that has one. Without it the driver is fake only, credentials or not. */
   readonly live?: LiveBackend;
   capabilities(): CapabilityTable;
-  /** What `channelstack env` prints for this channel. */
-  env(): Record<string, string>;
+  /** What `channelstack env` prints for this channel: for the built-in app, or for the app named `app`. */
+  env(app?: string): Record<string, string>;
   /**
    * What of the agent's work in a session is still open, in words a failure message can show:
    * a stream it hasn't stopped, for example. Empty when nothing is.

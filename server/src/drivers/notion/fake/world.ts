@@ -74,7 +74,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     retry: fixedRetries(RETRY_DELAYS_MS),
     stamp: stampAttempt,
     sign: (secret, body) => ({ "user-agent": "notion-api", ...signNotionWebhook(secret, body) }),
-    secret: () => context.secret("verificationToken"),
+    secret: (app) => context.apps.secret(app, "verificationToken"),
     forgedSecret: () => `secret_${randomToken()}`,
   });
   const links = notionLinks(context.apiUrl, (page) => titleOf(page));

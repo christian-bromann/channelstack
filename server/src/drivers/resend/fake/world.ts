@@ -78,7 +78,7 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
       "user-agent": "Svix-Webhooks/1.0 (sender-resend; +https://www.svix.com/http-sender/)",
       ...signResendWebhook(secret, id, body, atMs),
     }),
-    secret: () => context.secret("webhookSecret"),
+    secret: (app) => context.apps.secret(app, "webhookSecret"),
     forgedSecret: () => RESEND_SECRETS.webhookSecret.generate(),
     staleMs: STALE_MS,
   });

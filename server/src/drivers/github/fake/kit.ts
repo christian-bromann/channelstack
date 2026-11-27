@@ -139,7 +139,7 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
       "x-github-hook-installation-target-type": "integration",
       ...signGitHubWebhook(secret, body),
     }),
-    secret: () => context.secret("webhookSecret"),
+    secret: (app) => context.apps.secret(app, "webhookSecret"),
   });
 
   const emit: GitHubKit["emit"] = (repo, event, sender, payload) => {

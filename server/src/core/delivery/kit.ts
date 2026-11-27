@@ -1,3 +1,4 @@
+import { BUILT_IN_APP } from "../apps/index.ts";
 import type { Clock } from "../clock/index.ts";
 import { randomToken } from "../secrets/index.ts";
 import type {
@@ -42,18 +43,28 @@ export interface PlatformDeliveries {
   readonly retry?: RetryPolicy;
   /** How the platform puts each attempt into the signed body (`DeliveryRequest.stamp`). */
   readonly stamp?: DeliveryRequest["stamp"];
-  /** The platform's headers for one attempt, signed with `secret` over the exact body, at `atMs`. */
-  sign(secret: string, body: string, atMs: number, request: { id: string; type: string }): Record<string, string>;
-  /** The secret the agent checks signatures with. */
-  secret(): string;
+  /** The platform's headers for one attempt, signed with `secret` over the exact body, at `atMs`, for the app at `url`. */
+  sign(secret: string, body: string, atMs: number, request: SignedRequest): Record<string, string>;
+  /** The secret the app the delivery goes to checks signatures with: the built-in app's, or another's (decision 0027). */
+  secret(app: string): string;
   /** A secret the agent can't know, for a forged delivery. Defaults to a random token. */
   forgedSecret?(): string;
   /** How far back a stale delivery is signed: past what the platform's own receivers accept. */
   readonly staleMs?: number;
 }
 
+/** What a signer knows of the delivery it signs. */
+interface SignedRequest {
+  readonly id: string;
+  readonly type: string;
+  readonly url: string;
+  readonly app: string;
+}
+
 /** One delivery to send. What the platform always sends the same way comes from `PlatformDeliveries`. */
-type Outgoing = Omit<DeliveryRequest, "driver" | "sign" | "timeoutMs" | "retry" | "stamp"> & {
+type Outgoing = Omit<DeliveryRequest, "driver" | "sign" | "timeoutMs" | "retry" | "stamp" | "app"> & {
+  /** The app it goes to, signed with that app's secret. The built-in app when left out. */
+  readonly app?: string;
   /** Sign this one differently: a request the platform doesn't sign (Notion's verification). */
   readonly sign?: DeliveryRequest["sign"];
   /** `false`: the platform doesn't retry this one (Slack's interactions). */
@@ -98,29 +109,31 @@ export function deliveryKit(
 ): DeliveryKit {
   const { delivery, clock } = deps;
   const signer =
-    (secret: string, request: { id: string; type: string }) =>
+    (secret: string, request: SignedRequest) =>
     (body: string, atMs: number): Record<string, string> =>
       platform.sign(secret, body, atMs, request);
   return {
     send(outgoing) {
-      const { retry, stamp, sign, ...rest } = outgoing;
+      const { retry, stamp, sign, app = BUILT_IN_APP, ...rest } = outgoing;
       const retryPolicy = retry === false ? undefined : (retry ?? platform.retry);
       const stamper = stamp === false ? undefined : (stamp ?? platform.stamp);
       return delivery.enqueue({
         ...rest,
+        app,
         driver: platform.driver,
         timeoutMs: platform.timeoutMs,
-        sign: sign ?? signer(platform.secret(), outgoing),
+        sign: sign ?? signer(platform.secret(app), { ...outgoing, app }),
         ...(retryPolicy ? { retry: retryPolicy } : {}),
         ...(stamper ? { stamp: stamper } : {}),
       });
     },
     resend(session, id, options = {}) {
       const { request } = delivery.get(session, id);
-      const secret = options.badSignature ? (platform.forgedSecret?.() ?? randomToken()) : platform.secret();
+      const app = request.app ?? BUILT_IN_APP;
+      const secret = options.badSignature ? (platform.forgedSecret?.() ?? randomToken()) : platform.secret(app);
       const stale = options.stale === true;
       return delivery.again(session, id, {
-        sign: options.forge ? (body, atMs) => options.forge?.(secret, body, atMs) ?? {} : signer(secret, request),
+        sign: options.forge ? (body, atMs) => options.forge?.(secret, body, atMs) ?? {} : signer(secret, { ...request, app }),
         forged: options.badSignature === true || stale || options.forge !== undefined,
         ...(stale ? { atMs: clock() - (platform.staleMs ?? 0) } : {}),
         ...(options.headers ? { headers: options.headers } : {}),

@@ -97,3 +97,49 @@ describe("secrets.json", () => {
     expect(Secrets.ephemeral(specs).all()).toHaveLength(Object.keys(everyFormat).length + 1);
   });
 });
+
+describe("an app's secrets (decision 0027)", () => {
+  test("exit check 12.5: they are made once, kept in secrets.json (0600) and the same after a restart", () => {
+    const dir = home();
+    const first = Secrets.load(dir, specs);
+    const token = first.forApp("echo", "coder", "appToken");
+
+    expect(token).toMatch(TOKEN.pattern);
+    expect(token).not.toBe(first.get("echo", "appToken"));
+    expect(first.forApp("echo", "coder", "appToken")).toBe(token);
+    expect(Secrets.load(dir, specs).forApp("echo", "coder", "appToken")).toBe(token);
+    expect(JSON.parse(readFileSync(Secrets.path(dir), "utf8")).apps.echo.coder.appToken).toBe(token);
+    if (posix) expect(statSync(Secrets.path(dir)).mode & 0o777).toBe(0o600);
+  });
+
+  test("the built-in app's are the driver's own", () => {
+    const secrets = Secrets.load(home(), specs);
+    expect(secrets.forApp("echo", "my-agent", "appToken")).toBe(secrets.get("echo", "appToken"));
+  });
+
+  test("exit check 12.5: rotate changes them too, and keeps the app", () => {
+    const dir = home();
+    const token = Secrets.load(dir, specs).forApp("echo", "coder", "appToken");
+    const rotated = Secrets.rotate(dir, specs);
+    expect(rotated.all()).not.toContain(token);
+    expect(JSON.parse(readFileSync(Secrets.path(dir), "utf8")).apps.echo.coder.appToken).toMatch(TOKEN.pattern);
+  });
+
+  test("they are handed to listeners as they are made, and are in all()", () => {
+    const secrets = Secrets.ephemeral(specs);
+    const heard: string[] = [];
+    secrets.onNew((values) => heard.push(...values));
+    const token = secrets.forApp("echo", "coder", "appToken");
+    secrets.forApp("echo", "coder", "appToken");
+    expect(heard).toEqual([token]);
+    expect(secrets.all()).toContain(token);
+  });
+
+  test("a tampered value of an app's is replaced on load", () => {
+    const dir = home();
+    const spec = { echo: { appToken: TOKEN } };
+    const path = Secrets.path(dir);
+    writeFileSync(path, JSON.stringify({ version: 1, secrets: {}, apps: { echo: { coder: { appToken: "tampered" } } } }));
+    expect(Secrets.load(dir, spec).forApp("echo", "coder", "appToken")).toMatch(TOKEN.pattern);
+  });
+});

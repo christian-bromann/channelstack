@@ -21,7 +21,7 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
     driver: "echo",
     timeoutMs: ACK_WINDOW_MS,
     sign: (secret, body, atMs) => signEchoDelivery(secret, body, atMs),
-    secret: () => context.secret("signingSecret"),
+    secret: (app) => context.apps.secret(app, "signingSecret"),
   });
 
   const post = (room: EchoRoom, author: EchoPrincipal, text: string, deliveryId?: string): EchoMessage => {

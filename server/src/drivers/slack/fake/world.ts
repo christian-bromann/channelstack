@@ -151,7 +151,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     timeoutMs: ACK_WINDOW_MS,
     retry: SLACK_RETRIES,
     sign: (secret, body, atMs) => signSlackRequest(secret, body, atMs),
-    secret: () => context.secret("signingSecret"),
+    secret: (app) => context.apps.secret(app, "signingSecret"),
     staleMs: STALE_MS,
   });
 

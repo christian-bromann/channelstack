@@ -85,7 +85,8 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
         return afterMs === undefined ? undefined : { afterMs, headers: {} };
       },
     },
-    sign: (secret, _body, atMs) => pushHeaders(secret, context.webhookUrl ?? "", atMs),
+    // Google signs every push with its own key; each app's push endpoint is its audience.
+    sign: (secret, _body, atMs, { url }) => pushHeaders(secret, url, atMs),
     secret: () => context.secret("pushKey"),
     // Another key, but the same `kid`: a token that fails its signature check.
     forgedSecret: () => GOOGLE_SECRETS.pushKey.generate(),

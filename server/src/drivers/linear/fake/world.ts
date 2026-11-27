@@ -71,7 +71,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       "user-agent": "Linear-Webhook",
       ...signLinearWebhook(secret, body, atMs),
     }),
-    secret: () => context.secret("webhookSecret"),
+    secret: (app) => context.apps.secret(app, "webhookSecret"),
     // Linear's receivers refuse a timestamp more than a minute away from now.
     staleMs: 120_000,
   });

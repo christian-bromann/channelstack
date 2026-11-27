@@ -10,6 +10,8 @@ export interface DeliveryRequest {
   readonly id: string;
   readonly session: string;
   readonly driver: string;
+  /** The app it goes to (decision 0027): `my-agent`, or one a test made. */
+  readonly app?: string;
   /** The platform's event type. */
   readonly type: string;
   readonly url: string;

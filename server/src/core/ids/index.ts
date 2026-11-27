@@ -28,36 +28,65 @@ export function parseSeed(seed: string): number {
   return createHash("sha256").update(seed).digest().readUInt32BE(0);
 }
 
+/** The ids of one named thing, from `IdGenerator.named`. */
+export interface NamedIds {
+  next(format: IdFormat): string;
+}
+
+function drawFrom(rng: RandomGenerator): Draw {
+  return {
+    int: (min, max) => uniformInt(rng, min, max),
+    chars: (length, alphabet) => {
+      let out = "";
+      for (let i = 0; i < length; i++) out += alphabet[uniformInt(rng, 0, alphabet.length - 1)];
+      return out;
+    },
+  };
+}
+
 /**
  * The one source of ids. Random ids come from a seeded generator, so a run with the same
  * `CHANNELSTACK_SEED` hands out the same ids; they never repeat within a world.
  */
 export class IdGenerator {
-  readonly #rng: RandomGenerator;
   readonly #clock: Clock;
   readonly #used = new Map<string, Set<string>>();
   readonly #sequences = new Map<string, number>();
   #lastTs = 0;
   readonly #draw: Draw;
+  readonly #seed: number;
+  readonly #named = new Map<string, NamedIds>();
 
   constructor(options: { seed: number; clock: Clock }) {
-    this.#rng = xoroshiro128plus(options.seed);
+    this.#seed = options.seed;
     this.#clock = options.clock;
-    this.#draw = {
-      int: (min, max) => uniformInt(this.#rng, min, max),
-      chars: (length, alphabet) => {
-        let out = "";
-        for (let i = 0; i < length; i++) out += alphabet[uniformInt(this.#rng, 0, alphabet.length - 1)];
-        return out;
-      },
-    };
+    this.#draw = drawFrom(xoroshiro128plus(options.seed));
   }
 
   /** A new id of this kind, unique in the world. */
   next(format: IdFormat): string {
+    return this.#unique(format, this.#draw);
+  }
+
+  /**
+   * Ids for one named thing (an app: `slack:coder`), drawn from the seed and the name alone, so
+   * they don't depend on what was made before it. They are unique in the world like any other.
+   */
+  named(key: string): NamedIds {
+    let named = this.#named.get(key);
+    if (!named) {
+      const seed = createHash("sha256").update(`${this.#seed}:${key}`).digest().readUInt32BE(0);
+      const draw = drawFrom(xoroshiro128plus(seed));
+      named = { next: (format) => this.#unique(format, draw) };
+      this.#named.set(key, named);
+    }
+    return named;
+  }
+
+  #unique(format: IdFormat, draw: Draw): string {
     const used = this.#usedSet(format.kind);
     for (;;) {
-      const id = format.generate(this.#draw);
+      const id = format.generate(draw);
       if (!used.has(id)) {
         used.add(id);
         return id;
