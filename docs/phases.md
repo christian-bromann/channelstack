@@ -76,6 +76,7 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 | 7 | SDK breadth and MCP | Smoke parity in TypeScript, Python and Rust; the pytest integration; MCP drives a conversation |
 | 8 | The channel kit, the email core and Resend | Every channel is on the kit; all fake Resend examples and `resendChecks()` pass; Resend passes live |
 | 9 | Google (Gmail) | All fake Google examples and `googleChecks()` pass on the kit; Gmail passes live |
+| 10 | Twilio (SMS) | All fake Twilio examples and `twilioChecks()` pass on the kit; Twilio passes live |
 
 Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake design settles before live adapters are written against it.
 
@@ -351,6 +352,36 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ---
 
+## Phase 10: Twilio (SMS)
+
+[Decision 0025](decisions/0025-twilio.md): Twilio's Programmable Messaging, SMS first, and why. Phases 10 and 11 (Discord) are built at the same time, each in its own pull request, at the maintainer's request.
+
+**Build:**
+- **The Twilio fake on the kit:**
+  - The REST API the `twilio` SDK calls for messaging: `messages.create` (from a number or a Messaging Service, with a `StatusCallback`), `list`, `fetch`, `update` (redacting) and `remove`; `accounts.fetch` and `incomingPhoneNumbers.list`. Basic auth with the Account SID and Auth Token or an API key, and Twilio's test credentials with its magic numbers.
+  - The inbound webhook: form-encoded, signed with `X-Twilio-Signature`, with `I-Twilio-Idempotency-Token`, Twilio's timeouts and retries and the connection overrides a URL carries. TwiML in the agent's answer is sent, a retry's too.
+  - Status callbacks (`queued`, `sent`, `delivered`, `undelivered`, `failed`), signed the same way.
+  - Twilio's error shape and codes, SIDs, E.164, the 1600-character limit and segments, and opt-out (`STOP`, `START`, `HELP`).
+- `twilioChecks()`, a reference agent on the `twilio` SDK, and its broken variant.
+- **Twilio live:** the agent's account and number, and each person's number on an account of theirs. Recipients are held to the allowlist, and every message a session saw is deleted when it closes.
+
+**Exit checks:**
+
+| # | Check | How |
+|---|---|---|
+| 10.1 | Every fake Twilio example passes | All of `api/examples/twilio.test.ts` except "live mode" |
+| 10.2 | Twilio matches its schema | Every fake answer validates against Twilio's pinned OpenAPI description (`twilio/twilio-oai`), and every webhook's parameters against the Message fields they carry |
+| 10.3 | Signatures | Delivery cases T1–T4 ([appendix](#appendix-delivery-cases)) pass against the real fake, with the `twilio` SDK's `validateRequest` and `MessagingResponse` as the receiver |
+| 10.4 | Standard checks | `twilioChecks()` pass, and each check fails against its broken variant |
+| 10.5 | All channels in one run | `api/examples/shared.test.ts` passes with Twilio |
+| 10.6 | The kit held | `pnpm check:channels` passes, and the PR lists every file it changed outside the Twilio driver, its contract, its agents, scenarios and docs |
+| 10.7 | Twilio live | The "live mode" block of `api/examples/twilio.test.ts` passes against the sandbox numbers; texting a number outside the allowlist fails with `live_not_allowlisted` before any call, and the sweep finds nothing left |
+| 10.8 | Conformance | `scenarios/twilio/` runs in the nightly differential run, and each difference is fixed or recorded in `divergences.yaml` |
+
+**Docs to update:** the same list as phase 8, for Twilio, and decision 0025.
+
+---
+
 ## After 0.1
 
 Discord and Stripe drivers, more email providers, third-party driver plugins, LLM-driven personas, transcript export to LangSmith or Braintrust judges. Teams isn't planned. (The full matcher set for pytest, once listed here, is done: [decision 0018](decisions/0018-pytest-expect.md).)
@@ -388,5 +419,9 @@ Checks that each fake sends deliveries the platform's **official** receiver acce
 | M1 | `google-auth-library`'s `verifyIdToken` accepts a Pub/Sub push token against the fake's certificates, with the push endpoint as audience | phase 9 |
 | M2 | A token for another audience, or signed by another key, is rejected | phase 9 |
 | M3 | An expired token is rejected | phase 9 |
+| T1 | The `twilio` SDK's `validateRequest` accepts a text's webhook signed with the Auth Token over the URL and the sorted parameters; the URL is the configured one without its fragment of connection overrides | phase 10 |
+| T2 | Another token, another URL or a changed parameter fails it, and a forged webhook is refused | phase 10 |
+| T3 | As the URL's connection overrides say, a 5xx is retried, with the same `I-Twilio-Idempotency-Token` and a valid signature | phase 10 |
+| T4 | TwiML from `MessagingResponse` is sent back to the sender, and its status callbacks validate | phase 10 |
 
 Side finding: Bolt with a single `token` calls `auth.test` on every incoming request, so the Slack fake serves `auth.test` from phase 1.

@@ -138,13 +138,13 @@ export default function Home() {
             <HeroWaves />
             <p className="eyebrow">
               <span className="rec" aria-hidden="true" />
-              Test harness for Slack, GitHub, Linear, Notion, Resend and Gmail apps
+              Test harness for Slack, GitHub, Linear, Notion, Resend, Gmail and Twilio apps
             </p>
             <h1 id="hero-title">
               Your app’s whole world, <em>on localhost.</em>
             </h1>
             <p className="lede">
-              channelstack recreates <strong>Slack, GitHub, Linear, Notion, Resend and Gmail</strong> on your machine,
+              channelstack recreates <strong>Slack, GitHub, Linear, Notion, Resend, Gmail and Twilio</strong> on your machine,
               for the bots, integrations and AI agents you build on them. Script the people, let your app answer through
               its real code path, and assert on what a person would see. Signed webhooks, real payload shapes and real
               ids, with no changes to how your app works.

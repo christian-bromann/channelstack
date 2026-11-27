@@ -26,7 +26,7 @@ An empty variable counts as not set everywhere.
 | `CHANNELSTACK_SERVER_FILE` | `<home>/server.json` | Where `start` writes the control API's URL and token (0600). `--server-file` wins. The attach CLI reads it too |
 | `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` | none | Where the server delivers that channel's events to the app. Read once, when the server starts |
 
-`<CHANNEL>` is `SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND` or `GOOGLE`: `CHANNELSTACK_SLACK_WEBHOOK_URL`, `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`, `CHANNELSTACK_RESEND_WEBHOOK_URL`, `CHANNELSTACK_GOOGLE_WEBHOOK_URL`. The value is the app's own endpoint for that platform, e.g. `http://localhost:3000/slack/events`. For Google it is the push endpoint: Pub/Sub's pushes go there, and their tokens are for it as their audience.
+`<CHANNEL>` is `SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND`, `GOOGLE` or `TWILIO`: `CHANNELSTACK_SLACK_WEBHOOK_URL`, `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`, `CHANNELSTACK_RESEND_WEBHOOK_URL`, `CHANNELSTACK_GOOGLE_WEBHOOK_URL`, `CHANNELSTACK_TWILIO_WEBHOOK_URL`. The value is the app's own endpoint for that platform, e.g. `http://localhost:3000/slack/events`. For Google it is the push endpoint: Pub/Sub's pushes go there, and their tokens are for it as their audience. For Twilio it is the number's messaging webhook, the URL Twilio signs; it may end in Twilio's connection overrides (`#rc=2&rp=5xx`), which Twilio leaves out of the signature.
 
 An app on Slack's Socket Mode connects out and needs no webhook URL. Without one and without a socket, a Slack interaction is refused with `dispatch_failed`. See [Connecting your app](/docs/guide/connecting-your-agent).
 
@@ -53,6 +53,8 @@ The SDKs read a person's token from the environment when a test leaves `token` o
 | `CHANNELSTACK_NOTION_USER_<NAME>_TOKEN` | `notion.createUser({ name })`: a personal access token |
 | `CHANNELSTACK_RESEND_USER_<NAME>_TOKEN` | `resend.createUser({ name })`: an API key of the person's own Resend team, with a verified domain their address is on |
 | `CHANNELSTACK_GOOGLE_USER_<NAME>_TOKEN` | `google.createUser({ name })`: a refresh token for the person's own Gmail account, from the agent's OAuth client |
+| `CHANNELSTACK_TWILIO_USER_<NAME>_TOKEN` | `twilio.createUser({ name })`: `<Account SID>:<Auth Token>` of the account that owns the person's number (the agent's own, or another) |
+| `CHANNELSTACK_TWILIO_USER_<NAME>_NUMBER` | `twilio.createUser({ name })`: the person's number on that account. Not needed when the account has one allowlisted number besides the agent's |
 
 `<NAME>` is the name in upper case with every run of other characters as `_`: `Ana` is `ANA`, `ana-smith` is `ANA_SMITH`, the login `ana-channelstack` is `ANA_CHANNELSTACK`.
 
@@ -68,8 +70,9 @@ Read by the **server**. A channel runs live when every one of its credentials is
 | Notion | `CHANNELSTACK_NOTION_TOKEN` (the integration's token) | `CHANNELSTACK_LIVE_NOTION_WORKSPACES`: workspace ids | `CHANNELSTACK_NOTION_PAGE`, `CHANNELSTACK_NOTION_UNSEEN_PAGE` |
 | Resend | `CHANNELSTACK_RESEND_API_KEY` (the agent's team's key, `re_…`) | `CHANNELSTACK_LIVE_RESEND_DOMAINS`: the domains mail may go to. Every recipient is checked before anything is sent | `CHANNELSTACK_RESEND_ADDRESS` |
 | Google | `CHANNELSTACK_GOOGLE_CLIENT_ID`, `CHANNELSTACK_GOOGLE_CLIENT_SECRET` (the agent's OAuth client, `GOCSPX-…`), `CHANNELSTACK_GOOGLE_REFRESH_TOKEN` (its mailbox's refresh token, `1//0…`) | `CHANNELSTACK_LIVE_GOOGLE_ADDRESSES`: the addresses mail may go to and come from, the agent's and the people's. Every recipient is checked before anything is sent | |
+| Twilio | `CHANNELSTACK_TWILIO_ACCOUNT_SID`, `CHANNELSTACK_TWILIO_AUTH_TOKEN` (the agent's account), `CHANNELSTACK_TWILIO_NUMBER` (its number, E.164) | `CHANNELSTACK_LIVE_TWILIO_NUMBERS`: the numbers texts may go to and come from, the agent's and the people's. Every recipient is checked before anything is sent | |
 
-Allowlists are comma-separated. Live mode acts only where its allowlist names the workspace (for Resend the domain, for Google the address); anywhere else is refused with `live_not_allowlisted`, and an empty allowlist means live mode acts nowhere.
+Allowlists are comma-separated. Live mode acts only where its allowlist names the workspace (for Resend the domain, for Google the address, for Twilio the number); anywhere else is refused with `live_not_allowlisted`, and an empty allowlist means live mode acts nowhere.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -122,6 +125,11 @@ Read by the **app**. `channelstack env` (and the `channelstack.env()` fixture) p
 | `GOOGLE_PUBSUB_TOPIC` | Google | The topic to give `users.watch`: the only one the fake publishes to |
 | `GOOGLE_PUSH_SERVICE_ACCOUNT` | Google | Who pushes: the `email` claim of every push token |
 | `GOOGLE_PUSH_AUDIENCE` | Google | The `aud` of every push token: the push endpoint, `CHANNELSTACK_GOOGLE_WEBHOOK_URL`. Printed when that is set |
+| `TWILIO_API_URL` | Twilio | Where the agent's `twilio` client sends `https://api.twilio.com`, through an `httpClient`: the SDK has no base-URL option |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | Twilio | The agent's account (`AC…`) and its Auth Token, which also signs the webhooks |
+| `TWILIO_API_KEY`, `TWILIO_API_SECRET` | Twilio | An API key of the account (`SK…`) and its secret, which the API takes in place of the Auth Token |
+| `TWILIO_PHONE_NUMBER`, `TWILIO_MESSAGING_SERVICE_SID` | Twilio | The agent's number, and a Messaging Service (`MG…`) with it in its sender pool |
+| `TWILIO_TEST_ACCOUNT_SID`, `TWILIO_TEST_AUTH_TOKEN` | Twilio | The account's test credentials: with them, sending takes Twilio's magic numbers (`+15005550006`) and sends nothing |
 | `ECHO_API_URL`, `ECHO_APP_TOKEN`, `ECHO_SIGNING_SECRET` | Echo | channelstack's own test platform. Ignore them |
 
 The names are the ones the platforms' SDKs and examples use; map them to your app's own if they differ. `channelstack secrets rotate` changes every secret; run `channelstack env` again after a restart.

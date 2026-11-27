@@ -9,7 +9,7 @@
 #
 # `pnpm release:version` puts the draft below the changelog's hand-written "Unreleased" lines, for
 # the maintainer to edit. The draft has the changelog's sections, a bullet per platform or package:
-#   - "The fakes" from slack, github, linear, notion, resend and gmail;
+#   - "The fakes" from slack, github, linear, notion, resend, gmail and twilio;
 #   - "Testing" from pytest, "Tools" from server, "Packages" from sdk-ts, sdk-python and sdk-rust;
 #   - "Other" from a title without one of those scopes, such as one from before the convention.
 # A title with several scopes (`fix(slack,github): …`) is listed under each. Only feat, fix and perf
@@ -22,12 +22,12 @@ footer = ""
 trim = false
 body = """
 {%- set sections = [
-    "The fakes|slack:Slack,github:GitHub,linear:Linear,notion:Notion,resend:Resend,gmail:Gmail",
+    "The fakes|slack:Slack,github:GitHub,linear:Linear,notion:Notion,resend:Resend,gmail:Gmail,twilio:Twilio",
     "Testing|pytest:pytest-channelstack",
     "Tools|server:The server",
     "Packages|sdk-ts:The TypeScript SDK,sdk-python:The Python SDK,sdk-rust:The Rust SDK"
 ] -%}
-{%- set listed = ["slack", "github", "linear", "notion", "resend", "gmail", "pytest", "server", "sdk-ts", "sdk-python", "sdk-rust"] -%}
+{%- set listed = ["slack", "github", "linear", "notion", "resend", "gmail", "twilio", "pytest", "server", "sdk-ts", "sdk-python", "sdk-rust"] -%}
 {%- for section in sections -%}
     {%- set title = section | split(pat="|") | first -%}
     {%- set entries = section | split(pat="|") | last | split(pat=",") -%}

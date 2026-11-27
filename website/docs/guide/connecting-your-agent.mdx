@@ -44,7 +44,7 @@ If portless isn't installed, the server stops with `portless isn't installed. In
 npx channelstack start --no-portless --port 4500
 ```
 
-The fakes are then at `http://127.0.0.1:4500/slack`, `/github`, `/linear`, `/notion`, `/resend` and `/google`, and `channelstack env` prints those URLs instead. (`googleapis` keeps Gmail's paths at the root of whatever host it is given, so without portless Gmail's API is served at the server's root too, and `GOOGLE_API_URL` is `http://127.0.0.1:4500/`.) `--port` defaults to 4500 without portless; `--port 0` picks a free port. Plain HTTP on loopback needs no certificate, so this is also the simplest way around [TLS trust](#tls-trust-per-runtime) problems.
+The fakes are then at `http://127.0.0.1:4500/slack`, `/github`, `/linear`, `/notion`, `/resend`, `/google` and `/twilio`, and `channelstack env` prints those URLs instead. (`googleapis` keeps Gmail's paths at the root of whatever host it is given, so without portless Gmail's API is served at the server's root too, and `GOOGLE_API_URL` is `http://127.0.0.1:4500/`.) `--port` defaults to 4500 without portless; `--port 0` picks a free port. Plain HTTP on loopback needs no certificate, so this is also the simplest way around [TLS trust](#tls-trust-per-runtime) problems.
 
 ## Give the app its environment
 
@@ -74,6 +74,7 @@ What it prints, per platform:
 | Notion   | `NOTION_BASE_URL`, `NOTION_TOKEN` (`ntn_…`), `NOTION_VERIFICATION_TOKEN`                                                                                         |
 | Resend   | `RESEND_BASE_URL`, `RESEND_API_KEY` (`re_…`), `RESEND_WEBHOOK_SECRET` (`whsec_…`), `RESEND_FROM` (`my-agent <my-agent@acme.example>`, the address it sends from) |
 | Google   | `GOOGLE_API_URL` (the root for `googleapis`), `GOOGLE_TOKEN_URL`, `GOOGLE_CERTS_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (`GOCSPX-…`), `GOOGLE_REFRESH_TOKEN` (`1//0…`), `GMAIL_ADDRESS`, `GOOGLE_PUBSUB_TOPIC`, `GOOGLE_PUSH_SERVICE_ACCOUNT`, `GOOGLE_PUSH_AUDIENCE` |
+| Twilio   | `TWILIO_API_URL` (for the `twilio` client's `httpClient`), `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_API_KEY`, `TWILIO_API_SECRET`, `TWILIO_PHONE_NUMBER`, `TWILIO_MESSAGING_SERVICE_SID`, `TWILIO_TEST_ACCOUNT_SID`, `TWILIO_TEST_AUTH_TOKEN` |
 
 It also prints three `ECHO_*` lines for the internal driver. A platform that runs [live](/docs/guide/live-mode) prints nothing: there, the app uses its own real configuration.
 
@@ -96,6 +97,7 @@ Every platform SDK already has a base-URL option. These are the ones the [refere
 | `resend`                                                        | none: it reads the variable itself     | `RESEND_BASE_URL`                                   |
 | `googleapis`                                                    | `rootUrl` in `google.gmail({ … })`     | `GOOGLE_API_URL`                                    |
 | `google-auth-library`                                           | `endpoints` in `new OAuth2Client(…)`   | `GOOGLE_TOKEN_URL`, `GOOGLE_CERTS_URL`              |
+| `twilio`                                                        | an `httpClient` that rewrites `https://api.twilio.com` | `TWILIO_API_URL`                   |
 | Chat SDK adapters (`@chat-adapter/slack`, `/github`, `/linear`) | `apiUrl`, or read from the environment | `SLACK_API_URL`, `GITHUB_API_URL`, `LINEAR_API_URL` |
 
 ### Slack with Bolt
@@ -226,6 +228,10 @@ const gmail = google.gmail({ version: "v1", auth, ...(env.GOOGLE_API_URL ? { roo
 
 Watch the inbox with `users.watch` and `GOOGLE_PUBSUB_TOPIC`, check each push's token with `auth.verifyIdToken({ idToken, audience: GOOGLE_PUSH_AUDIENCE })` and its `email` against `GOOGLE_PUSH_SERVICE_ACCOUNT`, and send with `requestBody: { raw, threadId }`: a media upload goes to Google's own host whatever `rootUrl` says ([Google](/docs/platforms/google)).
 
+### Twilio
+
+The `twilio` SDK has no base-URL option, so give it an `httpClient` that sends its requests to `TWILIO_API_URL` when that is set ([Twilio](/docs/platforms/twilio) has the class). Check each webhook with `twilio.validateRequest(TWILIO_AUTH_TOKEN, signature, url, params)`, where `url` is the one the server was given in `CHANNELSTACK_TWILIO_WEBHOOK_URL`.
+
 ### Chat SDK
 
 The Chat SDK's Slack, GitHub and Linear adapters read `SLACK_API_URL`, `GITHUB_API_URL` and `LINEAR_API_URL` from the environment on their own, or take an `apiUrl` option. With the lines from `channelstack env` in the app's environment, an app on the Chat SDK needs no change at all.
@@ -241,6 +247,7 @@ CHANNELSTACK_LINEAR_WEBHOOK_URL=http://localhost:3002/webhooks/linear \
 CHANNELSTACK_NOTION_WEBHOOK_URL=http://localhost:3003/webhooks/notion \
 CHANNELSTACK_RESEND_WEBHOOK_URL=http://localhost:3004/webhooks/resend \
 CHANNELSTACK_GOOGLE_WEBHOOK_URL=http://localhost:3005/webhooks/google \
+CHANNELSTACK_TWILIO_WEBHOOK_URL=http://localhost:3006/webhooks/twilio \
 npx channelstack
 ```
 
@@ -252,6 +259,7 @@ npx channelstack
 | `CHANNELSTACK_NOTION_WEBHOOK_URL` | Integration webhooks, signed with `X-Notion-Signature`                                                                                                            |
 | `CHANNELSTACK_RESEND_WEBHOOK_URL` | `email.received` for mail to the agent, and `email.sent`, `email.delivered` and what else became of the mail it sent, signed the Svix way (`svix-signature`)      |
 | `CHANNELSTACK_GOOGLE_WEBHOOK_URL` | Pub/Sub pushes of Gmail's notifications, once the agent has called `users.watch`, each with an OIDC token for this URL in `Authorization`                         |
+| `CHANNELSTACK_TWILIO_WEBHOOK_URL` | Texts to the agent's number, form-encoded and signed with `X-Twilio-Signature` over this URL; status callbacks go to the `StatusCallback` the agent gives |
 
 Set only the ones your app uses. Any URL the server can reach works; a loopback URL is the simplest. The server reads these variables once, at start, so restart it to change one.
 

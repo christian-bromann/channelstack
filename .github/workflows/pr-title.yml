@@ -46,6 +46,7 @@ jobs:
             notion
             resend
             gmail
+            twilio
             server
             sdk-ts
             sdk-python

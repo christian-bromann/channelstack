@@ -4,7 +4,7 @@
 
 ## 1. The big picture
 
-One server process fakes Slack, GitHub, Linear, Notion, Resend and Google (Gmail) in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
+One server process fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail) and Twilio in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
 
 ```
  Vitest / pytest / Rust tests        channelstack CLI      MCP (coding agents)      UI (browser)
@@ -87,6 +87,10 @@ Objects the platform identifies by more than one value get nested paths: a Slack
 | | History | Decimal strings that grow with gaps; Pub/Sub message ids are 16 digits; user labels are `Label_<n>` |
 | | Mail | A `Message-ID` Gmail gives: `<CA` and 40 base-62 characters `@mail.gmail.com>`. A person is their mailbox: their id is their address |
 | | Tokens | Access tokens `ya29.…`, refresh tokens `1//0…`, client secrets `GOCSPX-…`, client ids `<12 digits>-<32>.apps.googleusercontent.com`; push tokens are RS256 JWTs signed with a per-install RSA key |
+| Twilio | SIDs | Two letters that say what it is and 32 hex characters: accounts `AC…`, messages `SM…`, numbers `PN…`, Messaging Services `MG…`, API keys `SK…`, requests `RQ…` |
+| | Numbers | E.164. The fake's are in the range kept for fiction, `+1 NXX 555-01XX`. A person is their phone: their id is their number |
+| | Webhooks | `I-Twilio-Idempotency-Token`, the same on each retry: a UUID |
+| | Tokens | Auth Tokens 32 hex characters, API key secrets 32 letters and digits; a live person's credential is `<Account SID>:<Auth Token>` |
 
 - **Generated from a seeded random source** per world, so ids are unique and realistic. `CHANNELSTACK_SEED` makes a run reproducible.
 - **Sequential where the platform is:** GitHub issue numbers, Linear identifiers, Slack `ts`.

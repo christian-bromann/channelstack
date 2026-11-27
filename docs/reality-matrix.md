@@ -246,6 +246,25 @@ Sent email can't be taken back. Live, every recipient must be an address in `CHA
 
 ---
 
+## Twilio
+
+Built in phase 10, against a stand-in of Twilio's REST API; checked against real Twilio numbers once the sandbox accounts exist (exit check 10.7). An agent on Twilio has an account and a number whose messaging webhook points at it. With the account and its number set (`CHANNELSTACK_TWILIO_ACCOUNT_SID`, `CHANNELSTACK_TWILIO_AUTH_TOKEN`, `CHANNELSTACK_TWILIO_NUMBER`), Twilio runs live: each person is another number that can send, on an account their token opens (`CHANNELSTACK_TWILIO_USER_<NAME>_TOKEN`, `<Account SID>:<Auth Token>`): a second number on the agent's account, or another account. A person's text goes out through Twilio from their number; the agent's answers are read back from what reached it.
+
+A text can't be taken back, and it costs money. Live, every number must be in `CHANNELSTACK_LIVE_TWILIO_NUMBERS`: the agent's and each person's when they join, and every recipient before Twilio is asked to send. A text carries no run tag, so every message a session saw (on each account it is on) goes on the ledger and is deleted when the session closes; the sweep deletes what a crashed run's ledger lists.
+
+| Feature | Fake | Live | How (live) | Notes |
+|---|---|---|---|---|
+| `twilio.createUser({ name, number, reachable, token })` | Done | Built | The account that owns the person's number; the number, or the account's one allowlisted number besides the agent's (`CHANNELSTACK_TWILIO_USER_<NAME>_NUMBER`) | A person is their phone: their `id` is their number. In the fake, a number in the range kept for fiction (`+1 NXX 555-01XX`). `reachable: false` (a phone that's off) is fake only |
+| `ana.text(body, { to, media })` | Done | Built | `POST …/Messages.json` from the person's number, with their account | To the agent's number, Twilio posts it to the agent's webhook. `STOP`, `START` and `HELP` are answered by Twilio itself (its own text, marked in a transcript), and after `STOP` the agent can't text the person (21610) |
+| `ana.messages()`, `waitForMessage` | Done | Built | The person's account's messages to their number | What reached the phone: an undelivered text didn't. Read again before each read (cached for a second) |
+| `conversation.messages()`, `replies()`, `transcript()`, `toHaveReplyFrom` | Done | Built | Each person's account | A conversation is the messages between two numbers |
+| `message.refresh()`, `status`, `errorCode`, `segments` | Done | Built | The messages as Twilio lists them | Segments as Twilio counts them: 160 GSM-7 septets in one (153 each in several), 70 UTF-16 units otherwise (67) |
+| The agent's API (`messages.create`, `list`, `fetch`, `update`, `remove`, `accounts.fetch`, `incomingPhoneNumbers.list`) | Done | Agent's concern | — | The fake answers as Twilio's OpenAPI description says (exit check 10.2), with Twilio's error shape (`{ code, message, more_info, status }`) and codes: 20003, 20404, 20008, 21211, 21212, 21266, 21602, 21603, 21604, 21606, 21610, 21617, 21701. Basic auth with the Account SID and Auth Token or an API key. With the test credentials (`TWILIO_TEST_ACCOUNT_SID`), the magic numbers do what Twilio documents (`+15005550006` sends; `+15005550001` and the others refuse) and nothing is sent. WhatsApp and the Media subresource are later ([decision 0025](decisions/0025-twilio.md)) |
+| TwiML answers (`<Response><Message>`) | Done | Agent's concern | — | Twilio sends each `<Message>` of the agent's answer to the webhook, a retry's too. Behind a relay (live), the relay answers Twilio, so an agent answers through the API |
+| Webhook deliveries (`message`, `status`) | Done | Agent's concern | — | Twilio posts to the number's webhook and the `StatusCallback`. The fake signs with `X-Twilio-Signature` over the URL without its fragment, sends `I-Twilio-Idempotency-Token`, waits 15 s and retries once on a connection failure, or as the URL's connection overrides say (`#rc`, `#rp`, `#tt`, `#rt`) |
+| `delivery.resend()` / redelivery | Done | No | — | Fake-only. Twilio has no API to send a webhook again |
+| `twilio.calls()`, `waitForCall`, `toHaveReceivedCall` | Done | Yes, with proxy | Proxy mode | Twilio doesn't report the account's API calls |
+
 ## What this means for test authors
 
 1. **Most of a test runs live with plain tokens.** Commenting, reviewing, delegating and every read work on all four platforms through a person's token, including Notion, now that it has personal access tokens. Slack is the exception for messages: one posted through the API carries the posting app's bot, so a person's `say` and `reply` are typed in the client by the browser actor.

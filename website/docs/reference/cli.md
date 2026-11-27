@@ -41,7 +41,7 @@ npx channelstack show
 | `channelstack --version`, `-v` | Print the version |
 | `channelstack --help`, `-h` | Print the usage |
 
-The attach CLI has Slack commands only. GitHub, Linear, Notion, Resend and Google are driven from tests.
+The attach CLI has Slack commands only. GitHub, Linear, Notion, Resend, Google and Twilio are driven from tests.
 
 ## Exit codes
 

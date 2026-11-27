@@ -1,0 +1,103 @@
+---
+title: "Twilio"
+order: 7
+description: "Test an agent people text at its Twilio number: point the twilio SDK at the fake, text it as people, and check its answers reach their phones."
+---
+
+# Twilio
+
+This page shows how to test an agent that answers text messages on a Twilio number: how to point it at the fake, who the people in a test are, what they text, and what you check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
+
+> [!TIP]
+> Every method, option and wait of the Twilio fake, with each call in TypeScript, Python and Rust, is in the [Twilio API reference](/docs/reference/api/twilio).
+
+## How a Twilio SMS agent works
+
+The agent has a Twilio account and a number whose messaging webhook points at it. When someone texts the number, Twilio posts the message to that webhook as a form (`MessageSid`, `From`, `To`, `Body`, …), signed with `X-Twilio-Signature`: HMAC-SHA1 with the account's Auth Token over the URL and the sorted parameters. The agent checks it with `twilio.validateRequest`.
+
+It answers in one of two ways: with TwiML in its answer to the webhook (`<Response><Message>…</Message></Response>`), or by calling `client.messages.create({ to, from, body })`, the number that texted being `From`. With a `statusCallback`, Twilio tells it what became of each text: `queued`, `sent`, then `delivered` or `undelivered`.
+
+## Connecting the agent
+
+`channelstack env` prints what the agent needs:
+
+```bash
+TWILIO_API_URL=https://twilio.localhost
+TWILIO_ACCOUNT_SID=AC…
+TWILIO_AUTH_TOKEN=…
+TWILIO_API_KEY=SK…
+TWILIO_API_SECRET=…
+TWILIO_PHONE_NUMBER=+1…55501…
+TWILIO_MESSAGING_SERVICE_SID=MG…
+TWILIO_TEST_ACCOUNT_SID=AC…
+TWILIO_TEST_AUTH_TOKEN=…
+```
+
+The `twilio` SDK reads `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` itself, but it has no setting for its base URL: every request goes to `https://api.twilio.com`. Give it an `httpClient` that sends those requests to `TWILIO_API_URL` when it is set, as Twilio's docs show for a proxy. Unset, the same code talks to Twilio.
+
+```ts title="agent.ts"
+import twilio from "twilio";
+
+const base = process.env.TWILIO_API_URL;
+class ApiUrl extends twilio.RequestClient {
+  override request<T>(options: Parameters<twilio.RequestClient["request"]>[0] & { data?: T }) {
+    return super.request<T>({ ...options, uri: options.uri.replace("https://api.twilio.com", base as string) });
+  }
+}
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN, {
+  ...(base ? { httpClient: new ApiUrl() } : {}),
+});
+```
+
+An agent that can't change its client runs in [proxy mode](/docs/guide/proxy-mode), which routes `api.twilio.com` to the fake.
+
+Start the server with `CHANNELSTACK_TWILIO_WEBHOOK_URL` set to the agent's webhook, for example `http://localhost:3000/webhooks/twilio`. That is the URL Twilio signs, so it is the one `validateRequest` must be given. It may end in Twilio's connection overrides, `#rc=2&rp=5xx`, which say how Twilio retries; the signature leaves them out.
+
+## What the fake covers
+
+The fake is one account with one number, in the range of numbers kept for fiction, and a Messaging Service with it in its sender pool. People are phones in the world outside it.
+
+| Area | What's there |
+|---|---|
+| Sending | `messages.create` with `To`, `From` or `MessagingServiceSid`, `Body`, `MediaUrl`, `StatusCallback`; basic auth with the Account SID and Auth Token, or the API key and its secret |
+| Reading | `messages.list` (`To`, `From`, `DateSent`, paging, newest first), `fetch`, `update` (an empty `Body` redacts), `remove`; `accounts.fetch`, `incomingPhoneNumbers.list` |
+| Webhooks | A text to the number, form-encoded and signed, with `I-Twilio-Idempotency-Token` (the same on a retry); Twilio's 15-second wait and one retry on a connection failure, or what the URL's connection overrides say |
+| TwiML | Each `<Message>` of the agent's answer is sent, to the sender unless its `to` says otherwise, with its `statusCallback`; a retry's answer is acted on too |
+| Status callbacks | `queued`, `sent`, then `delivered`, or `undelivered` with `ErrorCode` 30003 for a phone that's off |
+| Opt-out | A person who texts `STOP` gets Twilio's own answer, the agent's webhook gets `OptOutType=STOP`, and the agent can't text them (21610) until they text `START`. `HELP` gets Twilio's answer too |
+
+Answers and errors have Twilio's shapes, held to its OpenAPI description: messages are what the description says, and a refusal is `{ code, message, more_info, status }`, with Twilio's codes: 21211 for an invalid `To`, 21606 for a `From` that isn't the account's, 21617 for a body over 1600 characters, 20003 for wrong credentials, and the others. SIDs are Twilio's (`SM` and 32 hex characters), numbers E.164, and `num_segments` is counted as Twilio counts it: 160 GSM-7 characters in one segment and 153 in each of several, 70 and 67 for anything else.
+
+With the test credentials (`TWILIO_TEST_ACCOUNT_SID`, `TWILIO_TEST_AUTH_TOKEN`), sending does what Twilio documents for its magic numbers: `From: +15005550006` sends, `To: +15005550001` is an invalid number, `+15005550004` has opted out, and so on. Nothing is sent, and nothing can be read back.
+
+WhatsApp and the Media subresource aren't built yet.
+
+## People and what they do
+
+```ts
+test("a text to the agent gets one reply, back to the sender", async ({ twilio }) => {
+  const ana = await twilio.createUser({ name: "Ana" });
+
+  const text = await ana.text("Where is my order?", { to: twilio.app });
+
+  await expect(text.conversation).toHaveReplyFrom("my-agent", { text: /order/i });
+  await expect(text.conversation).toHaveRepliesFrom(twilio.app, { count: 1 });
+});
+```
+
+A person's `id` is their number: one the fake hands out unless the test gives one. They `text` the app or other people, and read what reached their phone with `messages()`. A text to the agent's number reaches its webhook; a text between people never does. `createUser({ name, reachable: false })` is a phone that's off.
+
+## What a test checks
+
+- `text.conversation.replies()` and `toHaveReplyFrom` / `toHaveRepliesFrom`: the texts between Ana's number and the agent's, after hers.
+- `ana.waitForMessage({ from: twilio.app })`: the answer on Ana's phone. `answer.refresh()` reads its `status` again, and `segments` says how many SMS it took.
+- `text.delivery`: the webhook that told the agent, with every attempt and its parameters (`payload`). `resend({ badSignature: true })` sends it again signed with another token, and the agent must refuse it; `redeliver()` sends it again as Twilio retries, and the agent must not answer twice.
+- `twilio.deliveries({ type: "status" })`: the status callbacks the agent got. `twilio.calls()` and `toHaveReceivedCall("messages.create")`: what the agent asked of Twilio.
+
+The standard checks register the same in one line: `twilioChecks({ app: "my-agent" })`.
+
+## Live mode
+
+With the agent's account and number set (`CHANNELSTACK_TWILIO_ACCOUNT_SID`, `CHANNELSTACK_TWILIO_AUTH_TOKEN`, `CHANNELSTACK_TWILIO_NUMBER`), the same tests run against real Twilio. Each person is another number that can send, with `<Account SID>:<Auth Token>` of the account that owns it in `CHANNELSTACK_TWILIO_USER_<NAME>_TOKEN`: a second number on the agent's account, or a second account. Twilio posts to the agent's webhook itself: channelstack never sends it anything live.
+
+A text can't be taken back, and it costs money, so live mode refuses any number outside `CHANNELSTACK_LIVE_TWILIO_NUMBERS`, the agent's and the people's included, before anything is sent. Every message a session sees is deleted when it closes, and `channelstack sweep` deletes what a crash left. See [Live mode](/docs/guide/live-mode).

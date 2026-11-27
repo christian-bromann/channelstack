@@ -1,7 +1,7 @@
 ---
 title: "How it works"
 order: 1
-description: "One server fakes Slack, GitHub, Linear, Notion, Resend and Google (Gmail); tests, the CLI, MCP and the UI drive it through one control API."
+description: "One server fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail) and Twilio; tests, the CLI, MCP and the UI drive it through one control API."
 ---
 
 # How it works
@@ -10,9 +10,9 @@ This page explains the parts of channelstack and how they fit together: the serv
 
 <RequestFlow />
 
-## One server, six fakes
+## One server, seven fakes
 
-channelstack is one server process. It fakes Slack, GitHub, Linear, Notion, Resend and Google (Gmail) in memory and serves each fake at a stable local address:
+channelstack is one server process. It fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail) and Twilio in memory and serves each fake at a stable local address:
 
 | Address                          | What it is                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------- |
@@ -23,6 +23,7 @@ channelstack is one server process. It fakes Slack, GitHub, Linear, Notion, Rese
 | `https://notion.localhost`       | Notion's API; sends integration webhooks                                              |
 | `https://resend.localhost`       | Resend's REST API; sends its webhooks, signed the Svix way                            |
 | `https://google.localhost`       | Gmail's API, Google's token endpoint and certificates; sends Pub/Sub pushes            |
+| `https://twilio.localhost`       | Twilio's REST API (Messages); sends signed webhooks and status callbacks              |
 
 The `*.localhost` names come from [portless](https://github.com/vercel-labs/portless). Without it, the server listens on one loopback port and puts each fake under a path prefix (`http://127.0.0.1:4500/slack`, `/github`, and so on). The [connecting your app](/docs/guide/connecting-your-agent) page shows both.
 
