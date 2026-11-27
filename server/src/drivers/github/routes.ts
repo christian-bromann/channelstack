@@ -542,6 +542,49 @@ export function registerGitHubRoutes(
   });
 
   router.route({
+    method: "get",
+    path: "/users",
+    summary: "The people this session created",
+    response: z.array(GitHubUser).openapi("GitHubUsers"),
+    sdkMethod: { on: "GitHubFixture", name: "users" },
+    stability,
+    handler: ({ session }) => store.users.list(session.id).map(userWire),
+  });
+
+  router.route({
+    method: "get",
+    path: "/repos",
+    summary: "The repositories this session created",
+    response: z.array(GitHubRepo).openapi("GitHubRepos"),
+    sdkMethod: { on: "GitHubFixture", name: "repos" },
+    stability,
+    handler: ({ session }) => store.repos.list(session.id).map(repoWire),
+  });
+
+  router.route({
+    method: "get",
+    path: "/issues",
+    summary: "The issues and pull requests in this session's repositories, oldest first",
+    response: z
+      .array(
+        z
+          .object({
+            issue: GitHubIssue,
+            title: z.string().openapi({ description: "Its title as it is now." }),
+            pullRequest: z.boolean().openapi({ description: "It is a pull request." }),
+          })
+          .openapi("GitHubIssueListing"),
+      )
+      .openapi("GitHubIssues"),
+    sdkMethod: { on: "GitHubFixture", name: "issues" },
+    stability,
+    handler: ({ session }) =>
+      store.issues
+        .list(session.id)
+        .map((issue) => ({ issue: issueWire(issue), title: issue.title, pullRequest: issue.pull !== undefined })),
+  });
+
+  router.route({
     method: "post",
     path: "/installation-id",
     summary: "The id of the App's installation, for a repository it is installed on",

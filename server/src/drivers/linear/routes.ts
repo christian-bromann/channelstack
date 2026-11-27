@@ -336,6 +336,43 @@ export function registerLinearRoutes(
   });
 
   router.route({
+    method: "get",
+    path: "/users",
+    summary: "The people this session created",
+    response: z.array(LinearUser).openapi("LinearUsers"),
+    sdkMethod: { on: "LinearFixture", name: "users" },
+    stability,
+    handler: ({ session }) => store.users.list(session.id).map(userWire),
+  });
+
+  router.route({
+    method: "get",
+    path: "/teams",
+    summary: "The teams this session created",
+    response: z.array(LinearTeam).openapi("LinearTeams"),
+    sdkMethod: { on: "LinearFixture", name: "teams" },
+    stability,
+    handler: ({ session }) => store.teams.list(session.id).map(teamWire),
+  });
+
+  router.route({
+    method: "get",
+    path: "/issues",
+    summary: "The issues in this session's teams, oldest first",
+    response: z
+      .array(
+        z
+          .object({ issue: LinearIssue, title: z.string().openapi({ description: "Its title as it is now." }) })
+          .openapi("LinearIssueListing"),
+      )
+      .openapi("LinearIssues"),
+    sdkMethod: { on: "LinearFixture", name: "issues" },
+    stability,
+    handler: ({ session }) =>
+      store.issues.list(session.id).map((issue) => ({ issue: issueWire(issue), title: issue.title })),
+  });
+
+  router.route({
     method: "post",
     path: "/teams",
     summary:

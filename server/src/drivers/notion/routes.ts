@@ -333,6 +333,30 @@ export function registerNotionRoutes(
   });
 
   router.route({
+    method: "get",
+    path: "/users",
+    summary: "The people this session created",
+    response: z.array(NotionUser).openapi("NotionUsers"),
+    sdkMethod: { on: "NotionFixture", name: "users" },
+    stability,
+    handler: ({ session }) => store.users.list(session.id).map(userWire),
+  });
+
+  router.route({
+    method: "get",
+    path: "/pages",
+    summary: "The pages this session created, a database's rows included, oldest first. Not those in the trash",
+    response: z.array(NotionPage).openapi("NotionPages"),
+    sdkMethod: { on: "NotionFixture", name: "pages" },
+    stability,
+    handler: ({ session }) =>
+      store.pages
+        .list(session.id)
+        .filter((page) => !page.inTrash)
+        .map(pageWire),
+  });
+
+  router.route({
     method: "post",
     path: "/pages",
     summary:

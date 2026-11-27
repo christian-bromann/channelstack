@@ -2369,6 +2369,92 @@
           }
         }
       },
+      "GitHubUsers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubUser"
+        }
+      },
+      "GitHubRepos": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubRepo"
+        }
+      },
+      "GitHubIssues": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubIssueListing"
+        }
+      },
+      "GitHubIssueListing": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "$ref": "#/components/schemas/GitHubIssue"
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title as it is now."
+          },
+          "pullRequest": {
+            "type": "boolean",
+            "description": "It is a pull request."
+          }
+        },
+        "required": [
+          "issue",
+          "title",
+          "pullRequest"
+        ]
+      },
+      "GitHubIssue": {
+        "type": "object",
+        "properties": {
+          "repoId": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "repo": {
+            "$ref": "#/components/schemas/GitHubRepo"
+          },
+          "url": {
+            "type": "string"
+          },
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GitHubUser"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubApp"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "user": "#/components/schemas/GitHubUser",
+                "app": "#/components/schemas/GitHubApp"
+              }
+            }
+          }
+        },
+        "required": [
+          "repoId",
+          "number",
+          "repo",
+          "url",
+          "author"
+        ],
+        "x-channelstack-resource": {
+          "id": [
+            "repoId",
+            "number"
+          ]
+        }
+      },
       "GitHubInstallationIdBody": {
         "type": "object",
         "properties": {
@@ -2463,53 +2549,6 @@
         "required": [
           "app"
         ]
-      },
-      "GitHubIssue": {
-        "type": "object",
-        "properties": {
-          "repoId": {
-            "type": "string"
-          },
-          "number": {
-            "type": "integer"
-          },
-          "repo": {
-            "$ref": "#/components/schemas/GitHubRepo"
-          },
-          "url": {
-            "type": "string"
-          },
-          "author": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/GitHubUser"
-              },
-              {
-                "$ref": "#/components/schemas/GitHubApp"
-              }
-            ],
-            "discriminator": {
-              "propertyName": "kind",
-              "mapping": {
-                "user": "#/components/schemas/GitHubUser",
-                "app": "#/components/schemas/GitHubApp"
-              }
-            }
-          }
-        },
-        "required": [
-          "repoId",
-          "number",
-          "repo",
-          "url",
-          "author"
-        ],
-        "x-channelstack-resource": {
-          "id": [
-            "repoId",
-            "number"
-          ]
-        }
       },
       "GitHubPullRequest": {
         "type": "object",
@@ -4140,6 +4179,18 @@
           "name"
         ]
       },
+      "LinearUsers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/LinearUser"
+        }
+      },
+      "LinearTeams": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/LinearTeam"
+        }
+      },
       "LinearTeam": {
         "type": "object",
         "properties": {
@@ -4161,6 +4212,72 @@
         "x-channelstack-resource": {
           "id": "id",
           "role": "resource"
+        }
+      },
+      "LinearIssues": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/LinearIssueListing"
+        }
+      },
+      "LinearIssueListing": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "$ref": "#/components/schemas/LinearIssue"
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title as it is now."
+          }
+        },
+        "required": [
+          "issue",
+          "title"
+        ]
+      },
+      "LinearIssue": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "team": {
+            "$ref": "#/components/schemas/LinearTeam"
+          },
+          "creator": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LinearUser"
+              },
+              {
+                "$ref": "#/components/schemas/LinearApp"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "user": "#/components/schemas/LinearUser",
+                "app": "#/components/schemas/LinearApp"
+              }
+            }
+          }
+        },
+        "required": [
+          "id",
+          "identifier",
+          "url",
+          "team",
+          "creator"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
         }
       },
       "LinearTeamOptions": {
@@ -4216,50 +4333,6 @@
               "minLength": 1
             }
           }
-        }
-      },
-      "LinearIssue": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "identifier": {
-            "type": "string"
-          },
-          "url": {
-            "type": "string"
-          },
-          "team": {
-            "$ref": "#/components/schemas/LinearTeam"
-          },
-          "creator": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/LinearUser"
-              },
-              {
-                "$ref": "#/components/schemas/LinearApp"
-              }
-            ],
-            "discriminator": {
-              "propertyName": "kind",
-              "mapping": {
-                "user": "#/components/schemas/LinearUser",
-                "app": "#/components/schemas/LinearApp"
-              }
-            }
-          }
-        },
-        "required": [
-          "id",
-          "identifier",
-          "url",
-          "team",
-          "creator"
-        ],
-        "x-channelstack-resource": {
-          "id": "id"
         }
       },
       "LinearCreateIssueBody": {
@@ -5181,6 +5254,18 @@
         "required": [
           "name"
         ]
+      },
+      "NotionUsers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/NotionUser"
+        }
+      },
+      "NotionPages": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/NotionPage"
+        }
       },
       "NotionPage": {
         "type": "object",
@@ -6275,6 +6360,45 @@
           "name"
         ]
       },
+      "ResendUsers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ResendUser"
+        }
+      },
+      "ResendThreads": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ResendThread"
+        }
+      },
+      "ResendThread": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The id of the thread's first email."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "resend"
+            ]
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "subject"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "resource"
+        }
+      },
       "ResendEmail": {
         "type": "object",
         "properties": {
@@ -6340,33 +6464,6 @@
         ],
         "x-channelstack-resource": {
           "id": "id"
-        }
-      },
-      "ResendThread": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "The id of the thread's first email."
-          },
-          "channel": {
-            "type": "string",
-            "enum": [
-              "resend"
-            ]
-          },
-          "subject": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "channel",
-          "subject"
-        ],
-        "x-channelstack-resource": {
-          "id": "id",
-          "role": "resource"
         }
       },
       "ResendPrincipal": {
@@ -6777,6 +6874,45 @@
           "name"
         ]
       },
+      "GoogleUsers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GoogleUser"
+        }
+      },
+      "GoogleThreads": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GoogleThread"
+        }
+      },
+      "GoogleThread": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The id of the thread's first email."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "google"
+            ]
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "subject"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "resource"
+        }
+      },
       "GoogleEmail": {
         "type": "object",
         "properties": {
@@ -6850,33 +6986,6 @@
         ],
         "x-channelstack-resource": {
           "id": "id"
-        }
-      },
-      "GoogleThread": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "The id of the thread's first email."
-          },
-          "channel": {
-            "type": "string",
-            "enum": [
-              "google"
-            ]
-          },
-          "subject": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "channel",
-          "subject"
-        ],
-        "x-channelstack-resource": {
-          "id": "id",
-          "role": "resource"
         }
       },
       "GooglePrincipal": {
@@ -12226,6 +12335,64 @@
             }
           }
         }
+      },
+      "get": {
+        "summary": "The people this session created",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubFixture",
+          "name": "users"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubUsers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/sessions/{session}/github/repos": {
@@ -12290,6 +12457,124 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GitHubRepo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "The repositories this session created",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubFixture",
+          "name": "repos"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubRepos"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/issues": {
+      "get": {
+        "summary": "The issues and pull requests in this session's repositories, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubFixture",
+          "name": "issues"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubIssues"
                 }
               }
             }
@@ -17370,9 +17655,125 @@
             }
           }
         }
+      },
+      "get": {
+        "summary": "The people this session created",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "LinearFixture",
+          "name": "users"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinearUsers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/sessions/{session}/linear/teams": {
+      "get": {
+        "summary": "The teams this session created",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "LinearFixture",
+          "name": "teams"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinearTeams"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "summary": "Create a team: its members, workflow states and labels. Without a key one is made up, so parallel tests never share one",
         "security": [
@@ -17432,6 +17833,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LinearTeam"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/linear/issues": {
+      "get": {
+        "summary": "The issues in this session's teams, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "LinearFixture",
+          "name": "issues"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinearIssues"
                 }
               }
             }
@@ -20679,9 +21140,125 @@
             }
           }
         }
+      },
+      "get": {
+        "summary": "The people this session created",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "NotionFixture",
+          "name": "users"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotionUsers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/sessions/{session}/notion/pages": {
+      "get": {
+        "summary": "The pages this session created, a database's rows included, oldest first. Not those in the trash",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "NotionFixture",
+          "name": "pages"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotionPages"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "summary": "Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. A person creating the page sends the event in both worlds",
         "security": [
@@ -23599,6 +24176,124 @@
             }
           }
         }
+      },
+      "get": {
+        "summary": "The people this session created",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendFixture",
+          "name": "users"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendUsers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/threads": {
+      "get": {
+        "summary": "The threads this session's people started, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendFixture",
+          "name": "threads"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendThreads"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/sessions/{session}/resend/users/{user}/send": {
@@ -24694,6 +25389,124 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GoogleUser"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "The people this session created",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleFixture",
+          "name": "users"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleUsers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/threads": {
+      "get": {
+        "summary": "The threads this session's people started, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleFixture",
+          "name": "threads"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleThreads"
                 }
               }
             }

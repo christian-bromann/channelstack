@@ -52,6 +52,50 @@ let user = resend.create_user().name("…").await?;
 
 **Returns** [`ResendUser`](/docs/reference/api/resend#resenduser).
 
+### users()
+
+The people this session created.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const users = await resend.users();
+```
+
+```python title="Python"
+users = await resend.users()
+```
+
+```rust title="Rust"
+let users = resend.users().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`ResendUsers`](/docs/reference/api/resend#resendusers).
+
+### threads()
+
+The threads this session's people started, oldest first.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const threads = await resend.threads();
+```
+
+```python title="Python"
+threads = await resend.threads()
+```
+
+```rust title="Rust"
+let threads = resend.threads().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`ResendThreads`](/docs/reference/api/resend#resendthreads).
+
 ### deliveries()
 
 Every webhook channelstack sent the agent for this session, with every attempt.
@@ -269,47 +313,6 @@ let email = user.wait_for_email().from("my-agent").await?;
 
 **Returns** [`ResendEmail`](/docs/reference/api/resend#resendemail). When the time is up, it fails with what it was waiting for.
 
-## ResendEmail
-
-Returned by [`ResendUser.send()`](/docs/reference/api/resend#send), [`ResendUser.reply()`](/docs/reference/api/resend#reply), [`ResendEmail.refresh()`](/docs/reference/api/resend#refresh).
-
-| Field | Python / Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channel` | `channel` | `"resend"` |
-| `thread` | `thread` | `ResendThread` |
-| `author` | `author` | `ResendPrincipal` |
-| `from` | `from_` · `from` | `string` |
-| `to` | `to` | `string[]` |
-| `cc` | `cc` | `string[]` |
-| `subject` | `subject` | `string` |
-| `text` | `text` | `string` |
-| `at` | `at` | `string` |
-| `messageId` | `message_id` | `string` |
-| `delivery` | `delivery` | `ResendDelivery \| undefined` |
-
-### refresh()
-
-Re-read an email.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const updated = await email.refresh();
-```
-
-```python title="Python"
-updated = await email.refresh()
-```
-
-```rust title="Rust"
-let updated = email.refresh().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`ResendEmail`](/docs/reference/api/resend#resendemail).
-
 ## ResendThread
 
 | Field | Type |
@@ -439,6 +442,47 @@ let email = thread.latest_reply().from("my-agent").await?;
 
 **Returns** [`ResendEmail`](/docs/reference/api/resend#resendemail). When the time is up, it fails with what it was waiting for.
 
+## ResendEmail
+
+Returned by [`ResendUser.send()`](/docs/reference/api/resend#send), [`ResendUser.reply()`](/docs/reference/api/resend#reply), [`ResendEmail.refresh()`](/docs/reference/api/resend#refresh).
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `id` | `id` | `string` |
+| `channel` | `channel` | `"resend"` |
+| `thread` | `thread` | `ResendThread` |
+| `author` | `author` | `ResendPrincipal` |
+| `from` | `from_` · `from` | `string` |
+| `to` | `to` | `string[]` |
+| `cc` | `cc` | `string[]` |
+| `subject` | `subject` | `string` |
+| `text` | `text` | `string` |
+| `at` | `at` | `string` |
+| `messageId` | `message_id` | `string` |
+| `delivery` | `delivery` | `ResendDelivery \| undefined` |
+
+### refresh()
+
+Re-read an email.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const updated = await email.refresh();
+```
+
+```python title="Python"
+updated = await email.refresh()
+```
+
+```rust title="Rust"
+let updated = email.refresh().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`ResendEmail`](/docs/reference/api/resend#resendemail).
+
 ## ResendDelivery
 
 Returned by [`ResendDelivery.refresh()`](/docs/reference/api/resend#refresh-1).
@@ -559,6 +603,18 @@ let updated = delivery.settled().await?;
 ## Types
 
 Plain values the handles return and take.
+
+### ResendUsers
+
+```ts
+type ResendUsers = ResendUser[];
+```
+
+### ResendThreads
+
+```ts
+type ResendThreads = ResendThread[];
+```
 
 ### ResendPrincipal
 
