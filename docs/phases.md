@@ -20,6 +20,7 @@
 | 9 | done | 2026-11-26, [#66](https://github.com/christian-bromann/channelstack/pull/66) (Gmail verified live against two accounts and a Pub/Sub topic; conformance without a difference) |
 | 10 | deferred | Twilio isn't shipping for now: [#102](https://github.com/christian-bromann/channelstack/pull/102) is closed without merging, and its branch `phase-10-twilio` is kept, to reopen if users ask for it |
 | 11 | done | 2026-11-27, [#103](https://github.com/christian-bromann/channelstack/pull/103) (built in parallel with phase 10; Discord verified live with the agent's bot and two people's bots; conformance without a difference) |
+| 13 | done | 2026-11-28, [#116](https://github.com/christian-bromann/channelstack/pull/116) (built before phase 12 merged; 13.9 narrowed to Slack, the other channels tracked in #120; 13.13's live side waits for the maintainer's key; R3.2 to R3.4 tracked in #126) |
 
 ## When a phase is done
 
