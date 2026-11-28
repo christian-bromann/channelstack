@@ -17,6 +17,18 @@ export interface Ir {
   errorDocs: Record<string, { status: number; description: string }>;
   /** The drivers in the binary, in their order (`x-channelstack-channels`). */
   channels: IrChannel[];
+  /** How the server compares text for attribution (`x-channelstack-text-normalisation`), which the matchers apply too. */
+  textNormalisation: IrTextNormalisation;
+}
+
+/**
+ * Text normalised as data: each rule replaces every match of its pattern (`$1` in the replacement
+ * is the pattern's first group), in order; then whitespace is collapsed and trimmed, then lowercased.
+ */
+interface IrTextNormalisation {
+  rules: Array<{ pattern: string; replacement: string }>;
+  collapseWhitespace: boolean;
+  lowercase: boolean;
 }
 
 /** A driver: its name (`github`), and its title, which is also the prefix of its types (`GitHubUser`). */
@@ -600,6 +612,11 @@ export function buildIr(openapi: Json): Ir {
     errors: [...errors].sort(),
     errorDocs: openapi["x-channelstack-errors"] ?? {},
     channels: openapi["x-channelstack-channels"] ?? [],
+    textNormalisation: openapi["x-channelstack-text-normalisation"] ?? {
+      rules: [],
+      collapseWhitespace: false,
+      lowercase: false,
+    },
   };
 }
 

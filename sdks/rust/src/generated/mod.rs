@@ -8068,11 +8068,25 @@ fn run_open_ai_fixture_unattributed<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_within_ms = options.get("withinMs").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/openai/unattributed",
             encode_segment(ctx.session()?)
         );
-        send(ctx, "GET", path, None, None, false, &[]).await
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("withinMs".into(), p_within_ms.clone());
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -23174,43 +23188,47 @@ impl OpenAIFixture {
         ))
     }
 
-    /// Script what the model answers: turns used in order, one per matching call, or a responder the test answers. Scripts are tried in the order they were added, with a function the test answers each call with: it runs in this process, and gets the call's request.
-    pub async fn respond_with<F, Fut, T>(&self, respond: F) -> Result<OpenAIScript>
+    /// Script what the model answers: turns used in order, one per matching call, or a responder the test answers. Scripts are tried in the order they were added, with a function the test answers each call with: it runs in this process, and gets the call's request. Set its options, then `.await` it.
+    pub fn respond_with<F, Fut, T>(&self, respond: F) -> OpenAIFixtureRespondWith
     where
         F: Fn(Value) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = T> + Send + 'static,
         T: IntoArg + Send + 'static,
     {
-        let script = self.respond(Value::Null).responder(true).send().await?;
-        let held = script.clone();
-        let answer = script.clone();
-        crate::runtime::responder::respond_with(
-            Box::new(move |since, wait_ms| {
-                let held = held.clone();
-                Box::pin(async move {
-                    let mut read = held.held_calls().wait_ms(wait_ms);
-                    if let Some(since) = since {
-                        read = read.since(since);
-                    }
-                    read.send().await
-                })
-            }),
-            std::sync::Arc::new(move |id, turn, error| {
-                let answer = answer.clone();
-                Box::pin(async move {
-                    let mut call = answer.answer_held(id);
-                    if let Some(turn) = turn {
-                        call = call.turn(turn);
-                    }
-                    if let Some(error) = error {
-                        call = call.error(error);
-                    }
-                    call.send().await
-                })
-            }),
-            respond,
-        );
-        Ok(script)
+        let start = move |script: &OpenAIScript| {
+            let held = script.clone();
+            let answer = script.clone();
+            crate::runtime::responder::respond_with(
+                Box::new(move |since, wait_ms| {
+                    let held = held.clone();
+                    Box::pin(async move {
+                        let mut read = held.held_calls().wait_ms(wait_ms);
+                        if let Some(since) = since {
+                            read = read.since(since);
+                        }
+                        read.send().await
+                    })
+                }),
+                std::sync::Arc::new(move |id, turn, error| {
+                    let answer = answer.clone();
+                    Box::pin(async move {
+                        let mut call = answer.answer_held(id);
+                        if let Some(turn) = turn {
+                            call = call.turn(turn);
+                        }
+                        if let Some(error) = error {
+                            call = call.error(error);
+                        }
+                        call.send().await
+                    })
+                }),
+                respond,
+            );
+        };
+        OpenAIFixtureRespondWith {
+            call: self.respond(Value::Null).responder(true),
+            start: Box::new(start),
+        }
     }
 
     /// Every model call attributed to this session, oldest first. Experimental.
@@ -23257,15 +23275,15 @@ impl OpenAIFixture {
         )
     }
 
-    /// Model calls no session could be given (the agent calling the model at startup, for example). Experimental.
-    pub fn unattributed(&self) -> Call<Value> {
-        Call::new(
+    /// Model calls no session could be given (the agent calling the model at startup, for example), oldest first: what a failing matcher names. Experimental.
+    pub fn unattributed(&self) -> OpenAIFixtureUnattributed {
+        OpenAIFixtureUnattributed(Call::new(
             &self.ctx,
             &self.data,
             vec![],
             run_open_ai_fixture_unattributed,
             as_value,
-        )
+        ))
     }
 
     /// Limit this session's model calls: requests and tokens per window, with truthful x-ratelimit-* headers. Experimental.
@@ -23334,6 +23352,50 @@ impl IntoFuture for OpenAIFixtureRespond {
     }
 }
 
+/// The options of [`OpenAIFixture::respond_with`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct OpenAIFixtureRespondWith {
+    call: OpenAIFixtureRespond,
+    start: Box<dyn FnOnce(&OpenAIScript) + Send>,
+}
+
+impl OpenAIFixtureRespondWith {
+    /// `when`.
+    pub fn when(self, value: impl IntoArg) -> Self {
+        Self {
+            call: self.call.when(value),
+            start: self.start,
+        }
+    }
+    /// `times`.
+    pub fn times(self, value: impl IntoArg) -> Self {
+        Self {
+            call: self.call.times(value),
+            start: self.start,
+        }
+    }
+    /// `timing`.
+    pub fn timing(self, value: impl IntoArg) -> Self {
+        Self {
+            call: self.call.timing(value),
+            start: self.start,
+        }
+    }
+    /// Add the script, and start answering its calls in the background.
+    pub async fn send(self) -> Result<OpenAIScript> {
+        let script = self.call.send().await?;
+        (self.start)(&script);
+        Ok(script)
+    }
+}
+
+impl IntoFuture for OpenAIFixtureRespondWith {
+    type Output = Result<OpenAIScript>;
+    type IntoFuture = BoxFuture<'static, Result<OpenAIScript>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
 /// The options of [`OpenAIFixture::calls`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct OpenAIFixtureCalls(Call<Value>);
 
@@ -23375,6 +23437,28 @@ impl OpenAIFixtureToolCalls {
 }
 
 impl IntoFuture for OpenAIFixtureToolCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`OpenAIFixture::unattributed`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct OpenAIFixtureUnattributed(Call<Value>);
+
+impl OpenAIFixtureUnattributed {
+    /// `withinMs`.
+    pub fn within_ms(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("withinMs", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for OpenAIFixtureUnattributed {
     type Output = Result<Value>;
     type IntoFuture = BoxFuture<'static, Result<Value>>;
     fn into_future(self) -> Self::IntoFuture {

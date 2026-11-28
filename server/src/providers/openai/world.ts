@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
+
 import type { Attribution, Attributor } from "../../core/attribution/index.ts";
 import type { Clock, Timers } from "../../core/clock/index.ts";
-import { delay } from "../../core/clock/index.ts";
 import type { IdGenerator } from "../../core/ids/index.ts";
 import type { StreamEnd } from "../../core/stream/index.ts";
 import type { Answer } from "./codecs/answer.ts";
@@ -50,11 +51,18 @@ export interface CallRecord {
   open?: string;
 }
 
-/** What the fake answers a call with: an answer, an error, or nothing at all (a scripted timeout). */
+/**
+ * What the fake answers a call with: an answer, an error, nothing at all (a scripted timeout), or
+ * nothing because the agent hung up while the call was held for its responder.
+ */
 export type Outcome =
   | { readonly kind: "answer"; readonly answer: Answer; readonly turn: Turn; readonly script: ScriptRecord }
-  | { readonly kind: "error"; readonly error: OpenAIError; readonly afterMs: number }
-  | { readonly kind: "timeout" };
+  | { readonly kind: "error"; readonly error: OpenAIError; readonly firstTokenMs: number }
+  | { readonly kind: "timeout" }
+  | { readonly kind: "aborted" };
+
+/** The agent hung up while its call was held: the call is abandoned, which is no problem of the test's. */
+class HungUp extends Error {}
 
 /** A call no script answered, or one a script couldn't: a 400 the SDKs don't retry, in channelstack's own code. */
 function noScript(message: string): OpenAIError {
@@ -65,7 +73,10 @@ function noScript(message: string): OpenAIError {
   });
 }
 
-/** How long a held call waits for its responder before it is refused: the SDKs' default wait. */
+/**
+ * How long a held call waits for its responder before it is refused: the channelstack SDKs'
+ * default wait (the OpenAI SDKs themselves wait 10 minutes).
+ */
 const ANSWER_TIMEOUT_MS = 10_000;
 
 export interface OpenAIWorldDeps {
@@ -87,9 +98,12 @@ export class OpenAIWorld {
   readonly #problems = new Map<string, string[]>();
   readonly #limits = new Map<string, SessionRateLimit>();
   readonly #unattributed: CallRecord[] = [];
+  /** The organization the agent's key belongs to: in OpenAI's headers and its rate-limit messages. */
+  readonly organization: string;
 
   constructor(deps: OpenAIWorldDeps) {
     this.#deps = deps;
+    this.organization = deps.ids.next(OPENAI_IDS.organization);
   }
 
   get ids(): IdGenerator {
@@ -99,6 +113,11 @@ export class OpenAIWorld {
   /** A call arrives: attributed, recorded, and in flight until it finishes. */
   begin(request: ModelRequest, body: unknown, headers: Headers): CallRecord {
     const text = requestText(request);
+    const attempt = Number(headers.get("x-stainless-retry-count") ?? 0) || 0;
+    // The same body sent again is the SDK retrying: it belongs where its first attempt went.
+    const key = createHash("sha256")
+      .update(JSON.stringify(body ?? null))
+      .digest("hex");
     // A file's name is evidence too: a person's shared file is something only their session was told of.
     const names = request.messages.flatMap((message) =>
       message.role === "user"
@@ -109,6 +128,7 @@ export class OpenAIWorld {
       minted: request.refs,
       tags: request.tags,
       text: [text, ...names].join("\n"),
+      attempt: { key, retry: attempt > 0 },
     });
     const kept: Record<string, string> = {};
     headers.forEach((value, name) => {
@@ -125,7 +145,7 @@ export class OpenAIWorld {
       headers: kept,
       text,
       startedAt: this.#deps.clock(),
-      attempt: Number(headers.get("x-stainless-retry-count") ?? 0) || 0,
+      attempt,
       attribution,
       place: this.#deps.place(attribution, request),
       status: 200,
@@ -159,8 +179,16 @@ export class OpenAIWorld {
     return this.#calls.get(session) ?? [];
   }
 
-  unattributed(): readonly CallRecord[] {
-    return this.#unattributed;
+  /** The calls no session claimed, oldest first: those of the last `withinMs` when it is given. */
+  unattributed(withinMs?: number): readonly CallRecord[] {
+    if (withinMs === undefined) return this.#unattributed;
+    const since = this.#deps.clock() - withinMs;
+    return this.#unattributed.filter((call) => call.startedAt >= since);
+  }
+
+  /** How long ago a call arrived, on the server's clock. */
+  ageOf(call: CallRecord): number {
+    return this.#deps.clock() - call.startedAt;
   }
 
   rateLimit(session: string, limits: RateLimits): SessionRateLimit {
@@ -204,18 +232,19 @@ export class OpenAIWorld {
   async outcome(call: CallRecord, abort: AbortSignal): Promise<Outcome> {
     const { session, request } = call;
     if (session === undefined) {
-      return { kind: "error", error: noScript(this.#unattributedMessage(call)), afterMs: 0 };
+      return { kind: "error", error: noScript(this.unattributedMessage(call)), firstTokenMs: 0 };
     }
     const limiter = this.limiter(session);
     if (limiter) {
-      const waitMs = limiter.admit(Math.ceil(call.text.length / 4));
-      if (waitMs !== undefined) {
+      const refusal = limiter.refusal(Math.ceil(call.text.length / 4));
+      if (refusal !== undefined) {
         const error = scriptedError(limiter.limits.error, {
           model: request.model,
-          retryAfterMs: waitMs,
           endpoint: request.endpoint,
+          limit: refusal,
+          organization: this.organization,
         });
-        return { kind: "error", error, afterMs: 0 };
+        return { kind: "error", error, firstTokenMs: 0 };
       }
     }
     const context: CallContext = {
@@ -226,7 +255,7 @@ export class OpenAIWorld {
     if (!script) {
       const message = this.#missingMessage(call);
       this.problem(session, message);
-      return { kind: "error", error: noScript(message), afterMs: 0 };
+      return { kind: "error", error: noScript(message), firstTokenMs: 0 };
     }
     call.script = script.id;
     script.calls.push(call.id);
@@ -236,9 +265,10 @@ export class OpenAIWorld {
       try {
         turn = await this.#ask(script, call, abort);
       } catch (error) {
+        if (error instanceof HungUp) return { kind: "aborted" };
         const message = error instanceof Error ? error.message : String(error);
         script.problems.push(message);
-        return { kind: "error", error: noScript(message), afterMs: 0 };
+        return { kind: "error", error: noScript(message), firstTokenMs: 0 };
       }
     } else {
       turn = this.scripts.take(script);
@@ -246,7 +276,7 @@ export class OpenAIWorld {
     if (turn === undefined) {
       const message = `${script.id} has no turn for call ${script.used}`;
       this.problem(session, message);
-      return { kind: "error", error: noScript(message), afterMs: 0 };
+      return { kind: "error", error: noScript(message), firstTokenMs: 0 };
     }
     const timing = { ...script.timing, ...turn.timing };
     if (turn.error === "timeout") return { kind: "timeout" };
@@ -257,18 +287,19 @@ export class OpenAIWorld {
         retryAfterMs: turn.retryAfter,
         shouldRetry: turn.shouldRetry,
         endpoint: request.endpoint,
+        organization: this.organization,
       });
-      return { kind: "error", error, afterMs: timing.firstToken ?? 0 };
+      return { kind: "error", error, firstTokenMs: timing.firstToken ?? 0 };
     }
     const problems = this.scripts.problemsOf(script, turn, request);
     if (problems.length > 0) {
       for (const problem of problems) if (!script.problems.includes(problem)) script.problems.push(problem);
-      return { kind: "error", error: noScript(problems.join("; ")), afterMs: 0 };
+      return { kind: "error", error: noScript(problems.join("; ")), firstTokenMs: 0 };
     }
     const answer = this.#answer(turn, request, call, script);
     if ("problems" in answer) {
       for (const problem of answer.problems) if (!script.problems.includes(problem)) script.problems.push(problem);
-      return { kind: "error", error: noScript(answer.problems.join("; ")), afterMs: 0 };
+      return { kind: "error", error: noScript(answer.problems.join("; ")), firstTokenMs: 0 };
     }
     return { kind: "answer", answer, turn: { ...turn, timing }, script };
   }
@@ -334,10 +365,16 @@ export class OpenAIWorld {
   #ask(script: ScriptRecord, call: CallRecord, abort: AbortSignal): Promise<Turn> {
     const id = this.#deps.ids.next(OPENAI_IDS.held);
     call.open = `a model call held for the responder ${script.id}`;
+    if (abort.aborted) return Promise.reject(new HungUp());
     return new Promise<Turn>((resolve, reject) => {
+      const hungUp = () => {
+        done();
+        reject(new HungUp());
+      };
       const done = () => {
         script.held.delete(id);
         cancel();
+        abort.removeEventListener("abort", hungUp);
         delete call.open;
       };
       const cancel = this.#deps.timers.after(ANSWER_TIMEOUT_MS, () => {
@@ -346,10 +383,7 @@ export class OpenAIWorld {
           new Error(`the test didn't answer the model call held for ${script.id} within ${ANSWER_TIMEOUT_MS / 1000}s`),
         );
       });
-      abort.addEventListener("abort", () => {
-        done();
-        reject(new Error(`the agent hung up while the call was held for ${script.id}`));
-      });
+      abort.addEventListener("abort", hungUp, { once: true });
       script.held.set(id, {
         id,
         script: script.id,
@@ -372,6 +406,9 @@ export class OpenAIWorld {
   #answer(turn: Turn, request: ModelRequest, call: CallRecord, script: ScriptRecord): Answer | { problems: string[] } {
     const number = script.used;
     const fill = (text: string) => fillTemplate(text, request, number);
+    // In JSON text, a filled value is escaped as a JSON string's content, so the arguments stay JSON.
+    const fillJson = (json: string) =>
+      fillTemplate(json, request, number, (value) => JSON.stringify(value).slice(1, -1));
     const chunks = Array.isArray(turn.text) ? turn.text.map(fill) : textChunks(fill(turn.text ?? ""));
     const text = chunks.join("");
     const { ids, clock } = this.#deps;
@@ -395,14 +432,14 @@ export class OpenAIWorld {
         const args = custom
           ? (spec.input as string)
           : typeof spec.arguments === "string"
-            ? spec.arguments
-            : JSON.stringify(spec.arguments ?? {});
+            ? fillJson(spec.arguments)
+            : JSON.stringify(fillValues(spec.arguments ?? {}, fill));
         return {
           id: ids.next(OPENAI_IDS.call),
           itemId: ids.next(custom ? OPENAI_IDS.customCall : OPENAI_IDS.functionCall),
           name: spec.name ?? "",
           kind: custom ? ("custom" as const) : ("function" as const),
-          arguments: custom ? args : fill(args),
+          arguments: args,
         };
       });
     const summary = turn.reasoning?.summary;
@@ -475,12 +512,38 @@ export class OpenAIWorld {
     return `no openai.respond(…) in this test answers this call. Newest user message: ${JSON.stringify(quoted)}. Tools offered: ${tools.length === 0 ? "none" : tools.join(", ")}. For example: ${example}`;
   }
 
-  #unattributedMessage(call: CallRecord): string {
+  /** What the agent is told about a call no session claimed (after `channelstack: `). */
+  unattributedMessage(call: CallRecord): string {
     return `this call couldn't be attributed to any test: nothing in it matches what a test's people wrote, an id a test owns, or an earlier answer. ${this.#missingMessage(call).replace(/^no openai\.respond\(…\) in this test answers this call\. /, "")}`;
   }
 
-  /** Wait the time a turn asks before its answer starts. */
-  wait(ms: number): Promise<void> {
-    return delay(this.#deps.timers, ms);
+  /**
+   * Hold the answer until `firstTokenMs` after the call arrived, unless the agent hangs up first:
+   * whether it did. Time already spent on the call (a responder's) counts toward it.
+   */
+  firstToken(call: CallRecord, firstTokenMs: number, hangUp: AbortSignal): Promise<boolean> {
+    if (hangUp.aborted) return Promise.resolve(true);
+    const ms = firstTokenMs - this.ageOf(call);
+    if (ms <= 0) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const hungUp = () => {
+        cancel();
+        resolve(true);
+      };
+      const cancel = this.#deps.timers.after(ms, () => {
+        hangUp.removeEventListener("abort", hungUp);
+        resolve(false);
+      });
+      hangUp.addEventListener("abort", hungUp, { once: true });
+    });
   }
+}
+
+/** Every string in a value with `fill` applied: a tool call's arguments, before they are JSON. */
+function fillValues(value: unknown, fill: (text: string) => string): unknown {
+  if (typeof value === "string") return fill(value);
+  if (Array.isArray(value)) return value.map((item) => fillValues(item, fill));
+  if (typeof value === "object" && value !== null)
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fillValues(item, fill)]));
+  return value;
 }

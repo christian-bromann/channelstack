@@ -1,7 +1,7 @@
 import type { SseFrame } from "../../../core/stream/index.ts";
 import type { OpenAIError } from "../errors.ts";
 import { base64Of } from "../media.ts";
-import { type Answer, type ChatDialect, jsonChunks } from "./answer.ts";
+import { type Answer, type ChatDialect, jsonChunks, obfuscation } from "./answer.ts";
 
 /** What every chunk and completion of one answer shares. */
 export interface ChatMeta {
@@ -11,6 +11,8 @@ export interface ChatMeta {
   readonly model: string;
   readonly fingerprint: string;
   readonly dialect: ChatDialect;
+  /** Every chunk padded with `obfuscation` (`stream_options.include_obfuscation`, on by default). */
+  readonly obfuscation: boolean;
 }
 
 /** Audio output stays downloadable for an hour, as OpenAI says in `expires_at`. */
@@ -98,6 +100,7 @@ function chunk(
     system_fingerprint: meta.fingerprint,
     choices: [{ index: 0, delta, logprobs: null, finish_reason: finish }],
     ...(usage ? { usage: null } : {}),
+    ...(meta.obfuscation ? { obfuscation: obfuscation() } : {}),
   });
 }
 
@@ -157,6 +160,7 @@ export function chatFrames(answer: Answer, meta: ChatMeta, includeUsage: boolean
         system_fingerprint: meta.fingerprint,
         choices: [],
         usage: usageWire(answer.usage),
+        ...(meta.obfuscation ? { obfuscation: obfuscation() } : {}),
       }),
     });
   }

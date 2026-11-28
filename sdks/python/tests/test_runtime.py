@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import inspect
+import json
 import secrets
 from collections.abc import Iterator
 from pathlib import Path
@@ -16,7 +17,14 @@ from channelstack.runtime.client import HandleContext
 from channelstack.runtime.credentials import credential
 from channelstack.runtime.files import read_changes, read_document, read_tree, set_files_root
 from channelstack.runtime.transport import ChannelstackError, Transport, on_refusal, unreported_refusals
-from channelstack.runtime.wait import QuietState, WaitTimeoutError, set_wait_defaults, until_quiet, wait_defaults
+from channelstack.runtime.wait import (
+    QuietState,
+    WaitTimeoutError,
+    normalised_text,
+    set_wait_defaults,
+    until_quiet,
+    wait_defaults,
+)
 
 TEMPLATE = "CHANNELSTACK_SLACK_USER_{name}_TOKEN"
 
@@ -233,3 +241,14 @@ def test_changes_are_a_list_of_files_or_a_map_of_path_to_contents_where_none_del
         "site/README.md",
         "site/src/app.ts",
     ]
+
+
+# The server's own cases (`server/src/core/attribution/attribution.test.ts` reads the same file).
+NORMALISATION_CASES: list[dict[str, str]] = json.loads(
+    (Path(__file__).resolve().parents[3] / "test" / "text-normalisation.json").read_text(encoding="utf-8")
+)["cases"]
+
+
+@pytest.mark.parametrize("case", NORMALISATION_CASES, ids=lambda case: case["text"] or "empty")
+def test_the_generated_rules_normalise_text_as_the_server_does(case: dict[str, str]) -> None:
+    assert normalised_text(case["text"]) == case["normalised"]

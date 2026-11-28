@@ -8,6 +8,9 @@
  *    ids and names (`owned_id`), and what its people wrote (`text`);
  * 5. when several sessions hold the same text and nothing else tells them apart: the one whose
  *    matching delivery is the oldest still unanswered (`order`).
+ *
+ * A retry (the same request again, as the SDK says it is) goes where its first attempt went,
+ * with the same evidence: never by order to another session.
  */
 
 /** How a request was attributed. */
@@ -51,25 +54,56 @@ export interface AttributionRequest {
   readonly tags: readonly string[];
   /** Everything the request says: instructions, messages, tool results. */
   readonly text: string;
+  /** The request as sent (`key`, its body's hash), and whether the client says it is sending it again. */
+  readonly attempt?: { readonly key: string; readonly retry: boolean };
 }
 
 /** The shortest string that counts as evidence: "hi" or "thanks" decides nothing. */
 const MIN_EVIDENCE = 8;
 /** The longest string that is compared: past this, a string is a document, not something a person said. */
 const MAX_EVIDENCE = 4000;
+/** How many first attempts are remembered for their retries. */
+const ATTEMPTS = 1000;
+
+/** A rule of `TEXT_NORMALISATION`: every match of `pattern` becomes `replacement`, where `$1` is the pattern's first group. */
+interface NormalisationRule {
+  readonly pattern: string;
+  readonly replacement: string;
+}
 
 /**
- * Text as both sides are compared: mentions and links removed (the agent strips `<@U…>` or
- * resolves it), whitespace collapsed, case ignored.
+ * Text as both sides are compared, as data: the rules in order, then whitespace collapsed and
+ * trimmed, then lowercased. The spec publishes it (`x-channelstack-text-normalisation`) and every
+ * SDK's matchers apply the table generated from it, so `toHaveSent` compares as attribution does.
+ * The patterns are written so JavaScript, Python's `re` and Rust's `regex` read them alike: no
+ * lookaround, no backreferences, no `\w` (whose meaning differs between them).
  */
+export const TEXT_NORMALISATION: {
+  readonly rules: readonly NormalisationRule[];
+  readonly collapseWhitespace: boolean;
+  readonly lowercase: boolean;
+} = {
+  rules: [
+    // A mention as the platform writes it (`<@U…>`, `<#C…>`, `<!here>`): the agent strips it or resolves it.
+    { pattern: "<[@#!][^>]*>", replacement: " " },
+    // A Slack link is its URL.
+    { pattern: "<(https?:[^>|]+)(\\|[^>]*)?>", replacement: " $1 " },
+    // A mention as a person types it (`@my-agent`).
+    { pattern: "(^|\\s)@[A-Za-z0-9_.-]+", replacement: " " },
+  ],
+  collapseWhitespace: true,
+  lowercase: true,
+};
+
+const RULES = TEXT_NORMALISATION.rules.map(
+  ({ pattern, replacement }) => [new RegExp(pattern, "g"), replacement] as const,
+);
+
+/** Text as both sides are compared (`TEXT_NORMALISATION`): mentions and links removed, whitespace collapsed, case ignored. */
 export function normalise(text: string): string {
-  return text
-    .replace(/<[@#!][^>]*>/g, " ")
-    .replace(/<(https?:[^>|]+)(\|[^>]*)?>/g, " $1 ")
-    .replace(/(^|\s)@[\w.-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
+  let normalised = RULES.reduce((current, [pattern, replacement]) => current.replace(pattern, replacement), text);
+  if (TEXT_NORMALISATION.collapseWhitespace) normalised = normalised.replace(/\s+/g, " ").trim();
+  return TEXT_NORMALISATION.lowercase ? normalised.toLowerCase() : normalised;
 }
 
 /** Every string inside a JSON value, and inside JSON or form text found in it (a Slack interaction's `payload`). */
@@ -116,6 +150,8 @@ export class Attributor {
   readonly #minted = new Map<string, string>();
   /** Per session: the deliveries an attributed call already answered. */
   readonly #answered = new Map<string, Set<string>>();
+  /** How each request was attributed, by its key: where its retries go. */
+  readonly #attempts = new Map<string, Attribution>();
 
   constructor(sources: AttributionSources) {
     this.#sources = sources;
@@ -130,9 +166,23 @@ export class Attributor {
   forget(session: string): void {
     for (const [id, owner] of this.#minted) if (owner === session) this.#minted.delete(id);
     this.#answered.delete(session);
+    for (const [key, attribution] of this.#attempts) if (attribution.session === session) this.#attempts.delete(key);
   }
 
   attribute(request: AttributionRequest): Attribution | undefined {
+    const { attempt } = request;
+    const first = attempt?.retry ? this.#attempts.get(attempt.key) : undefined;
+    if (first && this.#sources.sessions().includes(first.session)) return first;
+    const found = this.#attribute(request);
+    if (attempt && found) {
+      this.#attempts.delete(attempt.key);
+      this.#attempts.set(attempt.key, found);
+      if (this.#attempts.size > ATTEMPTS) this.#attempts.delete(this.#attempts.keys().next().value as string);
+    }
+    return found;
+  }
+
+  #attribute(request: AttributionRequest): Attribution | undefined {
     const open = new Set(this.#sources.sessions());
     for (const id of request.minted) {
       const session = this.#minted.get(id);

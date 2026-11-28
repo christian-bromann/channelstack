@@ -47,7 +47,8 @@ export const openai: DriverDefinition = {
         }),
       capabilities: () => ({}),
       openWork: (session) => world.openWork(session),
-      problems: (session) => world.problems(session),
+      // A problem can quote what the agent sent the model: scrubbed, as everything the control API returns.
+      problems: (session) => context.scrub(world.problems(session)),
       // What the agent needs: the official SDKs read both by themselves.
       env: () => ({ OPENAI_BASE_URL: baseUrl(), OPENAI_API_KEY: context.secret("apiKey") }),
     };

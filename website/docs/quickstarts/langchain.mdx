@@ -1,0 +1,200 @@
+---
+title: "LangChain"
+order: 5
+description: "Stream a LangChain answer into Slack from a Bolt app, on ChatOpenAI pointed at the fake OpenAI, and test the stream, the status line and a tool call."
+---
+
+# LangChain
+
+In this tutorial you write a Bolt app that answers a direct message by streaming a [LangChain](https://js.langchain.com) chat model into Slack, and that runs a tool when the model calls one. Its model is OpenAI, through LangChain's `ChatOpenAI` (`@langchain/openai`), and in tests that is channelstack's [fake OpenAI](/docs/guide/the-model): each test scripts what the model answers, so every run gets the same answer and needs no API key. Then you test the stream, the status line and a tool call, and break the agent once.
+
+[Getting started](/docs/getting-started) explains the server, `channelstack env` and a first test in more detail. This page builds on it.
+
+## 1. Create the project
+
+You need Node.js 24 or newer, which runs the TypeScript files below as they are.
+
+```bash
+mkdir langchain-agent && cd langchain-agent
+npm init -y
+npm pkg set type=module
+npm i @slack/bolt@5.1.0 @langchain/openai@1.8.5 @langchain/core@1.5.1
+npm i -D channelstack vitest
+```
+
+These are the versions this page was tested with.
+
+## 2. Start channelstack
+
+In a second terminal:
+
+```bash
+CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events \
+  npx channelstack start --no-portless --port 4500
+```
+
+In the first terminal:
+
+```bash
+npx channelstack env > .env.local
+```
+
+## 3. The model
+
+Among the lines `channelstack env` printed are two for the model:
+
+```ini title=".env.local"
+OPENAI_BASE_URL=http://127.0.0.1:4500/openai/v1
+OPENAI_API_KEY=sk-proj-…
+```
+
+(With portless, the base URL is `https://openai.localhost/v1`.) `ChatOpenAI` reads both by itself, so the agent needs no setting of its own: with them it talks to the fake OpenAI, and in production, without `OPENAI_BASE_URL` and with your real key, to OpenAI.
+
+The fake has no default answer. A model call that no test scripted gets a 400 (`channelstack_no_script`), and the test fails, saying which `openai.respond(…)` would have answered it.
+
+## 4. Write the agent
+
+The agent answers each direct message: it sets a status line, gives the model a tool that searches the incident log, and streams what the model writes into one message with `chat.startStream` and `chat.appendStream`. When the model calls the tool instead, the agent runs it, sends the result back and asks again, until the model answers. Then it ends the stream with `chat.stopStream`. When the person presses Stop, Slack sends `agent_session_stopped`, and the agent aborts the model:
+
+```ts title="agent.ts"
+import { type AIMessageChunk, type BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { tool } from "@langchain/core/tools";
+import { ChatOpenAI } from "@langchain/openai";
+import { App } from "@slack/bolt";
+
+const app = new App({
+  token: process.env.SLACK_BOT_TOKEN,
+  signingSecret: process.env.SLACK_SIGNING_SECRET,
+  // Unset in production, so the agent talks to Slack itself.
+  clientOptions: process.env.SLACK_API_URL ? { slackApiUrl: process.env.SLACK_API_URL } : {},
+});
+
+/** The one tool the model may call: a search of the incident log. */
+const searchIncidents = tool(
+  async () => "The web deploy failed at the migration step at 14:02; a DNS blip at 02:10 resolved itself.",
+  {
+    name: "search_incidents",
+    description: "Search the incident log",
+    schema: { type: "object", properties: { since: { type: "string" } } },
+  },
+);
+
+/** What is being written right now, by thread: Stop aborts it. */
+const writing = new Map<string, AbortController>();
+
+app.event("agent_session_stopped", async ({ event }) => {
+  const { channel, thread_ts: thread } = event as unknown as { channel: string; thread_ts: string };
+  writing.get(`${channel}:${thread}`)?.abort();
+});
+
+app.message(async ({ message, client }) => {
+  // Only what a person newly wrote in a DM: no edits, no bots.
+  if (message.subtype !== undefined || "bot_id" in message || message.channel_type !== "im") return;
+  const { channel } = message;
+  const thread = message.thread_ts ?? message.ts;
+
+  await client.assistant.threads.setStatus({ channel_id: channel, thread_ts: thread, status: "is thinking…" });
+  const stop = new AbortController();
+  writing.set(`${channel}:${thread}`, stop);
+  // The person's Slack id as OpenAI's `user`: it tells channelstack whose question the call answers.
+  const model = new ChatOpenAI({ model: "gpt-5-mini", user: message.user }).bindTools([searchIncidents]);
+  const messages: BaseMessage[] = [
+    new SystemMessage("You are my-agent, the team's assistant in Slack. Answer briefly."),
+    new HumanMessage(message.text ?? ""),
+  ];
+  let stream: string | undefined;
+  try {
+    // Until the model answers without calling the tool: at most five steps.
+    for (let step = 0; step < 5; step += 1) {
+      let answer: AIMessageChunk | undefined;
+      for await (const chunk of await model.stream(messages, { signal: stop.signal })) {
+        answer = answer === undefined ? chunk : answer.concat(chunk);
+        if (stop.signal.aborted || chunk.text === "") continue;
+        if (stream === undefined)
+          stream = (await client.chat.startStream({ channel, thread_ts: thread, markdown_text: chunk.text })).ts;
+        else await client.chat.appendStream({ channel, ts: stream, markdown_text: chunk.text });
+      }
+      if (answer === undefined || !answer.tool_calls?.length) break;
+      messages.push(answer);
+      for (const call of answer.tool_calls) messages.push(await searchIncidents.invoke(call));
+    }
+    if (stream !== undefined && !stop.signal.aborted) await client.chat.stopStream({ channel, ts: stream });
+  } catch (error) {
+    // After Stop, Slack refuses more text with `stopped_by_user`: that is expected.
+    const stopped = (error as { data?: { error?: string } }).data?.error === "stopped_by_user";
+    if (!stop.signal.aborted && !stopped) throw error;
+  } finally {
+    writing.delete(`${channel}:${thread}`);
+  }
+});
+
+await app.start(3000);
+console.log("⚡️ Bolt app is running");
+```
+
+`answer.concat(chunk)` joins the streamed pieces into one message, so once the stream ends, `answer.tool_calls` holds the tool calls whole. `searchIncidents.invoke(call)` runs the tool with the model's arguments and returns the `ToolMessage` that carries its result back to the model.
+
+It streams in a DM because Slack allows a stream there without more arguments. To stream in a thread of a channel, `chat.startStream` also needs `recipient_user_id` and `recipient_team_id`, and the fake refuses it without them, as Slack does.
+
+Start it in a third terminal:
+
+```bash
+node --env-file=.env.local agent.ts
+```
+
+## 5. Write the tests
+
+Add the Vitest plugin:
+
+```ts title="vitest.config.ts"
+import channelstack from "channelstack/vitest";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  plugins: [channelstack()],
+});
+```
+
+And two tests. Each first scripts what the model answers with the `openai` fixture: the first streams four pieces of an answer, a little slowly, and watches it from the status line to the end of the stream; the second scripts two turns, a call of `search_incidents` and then the answer, and checks that the agent ran the tool and sent its result back:
+
+<Example id="langchain-slack" />
+
+Run them:
+
+```bash
+npx vitest run
+```
+
+```
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+```
+
+`toHaveStatus` reads what a person sees of the agent in that thread: `working` while the status line is set, `streaming` while a stream is open, and `idle` once it has ended. Each check waits until it holds, so the first test follows the answer through those states in order. `toHaveSent(msg)` checks that Ana's message is what the agent asked the model. In the second, each scripted turn answers one model call: `toHaveAnswered({ times: 2 })` checks that the agent asked twice, once for the tool call and once with its result, and `toHaveSentToolResult` that the second call carried the tool's result, with what the tool returned.
+
+## 6. Break it on purpose
+
+Forget to give the model its tool:
+
+```diff title="agent.ts"
+-  const model = new ChatOpenAI({ model: "gpt-5-mini", user: message.user }).bindTools([searchIncidents]);
++  const model = new ChatOpenAI({ model: "gpt-5-mini", user: message.user });
+```
+
+Restart the agent and run the tests again. The second test fails at once:
+
+```
+ FAIL  agent.test.ts > the agent runs the tool the model calls, and answers from its result
+Error: The model calls of this test went wrong:
+  ms_vashkpt1awtp called `search_incidents`, but the request offered no tools
+```
+
+A real model can't call a tool the request doesn't offer, so the fake answers that call with a 400 and the test says why, instead of waiting for a reply that never comes. Put `bindTools` back, restart the agent, and both tests pass.
+
+## Next steps
+
+- [The model](/docs/guide/the-model): tool calls, a slow first token, a stream that breaks, errors, and what the agent sent.
+- [Slack](/docs/platforms/slack): streams, the status line, Stop and the agent split view, and the errors the fake answers with.
+- [Waiting and quiet](/docs/guide/waiting-and-quiet): why `toHaveRepliesFrom` waits for quiet and the other checks don't.
+- [Standard checks](/docs/guide/standard-checks): `slackChecks({ app: "my-agent", model: "openai" })` adds the model checks to the Slack ones.
+- [AI SDK](/docs/quickstarts/ai-sdk): the same kind of agent on the AI SDK, with a test of the Stop button.

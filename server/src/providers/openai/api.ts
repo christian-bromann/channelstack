@@ -1,8 +1,7 @@
 import { type Context, Hono } from "hono";
 
-import { bodyOf } from "../../core/fake/endpoint.ts";
+import { bodyOf, recordAs, type RestAnswer, type StreamOutcome, wrapRest } from "../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../core/router/index.ts";
-import { recordCall } from "../../core/router/inspect.ts";
 import { constantTimeEqual } from "../../core/signing/hmac.ts";
 import { type SseFrame, sseStream, type StreamBreak } from "../../core/stream/index.ts";
 import { type Answer, chatDialect } from "./codecs/answer.ts";
@@ -64,11 +63,30 @@ type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** The fake OpenAI's HTTP API: what the agent calls. */
+/**
+ * What a request keeps on its context: the session its call belongs to, the session whose rate
+ * limit a model call counts against, when it arrived, whether its key was good.
+ */
+const SESSION = "openaiSession";
+const LIMITED = "openaiLimitedBy";
+const STARTED = "openaiStartedAt";
+const AUTHENTICATED = "openaiAuthenticated";
+const sessionOf = (c: Context) => c.get(SESSION as never) as string | undefined;
+const belongsTo = (c: Context, session: string | undefined) => c.set(SESSION as never, session as never);
+
+/** OpenAI's refusal as the kit answers it: its body, status and headers. */
+const refusalOf = (error: OpenAIError): RestAnswer => ({
+  body: error.body(),
+  status: error.status,
+  headers: error.headers,
+  sessions: [],
+});
+
+/** The fake OpenAI's HTTP API: what the agent calls, on the REST kit (`wrapRest`). */
 export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hono {
   const api = new Hono();
   const { ids, clock } = context;
-  const organization = ids.next(OPENAI_IDS.organization);
+  const { organization } = world;
   const project = ids.next(OPENAI_IDS.project);
   const fingerprint = ids.next(OPENAI_IDS.fingerprint);
   const seen = new Set<string>();
@@ -82,11 +100,6 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     "openai-project": project,
     ...(world.limiter(session)?.headers() ?? defaultRateHeaders()),
   });
-
-  const errorResponse = (c: Context, error: OpenAIError, headers: Record<string, string>) => {
-    for (const [name, value] of Object.entries({ ...headers, ...error.headers })) c.header(name, value);
-    return c.json(error.body(), error.status as 400);
-  };
 
   /** The key the agent sent: `Authorization: Bearer`, or Azure's `api-key`. */
   const authorized = (c: Context): OpenAIError | undefined => {
@@ -111,63 +124,19 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
   };
 
   api.use("*", async (c, next) => {
+    c.set(STARTED as never, clock() as never);
     // What the Images API answered with as a URL is served without a key, as OpenAI's own links are.
     if (/^(?:\/openai)?\/generated\//.test(new URL(c.req.url).pathname)) return next();
     const refused = authorized(c);
-    if (refused) return errorResponse(c, refused, common(undefined, clock()));
+    if (refused) throw refused;
+    c.set(AUTHENTICATED as never, true as never);
     await next();
   });
 
-  /** The call on record in the event log, for `channelstack tail`, the inspector and quiet. */
-  const record = (c: Context, call: CallRecord) =>
-    recordCall(
-      context.events,
-      "openai",
-      [call.session],
-      {
-        operation: call.endpoint,
-        method: c.req.method,
-        path: new URL(c.req.url).pathname.replace(/^\/openai(?=\/)/, ""),
-        request: call.body,
-        responseStatus: call.status,
-        response: call.answer
-          ? {
-              text: call.answer.text,
-              toolCalls: call.answer.toolCalls.map(({ name }) => name),
-              finish: call.answer.finish,
-            }
-          : undefined,
-        error: call.error,
-        durationMs: call.durationMs ?? 0,
-      },
-      { unattributed: "world" },
-    );
-
-  /** A request the fake refuses before it is a call: recorded for no session. */
-  const refuse = (c: Context, operation: string, error: OpenAIError, body: unknown, startedAt: number) => {
-    recordCall(
-      context.events,
-      "openai",
-      [],
-      {
-        operation,
-        method: c.req.method,
-        path: new URL(c.req.url).pathname,
-        request: body,
-        responseStatus: error.status,
-        response: error.body(),
-        error: error.code ?? error.type,
-        durationMs: clock() - startedAt,
-      },
-      { unattributed: "world" },
-    );
-    return errorResponse(c, error, common(undefined, startedAt));
-  };
-
-  const parse = async (c: Context): Promise<Json | OpenAIError> => {
+  const parse = async (c: Context): Promise<Json> => {
     const parsed = await bodyOf(c);
     if ("invalid" in parsed) {
-      return invalidRequest(
+      throw invalidRequest(
         "We could not parse the JSON body of your request. (HINT: This likely means you aren't using your HTTP library correctly. The OpenAI API expects a JSON payload, but what was sent was not valid JSON. If you have trouble figuring out how to fix this, please contact us through our help center at help.openai.com.)",
       );
     }
@@ -194,13 +163,13 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
    * A multipart body (the media endpoints' uploads, `/v1/files`), or JSON: its fields, with each
    * file as `{ filename, mediaType, bytes, sha256 }`, and the bytes kept in `uploads`.
    */
-  const readForm = async (c: Context): Promise<Json | OpenAIError> => {
+  const readForm = async (c: Context): Promise<Json> => {
     if (!(c.req.header("content-type") ?? "").startsWith("multipart/form-data")) return parse(c);
     let form: Record<string, unknown>;
     try {
       form = await c.req.parseBody({ all: true });
     } catch {
-      return invalidRequest("We could not parse the multipart form body of your request.");
+      throw invalidRequest("We could not parse the multipart form body of your request.");
     }
     const body: Json = {};
     const files: Record<string, Media[]> = {};
@@ -241,60 +210,70 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
       : { type: "image", from: "url", url: value.image_url };
   };
 
-  /** One model call, any endpoint: attributed, answered as its script says, streamed with its timing. */
+  /**
+   * One model call, any endpoint: attributed, answered as its script says, streamed with its
+   * timing. It goes on record when it ends: answered, refused, cut, or abandoned by the agent.
+   */
   const answerCall = async (
     c: Context,
     endpoint: ModelRequest["endpoint"],
     normalise: (body: Json) => { request: ModelRequest; history?: { conversation?: Conversation; previous?: string } },
-    overrides: { model?: string; read?: (c: Context) => Promise<Json | OpenAIError> } = {},
+    overrides: { model?: string; read?: (c: Context) => Promise<Json> } = {},
   ): Promise<Response> => {
+    recordAs(c, { operation: endpoint });
     const startedAt = clock();
     const parsed = await (overrides.read ?? parse)(c);
-    if (parsed instanceof OpenAIError) return refuse(c, endpoint, parsed, undefined, startedAt);
     const body = overrides.model === undefined ? parsed : { ...parsed, model: overrides.model };
-    let normalised: ReturnType<typeof normalise>;
-    let request: ModelRequest;
-    try {
-      normalised = normalise(body);
-      request = await readParts(normalised.request);
-    } catch (error) {
-      if (error instanceof OpenAIError) return refuse(c, endpoint, error, body, startedAt);
-      throw error;
-    }
+    const normalised = normalise(body);
+    const request = await readParts(normalised.request);
     seen.add(request.model);
     const call = world.begin(request, body, c.req.raw.headers);
+    belongsTo(c, call.session);
+    c.set(LIMITED as never, call.session as never);
+    let ended: (outcome: StreamOutcome) => void = () => {};
+    recordAs(c, { operation: endpoint, ended: new Promise((resolve) => (ended = resolve)) });
     call.open = "a model call in flight";
-    const outcome = await world.outcome(call, c.req.raw.signal);
+    const hangUp = c.req.raw.signal;
+    const outcome = await world.outcome(call, hangUp);
 
-    const done = (result: Parameters<OpenAIWorld["finish"]>[1]) => {
+    const done = (result: Parameters<OpenAIWorld["finish"]>[1], response: unknown = summary(call)) => {
       world.finish(call, result);
-      record(c, call);
+      ended({ status: call.status, response, ...(call.error === undefined ? {} : { error: call.error }) });
+    };
+    /** The agent hung up before anything was sent: nothing is stored, and the call is `aborted`. */
+    const abandoned = () => {
+      done({ status: 0, end: "aborted" });
+      return new Response(null, { status: 499 });
     };
 
+    if (outcome.kind === "aborted") return abandoned();
     if (outcome.kind === "timeout") {
       call.open = "a model call that never answers (a scripted timeout)";
       await new Promise<void>((resolve) => {
-        if (c.req.raw.signal.aborted) resolve();
-        c.req.raw.signal.addEventListener("abort", () => resolve());
+        if (hangUp.aborted) resolve();
+        hangUp.addEventListener("abort", () => resolve(), { once: true });
       });
       done({ status: 0, end: "aborted", error: "timeout" });
       return new Response(null, { status: 408 });
     }
     if (outcome.kind === "error") {
-      await world.wait(outcome.afterMs);
-      done({ status: outcome.error.status, error: outcome.error.code ?? outcome.error.type });
-      return errorResponse(c, outcome.error, common(call.session, startedAt));
+      if (await world.firstToken(call, outcome.firstTokenMs, hangUp)) return abandoned();
+      done({ status: outcome.error.status, error: outcome.error.code ?? outcome.error.type }, outcome.error.body());
+      throw outcome.error;
     }
 
     const { answer, turn, script } = outcome;
     call.answer = answer;
     const created = Math.floor(startedAt / 1000);
+    const dialect = chatDialect(request, body);
     const chatMeta: ChatMeta = {
       id: call.id,
       created,
       model: request.model,
       fingerprint,
-      dialect: chatDialect(request, body),
+      dialect,
+      // OpenAI pads its own streams; the gateways' dialects don't.
+      obfuscation: request.includeObfuscation && dialect === "openai",
     };
     const store = endpoint === "responses" && body.store !== false;
     const encrypted =
@@ -340,12 +319,10 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     const timing = turn.timing ?? {};
     // Speech streams when `stream_format: "sse"` asks; the other endpoints when `stream` does.
     const streamed = request.stream || request.media?.streamFormat === "sse";
+    if (await world.firstToken(call, timing.firstToken ?? 0, hangUp)) return abandoned();
     if (!streamed) {
-      await world.wait(timing.firstToken ?? 0);
       keep();
       done({ status: 200 });
-      const headers = common(call.session, startedAt);
-      for (const [name, value] of Object.entries(headers)) c.header(name, value);
       return whole(c, endpoint, answer, request, body, { chatMeta, responseMeta, created });
     }
 
@@ -376,7 +353,6 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
           : {}),
       };
     }
-    await world.wait(timing.firstToken ?? 0);
     const stream = sseStream(
       {
         frames,
@@ -406,7 +382,6 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
         "content-type": "text/event-stream; charset=utf-8",
         "cache-control": "no-cache",
         connection: "keep-alive",
-        ...common(call.session, startedAt),
       },
     });
   };
@@ -586,23 +561,22 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
 
   // Files: what `file_id` parts name, and what file search cites.
   const PURPOSES = ["assistants", "batch", "fine-tune", "vision", "user_data", "evals"];
-  const noFile = (c: Context, id: string) =>
-    errorResponse(
-      c,
-      new OpenAIError(404, { message: `No such File object: ${id}`, type: "invalid_request_error", param: "id" }),
-      common(undefined, clock()),
-    );
+  const noFile = (id: string) =>
+    new OpenAIError(404, { message: `No such File object: ${id}`, type: "invalid_request_error", param: "id" });
+  const fileOf = (c: Context) => {
+    const id = c.req.param("id") ?? "";
+    const file = world.media.files.get(id);
+    if (!file) throw noFile(id);
+    return file;
+  };
   v1.post("/files", async (c) => {
     const parsed = await readForm(c);
-    if (parsed instanceof OpenAIError) return errorResponse(c, parsed, common(undefined, clock()));
     const file = uploads.get(parsed)?.file?.[0];
     const purpose = typeof parsed.purpose === "string" ? parsed.purpose : undefined;
-    const refuse400 = (message: string, param: string) =>
-      errorResponse(c, invalidRequest(message, param), common(undefined, clock()));
-    if (file === undefined) return refuse400("Missing required parameter: 'file'.", "file");
-    if (purpose === undefined) return refuse400("Missing required parameter: 'purpose'.", "purpose");
+    if (file === undefined) throw invalidRequest("Missing required parameter: 'file'.", "file");
+    if (purpose === undefined) throw invalidRequest("Missing required parameter: 'purpose'.", "purpose");
     if (!PURPOSES.includes(purpose)) {
-      return refuse400(
+      throw invalidRequest(
         `'${purpose}' is not one of ${PURPOSES.map((name) => `'${name}'`).join(", ")} - 'purpose'`,
         "purpose",
       );
@@ -617,86 +591,76 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
       createdAt: created,
       ...(Number.isFinite(seconds) && seconds > 0 ? { expiresAt: created + seconds } : {}),
     });
-    return plain(c, fileWire(stored));
+    return c.json(fileWire(stored));
   });
   v1.get("/files", (c) => {
     const purpose = c.req.query("purpose");
     const files = [...world.media.files.values()].filter((file) => purpose === undefined || file.purpose === purpose);
     const ordered = c.req.query("order") === "asc" ? files : files.reverse();
-    return plain(c, listOf(ordered.map(fileWire)));
+    return c.json(listOf(ordered.map(fileWire)));
   });
-  v1.get("/files/:id", (c) => {
-    const file = world.media.files.get(c.req.param("id"));
-    return file ? plain(c, fileWire(file)) : noFile(c, c.req.param("id"));
-  });
+  v1.get("/files/:id", (c) => c.json(fileWire(fileOf(c))));
   v1.delete("/files/:id", (c) => {
-    const id = c.req.param("id");
-    if (!world.media.files.delete(id)) return noFile(c, id);
-    return plain(c, { id, object: "file", deleted: true });
+    const { id } = fileOf(c);
+    world.media.files.delete(id);
+    return c.json({ id, object: "file", deleted: true });
   });
   v1.get("/files/:id/content", (c) => {
-    const file = world.media.files.get(c.req.param("id"));
-    if (!file) return noFile(c, c.req.param("id"));
-    for (const [name, value] of Object.entries(common(undefined, clock()))) c.header(name, value);
+    const file = fileOf(c);
     c.header("content-type", "application/octet-stream");
     return c.body(file.bytes as Uint8Array<ArrayBuffer>);
   });
 
   // A code interpreter's container: the files its code wrote.
-  const containerOf = (c: Context) => world.media.containers.get(c.req.param("container") ?? "");
-  const noContainer = (c: Context, what: string) =>
-    errorResponse(
-      c,
-      new OpenAIError(404, { message: `${what} not found.`, type: "invalid_request_error", param: null }),
-      common(undefined, clock()),
-    );
-  v1.get("/containers/:container/files", (c) => {
-    const files = containerOf(c);
-    if (!files) return noContainer(c, `Container ${c.req.param("container")}`);
-    return plain(c, listOf([...files.values()].map(containerFileWire)));
-  });
-  v1.get("/containers/:container/files/:file", (c) => {
-    const file = containerOf(c)?.get(c.req.param("file"));
-    return file ? plain(c, containerFileWire(file)) : noContainer(c, `File ${c.req.param("file")}`);
-  });
+  const notFoundIn = (what: string) =>
+    new OpenAIError(404, { message: `${what} not found.`, type: "invalid_request_error", param: null });
+  const containerOf = (c: Context) => {
+    const files = world.media.containers.get(c.req.param("container") ?? "");
+    if (!files) throw notFoundIn(`Container ${c.req.param("container") ?? ""}`);
+    return files;
+  };
+  const containerFileOf = (c: Context) => {
+    const file = containerOf(c).get(c.req.param("file") ?? "");
+    if (!file) throw notFoundIn(`File ${c.req.param("file") ?? ""}`);
+    return file;
+  };
+  v1.get("/containers/:container/files", (c) => c.json(listOf([...containerOf(c).values()].map(containerFileWire))));
+  v1.get("/containers/:container/files/:file", (c) => c.json(containerFileWire(containerFileOf(c))));
   v1.get("/containers/:container/files/:file/content", (c) => {
-    const file = containerOf(c)?.get(c.req.param("file"));
-    if (!file) return noContainer(c, `File ${c.req.param("file")}`);
-    for (const [name, value] of Object.entries(common(undefined, clock()))) c.header(name, value);
+    const file = containerFileOf(c);
     c.header("content-type", file.mediaType);
     return c.body(file.bytes as Uint8Array<ArrayBuffer>);
   });
 
-  const plain = (c: Context, body: unknown, status = 200) => {
-    for (const [name, value] of Object.entries(common(undefined, clock()))) c.header(name, value);
-    return c.json(body, status as 200);
+  const missing = (message: string) => new OpenAIError(404, { message, type: "invalid_request_error", param: null });
+  /** A stored response, its call on record for the session it belongs to. */
+  const storedOf = (c: Context) => {
+    const id = c.req.param("id") ?? "";
+    const stored = world.store.responses.get(id);
+    if (!stored) throw missing(`Response with id '${id}' not found.`);
+    belongsTo(c, stored.session);
+    return stored;
   };
-  const missing = (c: Context, message: string, param: string | null = null) =>
-    errorResponse(
-      c,
-      new OpenAIError(404, { message, type: "invalid_request_error", param }),
-      common(undefined, clock()),
-    );
+  /** A conversation, its call on record for the session it belongs to. */
+  const conversationOf = (c: Context) => {
+    const id = c.req.param("id") ?? "";
+    const conversation = world.store.conversations.get(id);
+    if (!conversation) throw missing(`Conversation with id '${id}' not found.`);
+    belongsTo(c, conversation.session);
+    return conversation;
+  };
 
-  v1.get("/responses/:id", (c) => {
-    const stored = world.store.responses.get(c.req.param("id"));
-    return stored ? plain(c, stored.object) : missing(c, `Response with id '${c.req.param("id")}' not found.`);
-  });
+  v1.get("/responses/:id", (c) => c.json(storedOf(c).object));
   v1.delete("/responses/:id", (c) => {
-    const id = c.req.param("id");
-    if (!world.store.responses.delete(id)) return missing(c, `Response with id '${id}' not found.`);
-    return plain(c, { id, object: "response", deleted: true });
+    const { id } = storedOf(c);
+    world.store.responses.delete(id);
+    return c.json({ id, object: "response", deleted: true });
   });
-  v1.get("/responses/:id/input_items", (c) => {
-    const stored = world.store.responses.get(c.req.param("id"));
-    if (!stored) return missing(c, `Response with id '${c.req.param("id")}' not found.`);
-    return plain(c, listOf([...stored.input].reverse()));
-  });
+  v1.get("/responses/:id/input_items", (c) => c.json(listOf([...storedOf(c).input].reverse())));
 
   // Conversations: their items are the history of the responses that name them.
   v1.post("/conversations", async (c) => {
     const parsed = await parse(c);
-    if (parsed instanceof OpenAIError) return errorResponse(c, parsed, common(undefined, clock()));
     const conversation = world.store.openConversation({
       id: ids.next(OPENAI_IDS.conversation),
       createdAt: Math.floor(clock() / 1000),
@@ -704,57 +668,51 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
       items: inputItems(parsed.items).map((item) => withId(item)),
       session: undefined,
     });
-    return plain(c, conversationWire(conversation));
+    return c.json(conversationWire(conversation));
   });
-  v1.get("/conversations/:id", (c) => {
-    const conversation = world.store.conversations.get(c.req.param("id"));
-    return conversation
-      ? plain(c, conversationWire(conversation))
-      : missing(c, `Conversation with id '${c.req.param("id")}' not found.`);
-  });
+  v1.get("/conversations/:id", (c) => c.json(conversationWire(conversationOf(c))));
   v1.post("/conversations/:id", async (c) => {
-    const conversation = world.store.conversations.get(c.req.param("id"));
-    if (!conversation) return missing(c, `Conversation with id '${c.req.param("id")}' not found.`);
+    const conversation = conversationOf(c);
     const parsed = await parse(c);
-    if (parsed instanceof OpenAIError) return errorResponse(c, parsed, common(undefined, clock()));
     if (isObject(parsed.metadata)) conversation.metadata = parsed.metadata as Record<string, string>;
-    return plain(c, conversationWire(conversation));
+    return c.json(conversationWire(conversation));
   });
   v1.delete("/conversations/:id", (c) => {
-    const id = c.req.param("id");
-    if (!world.store.conversations.delete(id)) return missing(c, `Conversation with id '${id}' not found.`);
-    return plain(c, { id, object: "conversation.deleted", deleted: true });
+    const { id } = conversationOf(c);
+    world.store.conversations.delete(id);
+    return c.json({ id, object: "conversation.deleted", deleted: true });
   });
   v1.get("/conversations/:id/items", (c) => {
-    const conversation = world.store.conversations.get(c.req.param("id"));
-    if (!conversation) return missing(c, `Conversation with id '${c.req.param("id")}' not found.`);
+    const conversation = conversationOf(c);
     const order = c.req.query("order") === "asc" ? "asc" : "desc";
-    return plain(c, listOf(order === "asc" ? conversation.items : [...conversation.items].reverse()));
+    return c.json(listOf(order === "asc" ? conversation.items : [...conversation.items].reverse()));
   });
   v1.post("/conversations/:id/items", async (c) => {
-    const conversation = world.store.conversations.get(c.req.param("id"));
-    if (!conversation) return missing(c, `Conversation with id '${c.req.param("id")}' not found.`);
+    const conversation = conversationOf(c);
     const parsed = await parse(c);
-    if (parsed instanceof OpenAIError) return errorResponse(c, parsed, common(undefined, clock()));
     const added = inputItems(parsed.items).map((item) => withId(item));
     conversation.items.push(...added);
-    return plain(c, listOf(added));
+    return c.json(listOf(added));
   });
+  const itemOf = (c: Context) => {
+    const conversation = world.store.conversations.get(c.req.param("id") ?? "");
+    const at = conversation?.items.findIndex((candidate) => candidate.id === c.req.param("item")) ?? -1;
+    if (!conversation || at === -1) throw missing(`Item with id '${c.req.param("item")}' not found.`);
+    belongsTo(c, conversation.session);
+    return { conversation, at };
+  };
   v1.get("/conversations/:id/items/:item", (c) => {
-    const conversation = world.store.conversations.get(c.req.param("id"));
-    const item = conversation?.items.find((candidate) => candidate.id === c.req.param("item"));
-    return item ? plain(c, item) : missing(c, `Item with id '${c.req.param("item")}' not found.`);
+    const { conversation, at } = itemOf(c);
+    return c.json(conversation.items[at]);
   });
   v1.delete("/conversations/:id/items/:item", (c) => {
-    const conversation = world.store.conversations.get(c.req.param("id"));
-    const at = conversation?.items.findIndex((candidate) => candidate.id === c.req.param("item")) ?? -1;
-    if (!conversation || at === -1) return missing(c, `Item with id '${c.req.param("item")}' not found.`);
+    const { conversation, at } = itemOf(c);
     conversation.items.splice(at, 1);
-    return plain(c, conversationWire(conversation));
+    return c.json(conversationWire(conversation));
   });
 
   v1.get("/models", (c) =>
-    plain(c, {
+    c.json({
       object: "list",
       data: [...new Set([...MODELS, ...seen])].map((id) => ({
         id,
@@ -765,7 +723,7 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     }),
   );
   v1.get("/models/:model", (c) =>
-    plain(c, { id: c.req.param("model"), object: "model", created: MODEL_CREATED, owned_by: "system" }),
+    c.json({ id: c.req.param("model"), object: "model", created: MODEL_CREATED, owned_by: "system" }),
   );
 
   /**
@@ -805,19 +763,44 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
   api.route("/openai/v1", v1);
   api.post("/openai/deployments/:deployment/chat/completions", (c) => {
     if (c.req.query("api-version") === undefined) {
-      return errorResponse(
-        c,
-        new OpenAIError(404, { message: "Resource not found", type: "invalid_request_error", code: "404" }),
-        common(undefined, clock()),
-      );
+      throw new OpenAIError(404, { message: "Resource not found", type: "invalid_request_error", code: "404" });
     }
     return chat(c, c.req.param("deployment"));
   });
+  api.all("*", (c) => {
+    throw notFound(c.req.method, new URL(c.req.url).pathname);
+  });
 
-  api.all("*", (c) =>
-    errorResponse(c, notFound(c.req.method, new URL(c.req.url).pathname), common(undefined, clock())),
+  // Every call on record for the session it belongs to (a model call when it ends); a call
+  // without the key is refused and kept off it. Every answer carries OpenAI's headers.
+  return wrapRest(
+    context,
+    {
+      driver: "openai",
+      refusal: (error) => (error instanceof OpenAIError ? refusalOf(error) : undefined),
+      internal: () =>
+        refusalOf(
+          new OpenAIError(500, {
+            message: "The server had an error while processing your request. Sorry about that!",
+            type: "server_error",
+          }),
+        ),
+      decorate: (answer, c) => {
+        // Only a model call carries its session's rate limit; every other answer, the default one.
+        const headers = common(
+          c?.get(LIMITED as never) as string | undefined,
+          (c?.get(STARTED as never) as number | undefined) ?? clock(),
+        );
+        // A refusal's own headers (the rate limit's, `retry-after`) stand.
+        return {
+          ...answer,
+          headers: Object.fromEntries(Object.entries(headers).filter(([name]) => !c?.res.headers.has(name))),
+        };
+      },
+    },
+    api,
+    { recorded: (c) => c.get(AUTHENTICATED as never) === true, sessions: (c) => [sessionOf(c)] },
   );
-  return api;
 }
 
 /** A list as OpenAI pages one: `object: "list"`, its first and last ids, and no more. */
@@ -829,4 +812,15 @@ function listOf(items: readonly Record<string, unknown>[]) {
     last_id: (items.at(-1)?.id as string | undefined) ?? null,
     has_more: false,
   };
+}
+
+/** What a model call's record shows of its answer: the text, the tools called, how it finished. */
+function summary(call: CallRecord) {
+  return call.answer
+    ? {
+        text: call.answer.text,
+        toolCalls: call.answer.toolCalls.map(({ name }) => name),
+        finish: call.answer.finish,
+      }
+    : undefined;
 }

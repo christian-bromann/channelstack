@@ -31,13 +31,14 @@ The folder is the section and the frontmatter's `order` is the position in it. T
 
 **Quickstarts** (`docs/quickstarts/`)
 
-One per agent framework, in the order people use them with channelstack. Each is a short tutorial: the framework's own agent, pointed at the fakes, and a first passing test. Each was followed step by step against a local channelstack, so the steps are known to work. The Chat SDK and AI SDK ones also match a reference agent in `examples/agents/` that CI runs; Pi has no reference agent.
+One per agent framework, in the order people use them with channelstack. Each is a short tutorial: the framework's own agent, pointed at the fakes, and a first passing test. Each was followed step by step against a local channelstack, so the steps are known to work. The Chat SDK and AI SDK ones also match a reference agent in `examples/agents/` that CI runs; Pi and LangChain have no reference agent.
 
 | Page | Kind | What it covers |
 |---|---|---|
 | Chat SDK | Tutorial | A Chat SDK bot (`chat` with `@chat-adapter/slack`, and the GitHub and Linear adapters) |
 | AI SDK | Tutorial | A Bolt app that streams an AI SDK answer, on `@ai-sdk/openai` pointed at the fake OpenAI, with tests that script the model |
 | Pi | Tutorial | A Pi agent in Slack |
+| LangChain | Tutorial | A Bolt app that streams a LangChain answer and runs its tool calls, on `ChatOpenAI` pointed at the fake OpenAI, with tests that script the model |
 
 **Guide** (`docs/guide/`)
 

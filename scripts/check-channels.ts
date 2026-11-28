@@ -126,7 +126,8 @@ const sources = (dir: string): string[] =>
     if (entry.isDirectory()) return entry.name === "schema" ? [] : sources(path);
     return entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts") ? [path] : [];
   });
-const BYPASSES: ReadonlyArray<readonly [RegExp, string]> = [
+/** What goes around the kit, and what to use instead; `channels` only for a channel's driver. */
+const BYPASSES: ReadonlyArray<readonly [RegExp, string, "channels"?]> = [
   [
     /\bdelivery\.(?:enqueue|again|list|get)\(|context\.delivery\b/,
     "calls the delivery queue: use its delivery kit (core/delivery/kit.ts)",
@@ -134,6 +135,8 @@ const BYPASSES: ReadonlyArray<readonly [RegExp, string]> = [
   [
     /path: "\/(?:deliveries|calls)"/,
     "registers an inspection route: use registerInspectionRoutes (core/router/inspection.ts)",
+    // A provider's `/calls` are its model calls, a resource of their own: it has no deliveries.
+    "channels",
   ],
   [/super\(\{ platform: code, status: 409 \}, message, data\)/, "repeats LivePlatformRefusal: extend it (core/errors)"],
   [/headers\.get\("retry-after"\)/, "reads Retry-After itself: use waitRetryAfter (core/clock)"],
@@ -144,20 +147,29 @@ const BYPASSES: ReadonlyArray<readonly [RegExp, string]> = [
 ];
 /**
  * The fakes whose API isn't REST, and so records its calls itself: Slack's Web API is methods
- * posted as forms, Linear's is one GraphQL endpoint. Every REST fake records through restApi.
+ * posted as forms, Linear's is one GraphQL endpoint. Every REST fake, a provider's too, records
+ * through restApi or wrapRest (a streamed answer when its stream ends).
  */
 const NOT_REST: Readonly<Record<string, string>> = {
   slack: "Web API methods, posted as forms",
   linear: "one GraphQL endpoint",
 };
-for (const file of sources(join(ROOT, "server", "src", "drivers"))) {
-  const text = readFileSync(file, "utf8");
-  for (const [pattern, says] of BYPASSES) {
-    if (pattern.test(text)) problems.push(`${relative(ROOT, file)} ${says}`);
-  }
-  const driver = relative(join(ROOT, "server", "src", "drivers"), file).split(sep)[0] ?? "";
-  if (/\brecordCall\(/.test(text) && !(driver in NOT_REST)) {
-    problems.push(`${relative(ROOT, file)} records its calls itself: a REST fake uses restApi (core/fake/endpoint.ts)`);
+// The channels' drivers and the providers (the fake OpenAI) alike.
+for (const [root, kind] of [
+  [join(ROOT, "server", "src", "drivers"), "channels"],
+  [join(ROOT, "server", "src", "providers"), "providers"],
+] as const) {
+  for (const file of sources(root)) {
+    const text = readFileSync(file, "utf8");
+    for (const [pattern, says, only] of BYPASSES) {
+      if ((only === undefined || only === kind) && pattern.test(text)) problems.push(`${relative(ROOT, file)} ${says}`);
+    }
+    const driver = relative(root, file).split(sep)[0] ?? "";
+    if (/\brecordCall\(/.test(text) && !(driver in NOT_REST)) {
+      problems.push(
+        `${relative(ROOT, file)} records its calls itself: a REST fake uses restApi or wrapRest (core/fake/endpoint.ts)`,
+      );
+    }
   }
 }
 // Core names no platform: each driver declares its ids, secrets and token shapes.

@@ -72,15 +72,20 @@ function matches(when: Match | undefined, request: ModelRequest, text: string, c
   return true;
 }
 
-/** What a template in a turn's text names, from the request. */
-export function fillTemplate(text: string, request: ModelRequest, call: number): string {
+/** What a template in a turn's text names, from the request; each value through `encode` (JSON text's). */
+export function fillTemplate(
+  text: string,
+  request: ModelRequest,
+  call: number,
+  encode: (value: string) => string = (value) => value,
+): string {
   return text.replace(/\{(lastUserText|toolResult(?:\.[\w-]+)?|model|call)\}/g, (_, name: string) => {
-    if (name === "lastUserText") return request.lastUserText ?? "";
-    if (name === "model") return request.model;
+    if (name === "lastUserText") return encode(request.lastUserText ?? "");
+    if (name === "model") return encode(request.model);
     if (name === "call") return String(call);
-    if (name === "toolResult") return request.lastToolResults.at(-1)?.text ?? "";
+    if (name === "toolResult") return encode(request.lastToolResults.at(-1)?.text ?? "");
     const tool = name.slice("toolResult.".length);
-    return request.lastToolResults.find((result) => result.name === tool)?.text ?? "";
+    return encode(request.lastToolResults.find((result) => result.name === tool)?.text ?? "");
   });
 }
 
@@ -139,17 +144,19 @@ export class Scripts {
 
   /**
    * The script that answers this call: the first, in the order they were added, whose `when`
-   * holds and that has calls left. A list that ran out no longer answers; that is noted on it.
+   * holds and that has calls left. A list that ran out no longer answers; when no other script
+   * answers the call either, that is noted on each list that ran out.
    */
   pick(session: string, request: ModelRequest, text: string, context: CallContext): ScriptRecord | undefined {
+    const ranOut: ScriptRecord[] = [];
     for (const script of this.of(session)) {
       if (!matches(script.when, request, text, context)) continue;
-      if (script.used >= script.times) {
-        const note = `${script.id} has ${script.times} ${script.times === 1 ? "turn" : "turns"}; call ${script.used + 1} arrived`;
-        if (!script.problems.includes(note)) script.problems.push(note);
-        continue;
-      }
-      return script;
+      if (script.used < script.times) return script;
+      ranOut.push(script);
+    }
+    for (const script of ranOut) {
+      const note = `${script.id} has ${script.times} ${script.times === 1 ? "turn" : "turns"}; call ${script.used + 1} arrived`;
+      if (!script.problems.includes(note)) script.problems.push(note);
     }
     return undefined;
   }

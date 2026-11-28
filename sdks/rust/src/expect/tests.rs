@@ -22,6 +22,8 @@ struct StandIn {
     open: Vec<String>,
     /// The `error` the last read of the calls filtered by.
     filtered_by: Mutex<Value>,
+    /// The windows the model's reads were asked for.
+    asked: Mutex<Vec<u64>>,
 }
 
 impl StandIn {
@@ -55,6 +57,28 @@ impl Subject for StandIn {
                 problems: vec![],
             })
         })
+    }
+
+    /// `unattributed` and `sessionCalls`, and the window asked for in `asked`.
+    fn model_reads(&self, within_ms: u64) -> BoxFuture<'_, Result<(Value, Value)>> {
+        self.asked.lock().unwrap().push(within_ms);
+        let reads = (
+            self.data["unattributed"].clone(),
+            self.data["sessionCalls"].clone(),
+        );
+        Box::pin(async move { Ok(reads) })
+    }
+}
+
+impl ScriptRefresh for StandIn {
+    fn read_script(&self) -> BoxFuture<'_, Result<Value>> {
+        self.answer("script")
+    }
+}
+
+impl ModelCalls for StandIn {
+    fn read_model_calls(&self) -> BoxFuture<'_, Result<Value>> {
+        self.answer("modelCalls")
     }
 }
 
@@ -178,12 +202,6 @@ impl Calls for StandIn {
             .filter(|call| error.is_null() || call["error"] == error)
             .collect();
         Box::pin(async move { Ok(Value::Array(calls)) })
-    }
-}
-
-impl ModelCalls for StandIn {
-    fn read_model_calls(&self) -> BoxFuture<'_, Result<Value>> {
-        self.answer("modelCalls")
     }
 }
 
@@ -1143,6 +1161,52 @@ async fn a_file_sent_holds_for_its_path_and_for_its_bytes() -> Result<()> {
     Ok(())
 }
 
+// --- The model ------------------------------------------------------------------------------------
+
+#[tokio::test]
+async fn to_have_answered_counts_the_turns_that_reached_the_agent_not_those_the_fake_refused()
+-> Result<()> {
+    let refused = StandIn::with(json!({ "script": {
+        "id": "ms_1",
+        "used": 1,
+        "problems": ["ms_1 called `search_incidents`, but the request offered no tools"],
+        "calls": [{ "response": { "error": "channelstack_no_script" } }],
+    }}));
+    assert_eq!(
+        failure(expect(&refused).to_have_answered().timeout(FAST).await),
+        "Expected script ms_1 to answer a call, it answered 0. Its problems:\n  ms_1 called `search_incidents`, but the request offered no tools"
+    );
+    // A held call (a responder still answering) isn't answered yet; a scripted error is an answer.
+    let held = StandIn::with(
+        json!({ "script": { "id": "ms_1", "used": 1, "problems": [], "calls": [{ "response": {} }] } }),
+    );
+    assert!(failure(expect(&held).to_have_answered().timeout(FAST).await).contains("answered 0"));
+    let answered = StandIn::with(
+        json!({ "script": { "id": "ms_1", "used": 3, "problems": [], "calls": [
+            { "response": { "text": "All good." } },
+            { "response": { "error": "rate_limit_exceeded" } },
+            { "response": { "error": "channelstack_no_script" } },
+        ]}}),
+    );
+    expect(&answered)
+        .to_have_answered()
+        .times(2)
+        .quiet_for(QUIET)
+        .await
+}
+
+#[tokio::test]
+async fn to_have_sent_compares_text_as_attribution_does_a_slack_link_is_its_url() -> Result<()> {
+    let call = StandIn::with(json!({ "modelCalls": [
+        { "request": { "text": "Ana: Deploy   https://example.com/runs/7 NOW", "tools": [] } },
+    ]}));
+    expect(&call)
+        .to_have_sent("<@U08B5K2M9QX> deploy <https://example.com/runs/7|the run> now")
+        .timeout(FAST)
+        .await?;
+    Ok(())
+}
+
 #[tokio::test]
 async fn a_file_not_sent_fails_with_what_was_sent_newest_first() {
     let message = failure(
@@ -1183,4 +1247,64 @@ async fn a_file_not_to_be_sent_once_quiet() -> Result<()> {
         "{message}"
     );
     Ok(())
+}
+
+#[tokio::test]
+async fn a_failing_check_names_the_model_calls_no_session_claimed_recent_ones_only() {
+    let thread = StandIn::with(json!({ "unattributed": [{
+        "id": "chatcmpl-1",
+        "lastUserText": "summarise the backlog",
+        "sinceMs": 2400,
+        "message": "this call couldn't be attributed to any test: nothing in it matches.",
+    }]}));
+    assert_eq!(
+        failure(
+            expect(&thread)
+                .to_have_reply_from("my-agent")
+                .timeout(FAST)
+                .await
+        ),
+        [
+            "Expected a reply from my-agent. The thread has:\n  (nothing)",
+            "1 model call in the last 10s couldn't be attributed to a test:",
+            "  chatcmpl-1 (\"summarise the backlog\", 2s ago): this call couldn't be attributed to any test: nothing in it matches.",
+        ]
+        .join("\n")
+    );
+    assert_eq!(*thread.asked.lock().unwrap(), vec![10_000]);
+}
+
+fn by_order(call: &str) -> Value {
+    json!({ "id": call, "request": { "context": {
+        "attributedBy": "order", "matched": "@my-agent hello", "tiedWith": ["ses_2"],
+    }}})
+}
+
+#[tokio::test]
+async fn a_failing_check_names_the_sessions_a_call_attributed_by_order_tied_with() {
+    let thread = StandIn::with(json!({ "sessionCalls": [
+        by_order("chatcmpl-1"),
+        { "id": "chatcmpl-2", "request": { "context": { "attributedBy": "text" } } },
+    ]}));
+    assert_eq!(
+        failure(
+            expect(&thread)
+                .to_have_reply_from("my-agent")
+                .timeout(FAST)
+                .await
+        ),
+        [
+            "Expected a reply from my-agent. The thread has:\n  (nothing)",
+            "Model call chatcmpl-1 was attributed by order, between 2 sessions that all sent \"@my-agent hello\" (this one and ses_2): each went to the oldest unanswered message. Give each test's prompt something of its own, or have the agent send `user`.",
+        ]
+        .join("\n")
+    );
+    let notes = super::model_notes(&[], &[by_order("chatcmpl-1"), by_order("chatcmpl-3")]);
+    assert_eq!(notes.len(), 1);
+    assert!(
+        notes[0].starts_with(
+            "Model calls chatcmpl-1, chatcmpl-3 were attributed by order, between 2 sessions"
+        ),
+        "{notes:?}"
+    );
 }

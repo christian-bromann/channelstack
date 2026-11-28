@@ -90,6 +90,12 @@ Objects the platform identifies by more than one value get nested paths: a Slack
 | | Tokens | Access tokens `ya29.…`, refresh tokens `1//0…`, client secrets `GOCSPX-…`, client ids `<12 digits>-<32>.apps.googleusercontent.com`; push tokens are RS256 JWTs signed with a per-install RSA key |
 | Discord | Everything | Snowflakes: Discord's epoch in the high bits, so what is made now has now in it (`discordSnowflake`), and people, the guild and roles that existed before a test have a time between 2016 and 2025. A Gateway session is 32 hex characters |
 | | Tokens | A bot token is `<the bot's id in base 64>.<6>.<38>`, so the bot's id is in it, as in Discord; an interaction's token `aW50ZXJhY3Rpb246…`; interactions are signed with a per-install Ed25519 key, whose public half is the app's |
+| OpenAI (the fake model) | Chat Completion | `chatcmpl-` and 29 base-62 characters; `system_fingerprint` is `fp_` and 10 hex characters |
+| | Response, conversation, items | A prefix and 48 hex characters: `resp_…`, `conv_…`, and the items `msg_…`, `fc_…` (function call), `ctc_…` (custom tool call), `rs_…` (reasoning) |
+| | Tool call | `call_` and 24 base-62 characters |
+| | Request, organization, project | `x-request-id` `req_` and 32 hex characters; `org-` and `proj_`, each with 24 base-62 characters |
+| | Key | A project key: `sk-proj-`, 74 base-62 characters, `T3BlbkFJ`, 74 more, random per install |
+| | The fake's own | A script `ms_` and 12 characters, a call held for a responder `mreq_` and 16 (lower-case base 36): OpenAI has neither |
 
 - **Generated from a seeded random source** per world, so ids are unique and realistic. `CHANNELSTACK_SEED` makes a run reproducible.
 - **Sequential where the platform is:** GitHub issue numbers, Linear identifiers, Slack `ts`.

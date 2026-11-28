@@ -1,6 +1,10 @@
+import { randomString } from "../../../core/secrets/index.ts";
 import type { Media } from "../media.ts";
 import type { ModelRequest } from "../request.ts";
 import type { BuiltInCall } from "../tools/shared.ts";
+
+/** Padding that makes every streamed piece's length uninformative, as OpenAI adds unless `include_obfuscation: false`. */
+export const obfuscation = () => randomString(16, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
 
 /** A tool call in an answer, its id minted and its arguments as the JSON text the model sends. */
 interface AnswerToolCall {

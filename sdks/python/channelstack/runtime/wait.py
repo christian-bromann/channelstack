@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+from ..generated import normalisation
 from .duration import Duration, parse_duration
 
 
@@ -140,6 +141,23 @@ def from_matches(author: Author, from_: Author | str | None) -> bool:
     if isinstance(from_, str):
         return from_ in (author.name, author.id)
     return author.id == from_.id
+
+
+_NORMALISATION_RULES = tuple(
+    # `$1` in a rule's replacement is its pattern's first group, as Python writes it.
+    (re.compile(pattern), re.sub(r"\$(\d)", r"\\g<\1>", replacement))
+    for pattern, replacement in normalisation.RULES
+)
+
+
+def normalised_text(text: str) -> str:
+    """Text as the server compares it for attribution, by the rules the spec publishes
+    (`generated/normalisation.py`): what `to_have_sent` compares."""
+    for pattern, replacement in _NORMALISATION_RULES:
+        text = pattern.sub(replacement, text)
+    if normalisation.COLLAPSE_WHITESPACE:
+        text = re.sub(r"\s+", " ", text).strip()
+    return text.lower() if normalisation.LOWERCASE else text
 
 
 def pattern_on_wire(pattern: str | re.Pattern[str]) -> str | dict[str, str]:

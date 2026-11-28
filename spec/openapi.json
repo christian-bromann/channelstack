@@ -9471,7 +9471,19 @@
               "owned_id",
               "text",
               "order"
-            ]
+            ],
+            "description": "The evidence that gave the call to this session, strongest first."
+          },
+          "matched": {
+            "type": "string",
+            "description": "The string that decided it: the minted id, the tag, the owned id, or the text the person wrote."
+          },
+          "tiedWith": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "With `attributedBy: \"order\"`: the other sessions whose people sent the same text. The call went to the oldest unanswered message."
           }
         }
       },
@@ -9678,6 +9690,14 @@
             "items": {
               "type": "string"
             }
+          },
+          "sinceMs": {
+            "type": "number",
+            "description": "How long ago it arrived, on the server's clock."
+          },
+          "message": {
+            "type": "string",
+            "description": "What the agent was told: why no session claimed it."
           }
         },
         "required": [
@@ -9685,7 +9705,9 @@
           "endpoint",
           "model",
           "at",
-          "tools"
+          "tools",
+          "sinceMs",
+          "message"
         ]
       },
       "OpenAIRateLimit": {
@@ -32894,7 +32916,7 @@
     },
     "/sessions/{session}/openai/unattributed": {
       "get": {
-        "summary": "Model calls no session could be given (the agent calling the model at startup, for example)",
+        "summary": "Model calls no session could be given (the agent calling the model at startup, for example), oldest first: what a failing matcher names",
         "security": [
           {
             "bearer": []
@@ -32902,7 +32924,10 @@
         ],
         "x-channelstack-method": {
           "on": "OpenAIFixture",
-          "name": "unattributed"
+          "name": "unattributed",
+          "options": [
+            "withinMs"
+          ]
         },
         "x-channelstack-error-codes": [
           "unauthorized",
@@ -32920,6 +32945,20 @@
             "required": true,
             "name": "session",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "description": "Only the calls that arrived this recently."
+            },
+            "required": false,
+            "description": "Only the calls that arrived this recently.",
+            "name": "withinMs",
+            "in": "query"
           }
         ],
         "responses": {
@@ -33394,5 +33433,23 @@
       "title": "OpenAI",
       "provider": true
     }
-  ]
+  ],
+  "x-channelstack-text-normalisation": {
+    "rules": [
+      {
+        "pattern": "<[@#!][^>]*>",
+        "replacement": " "
+      },
+      {
+        "pattern": "<(https?:[^>|]+)(\\|[^>]*)?>",
+        "replacement": " $1 "
+      },
+      {
+        "pattern": "(^|\\s)@[A-Za-z0-9_.-]+",
+        "replacement": " "
+      }
+    ],
+    "collapseWhitespace": true,
+    "lowercase": true
+  }
 }

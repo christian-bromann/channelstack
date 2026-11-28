@@ -4,6 +4,30 @@ import { BANNER, errorClassName, IrIndex, pathParts } from "./shared.ts";
 
 const OUT = "sdks/typescript/generated/index.ts";
 const CHANNELS_OUT = "sdks/typescript/generated/channels.ts";
+const NORMALISATION_OUT = "sdks/typescript/generated/normalisation.ts";
+
+/** How the server compares text (`x-channelstack-text-normalisation`), for the runtime's `normalisedText`. */
+function normalisationFile(ir: Ir): string {
+  const { rules, collapseWhitespace, lowercase } = ir.textNormalisation;
+  return [
+    `// ${BANNER}`,
+    "",
+    "/**",
+    " * Text as the server compares it for attribution: each rule replaces every match of its pattern",
+    " * (`$1` is its first group), in order; then, as its flags say, whitespace collapsed and trimmed and case lowered.",
+    " */",
+    "export const TEXT_NORMALISATION = {",
+    "  rules: [",
+    ...rules.map(
+      (rule) => `    { pattern: ${JSON.stringify(rule.pattern)}, replacement: ${JSON.stringify(rule.replacement)} },`,
+    ),
+    "  ],",
+    `  collapseWhitespace: ${collapseWhitespace},`,
+    `  lowercase: ${lowercase},`,
+    "} as const;",
+    "",
+  ].join("\n");
+}
 
 /** What the SDK and the Vitest integration need per channel, from the IR: the channel list, the fixtures, the unions. */
 function channelsFile(ir: Ir): string {
@@ -441,6 +465,11 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
             "  [QUIET](): Promise<QuietState> {",
             "    return quietOf(this.#ctx);",
             "  }",
+            "",
+            "  /** @internal The server and session this handle lives in: what a failing matcher reads the session's model calls with. */",
+            "  [CONTEXT](): HandleContext {",
+            "    return this.#ctx;",
+            "  }",
           ];
     const tail = [
       ...resource.methods.flatMap((m) => method(resource, m)),
@@ -540,7 +569,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   const spec = JSON.stringify(ir);
   const lines = [
     `// ${BANNER}`,
-    `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${ir.types.some((type) => type.stringField !== undefined) ? ", printsAs" : ""}, QUIET, quietOf${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
+    `import { ClientBase, connectWith, CONTEXT${disposes ? ", disposeQuietly" : ""}, type HandleContext${ir.types.some((type) => type.stringField !== undefined) ? ", printsAs" : ""}, QUIET, quietOf${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
     ...(usesCredentials ? ['import { credential } from "../runtime/credentials.ts";'] : []),
     ...(usesDurations ? ['import { type Duration, parseDuration } from "../runtime/duration.ts";'] : []),
     ...(usesFiles
@@ -586,5 +615,6 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   return new Map([
     [OUT, lines.join("\n")],
     [CHANNELS_OUT, channelsFile(ir)],
+    [NORMALISATION_OUT, normalisationFile(ir)],
   ]);
 }

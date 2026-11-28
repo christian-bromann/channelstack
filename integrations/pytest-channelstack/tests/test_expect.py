@@ -839,3 +839,122 @@ async def test_a_file_not_to_be_sent_once_quiet() -> None:
     await expect(SENT).not_to_have_sent_file(b"\x01", **FAST)
     with pytest.raises(AssertionError, match=r"^Expected the agent not to send the model these bytes \(6 bytes"):
         await expect(SENT).not_to_have_sent_file(PNG, **FAST)
+
+
+# The model
+
+
+@dataclass
+class ScriptStandIn:
+    """A script whose calls answered with these responses: what `to_have_answered` counts."""
+
+    responses: list[dict[str, Any]]
+    problems: list[str] = field(default_factory=lambda: [])
+    id: str = "ms_1"
+    _ctx: object = None
+
+    async def calls(self) -> list[Any]:
+        return [type("Call", (), {"response": response})() for response in self.responses]
+
+    async def refresh(self) -> "ScriptStandIn":
+        return self
+
+
+async def test_to_have_answered_counts_the_turns_that_reached_the_agent_not_those_the_fake_refused() -> None:
+    refused = ScriptStandIn(
+        [{"error": "channelstack_no_script"}], ["ms_1 called `search_incidents`, but the request offered no tools"]
+    )
+    with pytest.raises(
+        AssertionError,
+        match=r"^Expected script ms_1 to answer a call, it answered 0\. Its problems:\n"
+        r"  ms_1 called `search_incidents`, but the request offered no tools$",
+    ):
+        await expect(refused).to_have_answered(timeout="300ms")
+    # A held call (a responder still answering) isn't answered yet; a scripted error is an answer.
+    with pytest.raises(AssertionError, match="it answered 0"):
+        await expect(ScriptStandIn([{}])).to_have_answered(timeout="300ms")
+    answered = ScriptStandIn(
+        [{"text": "All good."}, {"error": "rate_limit_exceeded"}, {"error": "channelstack_no_script"}]
+    )
+    await expect(answered).to_have_answered(times=2, timeout="300ms")
+
+
+@dataclass
+class SentCall:
+    request: Any
+    _ctx: object = None
+
+    async def refresh(self) -> "SentCall":
+        return self
+
+
+async def test_to_have_sent_compares_text_as_attribution_does_a_slack_link_is_its_url() -> None:
+    call = SentCall(type("Request", (), {"text": "Ana: Deploy   https://example.com/runs/7 NOW", "tools": []})())
+    await expect(call).to_have_sent(Message(ANA, "<@U08B5K2M9QX> deploy <https://example.com/runs/7|the run> now"))
+
+
+class ModelReads:
+    """A server that answers the session's model reads with these, and records what was asked."""
+
+    def __init__(self, unattributed: list[Any] | None = None, calls: list[Any] | None = None) -> None:
+        self.unattributed = unattributed or []
+        self.calls = calls or []
+        self.asked: list[tuple[str, Any]] = []
+
+    async def request(self, method: str, path: str, *, query: Any = None, body: Any = None) -> Any:
+        self.asked.append((path, query))
+        return self.unattributed if path.endswith("/unattributed") else self.calls
+
+
+def _in_session(reads: ModelReads) -> Thread:
+    return Thread(_ctx=HandleContext(transport=cast(Transport, reads), session="ses_1"))
+
+
+async def test_a_failing_check_names_the_model_calls_no_session_claimed_recent_ones_only() -> None:
+    reads = ModelReads(
+        unattributed=[
+            {
+                "id": "chatcmpl-1",
+                "lastUserText": "summarise the backlog",
+                "sinceMs": 2400,
+                "message": "this call couldn't be attributed to any test: nothing in it matches.",
+            }
+        ]
+    )
+    with pytest.raises(AssertionError) as failure:
+        await expect(_in_session(reads)).to_have_reply_from("my-agent", **FAST)
+    assert str(failure.value) == "\n".join(
+        [
+            "Expected a reply from my-agent. The thread has:\n  (nothing)",
+            "1 model call in the last 10s couldn't be attributed to a test:",
+            '  chatcmpl-1 ("summarise the backlog", 2s ago): this call couldn\'t be attributed to any test: '
+            "nothing in it matches.",
+        ]
+    )
+    assert ("/sessions/ses_1/openai/unattributed", {"withinMs": 10_000}) in reads.asked
+
+
+def _by_order(call: str) -> dict[str, Any]:
+    return {
+        "id": call,
+        "request": {"context": {"attributedBy": "order", "matched": "@my-agent hello", "tiedWith": ["ses_2"]}},
+    }
+
+
+async def test_a_failing_check_names_the_sessions_a_call_attributed_by_order_tied_with() -> None:
+    reads = ModelReads(
+        calls=[_by_order("chatcmpl-1"), {"id": "chatcmpl-2", "request": {"context": {"attributedBy": "text"}}}]
+    )
+    with pytest.raises(AssertionError) as failure:
+        await expect(_in_session(reads)).to_have_reply_from("my-agent", **FAST)
+    assert str(failure.value) == "\n".join(
+        [
+            "Expected a reply from my-agent. The thread has:\n  (nothing)",
+            'Model call chatcmpl-1 was attributed by order, between 2 sessions that all sent "@my-agent hello" '
+            "(this one and ses_2): each went to the oldest unanswered message. Give each test's prompt something "
+            "of its own, or have the agent send `user`.",
+        ]
+    )
+    model_notes = matchers._model_notes  # pyright: ignore[reportPrivateUsage]
+    [both] = model_notes([], [_by_order("chatcmpl-1"), _by_order("chatcmpl-3")])
+    assert both.startswith("Model calls chatcmpl-1, chatcmpl-3 were attributed by order, between 2 sessions")

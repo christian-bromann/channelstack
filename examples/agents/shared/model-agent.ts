@@ -175,18 +175,23 @@ export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> =
     answering.set(key, stop);
     let stream: string | undefined;
     try {
+      const show = async (text: string) => {
+        if (stop.signal.aborted || text === "") return;
+        if (stream === undefined) {
+          // Outside a DM, Slack streams to someone: the person who asked, in their workspace.
+          const recipient =
+            channel.startsWith("D") || team === undefined ? {} : { recipient_user_id: user, recipient_team_id: team };
+          stream = (await client.chat.startStream({ channel, thread_ts: thread, markdown_text: text, ...recipient }))
+            .ts;
+        } else await client.chat.appendStream({ channel, ts: stream, markdown_text: text });
+      };
       const streaming: Streaming = {
-        // Bug: Stop ends the stream in Slack, but the model's request goes on.
+        // Bug: Stop ends the stream in Slack, but the model's request goes on: it isn't given the
+        // signal, and Slack refusing the stream after Stop doesn't end the reading either.
         signal: broken("slack.stop-cancels-model") ? new AbortController().signal : stop.signal,
         onText: async (text) => {
-          if (stop.signal.aborted || text === "") return;
-          if (stream === undefined) {
-            // Outside a DM, Slack streams to someone: the person who asked, in their workspace.
-            const recipient =
-              channel.startsWith("D") || team === undefined ? {} : { recipient_user_id: user, recipient_team_id: team };
-            stream = (await client.chat.startStream({ channel, thread_ts: thread, markdown_text: text, ...recipient }))
-              .ts;
-          } else await client.chat.appendStream({ channel, ts: stream, markdown_text: text });
+          if (broken("slack.stop-cancels-model")) return show(text).catch(() => undefined);
+          return show(text);
         },
         onImage: async (image, name) => {
           await client.filesUploadV2({

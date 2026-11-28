@@ -87,6 +87,43 @@ pub fn text_matches(text: &str, expected: &Value) -> bool {
     }
 }
 
+// The rules the spec publishes (`x-channelstack-text-normalisation`), generated with the SDK.
+include!("../generated/normalisation.rs");
+
+/// Text as the server compares it for attribution, by the rules the spec publishes
+/// (`generated/normalisation.rs`): what `to_have_sent` compares.
+pub fn normalised_text(text: &str) -> String {
+    static RULES: std::sync::OnceLock<Vec<(regex::Regex, String)>> = std::sync::OnceLock::new();
+    let rules = RULES.get_or_init(|| {
+        // `$1` in a rule's replacement is its pattern's first group; Rust writes it `${1}`.
+        let group = regex::Regex::new(r"\$(\d)").expect("a pattern");
+        NORMALISATION_RULES
+            .iter()
+            .map(|(pattern, replacement)| {
+                let regex = regex::Regex::new(pattern).expect("the generated rules compile");
+                (
+                    regex,
+                    group.replace_all(replacement, "$${${1}}").into_owned(),
+                )
+            })
+            .collect()
+    });
+    let mut normalised = text.to_owned();
+    for (pattern, replacement) in rules {
+        normalised = pattern
+            .replace_all(&normalised, replacement.as_str())
+            .into_owned();
+    }
+    if COLLAPSE_WHITESPACE {
+        normalised = normalised.split_whitespace().collect::<Vec<_>>().join(" ");
+    }
+    if LOWERCASE {
+        normalised.to_lowercase()
+    } else {
+        normalised
+    }
+}
+
 /// A `Regex` as it goes on the wire (`{ "source": …, "flags": "im" }`), as Python's `pattern_on_wire`
 /// sends one: the server's patterns are JavaScript's, which have no inline flags, so a leading flag
 /// group (`(?i)`, `(?ms)`) moves into `flags`. Any other group stays in the source.
@@ -350,8 +387,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{check_text, pattern_on_wire, text_matches};
-    use serde_json::json;
+    use super::{check_text, normalised_text, pattern_on_wire, text_matches};
+    use serde_json::{Value, json};
+
+    #[test]
+    fn the_generated_rules_normalise_text_as_the_server_does() {
+        // The server's own cases (`server/src/core/attribution/attribution.test.ts` reads the same file).
+        let table: Value =
+            serde_json::from_str(include_str!("../../../../test/text-normalisation.json")).unwrap();
+        let cases = table["cases"].as_array().unwrap();
+        assert!(!cases.is_empty());
+        for case in cases {
+            let text = case["text"].as_str().unwrap();
+            assert_eq!(normalised_text(text), case["normalised"], "{text:?}");
+        }
+    }
 
     #[test]
     fn a_regex_goes_on_the_wire_with_its_inline_flags_as_flags() {

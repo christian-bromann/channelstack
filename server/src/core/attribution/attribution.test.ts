@@ -3,9 +3,18 @@
  * first, strings several sessions share never deciding, and order between sessions that sent the
  * same text.
  */
+import { readFileSync } from "node:fs";
+
 import { describe, expect, test } from "vitest";
 
-import { Attributor, bodyStrings, type KnownString, normalise } from "./index.ts";
+import { Attributor, bodyStrings, type KnownString, normalise, TEXT_NORMALISATION } from "./index.ts";
+
+/** The cases every SDK's applier of the published rules is held to as well (`test/text-normalisation.json`). */
+const NORMALISATION_CASES = (
+  JSON.parse(readFileSync(new URL("../../../../test/text-normalisation.json", import.meta.url), "utf8")) as {
+    cases: Array<{ text: string; normalised: string }>;
+  }
+).cases;
 
 /** Sessions and what each knows, as the app would read them from deliveries and API answers. */
 function world(known: Record<string, Array<string | (Partial<KnownString> & { text: string })>>) {
@@ -93,6 +102,25 @@ describe("two sessions sent the same text", () => {
     expect(second).toMatchObject({ session: "ses_b", by: "order", tiedWith: ["ses_a"] });
   });
 
+  test("a retry goes to the session its first attempt went to, and the next new call to the other", () => {
+    const attributor = world({
+      ses_a: [{ text: "@my-agent how's my change doing?", delivery: "d_a", at: 1 }],
+      ses_b: [{ text: "@my-agent how's my change doing?", delivery: "d_b", at: 2 }],
+    });
+    const asked = (key: string, retry: boolean) => ({
+      ...request("how's my change doing?"),
+      attempt: { key, retry },
+    });
+
+    const first = attributor.attribute(asked("body-1", false));
+    const retried = attributor.attribute(asked("body-1", true));
+    const next = attributor.attribute(asked("body-2", false));
+
+    expect(first).toMatchObject({ session: "ses_a", by: "order" });
+    expect(retried).toMatchObject({ session: "ses_a", by: "order", tiedWith: ["ses_b"] });
+    expect(next).toMatchObject({ session: "ses_b", by: "order" });
+  });
+
   test("something only one of them has still decides", () => {
     const attributor = world({
       ses_a: ["@my-agent how's my change doing?", "U08B5K2M9QX"],
@@ -121,6 +149,18 @@ describe("reading what a session knows", () => {
     expect(normalise("<@U08B5K2M9QX>  Deploy   <https://example.com|the page> NOW")).toBe(
       "deploy https://example.com now",
     );
+  });
+
+  test.each(NORMALISATION_CASES)("the shared normalisation case %o", ({ text, normalised }) => {
+    expect(normalise(text)).toBe(normalised);
+  });
+
+  test("the rules are data every SDK can apply: only `$n` in replacements, and patterns all three regex engines read alike", () => {
+    for (const { pattern, replacement } of TEXT_NORMALISATION.rules) {
+      expect(replacement.replace(/\$[1-9]/g, "")).not.toContain("$");
+      // No lookaround or backreferences (Rust's `regex`), no `\w`, `\d` or `\b` (ASCII in JavaScript, Unicode elsewhere).
+      expect(pattern).not.toMatch(/\(\?[=!<]|\\[1-9wWdDbB]/);
+    }
   });
 
   test("a closed session's minted ids are forgotten", () => {

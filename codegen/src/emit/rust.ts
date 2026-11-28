@@ -4,6 +4,29 @@ import { BANNER, IrIndex, pathParts, snakeCase } from "./shared.ts";
 
 const OUT = "sdks/rust/src/generated/mod.rs";
 const SUBJECTS_OUT = "sdks/rust/src/generated/subjects.rs";
+const NORMALISATION_OUT = "sdks/rust/src/generated/normalisation.rs";
+
+/** How the server compares text (`x-channelstack-text-normalisation`), included into the runtime's `wait` for `normalised_text`. */
+function normalisationFile(ir: Ir): string {
+  const { rules, collapseWhitespace, lowercase } = ir.textNormalisation;
+  // A JSON string is a Rust string literal while it has no `\u` escape.
+  const literal = (value: string) => {
+    const quoted = JSON.stringify(value);
+    if (quoted.includes("\\u")) throw new Error(`A normalisation rule Rust can't write: ${quoted}`);
+    return quoted;
+  };
+  return [
+    `// ${BANNER}`,
+    "/// Text as the server compares it for attribution: each rule replaces every match of its pattern",
+    "/// (`$1` is its first group), in order; then, as its flags say, whitespace collapsed and trimmed and case lowered.",
+    "const NORMALISATION_RULES: &[(&str, &str)] = &[",
+    ...rules.map((rule) => `    (${literal(rule.pattern)}, ${literal(rule.replacement)}),`),
+    "];",
+    `const COLLAPSE_WHITESPACE: bool = ${collapseWhitespace};`,
+    `const LOWERCASE: bool = ${lowercase};`,
+    "",
+  ].join("\n");
+}
 
 /**
  * The matcher subjects every channel has by the same reads, for `expect/subjects.rs` to include: each
@@ -338,48 +361,89 @@ export function emitRust(ir: Ir): Map<string, string> {
     }
     const builder = builderName(resource, m.name);
     const { responder } = m;
-    // `respond_with(fn)`: the same call with the responder's flag, then the test answers what the server holds for it.
+    // `respond_with(fn)`: the same call with the responder's flag and the method's other options
+    // (`.when(…)`, `.times(…)`, `.timing(…)`), then the test answers what the server holds for it.
+    const withBuilder = `${builder}With`;
     const withFunction = responder
       ? [
           "",
-          `    /// ${m.summary}, with a function the test answers each call with: it runs in this process, and gets the call's request.`,
-          `    pub async fn ${ident(m.name)}_with<F, Fut, T>(&self, respond: F) -> Result<${type}>`,
+          `    /// ${m.summary}, with a function the test answers each call with: it runs in this process, and gets the call's request. Set its options, then \`.await\` it.`,
+          `    pub fn ${ident(m.name)}_with<F, Fut, T>(&self, respond: F) -> ${withBuilder}`,
           "    where",
           "        F: Fn(Value) -> Fut + Send + Sync + 'static,",
           "        Fut: std::future::Future<Output = T> + Send + 'static,",
           "        T: IntoArg + Send + 'static,",
           "    {",
-          `        let script = self.${ident(m.name)}(${m.args.map(() => "Value::Null").join(", ")}).${ident(responder.flag)}(true).send().await?;`,
-          "        let held = script.clone();",
-          "        let answer = script.clone();",
-          "        crate::runtime::responder::respond_with(",
-          "            Box::new(move |since, wait_ms| {",
-          "                let held = held.clone();",
-          "                Box::pin(async move {",
-          `                    let mut read = held.${ident(responder.held)}().wait_ms(wait_ms);`,
-          "                    if let Some(since) = since {",
-          "                        read = read.since(since);",
-          "                    }",
-          "                    read.send().await",
-          "                })",
-          "            }),",
-          "            std::sync::Arc::new(move |id, turn, error| {",
-          "                let answer = answer.clone();",
-          "                Box::pin(async move {",
-          `                    let mut call = answer.${ident(responder.answer)}(id);`,
-          "                    if let Some(turn) = turn {",
-          "                        call = call.turn(turn);",
-          "                    }",
-          "                    if let Some(error) = error {",
-          "                        call = call.error(error);",
-          "                    }",
-          "                    call.send().await",
-          "                })",
-          "            }),",
-          "            respond,",
-          "        );",
+          `        let start = move |script: &${type}| {`,
+          "            let held = script.clone();",
+          "            let answer = script.clone();",
+          "            crate::runtime::responder::respond_with(",
+          "                Box::new(move |since, wait_ms| {",
+          "                    let held = held.clone();",
+          "                    Box::pin(async move {",
+          `                        let mut read = held.${ident(responder.held)}().wait_ms(wait_ms);`,
+          "                        if let Some(since) = since {",
+          "                            read = read.since(since);",
+          "                        }",
+          "                        read.send().await",
+          "                    })",
+          "                }),",
+          "                std::sync::Arc::new(move |id, turn, error| {",
+          "                    let answer = answer.clone();",
+          "                    Box::pin(async move {",
+          `                        let mut call = answer.${ident(responder.answer)}(id);`,
+          "                        if let Some(turn) = turn {",
+          "                            call = call.turn(turn);",
+          "                        }",
+          "                        if let Some(error) = error {",
+          "                            call = call.error(error);",
+          "                        }",
+          "                        call.send().await",
+          "                    })",
+          "                }),",
+          "                respond,",
+          "            );",
+          "        };",
+          `        ${withBuilder} {`,
+          `            call: self.${ident(m.name)}(${m.args.map(() => "Value::Null").join(", ")}).${ident(responder.flag)}(true),`,
+          "            start: Box::new(start),",
+          "        }",
+          "    }",
+        ]
+      : [];
+    const withFunctionBuilder = responder
+      ? [
+          "",
+          `/// The options of [\`${resource.name}::${ident(m.name)}_with\`]: set the ones you need, then \`.send().await\` (or \`.await\`).`,
+          `pub struct ${withBuilder} {`,
+          `    call: ${builder},`,
+          `    start: Box<dyn FnOnce(&${type}) + Send>,`,
+          "}",
+          "",
+          `impl ${withBuilder} {`,
+          ...m.options
+            .filter((option) => option.name !== responder.flag)
+            .flatMap((option) => [
+              `    /// \`${option.name}\`.`,
+              `    pub fn ${ident(option.name)}(self, value: impl IntoArg) -> Self {`,
+              `        Self { call: self.call.${ident(option.name)}(value), start: self.start }`,
+              "    }",
+            ]),
+          "    /// Add the script, and start answering its calls in the background.",
+          `    pub async fn send(self) -> Result<${type}> {`,
+          "        let script = self.call.send().await?;",
+          "        (self.start)(&script);",
           "        Ok(script)",
           "    }",
+          "}",
+          "",
+          `impl IntoFuture for ${withBuilder} {`,
+          `    type Output = Result<${type}>;`,
+          `    type IntoFuture = BoxFuture<'static, Result<${type}>>;`,
+          "    fn into_future(self) -> Self::IntoFuture {",
+          "        Box::pin(self.send())",
+          "    }",
+          "}",
         ]
       : [];
     return {
@@ -416,6 +480,7 @@ export function emitRust(ir: Ir): Map<string, string> {
         "        self.0.into_future()",
         "    }",
         "}",
+        ...withFunctionBuilder,
       ],
     };
   };
@@ -733,5 +798,6 @@ export function emitRust(ir: Ir): Map<string, string> {
   return new Map([
     [OUT, lines.join("\n")],
     [SUBJECTS_OUT, subjectsFile(ir)],
+    [NORMALISATION_OUT, normalisationFile(ir)],
   ]);
 }

@@ -152,23 +152,27 @@ let sent_secrets = openai.sent_secrets().await?;
 
 ### unattributed()
 
-Model calls no session could be given (the agent calling the model at startup, for example).
+Model calls no session could be given (the agent calling the model at startup, for example), oldest first: what a failing matcher names.
 
 <CodeGroup>
 
 ```ts title="TypeScript"
-const unattributedCalls = await openai.unattributed();
+const unattributedCalls = await openai.unattributed({ withinMs });
 ```
 
 ```python title="Python"
-unattributed_calls = await openai.unattributed()
+unattributed_calls = await openai.unattributed(within_ms=within_ms)
 ```
 
 ```rust title="Rust"
-let unattributed_calls = openai.unattributed().await?;
+let unattributed_calls = openai.unattributed().within_ms(within_ms).await?;
 ```
 
 </CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `withinMs` | `within_ms` | `number \| undefined` | no | option |
 
 **Returns** [`OpenAIUnattributedCalls`](/docs/reference/api/openai#openaiunattributedcalls).
 
@@ -775,6 +779,8 @@ type OpenAIEndpoint = "chat.completions" | "responses" | "images.generations" | 
 | `thread` | `thread` | `OpenAIRef \| undefined` |
 | `message` | `message` | `OpenAIRef \| undefined` |
 | `attributedBy` | `attributed_by` | `"minted_id" \| "tag" \| "owned_id" \| "text" \| "order" \| undefined` |
+| `matched` | `matched` | `string \| undefined` |
+| `tiedWith` | `tied_with` | `string[] \| undefined` |
 
 ### OpenAIRef
 
@@ -867,3 +873,5 @@ type OpenAIUnattributedCalls = OpenAIUnattributedCall[];
 | `at` | `at` | `string` |
 | `lastUserText` | `last_user_text` | `string \| undefined` |
 | `tools` | `tools` | `string[]` |
+| `sinceMs` | `since_ms` | `number` |
+| `message` | `message` | `string` |
