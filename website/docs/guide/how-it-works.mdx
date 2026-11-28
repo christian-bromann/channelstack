@@ -24,7 +24,7 @@ channelstack is one server process. It fakes Slack, GitHub, Linear, Notion, Rese
 | `https://resend.localhost`       | Resend's REST API; sends its webhooks, signed the Svix way                            |
 | `https://google.localhost`       | Gmail's API, Google's token endpoint and certificates; sends Pub/Sub pushes            |
 | `https://discord.localhost`      | Discord's REST API at `/api/v10` and its Gateway; sends interactions, signed with Ed25519 |
-| `https://openai.localhost`       | OpenAI's API at `/v1` for your agent's model: Chat Completions, Responses, Conversations. It sends nothing; each test scripts what it answers |
+| `https://openai.localhost`       | OpenAI's API at `/v1` for your agent's model: Chat Completions, Responses, Conversations, images, audio and files. It sends nothing; each test scripts what it answers |
 
 The `*.localhost` names come from [portless](https://github.com/vercel-labs/portless). Without it, the server listens on one loopback port and puts each fake under a path prefix (`http://127.0.0.1:4500/slack`, `/github`, and so on). The [connecting your app](/docs/guide/connecting-your-agent) page shows both.
 

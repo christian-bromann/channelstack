@@ -141,7 +141,7 @@ That keeps the fake and the real platform from drifting apart in code. The night
 
 ### 3.4 Providers: the agent's model
 
-A **provider** is a fake the agent calls that isn't a channel: it has no people, apps, deliveries or transcripts. The one provider is the fake OpenAI ([decision 0029](decisions/0029-fake-openai.md), phase 13), in `server/src/providers/openai/`, beside the drivers.
+A **provider** is a fake the agent calls that isn't a channel: it has no people, apps, deliveries or transcripts. The one provider is the fake OpenAI ([decision 0029](decisions/0029-fake-openai.md), phases 13 and 14), in `server/src/providers/openai/`, beside the drivers.
 
 - **A driver definition with `provider: true`.** It registers like a driver (`DriverDefinition`: ids, token patterns, `secrets` for its API key, `hosts: ["api.openai.com"]` for proxy mode) and is listed in `DRIVERS`, but `CHANNELS`, and so the dev adapters, the channel unions and the UI's places, leave it out. Its `Driver` has a fake backend, `routes`, `env()` (`OPENAI_BASE_URL`, `OPENAI_API_KEY`), `openWork` and `problems`, and no live backend: it is fake in every run.
 - **Served like the fakes.** Its API is at `https://openai.localhost/v1` (`/openai/v1` without portless, `api.openai.com` through the proxy), and its control routes are under the session like a channel's (`/sessions/{s}/openai/scripts`, `…/calls`, `…/rate-limits`). The spec says `provider: true` in `x-channelstack-channels`, the IR carries it on the channel (`IrChannel.provider`), and the emitters give it a fixture (`openai` in Vitest and pytest, `session.openai()` in Rust) with no people or places.

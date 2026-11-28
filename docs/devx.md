@@ -17,6 +17,9 @@ https://slack.localhost        Slack Web API, Socket Mode (wss); sends Events AP
 https://github.localhost       GitHub REST + GraphQL; sends App webhooks
 https://linear.localhost       Linear GraphQL; sends webhooks + Agent Session events
 https://notion.localhost       Notion API; sends integration webhooks (comments, page changes)
+https://resend.localhost       Resend's API and receiving API; sends Svix-signed webhooks
+https://google.localhost       Gmail's API, Google's token endpoint and certificates; sends Pub/Sub pushes
+https://discord.localhost      Discord REST v10 and the Gateway (wss); sends interactions, signed with Ed25519
 https://openai.localhost       OpenAI API for the agent's model at /v1, scripted per test (section 6)
 
 https://my-agent.localhost     your agent, under its own portless name, so channelstack can deliver to it
@@ -48,6 +51,7 @@ channelstack is an independent project: the fake platforms are channelstack's ow
 | Resend | Email to and from the agent's team: sending, the receiving API, Svix-signed webhooks, Resend's test addresses ([decision 0021](decisions/0021-email-channels.md)) |
 | Google | A Gmail mailbox: messages, threads, labels, history and watch, Google's token endpoint, Pub/Sub pushes with OIDC tokens, one push a second ([decision 0022](decisions/0022-gmail-push-rate.md)) |
 | Discord | A guild: the Gateway (intents, RESUME), REST v10, threads, reactions, slash commands and buttons as interactions over HTTP (Ed25519) or the Gateway, permissions, rate limits ([decision 0026](decisions/0026-discord.md)) |
+| OpenAI (the agent's model, not a channel) | Chat Completions, the Responses and Conversations APIs, images, audio, files and built-in tools, scripted per test; no people, apps or deliveries ([section 6](#6-the-model), [decision 0029](decisions/0029-fake-openai.md)) |
 
 ## 2. First run
 
@@ -396,7 +400,7 @@ await using fault = await slack.fault({ type: "rate_limit" });  // undone when t
 | Framework | Integration | Fixtures | Matchers |
 |---|---|---|---|
 | Vitest | `channelstack/vitest` plugin | test context (`({ slack }) =>`) | `expect.extend` |
-| pytest | `pytest-channelstack` plugin | `channelstack` (the client), `channelstack_session`, `slack`, `github`, `linear`, `notion` | `expect(thread).to_have_reply_from("my-agent")`, `not_to_…` for negations ([decision 0018](decisions/0018-pytest-expect.md)) |
+| pytest | `pytest-channelstack` plugin | `channelstack` (the client), `channelstack_session`, `slack`, `github`, `linear`, `notion`, `resend`, `google`, `discord`, `openai` | `expect(thread).to_have_reply_from("my-agent")`, `not_to_…` for negations ([decision 0018](decisions/0018-pytest-expect.md)) |
 
 ### pytest
 
@@ -480,7 +484,7 @@ Ten of the Slack checks need nothing but the prompt. The stream and Stop checks 
 
 ## 6. The model
 
-channelstack fakes OpenAI's API at `https://openai.localhost/v1`: Chat Completions, the Responses API (stored responses, `previous_response_id`), the Conversations API and `GET /v1/models`. It's realistic on the wire (event shapes, ids, tool calls, errors, rate-limit headers, timing) and never in content: the model says what the test scripted ([decision 0029](decisions/0029-fake-openai.md), phase 13). Images, audio, files and OpenAI's built-in tools come in phase 14. The full interface is in [the approved design](../phase-log/model-providers/interface-draft.md); the website's "The model" page is the user's guide.
+channelstack fakes OpenAI's API at `https://openai.localhost/v1`: Chat Completions, the Responses API (stored responses, `previous_response_id`), the Conversations API and `GET /v1/models`. It's realistic on the wire (event shapes, ids, tool calls, errors, rate-limit headers, timing) and never in content: the model says what the test scripted ([decision 0029](decisions/0029-fake-openai.md), phases 13 and 14). It also serves images, audio and files, and scripts OpenAI's built-in tools. The full interface is in [the approved design](../phase-log/model-providers/interface-draft.md); the website's OpenAI page (`/docs/platforms/openai`) is the user's guide.
 
 ```ts
 test("a slow model and Slack's 3s retry still give one reply", async ({ slack, openai }) => {
@@ -502,7 +506,9 @@ test("a slow model and Slack's 3s retry still give one reply", async ({ slack, o
 - **Scripted per test** with the `openai` fixture (Vitest and pytest; `session.openai()` in Rust): `openai.respond(turns, { when, times, timing })`. A turn is a string, or an object with `text` (a string, or a stream's chunks), `toolCalls`, `reasoning`, `refusal`, `finish`, `usage`, `timing`, `failAfter`, `pauseAfter`, or an `error`. `when` picks the calls a script answers (`text`, `prompt`, `tools`, `toolResult`, `endpoint`, `model`, `from`, `in`); scripts are tried in the order they were added. A function instead of turns (`respond_with` in Rust, which takes the same `.when(…)`, `.times(…)` and `.timing(…)`) answers each call from its request, in the test process. Each script belongs to the test's session.
 - **Unscripted calls fail the test.** The agent gets a 400 (`channelstack_no_script`) naming the missing `openai.respond(…)`, and the test fails with the same message, at once in a waiting matcher or when its session closes.
 - **Timing and failures are scripted:** a slow first token, a stream that breaks (an error event, a cut connection or a stall), a stream held at `pauseAfter` (until `resume()`, or until the agent hangs up), OpenAI's documented errors, and `openai.rateLimit(…)` with truthful `x-ratelimit-*` headers.
-- **What the agent sent is readable:** `calls()`, `waitForCall()`, `latestCall()`, `toolCalls()`, and the matchers `toHaveReceivedCall`, `toHaveSent` (thread history, or text it shouldn't have), `toHaveSentSecrets`, `toHaveOfferedTool`, `toHaveSentToolResult`, `toBeAborted` and `toHaveAnswered`.
+- **What the agent sent is readable:** `calls()`, `waitForCall()`, `latestCall()`, `toolCalls()`, and the matchers `toHaveReceivedCall`, `toHaveSent` (thread history, or text it shouldn't have), `toHaveSentSecrets`, `toHaveOfferedTool`, `toHaveSentToolResult`, `toHaveSentFile`, `toBeAborted` and `toHaveAnswered`.
+- **Images, audio and files:** the image, file and audio parts the agent sends are recorded with their media type, size and SHA-256 (`toHaveSentFile`); a turn can answer with an image for the Images API, audio for `audio.speech` and Chat Completions' audio output, and text for transcriptions and translations; `/v1/files` stores uploads.
+- **Built-in tools are scripted, never run:** `webSearch`, `fileSearch`, `codeInterpreter`, `imageGeneration`, `mcp`, `shell`, `computer` and `applyPatch` in a turn's `toolCalls`, on the Responses API only, as on the real API.
 - **A call finds its test** from what it carries: an id the fake made for an earlier answer, a tag the agent sends (`user`, metadata, or the `x-channelstack-session` header), an id only that test's people and places have, or what its people wrote (`core/attribution`).
 - **The gateways come with it:** anything with an OpenAI base URL, from the official SDKs to OpenRouter (its `reasoning`), DeepSeek (`reasoning_content`), LiteLLM, Groq, Ollama and Azure OpenAI (deployment paths). The fake answers any model name. In proxy mode, `api.openai.com` goes to the fake.
 - **In the dev loop,** `channelstack openai respond|calls|undo` and MCP's `openai_respond` and `openai_calls` script and read the `dev` session's model (section 4).
@@ -529,7 +535,7 @@ This keeps the UI cheap: one generic transcript view plus generic controls, not 
 - run: pnpm vitest run                                # the plugin attaches to the running server
 ```
 
-With `--no-portless` the server serves `http://localhost:4500/{slack,github,linear,notion}` on one loopback port, with no TLS to trust, and `channelstack env` prints those URLs. A Docker image covers Python, Go and other stacks.
+With `--no-portless` the server serves `http://localhost:4500/{slack,github,linear,notion,resend,google,discord,openai}` on one loopback port, with no TLS to trust, and `channelstack env` prints those URLs. A Docker image covers Python, Go and other stacks.
 
 ## 9. Proxy mode: for agents that can't change their base URL
 

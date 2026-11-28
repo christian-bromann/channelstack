@@ -26,6 +26,8 @@ One page per platform: every handle, field, method and wait of its fake, each ca
 - [Notion API](/docs/reference/api/notion)
 - [Resend API](/docs/reference/api/resend)
 - [Google API](/docs/reference/api/google)
+- [Discord API](/docs/reference/api/discord)
+- [OpenAI API](/docs/reference/api/openai): the fake model's fixture, scripts and calls
 
 ## Test API
 

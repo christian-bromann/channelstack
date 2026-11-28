@@ -1,6 +1,6 @@
 # channelstack
 
-A test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord. channelstack runs fake versions of those platforms on your machine. Your tests script the people, your app answers through its real code path, and you check what a person would see.
+A test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord. channelstack runs fake versions of those platforms on your machine, and of OpenAI's API for your agent's model. Your tests script the people, your app answers through its real code path, and you check what a person would see.
 
 This package has the `channelstack` CLI and server, the TypeScript SDK, the Vitest plugin (`channelstack/vitest`) and the standard behaviour checks (`channelstack/checks`). The server binary for your platform comes with it, as an optional dependency (`@channelstack/server-<platform>-<arch>`).
 

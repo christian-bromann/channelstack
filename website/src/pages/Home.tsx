@@ -74,7 +74,7 @@ const CHANNELS = [
   {
     id: "openai",
     name: "OpenAI",
-    text: "The model your agent runs on, scripted per test: text, streams, tool calls, errors and a slow first token, on OpenAI’s API. A call no script answers fails the test.",
+    text: "The model your agent runs on, scripted per test: text, streams, tool calls, errors and a slow first token, images, audio and built-in tools, on OpenAI’s API. A call no script answers fails the test.",
     chips: ["chat.completions", "responses", "conversations", "tool calls", "x-ratelimit-*"],
   },
 ];

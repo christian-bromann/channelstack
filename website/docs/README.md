@@ -25,7 +25,7 @@ The folder is the section and the frontmatter's `order` is the position in it. T
 
 | Page | Kind | What it covers |
 |---|---|---|
-| Overview (`index.mdx`) | Explanation | What channelstack is in one screen, and who it's for (bots, apps, integrations and AI agents on the six platforms): a test scripts people, the fake platform delivers to the unchanged app, the matchers read what a person would see. Animated: the request flow |
+| Overview (`index.mdx`) | Explanation | What channelstack is in one screen, and who it's for (bots, apps, integrations and AI agents on the seven platforms, and the model behind them): a test scripts people, the fake platform delivers to the unchanged app, the matchers read what a person would see. Animated: the request flow |
 | Why channelstack (`why.md`) | Explanation | Why apps and agents on these platforms are hard to test (async replies, retries, signatures, Stop, no sandbox), what mocking the SDK misses, why fakes plus live runs |
 | Getting started (`getting-started.mdx`) | Tutorial | Install, start the server, `channelstack env`, run a small Bolt bot, write and pass a first Vitest test, then break the bot and watch it fail. Animated: the terminal |
 
@@ -72,7 +72,7 @@ One page per platform, the same shape on each: what the fake covers, connecting 
 | Resend | How-to |
 | Google | How-to |
 | Discord | How-to |
-| OpenAI | How-to: the fake model, not a platform your app lives in. `openai.respond(…)`, answers computed from the request, timing and failures, what the agent sent, how a call finds its test |
+| OpenAI | How-to: the fake model, not a platform your app lives in. `openai.respond(…)`, answers computed from the request, timing and failures, what the agent sent, images, audio and files, OpenAI's built-in tools, how a call finds its test |
 
 **Reference** (`docs/reference/`)
 
@@ -81,7 +81,7 @@ The reference is generated wherever there's one source for it, so it can't drift
 | Page | What it lists | Source |
 |---|---|---|
 | Vitest plugin | `channelstack()` options, the `channelstack` fixture, modes | Written by hand |
-| Client and sessions, Slack API, GitHub API, Linear API, Notion API, Resend API, Google API, Discord API (`api/`) | Every handle, field, method and wait: the call in each SDK's language, every parameter with its name in each language, what it returns, its errors, and what it needs live | **Generated** from `spec/ir.json` by `codegen/src/emit/docs.ts`, with the SDKs' own naming |
+| Client and sessions, Slack API, GitHub API, Linear API, Notion API, Resend API, Google API, Discord API, OpenAI API (`api/`) | Every handle, field, method and wait: the call in each SDK's language, every parameter with its name in each language, what it returns, its errors, and what it needs live | **Generated** from `spec/ir.json` by `codegen/src/emit/docs.ts`, with the SDKs' own naming |
 | Errors (`api/errors.mdx`) | Every error code: what channelstack's own mean, which platform's a fake's codes are, the SDK class, and the methods that raise it | **Generated**, from the IR and `x-channelstack-errors` |
 | Matchers | Every matcher: subject, arguments, waits how, fails with what. The pytest names next to each | Written by hand; to be generated from `integrations/matchers-core` |
 | CLI | Every command and flag | Written by hand; to be generated once the CLI's commands are one table |

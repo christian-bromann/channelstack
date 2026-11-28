@@ -265,7 +265,7 @@ Prints one line per delivery in the `dev` session, oldest first. `<channel>` is 
 
 Without a channel, every channel's deliveries, in the order they were sent, each line starting with its channel (`slack  Ev0A1B2C3D4E  event_callback app_mention  acknowledged  (attempts: 200)`). A channel the server can't list, such as one running live, is left out.
 
-Prints `Nothing was delivered to the agent on <channel> yet.`, or without a channel `Nothing was delivered to the agent yet.`, when there is none. An unknown channel fails with `say which channel: slack, github, linear, notion, resend, google, not "<channel>".`
+Prints `Nothing was delivered to the agent on <channel> yet.`, or without a channel `Nothing was delivered to the agent yet.`, when there is none. An unknown channel fails with `say which channel: slack, github, linear, notion, resend, google, discord, not "<channel>".` (`openai` has no deliveries: its calls are under [`channelstack openai calls`](#channelstack-openai-calls).)
 
 ## `channelstack redeliver`
 

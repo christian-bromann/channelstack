@@ -34,7 +34,7 @@ const CORS = {
   "Access-Control-Max-Age": "86400",
 };
 
-const INSTRUCTIONS = `channelstack's documentation. channelstack is a test harness for apps and AI agents that live in Slack, GitHub, Linear and Notion: one server fakes those platforms, tests act as people and check what a person would see.
+const INSTRUCTIONS = `channelstack's documentation. channelstack is a test harness for apps and AI agents that live in Slack, GitHub, Linear, Notion, email (Resend and Gmail) and Discord: one server fakes those platforms and OpenAI's API for the agent's model, tests act as people and check what a person would see.
 
 Use search_docs to find the page and section for a question, then read_doc to read the page. list_docs lists every page by section.`;
 

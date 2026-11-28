@@ -1,12 +1,12 @@
 [project]
 name = "channelstack"
 version = "0.1.1"
-description = "Test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord: the channelstack Python SDK."
+description = "Test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord, and their OpenAI model: the channelstack Python SDK."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
-keywords = ["testing", "slack", "github", "linear", "notion", "email", "agents", "fake", "test-harness"]
+keywords = ["testing", "slack", "github", "linear", "notion", "email", "discord", "openai", "agents", "fake", "test-harness"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

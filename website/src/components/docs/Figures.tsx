@@ -220,8 +220,8 @@ export function RetryTimeline() {
 export function ProxyRouting() {
   const routes = [
     { host: "slack.com", to: "fake Slack" },
-    { host: "api.github.com", to: "fake GitHub" },
-    { host: "api.openai.com", to: "the internet, untouched" },
+    { host: "api.openai.com", to: "fake OpenAI" },
+    { host: "sentry.io", to: "the internet, untouched" },
   ];
   return (
     <figure className="fig fig-proxy">
