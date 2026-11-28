@@ -473,6 +473,9 @@ describe("messages and the events they send", () => {
     expect(await refusal(post(`/users/${ana.id}/invite`, { participants: [app.id], channel: dm.id }))).toBe(
       "method_not_supported_for_channel_type",
     );
+    expect(await refusal(post(`/users/${ana.id}/kick`, { participant: ben.id, channel: dm.id }))).toBe(
+      "method_not_supported_for_channel_type",
+    );
   });
 
   test("kicking the app tells it once, then it hears nothing more", async () => {

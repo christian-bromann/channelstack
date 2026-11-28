@@ -53,6 +53,12 @@ export const fileUrl = (apiUrl: string, team: string, id: string, name: string) 
 const refuse = (code: string, message: string, data: Record<string, unknown> = {}) =>
   new SlackRefusal(code, message, data);
 
+/** A DM is between its two people, as on Slack: nobody joins or leaves it; a third is a group DM of its own. */
+function betweenTwo(conversation: SlackConversationRecord, change: string): void {
+  if (conversation.kind === "im")
+    throw refuse("method_not_supported_for_channel_type", `${conversation.id} is a direct message, which can't ${change}`);
+}
+
 /** What the fake `SlackWorld` adds for the provider API, where the agent acts as the app. */
 export interface FakeSlackWorld extends Immediate<SlackWorld> {
   /** Post as the app (`chat.postMessage`). The caller has checked membership and scopes. */
@@ -601,12 +607,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     invite(session, userId, participants, channel) {
       const conversation = store.conversations.get(session, channel);
       const inviter = member(session, userId, conversation);
-      // A DM is between two; talking with a third is a group DM of its own, as on Slack.
-      if (conversation.kind === "im")
-        throw refuse(
-          "method_not_supported_for_channel_type",
-          `${conversation.id} is a direct message, which can't take another person`,
-        );
+      betweenTwo(conversation, "take another person");
       for (const id of participants.map((candidate) => participant(session, candidate))) {
         if (conversation.members.has(id))
           throw refuse("already_in_channel", `${id} is already a member of ${conversation.id}`);
@@ -618,6 +619,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     kick(session, userId, target, channel) {
       const conversation = store.conversations.get(session, channel);
       const kicker = member(session, userId, conversation);
+      betweenTwo(conversation, "lose one of them");
       const id = participant(session, target);
       if (!conversation.members.has(id)) throw refuse("not_in_channel", `${id} is not a member of ${conversation.id}`);
       // The app hears that someone left while it is still a member; once it is removed itself, it hears nothing more.

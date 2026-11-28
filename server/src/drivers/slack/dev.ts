@@ -14,7 +14,8 @@ async function join(api: DevApi, place: DevPlace, person: Member): Promise<void>
   if (members.some((known) => known.id === person.id)) return;
   if (place.item.kind === "im")
     throw new DevRefusal(
-      `${place.name} is a direct message, which can't take another person: open a group message with all of you.`,
+      `${place.name} is a direct message, which can't take another person: ` +
+        "open a group message with all of you (`openDM`).",
     );
   const host = members.find((known) => known.kind === "user");
   if (!host) throw new DevRefusal(`nobody is in ${place.name} to invite ${person.name}.`);

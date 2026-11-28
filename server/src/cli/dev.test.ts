@@ -207,7 +207,7 @@ describe("the dev tools on every channel", () => {
     // Nobody else joins it: a DM is between two.
     const dm = places.map(({ name }) => name).find((name) => name.startsWith("Direct message")) ?? "";
     await expect(runSay(server, devChannel("slack"), "me too", { as: "ben", in: dm })).rejects.toThrow(
-      `${dm} is a direct message, which can't take another person: open a group message with all of you.`,
+      `${dm} is a direct message, which can't take another person: open a group message with all of you (\`openDM\`).`,
     );
 
     // Linear: delegating to the app (filled in), then Stop on the agent session it opened.

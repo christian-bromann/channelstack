@@ -11596,7 +11596,8 @@
           "fake_actor_in_live_world",
           "cross_workspace_credential",
           "not_found",
-          "not_in_channel"
+          "not_in_channel",
+          "method_not_supported_for_channel_type"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [

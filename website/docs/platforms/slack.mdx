@@ -149,7 +149,7 @@ Channels have only the members you list. The app is a member only when you inclu
 | `private`          | A private channel: the app reads it with the `groups:*` scopes, and an outsider gets `channel_not_found`               |
 | `topic`, `purpose` | Shown by `conversations.info`                                                                                          |
 
-A DM needs no channel: `ana.say("hi", { to: slack.app })` opens one, and `ana.openDM([ben, slack.app])` opens a group DM. The app is always in a DM with itself. To add the app later, a person invites it: `await ana.invite(slack.app, { channel })` sends `member_joined_channel`, then the `channel_join` message Slack posts in the channel (`subtype: "channel_join"`, with `inviter`). An agent that answers every `message` should skip those with a `subtype`, as the reference agents do.
+A DM needs no channel: `ana.say("hi", { to: slack.app })` opens one, and `ana.openDM([ben, slack.app])` opens a group DM. The app is always in a DM with itself. To add the app to a channel later, a person invites it: `await ana.invite(slack.app, { channel })` sends `member_joined_channel`, then the `channel_join` message Slack posts in the channel (`subtype: "channel_join"`, with `inviter`). An agent that answers every `message` should skip those with a `subtype`, as the reference agents do.
 
 ## What people do
 
@@ -187,7 +187,7 @@ A modal is the one the app opened for that person with `views.open`. `submit` fi
 
 ### Conversations and membership
 
-`ana.openDM(ben)` or `ana.openDM([ben, slack.app])` opens or reuses a DM; `ana.invite(...)` and `ana.kick(...)` change who's in a channel. A DM stays between its two people: inviting a third into it is refused with `method_not_supported_for_channel_type`, as on Slack, so open a group DM with all of them instead. `ana.ephemeral()` returns the messages only Ana can see, once the app is quiet.
+`ana.openDM(ben)` or `ana.openDM([ben, slack.app])` opens or reuses a DM; `ana.invite(...)` and `ana.kick(...)` change who's in a channel. A DM stays between its two people: inviting a third into it, or kicking one of them, is refused with `method_not_supported_for_channel_type`, as on Slack, so open a group DM with all of them instead. `ana.ephemeral()` returns the messages only Ana can see, once the app is quiet.
 
 ### What only the test does
 
