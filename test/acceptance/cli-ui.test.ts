@@ -75,6 +75,8 @@ test("the attach CLI talks to the agent, and the UI shows the same conversation"
         // The login code is gone from the address, and the inspector lists the agent's call.
         expect(await browser.getUrl()).not.toContain("login=");
         expect(await browser.$('[data-testid="inspector"]').getText()).toContain("← slack chat.postMessage");
+        // The browser may read the model calls too; this agent makes none.
+        expect(await browser.$('[data-testid="models"]').getText()).toBe("No model calls yet.");
       } finally {
         await browser.deleteSession();
       }

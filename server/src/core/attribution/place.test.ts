@@ -31,7 +31,7 @@ describe("placeFrom", () => {
 describe("each channel's deliveries", () => {
   test("Slack: the person, the channel, the thread and the message", async () => {
     const workspace = await slackWorkspace();
-    closing.push(() => workspace.agent.close());
+    closing.push(async () => workspace.agent.close());
     const message = await workspace.say("hello there everyone");
     await workspace.h.app.settled();
     const delivery = workspace.agent.received.at(-1);
@@ -46,7 +46,7 @@ describe("each channel's deliveries", () => {
 
   test("GitHub: the sender, the repository and the issue", async () => {
     const workspace = await githubWorkspace();
-    closing.push(() => workspace.agent.close());
+    closing.push(async () => workspace.agent.close());
     const issue = await workspace.post(`/users/${workspace.ana.id}/issues`, {
       issue: { title: "The deploy fails" },
       repo: workspace.repo.id,
@@ -65,7 +65,7 @@ describe("each channel's deliveries", () => {
 
   test("Linear: who wrote the comment, the team and the issue", async () => {
     const workspace = await linearWorkspace();
-    closing.push(() => workspace.agent.close());
+    closing.push(async () => workspace.agent.close());
     const issue = await workspace.post(`/users/${workspace.ana.id}/issues`, {
       issue: { title: "The deploy fails" },
       team: workspace.team.id,

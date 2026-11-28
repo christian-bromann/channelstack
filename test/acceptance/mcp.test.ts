@@ -42,6 +42,8 @@ test("an MCP client posts as a person and reads the agent's reply", async () => 
           [
             ...CHANNEL_NAMES.map((channel) => `${channel}_act`),
             "list_deliveries",
+            "openai_calls",
+            "openai_respond",
             "react",
             "redeliver",
             "reply",
