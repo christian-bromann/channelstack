@@ -1094,7 +1094,8 @@ fn png_sha256() -> String {
 fn model() -> StandIn {
     StandIn::with(json!({ "modelCalls": [
         { "request": { "messages": [{ "role": "user", "parts": [{ "type": "image", "from": "url", "url": "https://example.com/a.png" }] }] } },
-        { "request": { "messages": [], "file": { "type": "audio", "from": "data", "mediaType": "audio/wav", "bytes": 44, "sha256": "ab".repeat(32) } } },
+        // A media endpoint's call: its file is its message's first part.
+        { "request": { "messages": [{ "role": "user", "parts": [{ "type": "audio", "from": "data", "mediaType": "audio/wav", "bytes": 44, "sha256": "ab".repeat(32) }] }] } },
         { "request": { "messages": [
             { "role": "system", "text": "be brief" },
             { "role": "user", "parts": [{ "type": "image", "from": "data", "mediaType": "image/png", "bytes": 6, "sha256": png_sha256() }] },

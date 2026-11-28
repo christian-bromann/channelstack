@@ -66,12 +66,12 @@ export function annotationsOf(
       });
       continue;
     }
-    const stored = context.media.file(file);
+    const named = context.media.file(file, () => context.ids.next(OPENAI_IDS.file));
     annotations.push({
       type: "file_citation",
-      file_id: stored?.id ?? (file.startsWith("file-") ? file : context.ids.next(OPENAI_IDS.file)),
+      file_id: named.id,
       index: end,
-      filename: stored?.filename ?? citation.title ?? file,
+      filename: named.filename ?? citation.title ?? file,
     });
   }
   return { annotations, problems };

@@ -60,7 +60,10 @@ export interface ModelRequest {
   readonly media?: MediaOptions;
   /** Chat Completions' audio output: `modalities: ["text", "audio"]` and its `audio` settings. */
   readonly audioOutput?: { readonly format: string; readonly voice: string };
-  /** The MCP approval responses in the request's own input (not its history), by the approval request they answer, with its server and tool. */
+  /**
+   * The MCP approval responses in the request's own input (not its history) that no `mcp_call`
+   * has used yet, by the approval request they answer, with its server and tool.
+   */
   readonly approvals: readonly {
     readonly requestId: string;
     readonly approve: boolean;
@@ -447,6 +450,8 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
   const listedMcp: string[] = [];
   const asked = new Map<string, { server: string; tool: string }>();
   const approvals: { requestId: string; approve: boolean; server?: string; tool?: string }[] = [];
+  /** The approvals an `mcp_call` in the conversation already used. */
+  const used = new Set<string>();
   if (str(body.previous_response_id)) refs.push(str(body.previous_response_id) as string);
   for (const [at, item] of items.entries()) {
     const where = `input[${at - history.length}]`;
@@ -509,8 +514,12 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
       case "file_search_call":
       case "code_interpreter_call":
       case "image_generation_call":
+        if (str(item.id)) refs.push(str(item.id) as string);
+        break;
       case "mcp_call":
         if (str(item.id)) refs.push(str(item.id) as string);
+        // The call an approval allowed: that approval is used.
+        if (str(item.approval_request_id)) used.add(str(item.approval_request_id) as string);
         break;
       case "mcp_list_tools":
         if (str(item.id)) refs.push(str(item.id) as string);
@@ -599,7 +608,9 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
     endpoint: "responses",
     model,
     stream: body.stream === true,
-    approvals,
+    // An agent that sends the whole conversation again, instead of chaining it, sends the old
+    // approvals too: only those no call has used yet count.
+    approvals: approvals.filter((approval) => !used.has(approval.requestId)),
     listedMcp,
     ...(joined === "" ? {} : { instructions: joined }),
     messages: named,

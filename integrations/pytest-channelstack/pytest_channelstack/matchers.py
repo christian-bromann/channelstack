@@ -1383,10 +1383,9 @@ class Expectation:
         async def read() -> list[Any]:
             parts: list[Any] = []
             for call in await _model_calls(self._subject):
+                # A media endpoint's file is its message's first part, so the parts are everything.
                 for message in call.request.messages:
                     parts.extend(message.parts or [])
-                if call.request.file is not None:
-                    parts.append(call.request.file)
             return parts
 
         def described(parts: list[Any]) -> str:

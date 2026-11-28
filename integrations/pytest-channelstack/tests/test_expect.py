@@ -769,6 +769,9 @@ def part(type: str, **fields: Any) -> SimpleNamespace:
 
 
 def request(messages: list[SimpleNamespace] | None = None, file: SimpleNamespace | None = None) -> SimpleNamespace:
+    """A call as the fake reads it: a media endpoint's file is its message's first part, and its `file`."""
+    if file is not None:
+        messages = [SimpleNamespace(parts=[file]), *(messages or [])]
     return SimpleNamespace(request=SimpleNamespace(text="", tools=[], messages=messages or [], file=file))
 
 

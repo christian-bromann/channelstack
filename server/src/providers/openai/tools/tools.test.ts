@@ -376,6 +376,37 @@ describe("remote MCP: approval, then the call", () => {
     expect(await control("GET", "/problems")).toContainEqual(expect.stringMatching(/without approval/));
   });
 
+  test("resent whole instead of chained, an approval a call already used doesn't count again", async () => {
+    const { client, respond, prompt, control } = await setup();
+    await respond({
+      turns: [
+        { toolCalls: [{ mcp: { ...deploy, approval: true } }] },
+        { toolCalls: [{ mcp: { ...deploy, output: "started" } }], text: "Deploying." },
+        { toolCalls: [{ mcp: { ...deploy, output: "started again" } }] },
+      ],
+    });
+    const user = { role: "user", content: prompt };
+    const first = await ask(client, { store: false, input: [user], tools: [mcpTool] });
+    const approval = {
+      type: "mcp_approval_response",
+      approval_request_id: (first.output[1] as Item).id,
+      approve: true,
+    };
+    const second = await ask(client, { store: false, input: [user, ...first.output, approval], tools: [mcpTool] });
+
+    const third = await ask(client, {
+      store: false,
+      input: [user, ...first.output, approval, ...second.output, { role: "user", content: "deploy again" }],
+      tools: [mcpTool],
+    }).catch((caught: unknown) => caught);
+
+    expect(second.output[0]).toEqual(
+      expect.objectContaining({ type: "mcp_call", approval_request_id: approval.approval_request_id }),
+    );
+    expect((third as APIError).code).toBe("channelstack_no_script");
+    expect(await control("GET", "/problems")).toContainEqual(expect.stringMatching(/without approval/));
+  });
+
   test("a decline earlier in the conversation doesn't block a call approved now", async () => {
     const { client, respond, prompt } = await setup();
     await respond({

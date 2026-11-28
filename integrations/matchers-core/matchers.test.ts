@@ -213,7 +213,16 @@ describe("toHaveSentFile", () => {
         },
       ],
     },
-    { file: { type: "audio", from: "data", mediaType: "audio/wav", bytes: 44, sha256: "ab".repeat(32) } },
+    // A media endpoint's call: its file is its message's first part.
+    {
+      messages: [
+        {
+          role: "user",
+          text: "",
+          parts: [{ type: "audio", from: "data", mediaType: "audio/wav", bytes: 44, sha256: "ab".repeat(32) }],
+        },
+      ],
+    },
     {
       messages: [
         { role: "system", text: "be brief" },
@@ -233,7 +242,13 @@ describe("toHaveSentFile", () => {
     // One call is a subject too: `refresh()` reads it again.
     const call = {
       request: { text: "", tools: [] },
-      refresh: async () => ({ request: { text: "", tools: [], file: { type: "image", from: "data", sha256 } } }),
+      refresh: async () => ({
+        request: {
+          text: "",
+          tools: [],
+          messages: [{ role: "user", text: "", parts: [{ type: "image", from: "data", sha256 }] }],
+        },
+      }),
     };
     expect((await matchers.toHaveSentFile(state, call, png)).pass).toBe(true);
   });

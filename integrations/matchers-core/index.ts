@@ -790,10 +790,10 @@ export const matchers = {
     return settle(subject, state, options, {
       onceQuiet: false,
       read: async () =>
-        (await modelCalls(subject)).flatMap((call) => [
-          ...(call.request.messages ?? []).flatMap((message) => message.parts ?? []),
-          ...(call.request.file === undefined ? [] : [call.request.file]),
-        ]),
+        // A media endpoint's file is its message's first part, so the parts are everything.
+        (await modelCalls(subject)).flatMap((call) =>
+          (call.request.messages ?? []).flatMap((message) => message.parts ?? []),
+        ),
       holds: (parts) => parts.some((part) => part.sha256 === sha256),
       describe: (parts) =>
         `Expected the agent ${state.isNot ? "not " : ""}to send the model ${named} (${sizeOf(bytes.length)}, sha256 ${sha256.slice(0, 12)}). ${parts.length === 0 ? "It sent no image, file or audio." : `What it sent, newest first:\n${listing(parts.toReversed().map(partOf))}`}`,
@@ -903,7 +903,6 @@ interface ModelCallData {
     readonly text: string;
     readonly tools: ReadonlyArray<{ readonly type: string; readonly name?: string; readonly parameters?: unknown }>;
     readonly messages?: ReadonlyArray<{ readonly parts?: readonly ModelPart[] }>;
-    readonly file?: ModelPart;
   };
 }
 

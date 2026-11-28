@@ -2037,12 +2037,11 @@ impl<'a, S: ModelCalls + ?Sized> Expectation<'a, S> {
                 || async {
                     Ok(items(subject.read_model_calls().await?)
                         .iter()
+                        // A media endpoint's file is its message's first part, so the parts are everything.
                         .flat_map(|call| {
-                            let request = &call["request"];
-                            items(request["messages"].clone())
+                            items(call["request"]["messages"].clone())
                                 .iter()
                                 .flat_map(|message| items(message["parts"].clone()))
-                                .chain(request.get("file").filter(|file| file.is_object()).cloned())
                                 .collect::<Vec<_>>()
                         })
                         .collect::<Vec<_>>())

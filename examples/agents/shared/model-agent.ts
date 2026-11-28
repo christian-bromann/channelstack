@@ -158,9 +158,9 @@ export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> =
     return turns.flat();
   };
 
-  /** Tools waiting for a person's approval, by the button's value: how the answer goes on, and where. */
   /** How many approvals the agent asked for: each button's key is its own, even while others are pending. */
   let approvalsAsked = 0;
+  /** Tools waiting for a person's approval, by the button's value: how the answer goes on, and where. */
   const approvals = new Map<
     string,
     { resume: (approved: boolean, streaming: Streaming) => Promise<void>; where: Where }

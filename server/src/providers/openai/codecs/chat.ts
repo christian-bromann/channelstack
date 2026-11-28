@@ -1,7 +1,7 @@
 import type { SseFrame } from "../../../core/stream/index.ts";
 import type { OpenAIError } from "../errors.ts";
 import { base64Of } from "../media.ts";
-import { type Answer, type ChatDialect, jsonChunks, textChunks } from "./answer.ts";
+import { type Answer, type ChatDialect, jsonChunks } from "./answer.ts";
 
 /** What every chunk and completion of one answer shares. */
 export interface ChatMeta {

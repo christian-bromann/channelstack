@@ -143,7 +143,7 @@ describe("the Images API", () => {
   });
 });
 
-describe("the Images API refuses what OpenAI refuses", () => {
+describe("the Images API: more formats, edits, and what it refuses", () => {
   test("a WebP file for `output_format: webp`", async () => {
     const { client, respond } = await setup(PROMPT);
     await respond({ turns: [{ image: [content(FILES.webp, "chart.webp")] }] });
@@ -163,6 +163,27 @@ describe("the Images API refuses what OpenAI refuses", () => {
 
     expect([(noModel as APIError).status, (noModel as APIError).code]).toEqual([400, "missing_required_parameter"]);
     expect([(url as APIError).status, (url as APIError).param]).toEqual([400, "response_format"]);
+  });
+
+  test("an edit without a model: refused as an upload; given the description's default as JSON", async () => {
+    const { client, respond, control } = await setup(PROMPT);
+    await respond({ turns: [{ image: [{ placeholder: {} }] }] });
+
+    const upload = await client.images
+      .edit({ prompt: PROMPT, image: await toFile(Buffer.from(CHART), "chart.png") } as never)
+      .catch((caught: unknown) => caught);
+    // The JSON body names its images (here by a data URL), as `images.edit` sends it without uploads.
+    const json = await client.post("/images/edits", {
+      body: {
+        prompt: PROMPT,
+        images: [{ image_url: `data:image/png;base64,${Buffer.from(CHART).toString("base64")}` }],
+      },
+    });
+
+    expect([(upload as APIError).status, (upload as APIError).code]).toEqual([400, "missing_required_parameter"]);
+    expect((json as { data: unknown[] }).data).toHaveLength(1);
+    const [call] = await control("GET", "/calls?endpoint=images.edits");
+    expect(call.model).toBe("gpt-image-2.6-sunburst");
   });
 
   test("edits: every image and the mask are parts of the request", async () => {

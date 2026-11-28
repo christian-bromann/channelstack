@@ -214,9 +214,14 @@ export class MediaStore {
   /** What the Images API answered with as a URL (`response_format: "url"`): served without a key, as OpenAI's are. */
   readonly generated = new Map<string, Media>();
 
-  /** A file in `/v1/files` by its id, or by its name: what a citation or a file search names. */
-  file(idOrName: string): StoredFile | undefined {
-    return this.files.get(idOrName) ?? [...this.files.values()].find((file) => file.filename === idOrName);
+  /**
+   * A file a citation or a file search names, by its id or its name: the one in `/v1/files`, or,
+   * for one the fake doesn't have, the `file-…` id given or a new one (`mint`), with no name.
+   */
+  file(idOrName: string, mint: () => string): { id: string; filename?: string } {
+    const found = this.files.get(idOrName) ?? [...this.files.values()].find((file) => file.filename === idOrName);
+    if (found) return { id: found.id, filename: found.filename };
+    return { id: idOrName.startsWith("file-") ? idOrName : mint() };
   }
 
   keepFile(file: StoredFile): StoredFile {
