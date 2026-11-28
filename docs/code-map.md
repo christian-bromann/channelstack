@@ -203,7 +203,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 
 | Concern | Module | Notes |
 |---|---|---|
-| No existing test edited | `check-unchanged-tests.ts` (`pnpm check:unchanged`) | Each `test(...)` of `test/acceptance/examples` and each scenario file that existed at `phase-12-start` (or `--base`), compared with HEAD by full name: unchanged, imports aside (exit check 12.1) |
+| No existing test edited | `check-unchanged-tests.ts` (`pnpm check:unchanged`), `lib/tests-of.ts` | Each test of `test/acceptance/examples` and each scenario file that existed at `phase-12-start` (or `--base`), compared with HEAD by full name: unchanged, imports aside (exit check 12.1). `testsOf` finds every `test(…)` and `it(…)` with its modifiers (`test.skipIf(…)(…)`, `test.concurrent(…)`, `test.for(…)(…)`), inside `describe` blocks of any kind |
 | The gate | `verify-phase.ts` | Standing checks, then the exit checks of phase 0..n; one group of them (`--group static|unit|accept`) and one acceptance part (`--part`, `--repeat`), as CI runs them side by side |
 | Building the spec from the routes; comparing generated files | `lib/generate.ts` | Used by `spec.ts` and `sdk.ts` (write, or `--check`) |
 | Build targets and where build output goes | `lib/packages.ts` | The five targets, `binaryPath`, the platform package directories. Package and binary names come from the SDK launcher |

@@ -1,15 +1,16 @@
 /**
  * `pnpm check:unchanged [--base <ref>]` (exit check 12.1): no example or scenario that existed at
- * the start of the phase was edited to pass. Every `test(...)` of `test/acceptance/examples` at
+ * the start of the phase was edited to pass. Every test of `test/acceptance/examples` at
  * `<ref>` (default the `phase-12-start` tag) must still be there, by its full name ("describe >
- * test"), with the same source; imports and new tests don't count. Every scenario file there must
- * be unchanged.
+ * test"), with the same source; imports and new tests don't count. A test is any `test(…)` or
+ * `it(…)`, with its modifiers (`test.skipIf(…)(…)`, `test.concurrent(…)`, `test.for(…)(…)`).
+ * Every scenario file there must be unchanged.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import ts from "typescript";
+import { testsOf } from "./lib/tests-of.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 const flag = (name: string) => {
@@ -28,29 +29,6 @@ function baseCommit(): string {
     git("fetch", "--no-tags", "--depth=1", "origin", `refs/tags/${base}:refs/tags/${base}`);
     return git("rev-parse", "--verify", `${base}^{commit}`).trim();
   }
-}
-
-/** Every `test(...)` in a file, by its full name, with its source as written. */
-function testsOf(source: string, file: string): Map<string, string> {
-  const tests = new Map<string, string>();
-  const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-  const visit = (node: ts.Node, names: readonly string[]) => {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
-      const [title] = node.arguments;
-      const name = title && ts.isStringLiteralLike(title) ? title.text : undefined;
-      if (node.expression.text === "describe" && name !== undefined) {
-        ts.forEachChild(node, (child) => visit(child, [...names, name]));
-        return;
-      }
-      if (node.expression.text === "test" && name !== undefined) {
-        tests.set([...names, name].join(" > "), node.getText(tree));
-        return;
-      }
-    }
-    ts.forEachChild(node, (child) => visit(child, names));
-  };
-  visit(tree, []);
-  return tests;
 }
 
 const commit = baseCommit();
