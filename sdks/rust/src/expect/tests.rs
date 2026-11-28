@@ -1196,6 +1196,34 @@ async fn to_have_answered_counts_the_turns_that_reached_the_agent_not_those_the_
 }
 
 #[tokio::test]
+async fn to_have_answered_leaves_out_a_call_the_agent_hung_up_on_before_its_first_token()
+-> Result<()> {
+    // The fake had the answer, but the agent was gone before a byte of it was sent.
+    let abandoned = StandIn::with(
+        json!({ "script": { "id": "ms_1", "used": 1, "problems": [], "calls": [
+            { "response": { "status": 0, "text": "Too late.", "end": "aborted" } },
+        ]}}),
+    );
+    assert_eq!(
+        failure(expect(&abandoned).to_have_answered().timeout(FAST).await),
+        "Expected script ms_1 to answer a call, it answered 0"
+    );
+    // A scripted timeout reached the agent, and so did a stream it hung up on midway.
+    let counted = StandIn::with(
+        json!({ "script": { "id": "ms_1", "used": 3, "problems": [], "calls": [
+            { "response": { "status": 0, "text": "Too late.", "end": "aborted" } },
+            { "response": { "status": 0, "error": "timeout", "end": "aborted" } },
+            { "response": { "status": 200, "text": "Half of it", "end": "aborted" } },
+        ]}}),
+    );
+    expect(&counted)
+        .to_have_answered()
+        .times(2)
+        .quiet_for(QUIET)
+        .await
+}
+
+#[tokio::test]
 async fn to_have_sent_compares_text_as_attribution_does_a_slack_link_is_its_url() -> Result<()> {
     let call = StandIn::with(json!({ "modelCalls": [
         { "request": { "text": "Ana: Deploy   https://example.com/runs/7 NOW", "tools": [] } },

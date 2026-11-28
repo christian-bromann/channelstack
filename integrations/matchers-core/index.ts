@@ -987,17 +987,23 @@ interface Texted {
 
 /** A call a script was given, as far as its answer goes. */
 interface ScriptCall {
-  readonly response: { readonly text?: string | undefined; readonly error?: string | undefined };
+  readonly response: {
+    readonly status?: number | undefined;
+    readonly text?: string | undefined;
+    readonly error?: string | undefined;
+  };
 }
 
 /**
  * Whether the script's turn reached the agent: an answer (text, tool calls, a refusal) or a
  * scripted error. Not a call the fake refused for the script (`channelstack_no_script`: a turn the
- * real API can't give, a list that ran out, a responder that threw), nor one a responder still holds.
+ * real API can't give, a list that ran out, a responder that threw), nor one a responder still
+ * holds, nor one the agent hung up on before anything was sent (status 0 without a scripted error).
  */
-const answered = (call: ScriptCall) =>
-  call.response.error !== "channelstack_no_script" &&
-  (call.response.text !== undefined || call.response.error !== undefined);
+const answered = ({ response }: ScriptCall) =>
+  response.error !== "channelstack_no_script" &&
+  (response.text !== undefined || response.error !== undefined) &&
+  (response.status !== 0 || response.error !== undefined);
 
 interface ModelToolCall {
   readonly name: string;

@@ -24,6 +24,7 @@ export const openai: DriverDefinition = {
       clock: context.clock,
       timers: context.timers,
       attribution: context.attribution,
+      scrub: (text) => context.scrub(text),
       place: (attribution) => context.place(attribution),
     });
     const api = createOpenAIApi(context, world);

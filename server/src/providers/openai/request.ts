@@ -449,23 +449,31 @@ export type InputItem = Json;
 
 /**
  * A Responses request, normalised. `history` is what comes before its own input: the chain
- * `previous_response_id` names, or the conversation's items.
+ * `previous_response_id` names, or the conversation's items. `stored` finds the item an
+ * `item_reference` names, which stands for that item, as OpenAI reads it.
  */
-export function responsesRequest(body: Json, headers: Headers, history: readonly InputItem[]): ModelRequest {
+export function responsesRequest(
+  body: Json,
+  headers: Headers,
+  history: readonly InputItem[],
+  stored: (id: string) => InputItem | undefined = () => undefined,
+): ModelRequest {
   const model = str(body.model);
   if (model === undefined || model === "") {
     throw invalidRequest("Missing required parameter: 'model'.", "model", "missing_required_parameter");
   }
   if (body.background === true) throw unsupportedInFake("`background: true`", "background");
   const own = inputItems(body.input);
-  const items = [...history, ...own];
+  const items = [...history, ...own].map((item) => {
+    const id = item.type === "item_reference" ? str(item.id) : undefined;
+    return (id === undefined ? undefined : stored(id)) ?? item;
+  });
   // A tool's output answers a call the input, its chain or its conversation holds, as OpenAI requires.
   const calls = new Set(
     items.flatMap((item) =>
       item.type === "function_call" || item.type === "custom_tool_call" ? [str(item.call_id)] : [],
     ),
   );
-  const referenced = items.some((item) => item.type === "item_reference");
   const messages: ModelMessage[] = [];
   const refs: string[] = [];
   const listedMcp: string[] = [];
@@ -521,8 +529,7 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
             "missing_required_parameter",
           );
         }
-        // A custom tool's call may be an `item_reference` to a stored item; a function's never is.
-        if (!calls.has(callId) && (type === "function_call_output" || !referenced)) {
+        if (!calls.has(callId)) {
           throw invalidRequest(
             `No tool call found for ${type === "function_call_output" ? "function call" : "custom tool call"} output with call_id ${callId}.`,
             "input",
@@ -538,6 +545,9 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
         break;
       }
       case "reasoning":
+        if (str(item.id)) refs.push(str(item.id) as string);
+        break;
+      // A reference to an item the fake doesn't keep (one sent with `store: false`).
       case "item_reference":
       case "web_search_call":
       case "file_search_call":

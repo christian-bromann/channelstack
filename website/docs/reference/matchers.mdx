@@ -739,6 +739,8 @@ expect(script).toHaveAnswered(options?)
   <dd>`to_have_answered`, and `not_to_have_answered` for the negation</dd>
 </dl>
 
+A call counts once the script's turn reached the agent: its answer, or its scripted error. A call the fake refused for the script doesn't count, nor one a responder still holds, nor one the agent hung up on before the first token.
+
 ## Read methods
 
 Every matcher is built on a plain read, so a test can read the value itself:

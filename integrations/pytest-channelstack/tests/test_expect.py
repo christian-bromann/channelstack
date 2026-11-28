@@ -879,6 +879,22 @@ async def test_to_have_answered_counts_the_turns_that_reached_the_agent_not_thos
     await expect(answered).to_have_answered(times=2, timeout="300ms")
 
 
+async def test_to_have_answered_leaves_out_a_call_the_agent_hung_up_on_before_its_first_token() -> None:
+    # The fake had the answer, but the agent was gone before a byte of it was sent.
+    abandoned = ScriptStandIn([{"status": 0, "text": "Too late.", "end": "aborted"}])
+    with pytest.raises(AssertionError, match=r"^Expected script ms_1 to answer a call, it answered 0$"):
+        await expect(abandoned).to_have_answered(timeout="300ms")
+    # A scripted timeout reached the agent, and so did a stream it hung up on midway.
+    counted = ScriptStandIn(
+        [
+            {"status": 0, "text": "Too late.", "end": "aborted"},
+            {"status": 0, "error": "timeout", "end": "aborted"},
+            {"status": 200, "text": "Half of it", "end": "aborted"},
+        ]
+    )
+    await expect(counted).to_have_answered(times=2, timeout="300ms")
+
+
 @dataclass
 class SentCall:
     request: Any

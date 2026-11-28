@@ -290,7 +290,10 @@ describe("toHaveSentFile", () => {
 
 describe("the model", () => {
   /** A script whose calls are these: what `toHaveAnswered` counts. */
-  const script = (responses: Array<{ text?: string; error?: string }>, problems: string[] = []) => ({
+  const script = (
+    responses: Array<{ status?: number; text?: string; error?: string; end?: string }>,
+    problems: string[] = [],
+  ) => ({
     ...quiet,
     id: "ms_1",
     refresh: async () => ({ used: responses.length, problems }),
@@ -316,6 +319,21 @@ describe("the model", () => {
       { error: "channelstack_no_script" },
     ]);
     expect((await matchers.toHaveAnswered(state, answered, { times: 2 })).pass).toBe(true);
+  });
+
+  test("toHaveAnswered leaves out a call the agent hung up on before its first token, not a scripted timeout", async () => {
+    // The fake had the answer, but the agent was gone before a byte of it was sent.
+    const abandoned = script([{ status: 0, text: "Too late.", end: "aborted" }]);
+    const result = await matchers.toHaveAnswered(state, abandoned);
+    expect(result.pass).toBe(false);
+    expect(result.message()).toBe("Expected script ms_1 to answer a call, it answered 0");
+
+    const counted = script([
+      { status: 0, text: "Too late.", end: "aborted" },
+      { status: 0, error: "timeout", end: "aborted" },
+      { status: 200, text: "Half of it", end: "aborted" },
+    ]);
+    expect((await matchers.toHaveAnswered(state, counted, { times: 2 })).pass).toBe(true);
   });
 
   test("toHaveSent compares text as attribution does: a Slack link is its URL", async () => {

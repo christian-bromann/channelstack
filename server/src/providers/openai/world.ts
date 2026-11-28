@@ -37,6 +37,8 @@ export interface CallRecord {
   readonly text: string;
   readonly startedAt: number;
   readonly attempt: number;
+  /** The hash of its body: a retry of it is the same request again. */
+  readonly key: string;
   readonly attribution: Attribution | undefined;
   readonly place: CallPlace;
   script?: string;
@@ -84,6 +86,8 @@ export interface OpenAIWorldDeps {
   readonly clock: Clock;
   readonly timers: Timers;
   readonly attribution: Attributor;
+  /** Text with every token and secret channelstack knows replaced: before a quote of it is cut, so a cut secret is still found. */
+  scrub(text: string): string;
   /** The channel context of an attributed call, from its source. */
   place(attribution: Attribution | undefined, request: ModelRequest): CallPlace;
 }
@@ -146,6 +150,7 @@ export class OpenAIWorld {
       text,
       startedAt: this.#deps.clock(),
       attempt,
+      key,
       attribution,
       place: this.#deps.place(attribution, request),
       status: 200,
@@ -500,13 +505,26 @@ export class OpenAIWorld {
     call.durationMs = this.#deps.clock() - call.startedAt;
     call.done = true;
     delete call.open;
+    if (call.session !== undefined) {
+      // Anything short of a whole answer may be retried, and its retry belongs where this call went.
+      const whole = result.status === 200 && (result.end === undefined || result.end === "completed");
+      this.#deps.attribution.settled(call.key, call.session, !whole);
+    }
+  }
+
+  /**
+   * The agent's text as the fake quotes it (in a problem, an error, the control API): scrubbed
+   * whole first, then cut to `length` characters with an ellipsis.
+   */
+  excerpt(text: string, length: number): string {
+    const scrubbed = this.#deps.scrub(text);
+    return scrubbed.length > length ? `${scrubbed.slice(0, length - 3)}…` : scrubbed;
   }
 
   #missingMessage(call: CallRecord): string {
     const { request } = call;
     const tools = request.tools.map((tool) => tool.name ?? tool.type);
-    const user = request.lastUserText ?? "";
-    const quoted = user.length > 80 ? `${user.slice(0, 77)}…` : user;
+    const quoted = this.excerpt(request.lastUserText ?? "", 80);
     const example =
       quoted === "" ? `openai.respond("…")` : `openai.respond("…", { when: { text: ${JSON.stringify(quoted)} } })`;
     return `no openai.respond(…) in this test answers this call. Newest user message: ${JSON.stringify(quoted)}. Tools offered: ${tools.length === 0 ? "none" : tools.join(", ")}. For example: ${example}`;

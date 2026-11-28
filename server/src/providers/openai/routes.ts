@@ -716,7 +716,9 @@ export function registerOpenAIRoutes(
           endpoint: call.endpoint,
           model: call.request.model,
           at: iso(call.startedAt),
-          ...(call.request.lastUserText === undefined ? {} : { lastUserText: call.request.lastUserText.slice(0, 200) }),
+          ...(call.request.lastUserText === undefined
+            ? {}
+            : { lastUserText: world.excerpt(call.request.lastUserText, 200) }),
           tools: call.request.tools.map((tool) => tool.name ?? tool.type),
           sinceMs: world.ageOf(call),
           message: world.unattributedMessage(call),

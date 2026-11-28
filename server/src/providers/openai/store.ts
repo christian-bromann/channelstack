@@ -28,32 +28,28 @@ export class OpenAIStore {
   /** The reasoning blobs (`encrypted_content`) the fake gave out: only these come back valid. */
   readonly issued = new Set<string>();
 
-  /** Every item of a stored response by its id: what an `item_reference` names. */
-  readonly #items = new Map<string, InputItem>();
-
   keep(response: StoredResponse): void {
     this.responses.set(response.id, response);
-    for (const item of [...response.input, ...response.output])
-      if (typeof item.id === "string") this.#items.set(item.id, item);
-    if (this.responses.size > LIMIT) this.#forget(this.responses.keys().next().value as string);
-  }
-
-  /** The item an `item_reference` names, from a stored response. */
-  item(id: string): InputItem | undefined {
-    return this.#items.get(id);
-  }
-
-  #forget(id: string): void {
-    const response = this.responses.get(id);
-    this.responses.delete(id);
-    for (const item of [...(response?.input ?? []), ...(response?.output ?? [])])
-      if (typeof item.id === "string") this.#items.delete(item.id);
+    if (this.responses.size > LIMIT) this.responses.delete(this.responses.keys().next().value as string);
   }
 
   /** What a response chained with `previous_response_id` comes after: its input and its output. */
   history(id: string): readonly InputItem[] | undefined {
     const stored = this.responses.get(id);
     return stored === undefined ? undefined : [...stored.input, ...stored.output];
+  }
+
+  /** The stored item an `item_reference` names: in a stored response's output or input, or a conversation. */
+  item(id: string): InputItem | undefined {
+    for (const response of this.responses.values()) {
+      const found = response.output.find((item) => item.id === id) ?? response.input.find((item) => item.id === id);
+      if (found) return found;
+    }
+    for (const conversation of this.conversations.values()) {
+      const found = conversation.items.find((item) => item.id === id);
+      if (found) return found;
+    }
+    return undefined;
   }
 
   openConversation(conversation: Conversation): Conversation {
@@ -64,14 +60,13 @@ export class OpenAIStore {
 
   /** A closed session's responses and conversations are forgotten with it. */
   release(session: string): void {
-    for (const [id, response] of this.responses) if (response.session === session) this.#forget(id);
+    for (const [id, response] of this.responses) if (response.session === session) this.responses.delete(id);
     for (const [id, conversation] of this.conversations)
       if (conversation.session === session) this.conversations.delete(id);
   }
 
   clear(): void {
     this.responses.clear();
-    this.#items.clear();
     this.conversations.clear();
     this.issued.clear();
   }

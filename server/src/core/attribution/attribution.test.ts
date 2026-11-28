@@ -121,6 +121,46 @@ describe("two sessions sent the same text", () => {
     expect(next).toMatchObject({ session: "ses_b", by: "order" });
   });
 
+  test("a retry goes to its own first attempt when another session's identical first attempt came in between", () => {
+    const attributor = world({
+      ses_a: [{ text: "@my-agent how's my change doing?", delivery: "d_a", at: 1 }],
+      ses_b: [{ text: "@my-agent how's my change doing?", delivery: "d_b", at: 2 }],
+    });
+    const asked = (retry: boolean) => ({ ...request("how's my change doing?"), attempt: { key: "same-body", retry } });
+
+    // A's first attempt fails; B's, the same request, comes while A's SDK waits to retry.
+    const firstOfA = attributor.attribute(asked(false));
+    attributor.settled("same-body", "ses_a", true);
+    const firstOfB = attributor.attribute(asked(false));
+    const retryOfA = attributor.attribute(asked(true));
+    attributor.settled("same-body", "ses_a", false);
+    // B's fails too, after A's retry got its answer: B's retry is B's.
+    attributor.settled("same-body", "ses_b", true);
+    const retryOfB = attributor.attribute(asked(true));
+
+    expect(firstOfA).toMatchObject({ session: "ses_a", by: "order" });
+    expect(firstOfB).toMatchObject({ session: "ses_b", by: "order" });
+    expect(retryOfA).toMatchObject({ session: "ses_a" });
+    expect(retryOfB).toMatchObject({ session: "ses_b" });
+  });
+
+  test("when both identical first attempts failed, the retries go oldest first, one each", () => {
+    const attributor = world({
+      ses_a: [{ text: "@my-agent how's my change doing?", delivery: "d_a", at: 1 }],
+      ses_b: [{ text: "@my-agent how's my change doing?", delivery: "d_b", at: 2 }],
+    });
+    const asked = (retry: boolean) => ({ ...request("how's my change doing?"), attempt: { key: "same-body", retry } });
+
+    attributor.attribute(asked(false));
+    attributor.attribute(asked(false));
+    attributor.settled("same-body", "ses_a", true);
+    attributor.settled("same-body", "ses_b", true);
+    const one = attributor.attribute(asked(true));
+    const two = attributor.attribute(asked(true));
+
+    expect([one?.session, two?.session]).toEqual(["ses_a", "ses_b"]);
+  });
+
   test("something only one of them has still decides", () => {
     const attributor = world({
       ses_a: ["@my-agent how's my change doing?", "U08B5K2M9QX"],

@@ -2,6 +2,7 @@ import { Ajv } from "ajv";
 
 import { CursorList } from "../../core/events/index.ts";
 import { matchesText } from "../../core/router/inspect.ts";
+import { invalidRequest } from "./errors.ts";
 import type { ModelRequest } from "./request.ts";
 import { builtInKindOf } from "./tools/index.ts";
 import type { Match, Turn, TurnInput } from "./turns.ts";
@@ -169,6 +170,59 @@ export class Scripts {
     return turn;
   }
 
+  /**
+   * Refuse a request whose strict schema isn't JSON Schema, as OpenAI does: a 400 naming the
+   * function or the response format. Only strict schemas are compiled, as only they are held to a turn.
+   */
+  refuseInvalidSchemas(request: ModelRequest): void {
+    const chat = request.endpoint === "chat.completions";
+    for (const [at, tool] of request.tools.entries()) {
+      if (tool.strict !== true || tool.parameters === undefined) continue;
+      const problem = this.#schemaProblem(tool.parameters);
+      if (problem === undefined) continue;
+      throw invalidRequest(
+        `Invalid schema for function '${tool.name ?? tool.type}': ${problem}.`,
+        chat ? `tools[${at}].function.parameters` : `tools[${at}].parameters`,
+        "invalid_function_parameters",
+      );
+    }
+    const format = request.responseFormat;
+    if (format?.type !== "json_schema" || format.strict !== true) return;
+    const problem = this.#schemaProblem(format.schema);
+    if (problem === undefined) return;
+    throw invalidRequest(
+      `Invalid schema for response_format '${format.name}': ${problem}.`,
+      chat ? "response_format" : "text.format.schema",
+      "invalid_json_schema",
+    );
+  }
+
+  /** Why a schema the agent sent isn't JSON Schema, if it isn't. */
+  #schemaProblem(schema: unknown): string | undefined {
+    if (typeof schema !== "object" || schema === null || Array.isArray(schema)) return "schema must be an object";
+    try {
+      this.#ajv.compile(schema);
+      return undefined;
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    } finally {
+      this.#ajv.removeSchema(schema);
+    }
+  }
+
+  /**
+   * Whether `value` holds to a schema the agent sent, and why not. The schema is forgotten after,
+   * so the server doesn't keep every request's, and another request's `$id` is no clash.
+   */
+  #validate(schema: object, value: unknown): string | undefined {
+    try {
+      const validate = this.#ajv.compile(schema);
+      return validate(value) ? undefined : this.#ajv.errorsText(validate.errors);
+    } finally {
+      this.#ajv.removeSchema(schema);
+    }
+  }
+
   /** What makes a turn impossible on the real API for this request, in a sentence each. */
   problemsOf(script: ScriptRecord, turn: Turn, request: ModelRequest): string[] {
     const problems: string[] = [];
@@ -189,11 +243,9 @@ export class Scripts {
       if (request.toolChoice === "none")
         problems.push(`${script.id} called \`${call.name}\`, but the request's tool_choice is "none"`);
       if (tool.strict === true && tool.parameters !== undefined && typeof call.arguments === "object") {
-        const valid = this.#ajv.validate(tool.parameters as object, call.arguments);
-        if (!valid) {
-          problems.push(
-            `${script.id} called \`${call.name}\` with arguments its strict schema refuses: ${this.#ajv.errorsText(this.#ajv.errors)}`,
-          );
+        const refused = this.#validate(tool.parameters as object, call.arguments);
+        if (refused !== undefined) {
+          problems.push(`${script.id} called \`${call.name}\` with arguments its strict schema refuses: ${refused}`);
         }
       }
     }
@@ -207,10 +259,9 @@ export class Scripts {
         problems.push(`${script.id} answered text that isn't JSON, but the request asked for ${format.type}`);
       }
       if (parsed !== undefined && format.type === "json_schema" && format.strict === true) {
-        if (!this.#ajv.validate(format.schema as object, parsed)) {
-          problems.push(
-            `${script.id} answered JSON that the strict schema "${format.name}" refuses: ${this.#ajv.errorsText(this.#ajv.errors)}`,
-          );
+        const refused = this.#validate(format.schema as object, parsed);
+        if (refused !== undefined) {
+          problems.push(`${script.id} answered JSON that the strict schema "${format.name}" refuses: ${refused}`);
         }
       }
     }
