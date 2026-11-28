@@ -28,9 +28,26 @@ export class OpenAIStore {
   /** The reasoning blobs (`encrypted_content`) the fake gave out: only these come back valid. */
   readonly issued = new Set<string>();
 
+  /** Every item of a stored response by its id: what an `item_reference` names. */
+  readonly #items = new Map<string, InputItem>();
+
   keep(response: StoredResponse): void {
     this.responses.set(response.id, response);
-    if (this.responses.size > LIMIT) this.responses.delete(this.responses.keys().next().value as string);
+    for (const item of [...response.input, ...response.output])
+      if (typeof item.id === "string") this.#items.set(item.id, item);
+    if (this.responses.size > LIMIT) this.#forget(this.responses.keys().next().value as string);
+  }
+
+  /** The item an `item_reference` names, from a stored response. */
+  item(id: string): InputItem | undefined {
+    return this.#items.get(id);
+  }
+
+  #forget(id: string): void {
+    const response = this.responses.get(id);
+    this.responses.delete(id);
+    for (const item of [...(response?.input ?? []), ...(response?.output ?? [])])
+      if (typeof item.id === "string") this.#items.delete(item.id);
   }
 
   /** What a response chained with `previous_response_id` comes after: its input and its output. */
@@ -47,13 +64,14 @@ export class OpenAIStore {
 
   /** A closed session's responses and conversations are forgotten with it. */
   release(session: string): void {
-    for (const [id, response] of this.responses) if (response.session === session) this.responses.delete(id);
+    for (const [id, response] of this.responses) if (response.session === session) this.#forget(id);
     for (const [id, conversation] of this.conversations)
       if (conversation.session === session) this.conversations.delete(id);
   }
 
   clear(): void {
     this.responses.clear();
+    this.#items.clear();
     this.conversations.clear();
     this.issued.clear();
   }

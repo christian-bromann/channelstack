@@ -33,8 +33,14 @@ const problemsOf = (name: string, value: unknown, where: string): string[] => {
   return (validate.errors ?? []).slice(0, 5).map((error) => `${where}: ${error.instancePath || "/"} ${error.message}`);
 };
 
-/** The schema an answer of this path is held to, by its method and path; none for one with no body to check. */
-function answerSchema(method: string, path: string): string | undefined {
+/** Held to any of several schemas, as OpenAI describes an answer whose shape its format decides (a transcript's). */
+const problemsOfAny = (names: readonly string[], value: unknown, where: string): string[] => {
+  const found = names.map((name) => problemsOf(name, value, where));
+  return found.some((problems) => problems.length === 0) ? [] : (found[0] ?? []);
+};
+
+/** The schemas an answer of this path is held to, by its method and path; none for one with no JSON body to check. */
+function answerSchema(method: string, path: string): string | readonly string[] | undefined {
   const route = `${method.toUpperCase()} ${path.replace(/^\/openai(?=\/)/, "").replace(/^\/openai\/v1|^\/v1/, "")}`;
   if (route === "POST /chat/completions" || /^POST \/openai\/deployments\/[^/]+\/chat\/completions$/.test(route)) {
     return "CreateChatCompletionResponse";
@@ -46,6 +52,21 @@ function answerSchema(method: string, path: string): string | undefined {
   if (/^DELETE \/conversations\/[^/]+$/.test(route)) return "DeletedConversationResource";
   if (/^GET \/conversations\/[^/]+\/items$/.test(route)) return "ConversationItemList";
   if (route === "GET /models") return "ListModelsResponse";
+  if (route === "POST /images/generations" || route === "POST /images/edits") return "ImagesResponse";
+  if (route === "POST /audio/transcriptions") {
+    return [
+      "CreateTranscriptionResponseJson",
+      "CreateTranscriptionResponseVerboseJson",
+      "CreateTranscriptionResponseDiarizedJson",
+    ];
+  }
+  if (route === "POST /audio/translations")
+    return ["CreateTranslationResponseJson", "CreateTranslationResponseVerboseJson"];
+  if (route === "POST /files" || /^GET \/files\/[^/]+$/.test(route)) return "OpenAIFile";
+  if (route === "GET /files") return "ListFilesResponse";
+  if (/^DELETE \/files\/[^/]+$/.test(route)) return "DeleteFileResponse";
+  if (/^GET \/containers\/[^/]+\/files$/.test(route)) return "ContainerFileListResource";
+  if (/^GET \/containers\/[^/]+\/files\/[^/]+$/.test(route)) return "ContainerFileResource";
   return undefined;
 }
 
@@ -54,12 +75,17 @@ export function openaiResponseProblems(method: string, path: string, status: num
   const where = `${method} ${path} ${status}`;
   if (status >= 400) return problemsOf("ErrorResponse", body, where);
   const name = answerSchema(method, path);
-  return name === undefined ? [] : problemsOf(name, body, where);
+  if (name === undefined) return [];
+  return typeof name === "string" ? problemsOf(name, body, where) : problemsOfAny(name, body, where);
 }
 
 /** What it says about one event of a stream: a Chat Completions chunk, or a Responses event. */
 export function openaiStreamProblems(path: string, event: Json): string[] {
   if ("error" in event && !("type" in event)) return problemsOf("ErrorResponse", event, `${path} stream`);
   if (/chat\/completions$/.test(path)) return problemsOf("CreateChatCompletionStreamResponse", event, `${path} chunk`);
+  if (/audio\/transcriptions$/.test(path))
+    return problemsOf("CreateTranscriptionResponseStreamEvent", event, `${path} ${String(event.type)}`);
+  if (/audio\/speech$/.test(path))
+    return problemsOf("CreateSpeechResponseStreamEvent", event, `${path} ${String(event.type)}`);
   return problemsOf("ResponseStreamEvent", event, `${path} ${String(event.type)}`);
 }

@@ -180,6 +180,12 @@ export interface DriverContext {
   readonly attribution: Attributor;
   /** For a provider: where an attributed request belongs in the channels, from the delivery that decided it. */
   place(attribution: Attribution | undefined): MessagePlace;
+  /**
+   * For a provider: fetch a URL on a fake's address the way an outside client would, with no
+   * credentials (OpenAI downloading an image the agent named). Undefined when the URL isn't on a
+   * fake's address: the provider doesn't fetch it.
+   */
+  fetchFake(url: string): Promise<Response> | undefined;
   /** The kinds of secret channelstack knows that are in this text (`slack.botToken`), never their values. */
   findSecrets(text: string): string[];
   /** A value with every token and registered secret scrubbed, as the event log records it. */

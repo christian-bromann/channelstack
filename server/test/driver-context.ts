@@ -37,6 +37,7 @@ export function driverContext(overrides: Partial<DriverContext> = {}): DriverCon
     attribution: new Attributor({ sessions: () => [], known: () => [] }),
     place: () => ({}),
     findSecrets: () => [],
+    fetchFake: () => undefined,
     scrub: (value) => value,
     live: {
       active: false,

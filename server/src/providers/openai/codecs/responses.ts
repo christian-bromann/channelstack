@@ -32,17 +32,25 @@ export function outputItems(answer: Answer, meta: Pick<ResponseMeta, "encryptedR
       ...(meta.encryptedReasoning === undefined ? {} : { encrypted_content: meta.encryptedReasoning }),
     });
   }
-  if (answer.refusal !== undefined || answer.text !== "" || answer.toolCalls.length === 0) {
-    items.push(messageItem(answer, "completed"));
-  }
+  for (const call of hosted(answer)) items.push(...call.items.map(({ item }) => item));
+  if (hasMessage(answer)) items.push(messageItem(answer, "completed"));
   for (const call of answer.toolCalls) items.push(callItem(call, "completed"));
+  for (const call of clientRun(answer)) items.push(...call.items.map(({ item }) => item));
   return items;
 }
+
+/** Built-in calls OpenAI ran come before the message that tells of them; the agent's own come after, with the functions. */
+const hosted = (answer: Answer) => answer.builtIns.filter((call) => call.hosted);
+const clientRun = (answer: Answer) => answer.builtIns.filter((call) => !call.hosted);
+
+/** A message is sent when there is text or a refusal, or when nothing else is. */
+const hasMessage = (answer: Answer) =>
+  answer.refusal !== undefined || answer.text !== "" || (answer.toolCalls.length === 0 && answer.builtIns.length === 0);
 
 const contentPart = (answer: Answer) =>
   answer.refusal !== undefined
     ? { type: "refusal", refusal: answer.refusal }
-    : { type: "output_text", text: answer.text, annotations: [], logprobs: [] };
+    : { type: "output_text", text: answer.text, annotations: answer.annotations, logprobs: [] };
 
 const messageItem = (answer: Answer, status: string, empty = false) => ({
   id: answer.messageId,
@@ -180,7 +188,17 @@ export function responseFrames(answer: Answer, meta: ResponseMeta): SseFrame[] {
     emit("response.output_item.done", { output_index, item: finished[index] });
     index += 1;
   }
-  if (answer.refusal !== undefined || answer.text !== "" || answer.toolCalls.length === 0) {
+  const builtIn = (call: Answer["builtIns"][number]) => {
+    for (const { item, added, events } of call.items) {
+      const output_index = index;
+      emit("response.output_item.added", { output_index, item: added });
+      for (const event of events(output_index)) emit(event.type, event.data, event.content === true);
+      emit("response.output_item.done", { output_index, item });
+      index += 1;
+    }
+  };
+  for (const call of hosted(answer)) builtIn(call);
+  if (hasMessage(answer)) {
     const output_index = index;
     const item_id = answer.messageId;
     emit("response.output_item.added", { output_index, item: messageItem(answer, "in_progress", true) });
@@ -203,6 +221,15 @@ export function responseFrames(answer: Answer, meta: ResponseMeta): SseFrame[] {
           true,
         );
       }
+      answer.annotations.forEach((annotation, annotation_index) => {
+        emit("response.output_text.annotation.added", {
+          item_id,
+          output_index,
+          content_index: 0,
+          annotation_index,
+          annotation,
+        });
+      });
       emit("response.output_text.done", { item_id, output_index, content_index: 0, text: answer.text, logprobs: [] });
     }
     emit("response.content_part.done", { item_id, output_index, content_index: 0, part });
@@ -230,6 +257,7 @@ export function responseFrames(answer: Answer, meta: ResponseMeta): SseFrame[] {
     emit("response.output_item.done", { output_index, item: finished[index] });
     index += 1;
   }
+  for (const call of clientRun(answer)) builtIn(call);
   const status = finalStatus(answer);
   emit(status === "completed" ? "response.completed" : "response.incomplete", {
     response: responseObject(answer, meta, status),

@@ -3,78 +3,12 @@
  * 13.8 and 13.11): every turn kind on both endpoints, streamed and not, the errors and the SDK's
  * retries, scripts that run out, and the store behind `previous_response_id` and conversations.
  */
-import OpenAI, { APIError, AzureOpenAI } from "openai";
-import { afterEach, describe, expect, test } from "vitest";
+import { APIError, AzureOpenAI } from "openai";
+import { describe, expect, test } from "vitest";
 
-import { openaiResponseProblems, openaiStreamProblems } from "../../../test/schemas/openai.ts";
-import { slackWorkspace } from "../../../test/slack-workspace.ts";
+import { useOpenAIWorkspace } from "../../../test/openai-workspace.ts";
 
-type Workspace = Awaited<ReturnType<typeof slackWorkspace>>;
-let open: Workspace | undefined;
-/** What OpenAI's description says about the answers and stream events of this test (exit check 13.2). */
-let problems: string[] = [];
-/** Streams still being read for the check: one that stalled or was cut is read as far as it went. */
-let reading: Promise<void>[] = [];
-afterEach(async () => {
-  await open?.agent.close();
-  open = undefined;
-  await Promise.race([Promise.allSettled(reading), new Promise((resolve) => setTimeout(resolve, 200))]);
-  const found = problems;
-  problems = [];
-  reading = [];
-  expect(found).toEqual([]);
-});
-
-/** Hold an answer of the fake to OpenAI's description: its body, or each event of its stream. */
-function check(method: string, path: string, response: Response): Response {
-  const copy = response.clone();
-  if ((copy.headers.get("content-type") ?? "").startsWith("text/event-stream")) {
-    reading.push(
-      copy
-        .text()
-        .then((text) => {
-          for (const line of text.split("\n")) {
-            if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
-            problems.push(...openaiStreamProblems(path, JSON.parse(line.slice(6)) as Record<string, unknown>));
-          }
-        })
-        .catch(() => {}),
-    );
-  } else {
-    reading.push(
-      copy
-        .json()
-        .then((body: unknown) => {
-          problems.push(...openaiResponseProblems(method, path, response.status, body));
-        })
-        .catch(() => {}),
-    );
-  }
-  return response;
-}
-
-/** A Slack workspace where Ana said `prompt`, and an OpenAI client on the fake, the way an agent has one. */
-async function setup(prompt = "what broke in the web deploy yesterday?") {
-  const workspace = await slackWorkspace();
-  open = workspace;
-  await workspace.say(prompt);
-  const { h, sessionId } = workspace;
-  const client = new OpenAI({
-    apiKey: h.secrets.get("openai", "apiKey"),
-    baseURL: "http://127.0.0.1:4500/openai/v1",
-    fetch: async (input, init) => {
-      const request = new Request(input as string, init as RequestInit);
-      return check(request.method, new URL(request.url).pathname, await h.app.fetch(request));
-    },
-  });
-  const control = async (method: string, path: string, body?: unknown) => {
-    const response = await h.call(method, `/sessions/${sessionId}/openai${path}`, body);
-    if (response.status >= 400) throw Object.assign(new Error(response.body.message), response);
-    return response.body;
-  };
-  const respond = (body: Record<string, unknown>) => control("POST", "/scripts", body);
-  return { ...workspace, client, control, respond, prompt };
-}
+const setup = useOpenAIWorkspace();
 
 const ask = (prompt: string) => [{ role: "user" as const, content: prompt }];
 
