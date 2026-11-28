@@ -13,7 +13,15 @@ import { linearWebhookProblems } from "../../../test/schemas/linear.ts";
 
 const agents: RecordingAgent[] = [];
 afterEach(() => {
-  for (const agent of agents.splice(0)) agent.close();
+  const done = agents.splice(0);
+  for (const agent of done) agent.close();
+  // Every webhook any app got, whichever test looked at it, holds to Linear's schema.
+  const problems = done.flatMap((agent) =>
+    agent.received.flatMap(({ headers, body }) =>
+      linearWebhookProblems(String(headers["linear-event"]), JSON.parse(body)),
+    ),
+  );
+  expect(problems.join("\n")).toBe("");
 });
 
 /** A workspace with my-agent at one endpoint and `coder` at another, and Ana in a team. `watcher`, if made, has a third. */

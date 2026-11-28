@@ -144,6 +144,49 @@ describe("exit check 12.3: Slack apps", () => {
     expect(new Set(deliveries.map((one) => one.app))).toEqual(new Set(["my-agent", "coder"]));
   });
 
+  test("another app's edit, delete and reaction_removed reach the app as Slack sends them, with that app's bot", async () => {
+    const { h, mine, post, app, coder, web } = await twoApps();
+    const channel = await post("/channels", { participants: [app.id, coder.id] });
+    const sent = await web("chat.postMessage", { channel: channel.id, text: "opened #12" }, coder.botToken);
+    await web("chat.update", { channel: channel.id, ts: sent.ts, text: "opened #12, ready" }, coder.botToken);
+    await web("reactions.add", { channel: channel.id, timestamp: sent.ts, name: "eyes" }, coder.botToken);
+    await web("reactions.remove", { channel: channel.id, timestamp: sent.ts, name: "eyes" }, coder.botToken);
+    await web("chat.delete", { channel: channel.id, ts: sent.ts }, coder.botToken);
+    await h.app.settled();
+
+    const heard = events(mine).map((one) => one.event);
+    expect(heard.map((event) => event.subtype ?? event.type)).toEqual([
+      "message",
+      "message_changed",
+      "reaction_added",
+      "reaction_removed",
+      "message_deleted",
+    ]);
+    const bot = { user: coder.botUserId, bot_id: coder.botId, app_id: coder.id };
+    expect(heard[1]).toMatchObject({ type: "message", message: { text: "opened #12, ready", ...bot } });
+    expect(heard[3]).toMatchObject({ user: coder.botUserId, reaction: "eyes", item: { ts: sent.ts } });
+    expect(heard[4]).toMatchObject({ type: "message", deleted_ts: sent.ts, previous_message: bot });
+  });
+
+  test("another app joining and leaving a channel reaches the app as member_joined_channel and member_left_channel", async () => {
+    const { h, mine, post, app, coder, web } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id] });
+    expect(await web("conversations.join", { channel: channel.id }, coder.botToken)).toMatchObject({ ok: true });
+    // An app leaves when a person removes it.
+    await post(`/users/${ana.id}/kick`, { participant: coder.id, channel: channel.id });
+    await h.app.settled();
+
+    const heard = events(mine).map((one) => one.event);
+    // Joining also posts Slack's `channel_join` message, by the app's bot.
+    expect(heard.map((event) => event.subtype ?? event.type)).toEqual([
+      "member_joined_channel",
+      "channel_join",
+      "member_left_channel",
+    ]);
+    for (const event of heard) expect(event).toMatchObject({ user: coder.botUserId, channel: channel.id });
+  });
+
   test("a bot can't open a DM with another bot", async () => {
     const { web, post, app, coder } = await twoApps();
     expect(await web("conversations.open", { users: app.botUserId }, coder.botToken)).toMatchObject({

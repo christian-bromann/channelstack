@@ -13,7 +13,16 @@ import { resendWebhookProblems } from "../../../test/schemas/resend.ts";
 
 const agents: RecordingAgent[] = [];
 afterEach(() => {
-  for (const agent of agents.splice(0)) agent.close();
+  const done = agents.splice(0);
+  for (const agent of done) agent.close();
+  // Every webhook any team got, whichever test looked at it, holds to Resend's description.
+  const problems = done.flatMap((agent) =>
+    agent.received.flatMap(({ body }) => {
+      const payload = JSON.parse(body) as { type: string };
+      return resendWebhookProblems(payload.type, payload);
+    }),
+  );
+  expect(problems.join("\n")).toBe("");
 });
 
 /** The `resend` SDK's receiver, as an agent checks its webhooks. */
