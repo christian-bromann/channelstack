@@ -1,5 +1,6 @@
 import { join } from "node:path";
 
+import { BUILT_IN_APP } from "../apps/index.ts";
 import { readPrivateJsonFile, writePrivateFile } from "../home/index.ts";
 import type { SecretFormat } from "./formats.ts";
 
@@ -20,9 +21,6 @@ interface SecretsFile {
   /** The apps tests made beside the built-in one (decision 0027), by driver and name. */
   apps?: AppSecretValues;
 }
-
-/** The name of each channel's built-in app, whose secrets are the driver's own. */
-const BUILT_IN_APP = "my-agent";
 
 function generateSpec(
   spec: SecretSpec,
