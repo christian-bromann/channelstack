@@ -31,8 +31,8 @@ transcript per place, and the inspection routes. The SDKs are generated from tha
   which entry is newest itself, `newest`); references,
   `<place>:<entry>` with the ids `show --json` lists, or a place by name; and who started a thread.
   Times are compared as instants: channels write them to different precisions, and an adapter may
-  say more precisely when an entry was written (`time`: Slack from `ts`; GitHub, whose times are to
-  the second, from when its issue last changed, which its list says to the millisecond).
+  say more precisely when an entry was written (`time`: Slack from `ts`). GitHub's transcript writes
+  each entry's own time to the millisecond, though GitHub's API writes times to the second.
 - **List routes, one per channel and kind:** `GET /users` on every channel, GitHub's `/repos` and
   `/issues`, Linear's `/teams` and `/issues`, Notion's `/pages`, the email channels' `/threads`.
   Slack had `/users` and `/conversations`. They are fixture reads in the SDKs too

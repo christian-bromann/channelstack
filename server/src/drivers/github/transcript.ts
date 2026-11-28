@@ -1,3 +1,4 @@
+import { iso } from "../../core/clock/index.ts";
 import { type TranscriptEntry, transcriptText } from "../../core/router/inspect.ts";
 import { minimizedReason } from "./payloads.ts";
 import type { GitHubCommentRecord, GitHubIssueRecord, GitHubReviewCommentRecord, GitHubReviewRecord } from "./world.ts";
@@ -34,9 +35,9 @@ export function renderTranscript(
   ): TranscriptEntry => ({
     id: String(id),
     author: principal(author),
-    // GitHub's pages and API show times to the second; the transcript keeps the fake's own, to the
-    // millisecond, so an entry orders against other channels' within that second.
-    at: new Date(at).toISOString(),
+    // As precisely as the record has it: the fake's to the millisecond, so its entries order against
+    // other channels' within a second; a live one's to the second, as GitHub writes times.
+    at: iso(at),
     text,
     controls: [],
     edited,

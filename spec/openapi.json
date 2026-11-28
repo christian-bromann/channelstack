@@ -2400,17 +2400,12 @@
           "pullRequest": {
             "type": "boolean",
             "description": "It is a pull request."
-          },
-          "updatedAt": {
-            "type": "string",
-            "description": "When it last changed (a comment changes it too), to the millisecond: GitHub's own times are to the second."
           }
         },
         "required": [
           "issue",
           "title",
-          "pullRequest",
-          "updatedAt"
+          "pullRequest"
         ]
       },
       "GitHubIssue": {
