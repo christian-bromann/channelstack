@@ -596,6 +596,23 @@ export function githubObjects(lookups: GitHubLookups) {
     updated_at: githubTime(repo.updatedAt),
   });
 
+  /** One App's check suite for a pushed commit, as `check_suite` webhooks carry it: no runs yet. */
+  const checkSuite = (
+    repo: GitHubRepoRecord,
+    id: number,
+    push: { branch: string; before: string | null; after: string; headCommit: Json },
+    app: GitHubAppRecord,
+  ): Json => ({
+    ...suite(repo, id, push.after, app),
+    head_branch: push.branch,
+    before: push.before,
+    latest_check_runs_count: 0,
+    check_runs_url: `${repoApi(repo)}/check-suites/${id}/check-runs`,
+    head_commit: push.headCommit,
+    rerequestable: true,
+    runs_rerequestable: true,
+  });
+
   const checkRun = (record: GitHubCheckRunRecord): Json => {
     const repo = lookups.repo(record.repo);
     const base = `${repoApi(repo)}/check-runs/${record.id}`;
@@ -770,6 +787,7 @@ export function githubObjects(lookups: GitHubLookups) {
     integration,
     installation,
     installationLite,
+    checkSuite,
     checkRun,
     status,
     gitCommit,

@@ -713,10 +713,10 @@ export function registerGitHubRoutes(
           .openapi({
             description: 'What its installation may do, e.g. `{ issues: "write" }`. Default: the built-in App\'s',
           }),
-        events: z
-          .array(z.string())
-          .optional()
-          .openapi({ description: "The webhook events it subscribes to. Default: the built-in App's" }),
+        events: z.array(z.string()).optional().openapi({
+          description:
+            "The webhook events it subscribes to, each one its permissions cover, as GitHub's App settings allow (`check_suite` among them). Default: the built-in App's that its permissions cover",
+        }),
       })
       .openapi("GitHubAppOptions"),
     response: GitHubApp,

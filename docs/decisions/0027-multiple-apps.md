@@ -121,9 +121,10 @@ What an app is, how it gets its credentials, and which of one app's actions the 
 
 - **An app:** a GitHub App, installed on the org with selected repositories: its own App id, slug, `<name>[bot]` bot user, private key, webhook secret and webhook URL. `GITHUB_APP_ID` and the others, per app, from `env --app`.
 - **It joins** with `createRepo({ apps: [github.app, reviewer] })` or `repo.installApp(reviewer)`, which sends that App `installation_repositories` only.
+- **Its events** are the ones its permissions cover, as GitHub's App settings allow: by default the built-in App's that its permissions cover, and an event they don't cover (`push` without contents) is refused with `invalid_argument`.
 - **What it hears from another App B,** for every event it subscribes to on a repository it is installed on: B's comments, issues, labels, pull requests, reviews, review comments and pushes, with `sender: { login: "b[bot]", type: "Bot" }`. One event that two Apps hear is two deliveries: each with its own GUID, signed with its own App's secret, with that App's `installation.id` and `X-GitHub-Hook-Installation-Target-ID`.
 - **Its own actions come back to it**, as GitHub sends them: there is no `GITHUB_TOKEN`-style suppression for Apps, which is where the loop comes from.
-- **Checks:** `check_run` `rerequested` and `requested_action` go to the App that made the check run only; `created` and `completed` go to every subscribed App (to confirm, B3). `check_suite` `requested` goes to each App with checks permission.
+- **Checks:** `check_run` `rerequested` and `requested_action` go to the App that made the check run only; `created` and `completed` go to every subscribed App (to confirm, B3). `check_suite` `requested` goes, on each push, to each App installed on the repository with checks write permission that subscribes to `check_suite`, about its own suite for the new head, and to it alone. The built-in App doesn't subscribe to `check_suite`, so what it hears is unchanged.
 - **Tokens:** an installation token is the App's and acts as `b[bot]`. For another App's installation the fake refuses it: a JWT for another installation's token with 404, a repository the installation doesn't cover with 404, a permission the App lacks with 403 `Resource not accessible by integration` (to confirm the codes, B10).
 
 #### Linear

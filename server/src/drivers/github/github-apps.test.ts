@@ -357,6 +357,76 @@ describe("exit check 12.3: GitHub Apps", () => {
     expect(await refusal(post(`/apps/${reader.id}/comment`, { body: "hi", issue: issueRef }))).toBe("forbidden");
   });
 
+  test("an App subscribes only to the events its permissions cover, and hears only those", async () => {
+    const { h, theirs, post, ana, issueRef, reviewer } = await twoApps();
+    const reader = await post("/apps", { name: "reader", permissions: { issues: "read" } });
+    expect(reader).toMatchObject({ name: "reader" });
+    expect(await refusal(post("/apps", { name: "pusher", permissions: { issues: "read" }, events: ["push"] }))).toBe(
+      "invalid_argument",
+    );
+    expect(await refusal(post("/apps", { name: "watcher", events: ["star"] }))).toBe("invalid_argument");
+    await post(`/repos/${issueRef.repoId}/install`, { app: reader.id });
+    await h.app.settled();
+    theirs.received.length = 0;
+
+    await post(`/users/${ana.id}/comment`, { body: "hi", issue: issueRef });
+    await post(`/users/${ana.id}/push`, {
+      changes: [{ path: "a.txt", content: Buffer.from("a\n").toString("base64") }],
+      repo: issueRef.repoId,
+      branch: "main",
+    });
+    await h.app.settled();
+    // reader and reviewer share an endpoint here: reader's are the ones for its App id.
+    const heard = (of: App) =>
+      webhooks(theirs)
+        .filter((hook) => hook.headers["x-github-hook-installation-target-id"] === String(of.appId))
+        .map((hook) => hook.event);
+    expect(heard(reader)).toEqual(["issue_comment"]);
+    expect(heard(reviewer)).toEqual(["issue_comment", "push"]);
+  });
+
+  test("check_suite requested goes to each App with checks write that subscribes to it, alone, for the pushed head", async () => {
+    const { h, mine, theirs, post, ana, issueRef, api, path } = await twoApps();
+    const ci = await post("/apps", {
+      name: "ci",
+      permissions: { checks: "write", contents: "read" },
+      events: ["check_suite", "check_run"],
+    });
+    const lint = await post("/apps", { name: "lint", permissions: { checks: "read" }, events: ["check_suite"] });
+    for (const one of [ci, lint]) await post(`/repos/${issueRef.repoId}/install`, { app: one.id });
+    await h.app.settled();
+    mine.received.length = 0;
+    theirs.received.length = 0;
+
+    const commit = await post(`/users/${ana.id}/push`, {
+      changes: [{ path: "a.txt", content: Buffer.from("a\n").toString("base64") }],
+      repo: issueRef.repoId,
+      branch: "main",
+      message: "Add a",
+    });
+    await h.app.settled();
+    const suites = webhooks(theirs).filter((hook) => hook.event === "check_suite");
+    // ci alone: lint may only read checks, and my-agent and reviewer don't subscribe to check_suite.
+    expect(suites.map((hook) => hook.headers["x-github-hook-installation-target-id"])).toEqual([String(ci.appId)]);
+    expect(suites[0]?.payload).toMatchObject({
+      action: "requested",
+      check_suite: {
+        head_sha: commit.sha,
+        head_branch: "main",
+        status: "queued",
+        app: { id: ci.appId, slug: "ci" },
+        head_commit: { id: commit.sha, message: "Add a" },
+      },
+      installation: { id: expect.any(Number) },
+      sender: { login: "ana" },
+    });
+    expect(webhooks(mine).some((hook) => hook.event === "check_suite")).toBe(false);
+
+    // The run ci makes for that commit is in the suite it was asked for.
+    const run = await api(ci, "POST", `${path}/check-runs`, { name: "build", head_sha: commit.sha });
+    expect(run.body.check_suite.id).toBe(suites[0]?.payload.check_suite.id);
+  });
+
   test("an App's private key and webhook secret come with its handle only: no author or principal holds them", async () => {
     const { h, base, post, get, app, reviewer, ana, issueRef, api, path } = await twoApps();
     const watch = watchCredentials(h, "github");

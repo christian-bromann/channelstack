@@ -92,7 +92,38 @@ export function createChecks(kit: GitHubKit) {
     }
   };
 
+  /** Each App has its own check suite on a commit: made the first time it is needed. */
+  const suiteOf = (repo: GitHubRepoRecord, sha: string, app: GitHubAppRecord): number => {
+    const key = `${repo.id}:${sha}:${app.name}`;
+    const suite = store.suites.get(key) ?? Number(ids.next(GITHUB_IDS.checkRun));
+    store.suites.set(key, suite);
+    return suite;
+  };
+
   return {
+    /**
+     * Code was pushed: GitHub makes a check suite for the head commit for each App installed on the
+     * repository with the checks write permission, and sends that App alone `check_suite`
+     * `requested`, when it subscribes to `check_suite`.
+     */
+    requestSuites(
+      repo: GitHubRepoRecord,
+      sender: number,
+      push: { branch: string; before: string | null; after: string; headCommit: Record<string, unknown> },
+    ): void {
+      for (const app of store.apps.all()) {
+        if (!repo.apps.has(app.name) || app.permissions.checks !== "write") continue;
+        const suite = suiteOf(repo, push.after, app);
+        kit.emit(
+          repo,
+          "check_suite",
+          sender,
+          { action: "requested", check_suite: objects.checkSuite(repo, suite, push, app) },
+          app,
+        );
+      }
+    },
+
     /** `POST /repos/{owner}/{repo}/check-runs`, as an App (the built-in one unless given). */
     create(
       repo: GitHubRepoRecord,
@@ -100,10 +131,7 @@ export function createChecks(kit: GitHubKit) {
       app: GitHubAppRecord = store.app,
     ): GitHubCheckRunRecord {
       validate(input);
-      // Each App has its own check suite on a commit.
-      const key = `${repo.id}:${input.headSha}:${app.name}`;
-      const suite = store.suites.get(key) ?? Number(ids.next(GITHUB_IDS.checkRun));
-      store.suites.set(key, suite);
+      const suite = suiteOf(repo, input.headSha, app);
       const run = store.add(store.checkRuns, store.sessionOf(repo), {
         id: Number(ids.next(GITHUB_IDS.checkRun)),
         app: app.name,
@@ -203,3 +231,5 @@ export function createChecks(kit: GitHubKit) {
     },
   };
 }
+
+export type GitHubChecks = ReturnType<typeof createChecks>;
