@@ -10,6 +10,7 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
 import { linearWebhookProblems } from "../../../test/schemas/linear.ts";
+import { LOOP_LIMIT } from "../../core/loops/index.ts";
 
 const agents: RecordingAgent[] = [];
 afterEach(() => {
@@ -41,7 +42,22 @@ async function twoApps() {
   /** A GraphQL operation, as the app whose token it is sends it. */
   const gql = async (token: string, query: string, variables: Record<string, unknown> = {}) =>
     (await h.provider("POST", "linear/graphql", { query, variables }, token)).body;
-  return { h, mine, theirs, watching, base, post, get, app, coder, ana, team, issue, gql };
+  return {
+    h,
+    sessionId: sessionId as string,
+    mine,
+    theirs,
+    watching,
+    base,
+    post,
+    get,
+    app,
+    coder,
+    ana,
+    team,
+    issue,
+    gql,
+  };
 }
 
 /** What an agent received: each webhook's event header and parsed body. */
@@ -288,6 +304,34 @@ describe("exit check 12.3: Linear apps", () => {
 
     expect(await refusal(post(`/apps/${app.id}/comment`, { body: "hi", issue: created.id }))).toBe("invalid_argument");
     expect(await refusal(post(`/apps/reviewer/comment`, { body: "hi", issue: created.id }))).toBe("not_found");
+  });
+
+  test("exit check 12.6: two apps commenting at each other on an issue are stopped at the guard's limit, and the session says so", async () => {
+    const { h, sessionId, mine, post, coder, ana, issue } = await twoApps();
+    const reviewer = await post("/apps", { name: "reviewer" });
+    const created = await issue();
+    const other = await issue({ title: "Another" });
+    await post(`/users/${ana.id}/comment`, { body: "go", issue: created.id });
+    for (let i = 0; i < LOOP_LIMIT + 5; i++) {
+      await post(`/apps/${i % 2 === 0 ? coder.id : reviewer.id}/comment`, { body: `turn ${i}`, issue: created.id });
+    }
+    await h.app.settled();
+    const onIssue = (id: string) =>
+      hooks(mine).filter((hook) => hook.event === "Comment" && hook.payload.data.issueId === id).length;
+
+    // my-agent heard Ana, then each app comment up to the limit, and nothing after; the other issue goes on.
+    expect(onIssue(created.id)).toBe(1 + LOOP_LIMIT);
+    const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
+    expect(quiet.loops).toEqual([
+      expect.stringMatching(/^a bot loop in linear [0-9a-f-]{36} was stopped after 50 app messages .*coder → reviewer/),
+    ]);
+    await post(`/apps/${coder.id}/comment`, { body: "elsewhere", issue: other.id });
+    // A person writing again starts the issue over.
+    await post(`/users/${ana.id}/comment`, { body: "again", issue: created.id });
+    await post(`/apps/${coder.id}/comment`, { body: "back", issue: created.id });
+    await h.app.settled();
+    expect(onIssue(created.id)).toBe(3 + LOOP_LIMIT);
+    expect(onIssue(other.id)).toBe(1);
   });
 
   test("an app is assignable, and an app subscribed to fewer events hears only those", async () => {

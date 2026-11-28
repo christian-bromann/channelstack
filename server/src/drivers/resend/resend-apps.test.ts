@@ -10,6 +10,7 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
 import { resendWebhookProblems } from "../../../test/schemas/resend.ts";
+import { LOOP_LIMIT } from "../../core/loops/index.ts";
 
 const agents: RecordingAgent[] = [];
 afterEach(() => {
@@ -42,7 +43,7 @@ async function twoTeams() {
   const rest = (method: string, path: string, key: string, body?: unknown) =>
     h.provider(method, `resend${path}`, body, key);
   const ana = await post("/users", { name: "Ana" });
-  return { h, mine, theirs, base, post, get, app, coder, rest, ana };
+  return { h, sessionId: sessionId as string, mine, theirs, base, post, get, app, coder, rest, ana };
 }
 
 /** The webhooks a team's endpoint got, parsed, after everything was sent. */
@@ -247,6 +248,38 @@ describe("exit check 12.3: Resend apps", () => {
       "invalid_argument",
     );
     expect(await refusal(post("/apps/nobody/send", { to: [ana.id], subject: "x", text: "x" }))).toBe("not_found");
+  });
+
+  test("exit check 12.6: an app answering in a thread without end is stopped at the guard's limit, its own email.sent too, and the session says so", async () => {
+    const { h, sessionId, mine, theirs, post, app, coder, ana } = await twoTeams();
+    const asked = await post(`/users/${encodeURIComponent(ana.id)}/send`, {
+      to: [coder.id],
+      cc: [app.id],
+      subject: "Loop",
+      text: "Answer this",
+    });
+    for (let i = 0; i < LOOP_LIMIT + 5; i++) {
+      await post(`/apps/${coder.id}/reply`, { email: asked.id, text: `turn ${i}`, all: true });
+    }
+    await h.app.settled();
+    const received = () => events(mine).filter((one) => one.type === "email.received").length;
+    const sent = () => events(theirs).filter((one) => one.type === "email.sent").length;
+
+    // my-agent heard Ana, then each of coder's answers up to the limit, and nothing after; so did coder's own email.sent.
+    expect(received()).toBe(1 + LOOP_LIMIT);
+    expect(sent()).toBe(LOOP_LIMIT);
+    const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
+    expect(quiet.loops).toEqual([expect.stringMatching(/^a bot loop in resend \S+ was stopped after 50 app messages/)]);
+    // A person writing again starts the thread over.
+    const again = await post(`/users/${encodeURIComponent(ana.id)}/reply`, {
+      email: asked.id,
+      text: "Again",
+      all: true,
+    });
+    expect(again.thread.id).toBe(asked.thread.id);
+    await post(`/apps/${coder.id}/reply`, { email: again.id, text: "back", all: true });
+    await h.app.settled();
+    expect(received()).toBe(3 + LOOP_LIMIT);
   });
 
   test("a person and an app can't share a name", async () => {
