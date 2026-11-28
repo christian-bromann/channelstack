@@ -2,7 +2,7 @@
  * The dev tools' actions, generated from the IR like the SDKs: per channel, everything its people
  * do (each method of its person handle that isn't a read), with the values each one takes. The
  * attach CLI (`channelstack <channel> <action>`) and `channelstack mcp` (`<channel>_act`) are built
- * on it, so a new action on the routes is a new action there with no hand-written list. Decision 0027.
+ * on it, so a new action on the routes is a new action there with no hand-written list. Decision 0028.
  */
 import type { Ir, IrField, IrParam, IrType } from "../ir.ts";
 import { channelGlue } from "./channels.ts";

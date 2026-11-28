@@ -888,7 +888,7 @@ export function registerSlackRoutes(
     summary: "Invite people or the app to a channel",
     params: UserParams,
     body: z.object({ participants: participants(), channel: conversationRef }).openapi("SlackInviteBody"),
-    errors: ["not_found", "not_in_channel", "already_in_channel"],
+    errors: ["not_found", "not_in_channel", "already_in_channel", "method_not_supported_for_channel_type"],
     sdkMethod: { on: "SlackUser", name: "invite", args: ["participants"], options: ["channel"] },
     stability,
     handler: async ({ session, params, body }) => {
@@ -902,7 +902,7 @@ export function registerSlackRoutes(
     summary: "Remove someone from a channel",
     params: UserParams,
     body: z.object({ participant: participantRef, channel: conversationRef }).openapi("SlackKickBody"),
-    errors: ["not_found", "not_in_channel"],
+    errors: ["not_found", "not_in_channel", "method_not_supported_for_channel_type"],
     sdkMethod: { on: "SlackUser", name: "kick", args: ["participant"], options: ["channel"] },
     stability,
     handler: async ({ session, params, body }) => {

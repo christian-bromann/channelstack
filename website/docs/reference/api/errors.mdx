@@ -201,6 +201,14 @@ SDK class: `InvalidFormBodyError` in TypeScript and Python, a subclass of `Chann
 
 Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
 
+### method_not_supported_for_channel_type
+
+The Slack fake refuses with it where the platform refuses the same request.
+
+SDK class: `MethodNotSupportedForChannelTypeError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::METHOD_NOT_SUPPORTED_FOR_CHANNEL_TYPE`.
+
+Raised by [`SlackUser.invite()`](/docs/reference/api/slack#invite), [`SlackUser.kick()`](/docs/reference/api/slack#kick).
+
 ### missing_access
 
 The Discord fake refuses with it where the platform refuses the same request.
