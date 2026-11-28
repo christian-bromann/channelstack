@@ -121,7 +121,7 @@ describe("the dev tools on every channel", () => {
   test("`last` is the newest entry anywhere, however precisely a channel writes its times", async () => {
     const server = attached();
     const github = devChannel("github");
-    // Two issues, and the first is active again, within the second GitHub writes times to.
+    // Two issues, and the first is active again.
     const later = () => server.h.clock.advance(10);
     await runSay(server, github, "first", { as: "mo", in: "Older" });
     later();
@@ -141,7 +141,7 @@ describe("the dev tools on every channel", () => {
     await runSay(server, devChannel("notion"), "a note", { as: "ana", in: "Plans" });
     expect(await runShow(server, undefined, {})).toMatch(/ana: a note\n$/);
 
-    // GitHub writes times to the second; within it, the issue that changed last is the newest.
+    // The issue said on last is the newest.
     later();
     await runSay(server, github, "later still", { as: "mo", in: "Newer" });
     expect(await runShow(server, undefined, {})).toMatch(/mo: later still\n$/);
@@ -158,6 +158,31 @@ describe("the dev tools on every channel", () => {
       "notion Plans",
       "github Newer",
     ]);
+  });
+
+  test("a label or a close on an issue leaves its newest entry's time as it was", async () => {
+    const server = attached();
+    const github = devChannel("github");
+    // At the start of a second, so all of it happens within the second GitHub's own times are written to.
+    server.h.clock.advance(1000 - (server.h.clock.now() % 1000));
+    const later = () => server.h.clock.advance(10);
+    await runSay(server, github, "on the issue", { as: "mo", in: "Older" });
+    later();
+    await runSay(server, devChannel("slack"), "in between", { as: "ana", in: "#general" });
+    later();
+    // Both change the issue, not what was said on it: Slack's message is still the newest.
+    await runChannel(server, "github", "label", ["bug"], { as: "mo", in: "Older" });
+    expect(await runShow(server, undefined, {})).toBe("ana: in between\n");
+    later();
+    await runChannel(server, "github", "close", [], { as: "mo", in: "Older" });
+    expect(await runShow(server, undefined, {})).toBe("ana: in between\n");
+
+    const session = await server.devSession();
+    const places = (await server.h.call("GET", `/sessions/${session}/places`)).body as Array<{
+      channel: string;
+      name: string;
+    }>;
+    expect(places.map(({ channel, name }) => `${channel} ${name}`)).toEqual(["github Older", "slack #general"]);
   });
 
   test("actions: values in order or by name, a place by `--in`, ids as their type, and who acts", async () => {

@@ -659,7 +659,6 @@ class GitHubIssueListing:
     issue: GitHubIssue
     title: str
     pull_request: bool
-    updated_at: str
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> GitHubIssueListing:
@@ -667,7 +666,6 @@ class GitHubIssueListing:
             issue=GitHubIssue(ctx, data["issue"]),
             title=data["title"],
             pull_request=data["pullRequest"],
-            updated_at=data["updatedAt"],
         )
 
 
