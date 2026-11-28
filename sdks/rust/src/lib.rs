@@ -1,5 +1,5 @@
-//! channelstack's Rust SDK: drive the fake (or real) Slack, GitHub, Linear and Notion your agent
-//! lives in, as the people who use it.
+//! channelstack's Rust SDK: drive the fake (or real) Slack, GitHub, Linear, Notion, email and
+//! Discord your agent lives in, as the people who use it, and script its model on the fake OpenAI.
 //!
 //! ```no_run
 //! # async fn example() -> channelstack::Result<()> {

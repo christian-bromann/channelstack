@@ -32,7 +32,8 @@ Usage:
       --log-level <level>         debug, info, warn, error or silent (default info)
       --proxy                     Also run an HTTP proxy for agents with hard-coded hosts: slack.com, api.github.com,
                                   api.linear.app, api.notion.com, api.resend.com, Google's googleapis.com hosts,
-                                  discord.com and api.openai.com go to the fakes, every other host passes through
+                                  discord.com, gateway.discord.gg and api.openai.com go to the fakes, every other
+                                  host passes through
       --proxy-port <n>            The proxy's loopback port (default 7464; 0 picks a free one)
       --record <dir>              With --proxy: write the shape of every exchange with those hosts, and of every
                                   webhook, to <dir>/shapes.jsonl (structure only, never a value)

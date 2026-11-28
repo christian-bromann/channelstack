@@ -95,7 +95,7 @@ Importing the `undici` package installs its own global dispatcher, which replace
 channelstack has its own CA for proxy mode, separate from the one portless uses.
 
 - **Where:** made once per install in `<home>/ca/`, private (files 0600, directory 0700). `ca.pem` is the CA alone, `bundle.pem` the public roots plus the CA, and `ca.json` holds its key.
-- **What it may sign:** only the four routed hosts. Not their subdomains and no IP address: a certificate it signs for any other name fails verification, whoever made it. So even a leaked CA can't vouch for another site.
+- **What it may sign:** only the routed hosts (the platforms' and `api.openai.com`). Not their subdomains and no IP address: a certificate it signs for any other name fails verification, whoever made it. So even a leaked CA can't vouch for another site.
 - **Where it's trusted:** nowhere but the app's environment. It is never added to a system trust store.
 - **How long it lasts:** a year. It's replaced at the next start when it is about to expire or when the routed hosts change. The certificate for the hosts is made at each start and kept in memory.
 
