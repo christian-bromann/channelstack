@@ -104,8 +104,10 @@ Every fixture is automatic. Destructure what a test needs:
 | `notion`       | `NotionFixture`       | The test's view of the Notion workspace               |
 | `resend`       | `ResendFixture`       | The test's view of the Resend team                    |
 | `google`       | `GoogleFixture`       | The test's view of the Gmail mailbox                  |
+| `discord`      | `DiscordFixture`      | The test's view of the Discord guild                  |
+| `openai`       | `OpenAIFixture`       | The fake OpenAI, your agent's model                   |
 
-The channel fixtures' members are listed in the API reference: [`SlackFixture`](/docs/reference/api/slack#slackfixture), [`GitHubFixture`](/docs/reference/api/github#githubfixture), [`LinearFixture`](/docs/reference/api/linear#linearfixture), [`NotionFixture`](/docs/reference/api/notion#notionfixture), [`ResendFixture`](/docs/reference/api/resend#resendfixture), [`GoogleFixture`](/docs/reference/api/google#googlefixture), [`DiscordFixture`](/docs/reference/api/discord#discordfixture).
+The channel fixtures' members are listed in the API reference: [`SlackFixture`](/docs/reference/api/slack#slackfixture), [`GitHubFixture`](/docs/reference/api/github#githubfixture), [`LinearFixture`](/docs/reference/api/linear#linearfixture), [`NotionFixture`](/docs/reference/api/notion#notionfixture), [`ResendFixture`](/docs/reference/api/resend#resendfixture), [`GoogleFixture`](/docs/reference/api/google#googlefixture), [`DiscordFixture`](/docs/reference/api/discord#discordfixture), and the model's: [`OpenAIFixture`](/docs/reference/api/openai#openaifixture).
 
 A suite builds its own fixtures on these with `test.extend`:
 

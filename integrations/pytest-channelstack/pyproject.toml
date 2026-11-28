@@ -1,12 +1,12 @@
 [project]
 name = "pytest-channelstack"
 version = "0.1.1"
-description = "pytest fixtures and expect(...) checks for channelstack: test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord."
+description = "pytest fixtures and expect(...) checks for channelstack: test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord, and their OpenAI model."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
-keywords = ["pytest", "testing", "slack", "github", "linear", "notion", "email", "agents"]
+keywords = ["pytest", "testing", "slack", "github", "linear", "notion", "email", "discord", "openai", "agents"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Framework :: Pytest",

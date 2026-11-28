@@ -9,7 +9,7 @@ export const SITE = {
   title: "channelstack: test your Slack, GitHub, Linear, Notion, Resend, Gmail and Discord apps on localhost",
   /** Shown in search results and link previews; kept under 160 characters so it isn't cut off. */
   description:
-    "Test your Slack, GitHub, Linear, Notion, email and Discord apps on localhost. channelstack fakes the platforms: script the people, assert on what they see.",
+    "Test your Slack, GitHub, Linear, Notion, email and Discord apps on localhost. channelstack fakes the platforms and OpenAI: script the people and the model.",
   repo: "https://github.com/christian-bromann/channelstack",
   install: "npm i -D channelstack",
   version: VERSION,

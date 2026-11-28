@@ -12,7 +12,7 @@ Proxy mode is for apps whose platform URL you can't change: an app that hard-cod
 
 ## When you need it
 
-If your app's SDK takes a base URL (`SLACK_API_URL`, Octokit's `baseUrl`, `LINEAR_API_URL`, `NOTION_BASE_URL`, `RESEND_BASE_URL`, `googleapis`' `rootUrl`, discord.js's `rest.api`), use that instead: it's simpler and needs no CA ([Connecting your app](/docs/guide/connecting-your-agent)). Reach for proxy mode when:
+If your app's SDK takes a base URL (`SLACK_API_URL`, Octokit's `baseUrl`, `LINEAR_API_URL`, `NOTION_BASE_URL`, `RESEND_BASE_URL`, `googleapis`' `rootUrl`, discord.js's `rest.api`, `OPENAI_BASE_URL` for the model), use that instead: it's simpler and needs no CA ([Connecting your app](/docs/guide/connecting-your-agent)). Reach for proxy mode when:
 
 - the app or a library it uses calls `https://slack.com/api/…` (or another platform host) directly;
 - you can set environment variables for the app, but not its code or config;

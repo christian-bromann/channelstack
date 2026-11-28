@@ -282,7 +282,7 @@ Discord has no API that acts as a person, and a user token or a scripted account
 
 ## OpenAI (the fake model)
 
-Built in phase 13 ([decision 0029](decisions/0029-fake-openai.md)). The fake OpenAI is the agent's model, not a channel: it has no people and no deliveries, and it is fake in every run. In a live run the channels are real and the model is still the fake, so a nightly run against a sandbox workspace is as deterministic as the fake run, once each call finds its test: live there are no deliveries for attribution to read, so a call is attributed by a minted id or a tag naming the session ([live-mode.md, section 1.1](live-mode.md#11-the-fake-model-in-a-live-run)). There is no live OpenAI backend: an agent that should use the real model is given no `OPENAI_BASE_URL` (base-URL mode only; proxy mode routes `api.openai.com` to the fake).
+Built in phases 13 and 14 ([decision 0029](decisions/0029-fake-openai.md)). The fake OpenAI is the agent's model, not a channel: it has no people and no deliveries, and it is fake in every run. In a live run the channels are real and the model is still the fake, so a nightly run against a sandbox workspace is as deterministic as the fake run, once each call finds its test: live there are no deliveries for attribution to read, so a call is attributed by a minted id or a tag naming the session ([live-mode.md, section 1.1](live-mode.md#11-the-fake-model-in-a-live-run)). There is no live OpenAI backend: an agent that should use the real model is given no `OPENAI_BASE_URL` (base-URL mode only; proxy mode routes `api.openai.com` to the fake).
 
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|

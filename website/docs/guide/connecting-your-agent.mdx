@@ -28,12 +28,13 @@ channelstack 0.0.0 · in-memory
   resend   https://resend.localhost
   google   https://google.localhost
   discord  https://discord.localhost
+  openai   https://openai.localhost
   UI       https://channelstack.localhost/?login=…
 
   `channelstack env` prints tokens and URLs as .env lines
 ```
 
-`npx channelstack` is short for `npx channelstack start`. It registers the `*.localhost` names with [portless](https://github.com/vercel-labs/portless), which serves them over HTTPS. The UI line is a one-time link that signs one browser in; `channelstack ui` prints a fresh one. `echo` is an internal driver channelstack uses to test itself; you can ignore it.
+`npx channelstack` is short for `npx channelstack start`. It registers the `*.localhost` names with [portless](https://github.com/vercel-labs/portless), which serves them over HTTPS. The UI line is a one-time link that signs one browser in; `channelstack ui` prints a fresh one. `echo` is an internal driver channelstack uses to test itself; you can ignore it. `openai` is the [fake OpenAI](/docs/platforms/openai), for your agent's model.
 
 The server keeps everything in memory. Stop it with Ctrl+C, and the next start begins with an empty world.
 
@@ -45,7 +46,7 @@ If portless isn't installed, the server stops with `portless isn't installed. In
 npx channelstack start --no-portless --port 4500
 ```
 
-The fakes are then at `http://127.0.0.1:4500/slack`, `/github`, `/linear`, `/notion`, `/resend`, `/google` and `/discord`, and `channelstack env` prints those URLs instead. (`googleapis` keeps Gmail's paths at the root of whatever host it is given, so without portless Gmail's API is served at the server's root too, and `GOOGLE_API_URL` is `http://127.0.0.1:4500/`.) `--port` defaults to 4500 without portless; `--port 0` picks a free port. Plain HTTP on loopback needs no certificate, so this is also the simplest way around [TLS trust](#tls-trust-per-runtime) problems.
+The fakes are then at `http://127.0.0.1:4500/slack`, `/github`, `/linear`, `/notion`, `/resend`, `/google` and `/discord`, the fake OpenAI at `/openai/v1`, and `channelstack env` prints those URLs instead. (`googleapis` keeps Gmail's paths at the root of whatever host it is given, so without portless Gmail's API is served at the server's root too, and `GOOGLE_API_URL` is `http://127.0.0.1:4500/`.) `--port` defaults to 4500 without portless; `--port 0` picks a free port. Plain HTTP on loopback needs no certificate, so this is also the simplest way around [TLS trust](#tls-trust-per-runtime) problems.
 
 ## Give the app its environment
 
