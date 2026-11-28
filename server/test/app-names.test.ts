@@ -299,3 +299,17 @@ describe("R3.2: where an app's handle goes, its name is no handle", () => {
     }
   });
 });
+
+describe("R3.1: the agent's own calls know the whole workspace", () => {
+  test("slack: an app DMs a person of a session that never used it, by conversations.open and by a post to their id", async () => {
+    const { h, theirs, reviewer: coder } = await twoSessions("slack", "coder");
+    const bea = await theirs.post("/users", { name: "Bea" });
+    const web = async (method: string, args: Record<string, unknown>) =>
+      h.provider("POST", `slack/api/${method}`, args, coder.botToken);
+
+    const opened = await web("conversations.open", { users: bea.id });
+    expect(opened).toMatchObject({ status: 200, body: { ok: true } });
+    const posted = await web("chat.postMessage", { channel: bea.id, text: "your review is ready" });
+    expect(posted).toMatchObject({ status: 200, body: { ok: true, channel: opened.body.channel.id } });
+  });
+});

@@ -67,6 +67,12 @@ function betweenTwo(conversation: SlackConversationRecord, change: string): void
 
 /** What the fake `SlackWorld` adds for the provider API, where the agent acts as the app. */
 export interface FakeSlackWorld extends Immediate<SlackWorld> {
+  /**
+   * The agent's own DM (`conversations.open`, or a post to a user id): its members are user ids
+   * as Slack has them, the whole workspace's, so no test handle is resolved. `session` is the
+   * session of the person it is with.
+   */
+  openDirect(session: string, creator: string, members: readonly string[]): SlackConversationRecord;
   /** Post as the app (`chat.postMessage`). The caller has checked membership and scopes. */
   postAsApp(
     conversation: SlackConversationRecord,
@@ -434,8 +440,9 @@ export function createFakeWorld(
     return message;
   };
 
+  /** A DM or group DM of user ids (already resolved): the one these members have, or a new one. */
   const open = (session: string, creator: string, others: readonly string[]): SlackConversationRecord => {
-    const members = new Set([creator, ...others.map((id) => participant(session, id))]);
+    const members = new Set([creator, ...others]);
     if (members.size < 2) throw new ProtocolError("invalid_argument", "A DM needs someone else in it");
     const existing = store
       .conversationsOf(session)
@@ -641,13 +648,22 @@ export function createFakeWorld(
     },
 
     openConversation(session, userId, withParticipants) {
-      return open(session, store.users.get(session, userId).id, withParticipants);
+      const others = withParticipants.map((id) => participant(session, id));
+      return open(session, store.users.get(session, userId).id, others);
     },
+
+    openDirect: open,
 
     postAsUser(session, userId, input, where) {
       const user = store.users.get(session, userId);
       const conversation =
-        "channel" in where ? store.conversations.get(session, where.channel) : open(session, user.id, where.to);
+        "channel" in where
+          ? store.conversations.get(session, where.channel)
+          : open(
+              session,
+              user.id,
+              where.to.map((id) => participant(session, id)),
+            );
       member(session, user.id, conversation);
       const body = content(session, input);
       const message = post(conversation, user.id, body, {

@@ -222,7 +222,7 @@ export function createSlackApi(
     // Posting to a user id opens the DM with that person, as Slack does.
     const person = conversation ? undefined : store.users.find(id);
     const owner = person ? store.users.owner(person.id) : undefined;
-    if (person && owner !== undefined) conversation = world.openConversation(owner, person.id, [bot()]);
+    if (person && owner !== undefined) conversation = world.openDirect(owner, person.id, [bot()]);
     if (!conversation) throw new SlackApiError("channel_not_found");
     if (!conversation.members.has(bot())) {
       // Slack doesn't reveal a private conversation the app isn't in.
@@ -641,7 +641,7 @@ export function createSlackApi(
       if (first === undefined || owner === undefined || people.some((id) => store.users.owner(id) !== owner)) {
         throw new SlackApiError("user_not_found");
       }
-      return { channel: { id: world.openConversation(owner, first, [...people.slice(1), bot()]).id } };
+      return { channel: { id: world.openDirect(owner, first, [...people.slice(1), bot()]).id } };
     },
 
     "conversations.list": (args) => {
