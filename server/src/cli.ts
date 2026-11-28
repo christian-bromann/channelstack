@@ -3,10 +3,11 @@ import { parseArgs } from "node:util";
 
 import pkg from "../package.json" with { type: "json" };
 import { CONTROL_PREFIX } from "./app.ts";
-import { actionOptionNames, runChannel } from "./cli/act.ts";
-import { attach, type Attached } from "./cli/attach.ts";
+import { runChannel } from "./cli/act.ts";
+import { attach, type Attached, type AttachFlags } from "./cli/attach.ts";
 import { runDeliveries, runRedeliver } from "./cli/deliveries.ts";
-import { runShow } from "./cli/dev.ts";
+import { type DevFlags, runShow } from "./cli/dev.ts";
+import { closest, type Command, commandLine, find, flagsOf, parseOptions, renderHelp } from "./cli/help.ts";
 import { runDoctor, runLogin, runSweep } from "./cli/live.ts";
 import { runMcp } from "./cli/mcp.ts";
 import { runOpenAI } from "./cli/openai.ts";
@@ -20,72 +21,6 @@ import { randomSeed, Secrets } from "./core/secrets/index.ts";
 import { DEV_CHANNELS, DRIVERS, proxyHosts, secretSpecs } from "./drivers/index.ts";
 import { start } from "./serve.ts";
 import { UI_PAGE } from "./ui/page.ts";
-
-const USAGE = `channelstack ${pkg.version}
-
-Usage:
-  channelstack [start]            Start the server (fake Slack, GitHub, Linear and Notion in memory)
-      --no-portless               One loopback port with path prefixes, instead of *.localhost names
-      --port <n>                  The loopback port (default 4500 without portless; 0 picks a free one)
-      --server-file <path>        Where to write the control API's URL and token (default <home>/server.json)
-      --log-level <level>         debug, info, warn, error or silent (default info)
-      --proxy                     Also run an HTTP proxy for agents with hard-coded hosts: slack.com, api.github.com,
-                                  api.linear.app and api.notion.com go to the fakes, every other host passes through
-      --proxy-port <n>            The proxy's loopback port (default 7464; 0 picks a free one)
-      --record <dir>              With --proxy: write the shape of every exchange with those hosts, and of every
-                                  webhook, to <dir>/shapes.jsonl (structure only, never a value)
-  channelstack env                Print .env lines for the agent, from the running server
-      --proxy                     For proxy mode: HTTPS_PROXY and the CA the agent trusts, instead of the API URLs
-      --app <name>                Another app's lines, under the same keys (made the first time it is asked for)
-      --channel <name>            Only that channel's lines
-  channelstack ca rotate          Replace proxy mode's CA (<home>/ca); restart the server and run \`channelstack env --proxy\`
-
-  Attached to the running server (a shared "dev" session; people and places are created on first use).
-  <channel> is slack, github, linear, notion, resend, google or discord; a place is a Slack channel, a GitHub
-  issue, a Linear issue, a Notion page, an email thread or a Discord channel, by its name:
-  channelstack <channel> say   --as <name> --in <place> "<text>"
-  channelstack <channel> reply --as <name> [--to last|<ref>] "<text>"
-  channelstack <channel> react --as <name> <emoji> [--on last|<ref>]
-  channelstack <channel> show  [--in <place>] [--thread last|<ref>] [--json]   A place as a person reads it
-  channelstack <channel> actions                What else its people do (click, stop, review, delegate, …)
-  channelstack <channel> <action> [--as <name>] [--in <place>] [--on last|<ref>] [<value>…] [--<value> <v>…]
-                                  One of those, e.g. \`channelstack slack click --as ana Approve\`
-  channelstack show [--thread last] [--json]    The most recently active place on any channel
-  channelstack tail [--once]                    Events to the agent and its API calls, as they happen
-  channelstack deliveries [<channel>]           What was delivered to the agent: ids, events, outcomes, attempts
-  channelstack openai respond "<text>"          Script the fake OpenAI's answer in the dev session (templates:
-      [--when <text>] [--times <n>]             {lastUserText}, {toolResult}); --tool <name> --args <json> calls a
-      [--tool <name> --args <json>]             tool first, and the text answers its result
-  channelstack openai calls                     The dev session's model calls, one a line
-  channelstack openai undo <script>             Remove a script
-  channelstack redeliver [<channel>] [last|<id>]   Deliver it again, the way the platform does (Slack retries it)
-  channelstack mcp                              These commands as MCP tools over stdio, for a coding agent
-  channelstack ui                               A one-time link that opens the UI in a browser
-      --server <url>              The server to attach to (default: the one in server.json; also CHANNELSTACK_URL
-                                  with CHANNELSTACK_TOKEN)
-
-  Live mode (credentials in the environment; see docs/live-mode.md):
-  channelstack doctor             Which channels run live, whether their credentials work and are allowlisted,
-                                  and whether saved browser sessions are still signed in
-      --storage-state <path>      A saved browser session to check, besides those in <home>/browser
-  channelstack login slack --user <name>   Sign a sandbox person in by hand, once, in a browser window, and save the
-                                  session for the browser actor (<home>/browser/slack-<name>.json, 0600)
-      --save <path>               Also save it here, e.g. .auth/ana-slack.json for a test that names it
-  channelstack sweep              Remove what crashed live runs left: their ledgers' objects, and tagged channels
-      --older-than-hours <n>      Only tagged objects older than this (default 24)
-      --run <id>                  Only what this run made, of any age
-      --check                     Remove nothing; exit 1 if anything is left
-
-  channelstack secrets rotate     Replace every fake token and signing secret
-  channelstack --version
-  channelstack --help
-
-Environment:
-  CHANNELSTACK_HOME               State directory (default ~/.channelstack)
-  CHANNELSTACK_SEED               Makes generated ids reproducible
-  CHANNELSTACK_<DRIVER>_WEBHOOK_URL   Where the agent receives that driver's events
-  CHANNELSTACK_<DRIVER>_APP_<NAME>_WEBHOOK_URL   Where another app's events go (coder is CODER)
-`;
 
 const DEFAULT_PORT = 4500;
 /** Proxy mode's port, fixed so the `HTTPS_PROXY` line in an agent's `.env` stays right across restarts. */
@@ -103,15 +38,7 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-async function runStart(flags: {
-  "no-portless"?: boolean;
-  port?: string;
-  "server-file"?: string;
-  "log-level"?: string;
-  proxy?: boolean;
-  "proxy-port"?: string;
-  record?: string;
-}) {
+async function runStart(flags: Flags) {
   const portless = !flags["no-portless"];
   const port = portFlag("port", flags.port, portless ? 0 : DEFAULT_PORT);
   const proxyPort = flags.proxy ? portFlag("proxy-port", flags["proxy-port"], DEFAULT_PROXY_PORT) : undefined;
@@ -192,77 +119,116 @@ async function runEnv(
     .join("\n")}\n`;
 }
 
-async function runCa(action: string | undefined) {
-  if (action !== "rotate") fail(`unknown ca command "${action ?? ""}". Did you mean \`channelstack ca rotate\`?`);
+async function runCa() {
   const ca = await rotateCa(homeDir(), proxyHosts());
   process.stdout.write(
     `Replaced proxy mode's CA (${ca.caFile}). Restart the server; agents trust the new one from the same files.\n`,
   );
 }
 
-function runSecrets(action: string | undefined) {
-  if (action !== "rotate")
-    fail(`unknown secrets command "${action ?? ""}". Did you mean \`channelstack secrets rotate\`?`);
+function runSecrets() {
   Secrets.rotate(homeDir(), secretSpecs());
   process.stdout.write(
     "Rotated every fake token and signing secret. Restart the server and run `channelstack env` again.\n",
   );
 }
 
+/** The flags, once `checkFlags` has made sure each has the type its command declares. */
+interface Flags extends DevFlags, AttachFlags {
+  readonly [name: string]: unknown;
+  readonly "no-portless"?: boolean;
+  readonly port?: string;
+  readonly "log-level"?: string;
+  readonly proxy?: boolean;
+  readonly "proxy-port"?: string;
+  readonly record?: string;
+  readonly app?: string;
+  readonly channel?: string;
+  readonly once?: boolean;
+  readonly "storage-state"?: string[];
+  readonly "older-than-hours"?: string;
+  readonly run?: string;
+  readonly check?: boolean;
+  readonly user?: string;
+  readonly save?: string;
+  readonly when?: string;
+  readonly times?: string;
+  readonly tool?: string;
+  readonly args?: string;
+}
+
+/** A command's help, bold headings only on a terminal that wants colour. */
+const help = (path: readonly Command[]) =>
+  renderHelp(path, {
+    version: pkg.version,
+    style: { bold: process.stdout.isTTY === true && !process.env.NO_COLOR && process.env.TERM !== "dumb" },
+  });
+
+/** Refuse a flag the command doesn't take, naming the one that was probably meant. */
+function checkFlags(path: readonly Command[], values: Record<string, unknown>) {
+  const command = path.at(-1) as Command;
+  const line = commandLine(path);
+  const flags = flagsOf(command);
+  for (const [name, value] of Object.entries(values)) {
+    const flag = flags.get(name);
+    if (!flag) {
+      const meant = closest(
+        name,
+        [...flags.values()].filter((known) => !known.hidden).map((known) => known.name),
+      );
+      fail(
+        `${line} takes no --${name}.${meant ? ` Did you mean --${meant}?` : ""} Run \`${line} --help\` for its flags.`,
+      );
+    }
+    const values = Array.isArray(value) ? value : [value];
+    if (flag.value && values.some((one) => typeof one !== "string"))
+      fail(`--${name} needs a value: --${name} <${flag.value}>. Run \`${line} --help\`.`);
+    if (!flag.value && values.some((one) => typeof one !== "boolean"))
+      fail(`--${name} is a switch and takes no value. Run \`${line} --help\`.`);
+  }
+}
+
 async function main() {
   const { values, positionals } = parseArgs({
     args: process.argv.slice(2),
     allowPositionals: true,
-    options: {
-      // The values the channels' actions take, by name (`--button Approve`, `--issue last`); the
-      // commands' own options below come after, so none of them is taken for a value.
-      ...Object.fromEntries(actionOptionNames().map((name) => [name, { type: "string" as const }])),
-      version: { type: "boolean", short: "v" },
-      help: { type: "boolean", short: "h" },
-      "no-portless": { type: "boolean" },
-      port: { type: "string" },
-      "server-file": { type: "string" },
-      "log-level": { type: "string" },
-      proxy: { type: "boolean" },
-      app: { type: "string" },
-      channel: { type: "string" },
-      "proxy-port": { type: "string" },
-      record: { type: "string" },
-      server: { type: "string" },
-      as: { type: "string" },
-      in: { type: "string" },
-      thread: { type: "string" },
-      on: { type: "string" },
-      to: { type: "string" },
-      json: { type: "boolean" },
-      once: { type: "boolean" },
-      "storage-state": { type: "string", multiple: true },
-      "older-than-hours": { type: "string" },
-      run: { type: "string" },
-      check: { type: "boolean" },
-      user: { type: "string" },
-      save: { type: "string" },
-      when: { type: "string" },
-      times: { type: "string" },
-      tool: { type: "string" },
-      args: { type: "string" },
-    },
+    // Flags are checked against the command that was found, below, with a message that says what it takes.
+    strict: false,
+    options: parseOptions(),
   });
-  if (values.version) return void process.stdout.write(`${pkg.version}\n`);
-  if (values.help) return void process.stdout.write(USAGE);
+  if (values.version && positionals.length === 0) return void process.stdout.write(`${pkg.version}\n`);
+
+  // `channelstack help <command…>` is `channelstack <command…> --help`.
+  const asked = positionals[0] === "help";
+  const words = asked ? positionals.slice(1) : positionals;
+  const found = find(words);
+  if (!found.ok) {
+    const at = commandLine(found.path);
+    const meant = found.suggestion ? ` Did you mean \`${at} ${found.suggestion}\`?` : "";
+    fail(`unknown command "${found.typed}" for \`${at}\`.${meant} Run \`${at} --help\` for its commands.`);
+  }
+  // Help never acts and never attaches: it prints and exits 0.
+  if (asked || values.help) return void process.stdout.write(help(found.path));
+  // A group named alone (`channelstack slack`, `channelstack openai`) shows what it holds.
+  const group = found.path.length > 1 && (found.path.at(-1)?.commands?.length ?? 0) > 0;
+  if (group && found.path.length > words.length) return void process.stdout.write(help(found.path));
+  // No command is `start`.
+  const path = found.path.length > 1 ? found.path : (find(["start"]) as { path: readonly Command[] }).path;
+  checkFlags(path, values);
+  const flags = values as Flags;
 
   const [command = "start", action, ...rest] = positionals;
-  if (command === "start") return runStart(values);
-  if (command === "secrets") return runSecrets(action);
-  if (command === "ca") return runCa(action);
+  if (command === "start") return runStart(flags);
+  if (command === "secrets") return runSecrets();
+  if (command === "ca") return runCa();
   if (command === "login") {
     const result = await runLogin({
       env: process.env,
       home: homeDir(),
       drivers: DRIVERS,
       channel: action,
-      user: values.user,
-      save: values.save,
+      user: flags.user,
+      save: flags.save,
     });
     process.stdout.write(result.text);
     if (!result.ok) process.exitCode = 1;
@@ -272,12 +238,12 @@ async function main() {
     const live = { env: process.env, home: homeDir(), drivers: DRIVERS };
     const result =
       command === "doctor"
-        ? await runDoctor({ ...live, storageStates: values["storage-state"] ?? [] })
+        ? await runDoctor({ ...live, storageStates: flags["storage-state"] ?? [] })
         : await runSweep({
             ...live,
-            check: values.check === true,
-            run: values.run,
-            olderThanHours: values["older-than-hours"],
+            check: flags.check === true,
+            run: flags.run,
+            olderThanHours: flags["older-than-hours"],
           });
     process.stdout.write(result.text);
     if (!result.ok) process.exitCode = 1;
@@ -287,26 +253,24 @@ async function main() {
   // Everything else attaches to the running server.
   const print = (text: string) => void process.stdout.write(text);
   if (command === "env") {
-    return print(
-      await runEnv(attach(values), { proxy: values.proxy === true, app: values.app, channel: values.channel }),
-    );
+    return print(await runEnv(attach(flags), { proxy: flags.proxy === true, app: flags.app, channel: flags.channel }));
   }
   if (DEV_CHANNELS.some((channel) => channel.name === command))
-    return print(await runChannel(attach(values), command, action, rest, values));
+    return print(await runChannel(attach(flags), command, action, rest, flags));
   if (command === "ui") {
-    const { url } = await attach(values).request<{ url: string }>("POST", "/ui/login-links");
+    const { url } = await attach(flags).request<{ url: string }>("POST", "/ui/login-links");
     return print(`${url}\n`);
   }
-  if (command === "show") return print(await runShow(attach(values), undefined, values));
-  if (command === "tail") return runTail(attach(values), values, print);
-  if (command === "deliveries") return print(await runDeliveries(attach(values), action));
+  if (command === "show") return print(await runShow(attach(flags), undefined, flags));
+  if (command === "tail") return runTail(attach(flags), flags, print);
+  if (command === "deliveries") return print(await runDeliveries(attach(flags), action));
   if (command === "redeliver")
-    return print(await runRedeliver(attach(values), [action, ...rest].filter(Boolean) as string[]));
+    return print(await runRedeliver(attach(flags), [action, ...rest].filter(Boolean) as string[]));
   // Attaches on its first tool call, so a coding agent can start it before the server.
-  if (command === "mcp") return runMcp(values, pkg.version);
+  if (command === "mcp") return runMcp(flags, pkg.version);
   if (command === "openai") {
-    const { when, times, tool, args } = values;
-    return print(await runOpenAI(attach(values), action, rest, { when, times, tool, args }));
+    const { when, times, tool, args } = flags;
+    return print(await runOpenAI(attach(flags), action, rest, { when, times, tool, args }));
   }
   fail(`unknown command "${command}". Run \`channelstack --help\`.`);
 }

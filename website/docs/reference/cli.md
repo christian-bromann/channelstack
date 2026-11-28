@@ -43,16 +43,24 @@ npx channelstack show
 | [`channelstack secrets rotate`](#channelstack-secrets-rotate) | Replace every fake token and signing secret |
 | [`channelstack ca rotate`](#channelstack-ca-rotate) | Replace proxy mode's CA |
 | `channelstack --version`, `-v` | Print the version |
-| `channelstack --help`, `-h` | Print the usage |
+| `channelstack [<command>…] --help`, `-h`, `channelstack help [<command>…]` | Print a command's help: [Help](#help) |
 
 `<channel>` is `slack`, `github`, `linear`, `notion`, `resend`, `google` or `discord`: every channel has the same commands.
+
+## Help
+
+Every command has its own help: `channelstack --help` lists the commands and the channels, `channelstack slack --help` what people do on Slack (the shared commands and every action its routes generate), and `channelstack slack click --help` one action's values with their types. `channelstack help slack click` is the same. A command group named alone, `channelstack slack` or `channelstack openai`, prints its help too.
+
+Each help has the same sections, in this order: what the command does, `USAGE`, `EXAMPLES`, its subcommands, `ARGUMENTS`, `FLAGS` (`VALUES` for an action's own values), `SERVER FLAGS` for a command that attaches, and `LEARN MORE` with a link to this page. It goes to stdout, wrapped at 80 columns, with bold headings only on a terminal (never with `NO_COLOR`, `TERM=dumb` or in a pipe). `--help` wins over everything else on the line: the command doesn't run and no server is needed.
+
+A command takes only its own flags: `channelstack env --once` fails with ``channelstack env takes no --once. Run `channelstack env --help` for its flags.``, and a mistyped command or flag names the one that was probably meant (``unknown command "clik" for `channelstack slack`. Did you mean `channelstack slack click`?``).
 
 ## Exit codes
 
 | Code | When |
 |---|---|
-| `0` | The command did what it says. `start` exits `0` after a clean stop |
-| `1` | Anything went wrong: a bad flag, no server to attach to, a refusal from the server, an unknown command. The message goes to stderr, prefixed `channelstack: `. `doctor`, `login` and `sweep` also exit `1` when their check fails (see each) |
+| `0` | The command did what it says, or printed its help. `start` exits `0` after a clean stop |
+| `1` | Anything went wrong: a flag the command doesn't take, no server to attach to, a refusal from the server, an unknown command. The message goes to stderr, prefixed `channelstack: `. `doctor`, `login` and `sweep` also exit `1` when their check fails (see each) |
 
 ## Attaching to the running server
 

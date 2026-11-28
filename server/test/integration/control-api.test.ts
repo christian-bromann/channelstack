@@ -140,7 +140,30 @@ describe("the CLI", () => {
     });
     expect(cli(["secrets", "show"])).toMatchObject({ status: 1 });
     expect(cli(["start", "--port", "http"])).toMatchObject({ status: 1, stderr: expect.stringContaining("--port") });
-    expect(cli(["--help"]).stdout).toContain("channelstack secrets rotate");
+    expect(cli(["slack", "say", "--thead", "last"])).toMatchObject({
+      status: 1,
+      stderr: expect.stringContaining("channelstack slack say takes no --thead"),
+    });
+    expect(cli(["slak"])).toMatchObject({ status: 1, stderr: expect.stringContaining("`channelstack slack`") });
+  });
+
+  test("help is per command, and never acts or attaches", () => {
+    const noServer = { CHANNELSTACK_HOME: temporaryHome() };
+    const top = cli(["--help"], noServer);
+    expect(top).toMatchObject({ status: 0, stderr: "" });
+    expect(top.stdout).toMatch(/^ {2}secrets +Replace every fake token/m);
+    expect(top.stdout).not.toContain("--as <name>");
+
+    const slack = cli(["slack", "--help"], noServer);
+    expect(slack.stdout).toMatch(/^ {2}click +Click a button/m);
+    expect(cli(["help", "slack"], noServer).stdout).toBe(slack.stdout);
+    // A group named alone shows its help.
+    expect(cli(["slack"], noServer)).toMatchObject({ status: 0, stdout: slack.stdout });
+
+    // `--help` wins over everything else on the line: nothing is said, no server is needed.
+    const say = cli(["slack", "say", "--as", "ana", "--in", "#support", "hi", "-h"], noServer);
+    expect(say).toMatchObject({ status: 0, stderr: "" });
+    expect(say.stdout).toContain("channelstack slack say --as <name> --in <place> <text>");
   });
 
   test("a private server file gets its own token, and the shared one is left alone", async () => {

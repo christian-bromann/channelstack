@@ -32,8 +32,8 @@ export function actionsOf(channel: string): readonly Action[] {
   return ACTIONS[channel]?.actions ?? [];
 }
 
-/** Every value name an action takes on any channel: the CLI's `--<name>` options. */
-export function actionOptionNames(): string[] {
+/** Every value name an action takes on any channel: the values `runChannel` hands an action. */
+function actionOptionNames(): string[] {
   return [
     ...new Set(
       Object.values(ACTIONS).flatMap(({ actions }) => actions.flatMap(({ params }) => params.map(({ name }) => name))),
@@ -69,11 +69,12 @@ function typeText(type: ActionType, shorthand?: string): string {
   }
 }
 
+/** What a value of an action takes, as `describeAction` writes it: `SlackButtonRef (or its label)`. */
+export const paramText = (param: ActionParam): string => typeText(param.type, param.shorthand);
+
 /** `click(button, message?, thread?, channel?): Click a button…`, one line. */
 export function describeAction(action: Action): string {
-  const params = action.params.map(
-    (param) => `${param.name}${param.optional ? "?" : ""}: ${typeText(param.type, param.shorthand)}`,
-  );
+  const params = action.params.map((param) => `${param.name}${param.optional ? "?" : ""}: ${paramText(param)}`);
   return `${action.name}(${params.join(", ")}): ${action.summary}`;
 }
 
@@ -310,7 +311,7 @@ export async function runAct(
 }
 
 /** The shared verbs, which every channel has; anything else is one of the channel's actions. */
-const VERBS = ["say", "reply", "react", "show", "actions", "act"] as const;
+export const VERBS = ["say", "reply", "react", "show", "actions", "act"] as const;
 
 /**
  * `channelstack <channel> <verb|action> …`: `say`, `reply`, `react`, `show`, `actions`, and each of
