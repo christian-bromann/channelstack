@@ -31,6 +31,7 @@ import {
   waitFor,
   WaitTimeoutError,
 } from "../../sdks/typescript/client.ts";
+import { appTurns } from "../matchers-core/index.ts";
 // The fixtures and matchers the checks use come from the Vitest integration.
 import type {} from "../vitest/index.ts";
 
@@ -70,6 +71,29 @@ export interface ChecksOptions {
   loopTurns?: number;
 }
 
+/**
+ * How every `<channel>.no-reply-loop` ends. The conversation goes quiet with at most what a correct
+ * agent leaves (the `start` app messages there were when the peer began, then at most `turns`
+ * answers, each followed by the peer's): `toGoQuiet` fails otherwise. And the agent answered the
+ * other app at most `turns` times. Either failure names the authors in turn since a person last
+ * wrote (decision 0027).
+ */
+async function answeredAtMost(
+  conversation: unknown,
+  loop: { start: number; answered: number; turns: number; what: string; wait: { timeout?: Duration } },
+): Promise<void> {
+  const { start, answered, turns, what, wait } = loop;
+  await expect(conversation).toGoQuiet({
+    maxReplies: start + 2 * turns + 1,
+    ...(wait.timeout === undefined ? {} : { within: wait.timeout }),
+  });
+  const since = await appTurns(conversation);
+  expect(
+    answered,
+    `times it answered ${what}: ${since.count} app messages and no person between them: ${since.turns}`,
+  ).toBeLessThanOrEqual(turns);
+}
+
 /** What an email app does in `<channel>.no-reply-loop`: Resend's and Google's alike. */
 interface MailPeer<Email, Agent> {
   send(options: { to: Agent[]; subject: string; text: string; headers: Record<string, string> }): Promise<Email>;
@@ -96,7 +120,14 @@ async function autoMailLoop<
     const latest = (await answers()).at(-1) ?? first;
     await peer.reply(latest, { text: "Noted, thanks.", headers: auto });
   }
-  expect(seen, "times it answered mail another program sent on its own").toBeLessThanOrEqual(turns);
+  // The peer's first email starts the loop: no app message was there before it.
+  await answeredAtMost(first.thread, {
+    start: 0,
+    answered: seen,
+    turns,
+    what: "mail another program sent on its own",
+    wait,
+  });
 }
 
 /**
@@ -373,6 +404,7 @@ export function slackChecks(options: ChecksOptions): void {
       // The agent's answer to Ana; then the peer answers each of its answers, mentioning it, as a
       // second agent without a loop guard would.
       const first = await answersAgain(replies, 0, wait);
+      const start = (await appTurns(msg.thread)).count;
       let seen = first;
       for (let turn = 0; turn <= turns; turn++) {
         await peer.reply(`@${agent.name} thanks! Anything else?`, { thread: msg.thread });
@@ -380,7 +412,7 @@ export function slackChecks(options: ChecksOptions): void {
         if (now === seen) break;
         seen = now;
       }
-      expect(seen - first, "times it answered the other app").toBeLessThanOrEqual(turns);
+      await answeredAtMost(msg.thread, { start, answered: seen - first, turns, what: "the other app", wait });
     });
 
     check("slack.bad-signature", "rejects a delivery with a bad signature", async (context) => {
@@ -597,6 +629,7 @@ export function githubChecks(options: ChecksOptions): void {
         const agentComments = async () => (await issue.comments()).filter((one) => one.author.id === agent.id).length;
         // The peer answers each comment of the agent's, mentioning it, as a second agent without a loop guard would.
         const before = await agentComments();
+        const start = (await appTurns(issue)).count;
         let seen = before;
         for (let turn = 0; turn <= turns; turn++) {
           await peer.comment(`@${agent.name} thanks! Anything else?`, { issue });
@@ -604,7 +637,7 @@ export function githubChecks(options: ChecksOptions): void {
           if (now === seen) break;
           seen = now;
         }
-        expect(seen - before, "times it answered the other App").toBeLessThanOrEqual(turns);
+        await answeredAtMost(issue, { start, answered: seen - before, turns, what: "the other App", wait });
       },
     );
   });
@@ -685,6 +718,7 @@ export function linearChecks(options: ChecksOptions): void {
       const agentComments = async () => (await issue.comments()).filter((one) => one.author.id === agent.id).length;
       // The peer comments after each comment of the agent's, as a second agent without a loop guard would.
       const before = await agentComments();
+      const start = (await appTurns(issue)).count;
       let seen = before;
       for (let turn = 0; turn <= turns; turn++) {
         await peer.comment("Thanks! Anything else?", { issue });
@@ -692,7 +726,7 @@ export function linearChecks(options: ChecksOptions): void {
         if (now === seen) break;
         seen = now;
       }
-      expect(seen - before, "times it answered the other app").toBeLessThanOrEqual(turns);
+      await answeredAtMost(issue, { start, answered: seen - before, turns, what: "the other app", wait });
     });
   });
 }
@@ -765,6 +799,7 @@ export function notionChecks(options: ChecksOptions): void {
         (await comment.discussion.comments()).filter((one) => one.author.id === agent.id).length;
       // The peer answers each comment of the agent's in the discussion, as a second agent without a loop guard would.
       const before = await agentComments();
+      const start = (await appTurns(comment.discussion)).count;
       let seen = before;
       for (let turn = 0; turn <= turns; turn++) {
         await peer.reply("Thanks! Anything else?", { discussion: comment.discussion });
@@ -772,7 +807,13 @@ export function notionChecks(options: ChecksOptions): void {
         if (now === seen) break;
         seen = now;
       }
-      expect(seen - before, "times it answered the other integration").toBeLessThanOrEqual(turns);
+      await answeredAtMost(comment.discussion, {
+        start,
+        answered: seen - before,
+        turns,
+        what: "the other integration",
+        wait,
+      });
     });
   });
 }
@@ -984,6 +1025,7 @@ export function discordChecks(options: ChecksOptions): void {
         // The agent's answer to Ana; then the peer answers each of its answers, mentioning it, as a
         // second agent without a loop guard would.
         const first = await answersAgain(count, 0, wait);
+        const start = (await appTurns(channel)).count;
         let seen = first;
         for (let turn = 0; turn <= turns; turn++) {
           const latest = (await answers()).at(-1);
@@ -993,7 +1035,7 @@ export function discordChecks(options: ChecksOptions): void {
           if (now === seen) break;
           seen = now;
         }
-        expect(seen - first, "times it answered the other app").toBeLessThanOrEqual(turns);
+        await answeredAtMost(channel, { start, answered: seen - first, turns, what: "the other app", wait });
       },
     );
 

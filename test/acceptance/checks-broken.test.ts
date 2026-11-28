@@ -73,6 +73,17 @@ describe.for(channels)("the standard %s checks catch what they are for", ([name,
     expect(run.output).toContain(`[${id}]`);
     expect(run.status).toBe(1);
   });
+
+  // Exit check 12.6: against the variant that answers every app, the loop check fails through
+  // `toGoQuiet`, whose message names the authors in turn since a person last wrote.
+  test("its no-reply-loop check names the authors in turn", { timeout: 120_000 }, async () => {
+    const id = `${channel}.no-reply-loop`;
+    const run = await checks(channel, id, id);
+    expect(run.output, run.output).toContain("1 failed");
+    expect(run.output).toContain("Expected the conversation to go quiet");
+    expect(run.output).toMatch(/and no person between them: [^\n]*loop-peer[^\n]* → [^\n]*loop-peer/);
+    expect(run.status).toBe(1);
+  });
 });
 
 test("an agent that takes the button away after the first click passes the double-click check", async () => {

@@ -262,6 +262,17 @@ async function writersOf(subject: unknown): Promise<readonly { name: string; app
   return authors.map((author) => ({ name: author.name, app: (author as { kind?: string }).kind === "app" }));
 }
 
+/**
+ * The app messages of a conversation since a person last wrote in it, those before a check began
+ * included, and their authors in turn (`my-agent → coder → my-agent`): what `toGoQuiet` and each
+ * `<channel>.no-reply-loop` name when apps answer each other (decision 0027).
+ */
+export async function appTurns(subject: unknown): Promise<{ count: number; turns: string }> {
+  const writers = await writersOf(subject);
+  const since = writers.slice(writers.findLastIndex((writer) => !writer.app) + 1);
+  return { count: since.length, turns: since.map((writer) => writer.name).join(" → ") };
+}
+
 export const matchers = {
   /**
    * The conversation goes quiet within `within`, holding at most `maxReplies` app messages since
@@ -287,11 +298,9 @@ export const matchers = {
       if (!(error instanceof WaitTimeoutError)) throw error;
       quiet = false;
     }
-    const writers = await writersOf(subject);
-    const lastPerson = writers.findLastIndex((writer) => !writer.app);
-    const sincePerson = writers.slice(lastPerson + 1);
-    const pass = quiet && sincePerson.length <= options.maxReplies;
-    const turns = sincePerson.length === 0 ? "" : `: ${sincePerson.map((writer) => writer.name).join(" → ")}`;
+    const since = await appTurns(subject);
+    const pass = quiet && since.count <= options.maxReplies;
+    const turns = since.count === 0 ? "" : `: ${since.turns}`;
     const open = pass === state.isNot ? await stillOpen(subject) : [];
     const loops = pass === state.isNot ? await stoppedLoops(subject) : [];
     return {
@@ -299,7 +308,7 @@ export const matchers = {
       message: () =>
         `Expected the conversation ${state.isNot ? "not " : ""}to go quiet within ${typeof within === "number" ? `${within}ms` : within} with at most ${options.maxReplies} app ${options.maxReplies === 1 ? "message" : "messages"} since a person last wrote. ${
           quiet ? "It went quiet" : "It was still busy"
-        } with ${sincePerson.length} app ${sincePerson.length === 1 ? "message" : "messages"} and no person between them${turns}${
+        } with ${since.count} app ${since.count === 1 ? "message" : "messages"} and no person between them${turns}${
           open.length === 0 ? "" : `\nStill open: ${open.join("; ")}`
         }${loops.length === 0 ? "" : `\nStopped: ${loops.join("; ")}`}`,
     };
