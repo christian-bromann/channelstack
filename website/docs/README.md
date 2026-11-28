@@ -49,6 +49,7 @@ One per agent framework, in the order people use them with channelstack. Each is
 | Waiting and quiet | Explanation | Why matchers wait, positive vs negative and exact-count checks, the quiet window, "Still open:" messages, timeouts. Animated: the quiet window |
 | Delivery and failures | How-to | Retries, bad signatures, stale timestamps, redelivery, faults (rate limits, dropped sockets), what each proves. Animated: Slack's retry |
 | Standard checks | How-to | `slackChecks()` and the others: what each check catches, the options they need, skipping one |
+| Several apps | How-to | Agents together: `createApp({ name })`, a second agent from `env --app`, scripted apps, `toGoQuiet`, the loop guard, `no-reply-loop` |
 | pytest | How-to | `pytest-channelstack`: fixtures, `expect(...)`, the ini settings, modes |
 | The dev loop: CLI and UI | How-to | `channelstack slack say`, `show`, `tail`, `deliveries`, `redeliver`, the UI's login link, the shared `dev` session |
 | MCP for coding agents | How-to | `channelstack mcp`, its tools, the skill, the loop a coding agent runs |

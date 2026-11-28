@@ -1,3 +1,4 @@
+import { BUILT_IN_APP } from "../../../core/apps/index.ts";
 import type { DeliveryTransport } from "../../../core/delivery/index.ts";
 import type { DeliveryKit } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
@@ -15,6 +16,7 @@ import {
 import {
   type Immediate,
   NOBODY,
+  type SlackAppRecord,
   type SlackControlScope,
   type SlackConversationRecord,
   type SlackMessageInput,
@@ -46,6 +48,7 @@ export interface InteractionKit {
     conversation: SlackConversationRecord,
     message: SlackMessageInput,
     options: { threadTs?: string | undefined; ephemeralFor?: string | undefined },
+    app?: SlackAppRecord,
   ): SlackMessageRecord;
   edit(
     conversation: SlackConversationRecord,
@@ -54,29 +57,38 @@ export interface InteractionKit {
   ): void;
   remove(conversation: SlackConversationRecord, message: SlackMessageRecord): void;
   action(session: string, name: string, data: Record<string, unknown>): void;
-  /** The person's DM with the app, opened if there is none yet. */
-  directMessage(session: string, userId: string): SlackConversationRecord;
+  /** The person's DM with an app, opened if there is none yet. */
+  directMessage(session: string, userId: string, app: SlackAppRecord): SlackConversationRecord;
   /** A person writes in a thread. */
   replyAsUser: Immediate<SlackWorld>["replyAsUser"];
-  /** The app's Socket Mode connection, once it has chosen that over a request URL. */
-  transport(): DeliveryTransport | undefined;
-  /** Would the app be told about this kind of event in this conversation? It must be installed, subscribed and a member. */
-  hears(conversation: SlackConversationRecord | "dm", subscription: string): boolean;
-  /** Send an event about a conversation to the app, if it is subscribed, installed and a member. */
-  emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
+  /** An app's Socket Mode connection (the built-in app's unless named), once it has chosen that over a request URL. */
+  transport(app?: SlackAppRecord): DeliveryTransport | undefined;
+  /** Would the app (the built-in one unless named) be told about this kind of event here? It must be installed, subscribed and a member. */
+  hears(conversation: SlackConversationRecord | "dm", subscription: string, app?: SlackAppRecord): boolean;
+  /**
+   * Send an event about a conversation to the built-in app, if it is subscribed, installed and a
+   * member: Stop and the agent split view are a person's, and belong to the app they are for.
+   */
+  emit(
+    conversation: SlackConversationRecord,
+    subscription: string,
+    event: Record<string, unknown>,
+    app?: SlackAppRecord,
+  ): string | undefined;
 }
 
 /** Sending an interaction to the app, for the parts of the fake that have their own (modals). */
 export interface InteractionDispatch {
-  issueTrigger(session: string, user: SlackUserRecord): string;
+  issueTrigger(session: string, user: SlackUserRecord, app: SlackAppRecord): string;
   /** Refuses with `dispatch_failed` when Slack has nowhere to send an interaction. Asked before anything changes. */
-  reachable(): void;
+  reachable(app?: SlackAppRecord): void;
   send(
     session: string,
     type: string,
     body: string,
     payload: Record<string, unknown>,
     answered?: (answer: { contentType: string; body: string }) => void,
+    app?: SlackAppRecord,
   ): string;
 }
 
@@ -105,10 +117,16 @@ export function createInteractions(kit: InteractionKit): Interactions {
   const { context, store, refuse, member, requireMessage } = kit;
   const { ids, clock } = context;
 
-  /** A `trigger_id` the app may open one modal with, for three seconds. */
-  const issueTrigger = (session: string, user: SlackUserRecord): string => {
+  /** A `trigger_id` the app it is handed to may open one modal with, for three seconds: no other app may. */
+  const issueTrigger = (session: string, user: SlackUserRecord, app: SlackAppRecord): string => {
     const triggerId = ids.next(SLACK_IDS.trigger);
-    store.triggers.set(triggerId, { session, user: user.id, expiresAt: clock() + ACK_WINDOW_MS, used: false });
+    store.triggers.set(triggerId, {
+      session,
+      user: user.id,
+      app: app.name,
+      expiresAt: clock() + ACK_WINDOW_MS,
+      used: false,
+    });
     return triggerId;
   };
 
@@ -119,12 +137,14 @@ export function createInteractions(kit: InteractionKit): Interactions {
     user: SlackUserRecord,
     conversation: SlackConversationRecord,
     source?: SlackMessageRecord,
+    app: SlackAppRecord = store.app,
   ): InteractionContext => {
-    const triggerId = issueTrigger(session, user);
+    const triggerId = issueTrigger(session, user, app);
     // The URL is the credential, as with Slack's: whoever has it may answer.
     const key = `${store.team.id}/${triggerId.split(".")[0]}/${randomToken(18)}`;
     store.responseUrls.set(key, {
       session,
+      app: app.name,
       conversation: conversation.id,
       user: user.id,
       source: source?.ts,
@@ -135,16 +155,16 @@ export function createInteractions(kit: InteractionKit): Interactions {
     return {
       user,
       team: store.team,
-      app: store.app,
+      app,
       conversation,
-      verificationToken: context.secret("verificationToken"),
+      verificationToken: context.apps.secret(app.name, "verificationToken"),
       triggerId,
       responseUrl: `${context.apiUrl()}/hooks/${kind}/${key}`,
     };
   };
 
-  const reachable = () => {
-    if (context.webhookUrl === undefined && kit.transport() === undefined) {
+  const reachable = (app: SlackAppRecord = store.app) => {
+    if (context.apps.webhookUrl(app.name) === undefined && kit.transport(app) === undefined) {
       throw refuse("dispatch_failed", "The app has no request URL and no socket, so Slack has nowhere to send this");
     }
   };
@@ -156,15 +176,17 @@ export function createInteractions(kit: InteractionKit): Interactions {
     body: string,
     payload: Record<string, unknown>,
     answered?: (answer: { contentType: string; body: string }) => void,
+    app: SlackAppRecord = store.app,
   ): string => {
-    reachable();
+    reachable(app);
     const id = ids.next(SLACK_IDS.event);
     kit.deliveries.send({
       id,
       session,
+      app: app.name,
       type,
-      url: context.webhookUrl ?? "",
-      transport: kit.transport,
+      url: context.apps.webhookUrl(app.name) ?? "",
+      transport: () => kit.transport(app),
       body,
       contentType: "application/x-www-form-urlencoded",
       retry: false,
@@ -215,13 +237,19 @@ export function createInteractions(kit: InteractionKit): Interactions {
     message: SlackMessageRecord,
     action: Record<string, unknown>,
   ) => {
-    const payload = blockActionsPayload(answerable(session, "actions", user, conversation, message), {
+    // A control is on one app's message, and the interaction goes to that app (decision 0027).
+    const app = appOfMessage(message);
+    const payload = blockActionsPayload(answerable(session, "actions", user, conversation, message, app), {
       message: kit.messageObject(message),
       ephemeral: message.ephemeralFor !== undefined,
       actions: [action],
     });
-    return send(session, "block_actions", payloadForm(payload), payload);
+    return send(session, "block_actions", payloadForm(payload), payload, undefined, app);
   };
+
+  /** The app that wrote a message; the built-in app for anyone else's. */
+  const appOfMessage = (message: SlackMessageRecord): SlackAppRecord =>
+    store.apps.all().find((app) => app.botUserId === message.user) ?? store.app;
 
   return {
     dispatch: { issueTrigger, reachable, send },
@@ -239,7 +267,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
           `No button ${JSON.stringify(button.label ?? button.actionId)} there. Controls there: ${there.length === 0 ? "none" : there.join(", ")}`,
         );
       }
-      reachable();
+      reachable(appOfMessage(hit.message));
       kit.action(session, "click", {
         user: user.id,
         channel: conversation.id,
@@ -272,7 +300,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
       if (!many && chosen.length !== 1) {
         throw new ProtocolError("invalid_argument", "That menu takes one option");
       }
-      reachable();
+      reachable(appOfMessage(message));
       kit.action(session, "select", { user: user.id, channel: conversation.id, ts: message.ts, options: [...options] });
       return blockActions(
         session,
@@ -283,34 +311,38 @@ export function createInteractions(kit: InteractionKit): Interactions {
       );
     },
 
-    shortcutAsUser(session, userId, callbackId, target) {
+    shortcutAsUser(session, userId, callbackId, target, name = BUILT_IN_APP) {
       const user = store.users.get(session, userId);
+      // A message shortcut is one app's: it goes to that app alone (decision 0027).
+      const app = store.apps.get(session, name);
       const { conversation, messages } = inScope(session, user, { message: target });
       const [message] = messages as [SlackMessageRecord];
-      reachable();
+      reachable(app);
       kit.action(session, "shortcut", { user: user.id, channel: conversation.id, ts: message.ts, callbackId });
       // A shortcut has no message of the app's to replace: an answer through its response_url is a new message.
-      const payload = messageActionPayload(answerable(session, "actions", user, conversation), {
+      const payload = messageActionPayload(answerable(session, "actions", user, conversation, undefined, app), {
         callbackId,
         message: kit.messageObject(message),
         actionTs: slackTs(ids),
       });
-      return send(session, "message_action", payloadForm(payload), payload);
+      return send(session, "message_action", payloadForm(payload), payload, undefined, app);
     },
 
-    commandAsUser(session, userId, line, channel) {
+    commandAsUser(session, userId, line, channel, name = BUILT_IN_APP) {
       const conversation = store.conversations.get(session, channel);
       const user = member(session, userId, conversation);
+      // A slash command is one app's: it goes to that app alone, which answers as itself.
+      const app = store.apps.get(session, name);
       const [command = "", ...rest] = line.trim().split(/\s+/);
       if (!/^\/\S+$/.test(command)) throw new ProtocolError("invalid_argument", "A slash command starts with /");
-      reachable();
+      reachable(app);
       kit.action(session, "command", { user: user.id, channel: conversation.id, command });
-      const fields = slashCommandFields(answerable(session, "commands", user, conversation), {
+      const fields = slashCommandFields(answerable(session, "commands", user, conversation, undefined, app), {
         command,
         text: rest.join(" "),
       });
       // The app may answer in the response itself: JSON with a message, or plain text.
-      return send(session, "slash_command", new URLSearchParams(fields).toString(), fields, (answer) => {
+      const answered = (answer: { contentType: string; body: string }) => {
         if (answer.body.trim() === "") return;
         let message: Record<string, unknown> = { text: answer.body };
         if (answer.contentType.includes("application/json")) {
@@ -320,8 +352,9 @@ export function createInteractions(kit: InteractionKit): Interactions {
             return;
           }
         }
-        publish(conversation, user.id, undefined, message);
-      });
+        publish(conversation, user.id, undefined, message, app);
+      };
+      return send(session, "slash_command", new URLSearchParams(fields).toString(), fields, answered, app);
     },
 
     stopAsUser(session, userId, thread) {
@@ -329,8 +362,16 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const user = member(session, userId, conversation);
       const root = requireMessage(conversation, thread.ts);
       const rootTs = root.threadTs ?? root.ts;
+      // Stop is for the app working in the thread: the one streaming there, or else the last app that wrote.
+      const inThread = store
+        .messagesIn(conversation.id)
+        .filter((message) => message.ts === rootTs || message.threadTs === rootTs);
+      const working =
+        inThread.find((message) => message.stream?.state === "open") ??
+        inThread.toReversed().find((message) => store.isAppUser(message.user));
+      const app = (working && store.appOf(working.user)) ?? store.app;
       // The client only shows Stop for an app that listens for it. Refused before anything changes.
-      if (!kit.hears(conversation, "agent_session_stopped")) {
+      if (!kit.hears(conversation, "agent_session_stopped", app)) {
         throw refuse(
           "stop_unavailable",
           "The app doesn't receive agent_session_stopped here, so there is no Stop to press",
@@ -350,32 +391,39 @@ export function createInteractions(kit: InteractionKit): Interactions {
       store.threadState(conversation.id, rootTs).statusText = "";
       kit.action(session, "stop", { user: user.id, channel: conversation.id, ts: rootTs });
       return (
-        kit.emit(conversation, "agent_session_stopped", {
-          type: "agent_session_stopped",
-          channel: conversation.id,
-          thread_ts: rootTs,
-          user: user.id,
-          streaming_message_ts: streaming.map((message) => message.ts),
-          event_ts: slackTs(ids),
-        }) ?? ""
+        kit.emit(
+          conversation,
+          "agent_session_stopped",
+          {
+            type: "agent_session_stopped",
+            channel: conversation.id,
+            thread_ts: rootTs,
+            user: user.id,
+            streaming_message_ts: streaming.map((message) => message.ts),
+            event_ts: slackTs(ids),
+          },
+          app,
+        ) ?? ""
       );
     },
 
-    openAgentThread(session, userId, from) {
+    openAgentThread(session, userId, from, name = BUILT_IN_APP) {
       const user = store.users.get(session, userId);
+      const app = store.apps.get(session, name);
       const context = from === undefined ? undefined : store.conversations.get(session, from);
       // The split view belongs to an app that is installed and listening. Refused before a DM or a thread exists.
-      if (!kit.hears("dm", "assistant_thread_started")) {
+      if (!kit.hears("dm", "assistant_thread_started", app)) {
         throw refuse("split_view_unavailable", "The app doesn't receive assistant_thread_started");
       }
-      const dm = kit.directMessage(session, user.id);
+      const dm = kit.directMessage(session, user.id, app);
       // The thread hangs on an anchor nobody sees; what people and the app write are its replies.
-      const anchor = kit.postAsApp(dm, { text: "" }, { ephemeralFor: NOBODY });
+      const anchor = kit.postAsApp(dm, { text: "" }, { ephemeralFor: NOBODY }, app);
       kit.action(session, "openAgentThread", { user: user.id, channel: dm.id, ts: anchor.ts });
       kit.emit(
         dm,
         "assistant_thread_started",
         assistantThreadEvent("assistant_thread_started", user, dm, anchor.ts, context),
+        app,
       );
       return anchor;
     },
@@ -399,7 +447,9 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const dm = store.conversations.get(session, thread.channel);
       const user = member(session, userId, dm);
       const context = store.conversations.get(session, channel);
-      if (!kit.hears(dm, "assistant_thread_context_changed")) {
+      // The split view is the app's whose DM it is in.
+      const app = [...dm.members].map((id) => store.appOf(id)).find((one) => one !== undefined) ?? store.app;
+      if (!kit.hears(dm, "assistant_thread_context_changed", app)) {
         throw refuse("split_view_unavailable", "The app doesn't receive assistant_thread_context_changed");
       }
       kit.action(session, "switchContext", { user: user.id, channel: context.id, ts: thread.ts });
@@ -408,6 +458,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
           dm,
           "assistant_thread_context_changed",
           assistantThreadEvent("assistant_thread_context_changed", user, dm, thread.ts, context),
+          app,
         ) ?? ""
       );
     },
@@ -439,7 +490,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
         else kit.edit(conversation, source, { text, blocks });
         return true;
       }
-      publish(conversation, url.user, url.threadTs, body);
+      publish(conversation, url.user, url.threadTs, body, store.apps.named(url.app));
       return true;
     },
   };
@@ -470,6 +521,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
     userId: string,
     threadTs: string | undefined,
     body: Record<string, unknown>,
+    app?: SlackAppRecord,
   ): void {
     const text = typeof body.text === "string" ? body.text : "";
     const blocks = Array.isArray(body.blocks) ? body.blocks : undefined;
@@ -481,6 +533,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
         threadTs: typeof body.thread_ts === "string" ? body.thread_ts : threadTs,
         ...(body.response_type === "in_channel" ? {} : { ephemeralFor: userId }),
       },
+      app,
     );
   }
 }

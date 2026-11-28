@@ -1,3 +1,4 @@
+import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { slackDev } from "./dev.ts";
 import { createSlackFake } from "./fake/index.ts";
@@ -71,7 +72,7 @@ export const slack: DriverDefinition = {
           reality: () => (live ? "live" : "fake"),
           events: context.events,
           apiUrl: context.apiUrl,
-          secret: context.secret,
+          secret: (name, app) => context.apps.secret(app ?? BUILT_IN_APP, name),
         }),
       capabilities: () => ({}),
       // A stream the app started and hasn't stopped is work in progress.
@@ -80,14 +81,22 @@ export const slack: DriverDefinition = {
           .conversationsOf(session)
           .flatMap((conversation) => fake.store.messagesIn(conversation.id))
           .filter((message) => message.stream?.state === "open")
-          .map((message) => `a stream ${fake.store.app.name} started and never stopped: "${excerpt(message.text)}"`),
+          .map(
+            (message) =>
+              `a stream ${fake.store.appOf(message.user)?.name ?? fake.store.app.name} started and never stopped: "${excerpt(message.text)}"`,
+          ),
       // Live, `channelstack env` prints nothing for Slack (app.ts): the agent talks to it with its own configuration.
-      env: () => ({
-        SLACK_API_URL: `${context.apiUrl()}/api/`,
-        SLACK_BOT_TOKEN: context.secret("botToken"),
-        SLACK_APP_TOKEN: context.secret("appToken"),
-        SLACK_SIGNING_SECRET: context.secret("signingSecret"),
-      }),
+      env: (app) => {
+        // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same shape.
+        const { apps } = fake.store;
+        const name = apps.keyOf(apps.forEnv(app, (wanted) => fake.world.createApp(undefined, { name: wanted })));
+        return {
+          SLACK_API_URL: `${context.apiUrl()}/api/`,
+          SLACK_BOT_TOKEN: context.apps.secret(name, "botToken"),
+          SLACK_APP_TOKEN: context.apps.secret(name, "appToken"),
+          SLACK_SIGNING_SECRET: context.apps.secret(name, "signingSecret"),
+        };
+      },
     };
   },
 };

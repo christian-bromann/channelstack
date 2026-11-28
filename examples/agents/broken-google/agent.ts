@@ -79,6 +79,9 @@ async function reply(id: string) {
   const from = header(message, "From");
   const sender = (from.match(/<([^>]+)>/)?.[1] ?? from).toLowerCase();
   if (sender === GMAIL_ADDRESS.toLowerCase() || !message.labelIds?.includes("INBOX")) return;
+  // Bug: answers mail another program sent on its own, so two agents answer each other without end.
+  const auto = header(message, "Auto-Submitted");
+  if (auto !== "" && auto.toLowerCase() !== "no" && !broken("google.no-reply-loop")) return;
   const messageId = header(message, "Message-ID");
   const raw = [
     `From: my-agent <${GMAIL_ADDRESS}>`,

@@ -1,3 +1,4 @@
+import { BUILT_IN_APP } from "../src/core/apps/index.ts";
 import { BrowserActors } from "../src/core/browser/index.ts";
 import { systemClock, systemTimers } from "../src/core/clock/index.ts";
 import { DeliveryQueue } from "../src/core/delivery/index.ts";
@@ -20,8 +21,11 @@ export function driverContext(overrides: Partial<DriverContext> = {}): DriverCon
   const redactor = new Redactor();
   const log = createLogger({ level: "silent", redactor, write: () => {} });
   const events = new EventLog(systemClock, redactor);
+  const ids = new IdGenerator({ seed: 1, clock: systemClock });
+  const secret = overrides.secret ?? ((name: string) => `secret-for-${name}`);
+  const webhookUrl = overrides.webhookUrl;
   return {
-    ids: new IdGenerator({ seed: 1, clock: systemClock }),
+    ids,
     clock: systemClock,
     timers: systemTimers,
     registry: new Registry(),
@@ -33,6 +37,13 @@ export function driverContext(overrides: Partial<DriverContext> = {}): DriverCon
     secret: (name) => `secret-for-${name}`,
     apiUrl: () => "http://127.0.0.1:4500/fake",
     webhookUrl: undefined,
+    // Another app's secrets are `secret-for-<app>-<name>`; its events go where `webhookUrl` says, with `?app=<name>`.
+    apps: {
+      webhookUrl: (app) => (app === BUILT_IN_APP || webhookUrl === undefined ? webhookUrl : `${webhookUrl}?app=${app}`),
+      secret: (app, name) => (app === BUILT_IN_APP ? secret(name) : `secret-for-${app}-${name}`),
+      ids: (app) => ids.named(app),
+    },
+    loops: { wrote: () => true, allows: () => true },
     live: {
       active: false,
       strict: false,

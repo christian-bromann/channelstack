@@ -153,7 +153,7 @@ cargo add --dev tokio --features macros,rt-multi-thread
 The Python and Rust SDKs use the same server, from npm or the
 [GitHub releases](https://github.com/christian-bromann/channelstack/releases).
 
-There is no config file. Each fake has a built-in app named `my-agent`, and where it sends events comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` (`SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND`, `GOOGLE`, `DISCORD`) in the server's environment. [docs/devx.md](docs/devx.md) covers the CLI, Vitest and pytest, proxy mode and CI.
+There is no config file. Each fake has a built-in app named `my-agent`, and where it sends events comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` (`SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND`, `GOOGLE`, `DISCORD`) in the server's environment. A test that needs more agents or bots beside it makes them by name (`slack.createApp({ name: "coder" })`), each a real app of its platform whose events go to `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`; `channelstack env --app coder` prints its credentials. [docs/devx.md](docs/devx.md) covers the CLI, Vitest and pytest, proxy mode and CI.
 
 ## Status
 

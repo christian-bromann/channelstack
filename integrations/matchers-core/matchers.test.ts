@@ -185,3 +185,57 @@ describe("comments", () => {
     expect((await matchers.toHaveCommentsFrom(state, discussion, agent, { count: 1 })).pass).toBe(true);
   });
 });
+
+describe("toGoQuiet (exit check 12.6)", () => {
+  const coder = { id: "A0CODER", name: "coder", kind: "app" };
+  const loop = (turns: number) => [
+    entry("1", ana, "fix the login page"),
+    ...Array.from({ length: turns }, (_, at) => entry(String(at + 2), at % 2 === 0 ? agent : coder, `turn ${at}`)),
+  ];
+
+  test("a conversation that settles within the bound passes", async () => {
+    expect((await matchers.toGoQuiet(state, conversation(loop(2)), { maxReplies: 4 })).pass).toBe(true);
+  });
+
+  test("apps answering each other fail it, counting what came before the check, and the message names them in turn", async () => {
+    const result = await matchers.toGoQuiet(state, conversation(loop(5)), { maxReplies: 4 });
+    expect(result.pass).toBe(false);
+    expect(result.message()).toBe(
+      "Expected the conversation to go quiet within 100ms with at most 4 app messages since a person last wrote. It went quiet with 5 app messages and no person between them: my-agent → coder → my-agent → coder → my-agent",
+    );
+  });
+
+  test("a person writing starts the count over", async () => {
+    const entries = [...loop(4), entry("9", ana, "thanks"), entry("10", agent, "you're welcome")];
+    expect((await matchers.toGoQuiet(state, conversation(entries), { maxReplies: 1 })).pass).toBe(true);
+  });
+
+  test("a conversation that never goes quiet fails, and says it was busy and what the fake stopped", async () => {
+    const busy = {
+      ...conversation(loop(1)),
+      [QUIET]: async () => ({
+        busy: true,
+        quietForMs: 0,
+        open: ["1 delivery in flight"],
+        loops: ["a bot loop in slack C1 (50 app messages with no person between them: my-agent → coder …)"],
+      }),
+    };
+    const result = await matchers.toGoQuiet(state, busy, { within: "50ms", maxReplies: 4 });
+    expect(result.pass).toBe(false);
+    expect(result.message()).toContain("It was still busy with 1 app message");
+    expect(result.message()).toContain("Stopped: a bot loop in slack C1 (50 app messages");
+  });
+
+  test("comments count the same way: a GitHub issue, a Linear issue", async () => {
+    const issue = {
+      ...quiet,
+      comments: async () => [
+        { author: ana, body: "please triage" },
+        { author: agent, body: "on it" },
+        { author: coder, body: "done" },
+      ],
+    };
+    expect((await matchers.toGoQuiet(state, issue, { maxReplies: 1 })).pass).toBe(false);
+    expect((await matchers.toGoQuiet(state, issue, { maxReplies: 2 })).pass).toBe(true);
+  });
+});

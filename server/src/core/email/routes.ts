@@ -2,14 +2,16 @@ import { z } from "@hono/zod-openapi";
 
 import { iso } from "../clock/index.ts";
 import { ProtocolError } from "../errors/index.ts";
+import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../reality/index.ts";
 import { type Awaitable, type DriverRouter, pathParam, refTo } from "../router/index.ts";
 import { principalSchema, type TranscriptPrincipal, transcriptSchema } from "../router/inspect.ts";
 import { type Mailbox, threadTranscript } from "./index.ts";
 import type { EmailAppRecord, EmailPersonRecord, EmailRecord, EmailStore } from "./store.ts";
 
 /**
- * The control API every email channel has (Resend, Gmail), written once: the fixture, people who
- * send, reply and read their inbox, and the conversations a test reads. A channel adds its own
+ * The control API every email channel has (Resend, Gmail), written once: the fixture, its apps
+ * (decision 0027) and what a scripted app sends, people who send, reply and read their inbox, and
+ * the conversations a test reads. A channel adds its own
  * deliveries and calls (`registerInspectionRoutes`), and anything its email shows beyond these.
  */
 
@@ -26,9 +28,9 @@ export interface EmailMessageInput {
  * What people do on an email channel that works live, written once per channel. The fake implements
  * it over its world; live mode over the platform's API with each person's own account.
  */
-export interface EmailWorld<Email extends EmailRecord> {
+export interface EmailWorld<Email extends EmailRecord, App extends EmailAppRecord = EmailAppRecord> {
   /** The mail as the routes read it: the fake's own, or live, what was read back from the platform. */
-  readonly store: EmailStore<Email, EmailAppRecord>;
+  readonly store: EmailStore<Email, App>;
   createUser(
     session: string,
     input: { name: string; address?: string | undefined; token?: string | undefined },
@@ -46,11 +48,31 @@ export interface EmailWorld<Email extends EmailRecord> {
   principalOf(email: Email): TranscriptPrincipal;
 }
 
-export interface EmailRoutesSpec<Email extends EmailRecord> {
+/** What an app writes in an email: what a person does, and any headers of its own (`Auto-Submitted`). */
+export type EmailAppMessageInput = EmailMessageInput & { readonly headers: Readonly<Record<string, string>> };
+
+/**
+ * The apps a test makes on an email channel (decision 0027), and what an app a test made does
+ * when the test acts as it (a scripted app): each through the fake's own API, as that app's call
+ * would. Fake only: live, each app is a sandbox app set up by hand.
+ */
+interface EmailApps<Email extends EmailRecord, App extends EmailAppRecord> {
+  /** `createApp`: the app named `name` with the channel's settings, made the first time. */
+  create(session: string, input: { readonly name: string } & Record<string, unknown>): Awaitable<App>;
+  send(session: string, app: App, input: EmailAppMessageInput): Awaitable<Email>;
+  reply(
+    session: string,
+    app: App,
+    to: Email,
+    input: { text: string | undefined; html: string | undefined; all: boolean; headers: Record<string, string> },
+  ): Awaitable<Email>;
+}
+
+export interface EmailRoutesSpec<Email extends EmailRecord, App extends EmailAppRecord = EmailAppRecord> {
   /** The platform's name, the prefix of its types (`Resend`), and the channel's (`resend`). */
   readonly title: string;
   readonly channel: string;
-  readonly world: EmailWorld<Email>;
+  readonly world: EmailWorld<Email, App>;
   /** The channel's words for the agent's app (`team`, `mailbox`), its address, and the delivery an email to it causes. */
   readonly words: { readonly app: string; readonly address: string; readonly delivery: string };
   /** The fixture's `apiUrl`, and what it is to the agent. */
@@ -58,20 +80,40 @@ export interface EmailRoutesSpec<Email extends EmailRecord> {
   readonly apiUrlDescription: string;
   /** What a person's live `token` is on this platform. */
   readonly tokenDescription: string;
-  /** The channel's delivery, as an email to the agent carries the one that told it. */
-  readonly delivery: { readonly schema: z.ZodType; wire(session: string, email: Email): unknown | undefined };
+  /**
+   * The channel's delivery, as an email to the agent carries the one that told it (`wire`), and
+   * the one that told another app of it (`wireFor`, by the app's name).
+   */
+  readonly delivery: {
+    readonly schema: z.ZodType;
+    wire(session: string, email: Email): unknown | undefined;
+    wireFor(session: string, email: Email, app: string): unknown | undefined;
+  };
   /** What the channel's email shows beyond every channel's (Gmail's labels). */
   readonly emailFields?: { readonly shape: z.ZodRawShape; wire(email: Email): Record<string, unknown> };
+  /** An email's headers by lower-case name, the first of each: what its writer set among them. */
+  headers(email: Email): Record<string, string>;
+  /** The apps tests make: the settings `createApp` takes beside `name`, and what an app handle shows of its own. */
+  readonly apps: EmailApps<Email, App> & {
+    readonly options: z.ZodRawShape;
+    readonly fields: { readonly shape: z.ZodRawShape; wire(app: App): Record<string, unknown> };
+  };
 }
 
 const UserParams = z.object({ user: pathParam("user") });
+const AppParams = z.object({ app: pathParam("app") });
 const EmailParams = z.object({ email: pathParam("email") });
 const ThreadParams = z.object({ thread: pathParam("thread") });
 
+/** Apps are the fake's: live, each would be a sandbox app of its own, which these channels don't have yet. */
+const APPS_ARE_FAKE: LiveSupport = {
+  unsupported: "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)",
+};
+
 /** The email channel's control API. */
-export function registerEmailRoutes<Email extends EmailRecord>(
+export function registerEmailRoutes<Email extends EmailRecord, App extends EmailAppRecord = EmailAppRecord>(
   router: DriverRouter,
-  spec: EmailRoutesSpec<Email>,
+  spec: EmailRoutesSpec<Email, App>,
 ): void {
   const { title, channel, world } = spec;
   const { store } = world;
@@ -96,6 +138,7 @@ export function registerEmailRoutes<Email extends EmailRecord>(
       name: z.string(),
       botUserId: z.string(),
       address: z.string().openapi({ description: spec.words.address }),
+      ...spec.apps.fields.shape,
     })
     .openapi(`${title}App`, { "x-channelstack-resource": { id: "id", role: "app" } });
   const Thread = z
@@ -118,6 +161,10 @@ export function registerEmailRoutes<Email extends EmailRecord>(
       text: z.string().openapi({ description: "What its writer wrote, without the quoted history a reply carries." }),
       at: z.string(),
       messageId: z.string(),
+      headers: z.record(z.string(), z.string()).openapi({
+        description:
+          "Its headers by lower-case name, the first of each: those its writer set too (`auto-submitted`, so a check can see an answer marked as automatic).",
+      }),
       ...(spec.emailFields?.shape ?? {}),
       delivery: spec.delivery.schema.optional().openapi({ description: spec.words.delivery }),
     })
@@ -129,13 +176,14 @@ export function registerEmailRoutes<Email extends EmailRecord>(
   const recipients = (description: string) =>
     z.array(z.string().openapi(refTo(`${title}User`, `${title}App`))).openapi({ description });
 
-  const appWire = () => ({
-    id: store.app.id,
+  const appWire = (app: App) => ({
+    id: app.id,
     channel,
     kind: "app" as const,
-    name: store.app.name,
-    botUserId: store.app.id,
-    address: store.app.address,
+    name: app.name,
+    botUserId: app.id,
+    address: app.address,
+    ...spec.apps.fields.wire(app),
   });
   const userWire = (user: EmailPersonRecord) => ({
     id: user.id,
@@ -171,6 +219,7 @@ export function registerEmailRoutes<Email extends EmailRecord>(
       text: threadTranscript([{ ...messageOf(email), attachments: [] }]).entries[0]?.text ?? "",
       at: iso(email.createdAt),
       messageId: email.messageId,
+      headers: spec.headers(email),
       ...(spec.emailFields?.wire(email) ?? {}),
       ...(delivery === undefined ? {} : { delivery }),
     };
@@ -186,11 +235,41 @@ export function registerEmailRoutes<Email extends EmailRecord>(
     }
     return email;
   };
-  /** A recipient: a person or the app by their handle. */
+  /** A recipient: a person of the session or one of the apps it used, by their handle. */
   const mailboxOf = (session: string, id: string): Mailbox => {
-    if (id === store.app.id) return { address: store.app.address, name: store.app.name };
+    const app = store.apps.lookup(session, id);
+    if (app) return { address: app.address, name: app.name };
     const user = person(session, id);
     return { address: user.address, name: user.name };
+  };
+  /** What someone writes to recipients given by handle, checked as every email is. */
+  const message = (
+    session: string,
+    body: { to: string[]; cc: string[]; subject: string; text?: string | undefined; html?: string | undefined },
+  ): EmailMessageInput => {
+    if (body.to.length === 0) throw new ProtocolError("invalid_argument", "An email needs someone to go to");
+    if (body.text === undefined && body.html === undefined) {
+      throw new ProtocolError("invalid_argument", "An email needs `text` or `html`");
+    }
+    return {
+      to: body.to.map((id) => mailboxOf(session, id)),
+      cc: body.cc.map((id) => mailboxOf(session, id)),
+      subject: body.subject,
+      text: body.text,
+      html: body.html,
+    };
+  };
+  const appHeaders = z
+    .record(z.string(), z.string())
+    .default({})
+    .openapi({ description: "Headers of its own, as its API call would set them: `Auto-Submitted: auto-replied`." });
+  /** What a person sends. */
+  const sendFields = {
+    to: recipients("Who it goes to: apps, people."),
+    cc: recipients("Who gets a copy.").default([]),
+    subject: z.string(),
+    text: z.string().optional(),
+    html: z.string().optional(),
   };
 
   // --- The fixture ----------------------------------------------------------------------------
@@ -202,7 +281,95 @@ export function registerEmailRoutes<Email extends EmailRecord>(
     response: Fixture,
     factory: { on: "Session", name: channel },
     stability,
-    handler: () => ({ app: appWire(), apiUrl: spec.apiUrl() }),
+    handler: () => ({ app: appWire(store.app), apiUrl: spec.apiUrl() }),
+  });
+
+  // --- Apps -----------------------------------------------------------------------------------
+
+  router.route({
+    method: "post",
+    path: "/apps",
+    summary: `Make another app: a ${spec.words.app} of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_${channel.toUpperCase()}_APP_<NAME>_WEBHOOK_URL`,
+    body: z
+      .object({
+        name: z
+          .string()
+          .min(1)
+          .openapi({ description: "Its name: 1 to 32 lower-case letters, digits and hyphens, from a letter" }),
+        ...spec.apps.options,
+      })
+      .openapi(`${title}AppOptions`),
+    response: App,
+    errors: ["invalid_argument"],
+    factory: { on: `${title}Fixture`, name: "createApp", options: ["name", ...Object.keys(spec.apps.options)] },
+    live: APPS_ARE_FAKE,
+    stability,
+    handler: async ({ session, body }) => appWire(await spec.apps.create(session.id, body)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/apps",
+    summary: `The ${spec.words.app}s this session used: the agent's first, then each it got from \`createApp\`, in the order it first did. Another session's are \`not_found\` here`,
+    response: z.array(App).openapi(`${title}Apps`),
+    sdkMethod: { on: `${title}Fixture`, name: "apps" },
+    stability,
+    handler: ({ session }) => store.apps.of(session.id).map(appWire),
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/send",
+    summary: `An app a test made sends an email, through its own ${spec.words.app}'s API, as its own call would`,
+    params: AppParams,
+    body: z.object({ ...sendFields, headers: appHeaders }).openapi(`${title}AppSendBody`),
+    response: Email,
+    errors: ["not_found", "invalid_argument"],
+    sdkMethod: { on: `${title}App`, name: "send", options: ["to", "cc", "subject", "text", "html", "headers"] },
+    live: APPS_ARE_FAKE,
+    stability,
+    handler: async ({ session, params, body }) => {
+      const app = store.apps.scripted(session.id, params.app);
+      const email = await spec.apps.send(session.id, app, { ...message(session.id, body), headers: body.headers });
+      return emailWire(session.id, email);
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/reply",
+    summary: "An app a test made replies to an email, in its thread, as its own call would",
+    params: AppParams,
+    body: z
+      .object({
+        email: z.string().openapi(refTo(`${title}Email`)),
+        text: z.string().optional(),
+        html: z.string().optional(),
+        all: z
+          .boolean()
+          .default(false)
+          .openapi({ description: "Reply to everyone on the email, not only its sender." }),
+        headers: appHeaders,
+      })
+      .openapi(`${title}AppReplyBody`),
+    response: Email,
+    errors: ["not_found", "invalid_argument"],
+    sdkMethod: { on: `${title}App`, name: "reply", args: ["email"], options: ["text", "html", "all", "headers"] },
+    live: APPS_ARE_FAKE,
+    stability,
+    handler: async ({ session, params, body }) => {
+      if (body.text === undefined && body.html === undefined) {
+        throw new ProtocolError("invalid_argument", "A reply needs `text` or `html`");
+      }
+      const app = store.apps.scripted(session.id, params.app);
+      const email = await spec.apps.reply(session.id, app, emailOf(session.id, body.email), {
+        text: body.text,
+        html: body.html,
+        all: body.all,
+        headers: body.headers,
+      });
+      return emailWire(session.id, email);
+    },
   });
 
   router.route({
@@ -258,33 +425,15 @@ export function registerEmailRoutes<Email extends EmailRecord>(
   router.route({
     method: "post",
     path: "/users/{user}/send",
-    summary: `The person emails someone: the agent (\`${channel}.app\`), or another person`,
+    summary: `The person emails someone: the agent (\`${channel}.app\`), another app, or another person`,
     params: UserParams,
-    body: z
-      .object({
-        to: recipients("Who it goes to: the app, people."),
-        cc: recipients("Who gets a copy.").default([]),
-        subject: z.string(),
-        text: z.string().optional(),
-        html: z.string().optional(),
-      })
-      .openapi(`${title}SendBody`),
+    body: z.object(sendFields).openapi(`${title}SendBody`),
     response: Email,
     errors: ["not_found", "invalid_argument"],
     sdkMethod: { on: `${title}User`, name: "send", options: ["to", "cc", "subject", "text", "html"] },
     stability,
     handler: async ({ session, params, body }) => {
-      if (body.to.length === 0) throw new ProtocolError("invalid_argument", "An email needs someone to go to");
-      if (body.text === undefined && body.html === undefined) {
-        throw new ProtocolError("invalid_argument", "An email needs `text` or `html`");
-      }
-      const email = await world.send(session.id, person(session.id, params.user), {
-        to: body.to.map((id) => mailboxOf(session.id, id)),
-        cc: body.cc.map((id) => mailboxOf(session.id, id)),
-        subject: body.subject,
-        text: body.text,
-        html: body.html,
-      });
+      const email = await world.send(session.id, person(session.id, params.user), message(session.id, body));
       return emailWire(session.id, email);
     },
   });
@@ -353,6 +502,23 @@ export function registerEmailRoutes<Email extends EmailRecord>(
     handler: async ({ session, params }) => {
       await world.refresh(session.id);
       return emailWire(session.id, emailOf(session.id, params.email));
+    },
+  });
+
+  router.route({
+    method: "get",
+    path: "/emails/{email}/delivery-for",
+    summary: "The delivery that told this app of the email (decision 0027), or nothing when it wasn't told",
+    params: EmailParams,
+    query: z.object({ app: z.string().openapi({ param: { name: "app", in: "query" }, ...refTo(`${title}App`) }) }),
+    response: spec.delivery.schema.nullable(),
+    errors: ["not_found"],
+    sdkMethod: { on: `${title}Email`, name: "deliveryFor", args: ["app"] },
+    live: DELIVERY_IS_THE_PLATFORMS,
+    stability,
+    handler: ({ session, params, query }) => {
+      const app = store.apps.get(session.id, query.app);
+      return spec.delivery.wireFor(session.id, emailOf(session.id, params.email), app.name) ?? null;
     },
   });
 

@@ -130,7 +130,7 @@ With `--proxy`, a `Proxy` line adds the proxy's URL and the CA file, and the las
 ## `channelstack env`
 
 ```bash
-channelstack env [--proxy] [--server <url>]
+channelstack env [--proxy] [--app <name>] [--channel <name>] [--server <url>]
 ```
 
 Prints `KEY=value` lines for the app, one per line, from the running server, so the URLs match how it was started.
@@ -138,6 +138,8 @@ Prints `KEY=value` lines for the app, one per line, from the running server, so 
 | Flag | Meaning |
 |---|---|
 | `--proxy` | For proxy mode: the proxy and the CA the app trusts, instead of the API URLs. Fails with `channelstack env --proxy needs proxy mode: start the server with --proxy` when the server runs without `--proxy` |
+| `--app <name>` | Another app's lines, under the keys the built-in app's are printed with, for a second agent process. Makes the app the first time it is asked for ([Several apps](/docs/guide/several-apps)) |
+| `--channel <name>` | Only that channel's lines: `slack`, `github`, `linear`, `notion`, `resend` or `google` |
 
 What it prints is listed in [Environment variables](/docs/reference/environment-variables#what-channelstack-env-prints). A channel that runs live prints nothing: the app keeps its own configuration.
 

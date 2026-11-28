@@ -10,6 +10,7 @@ import { runShow } from "./cli/dev.ts";
 import { runDoctor, runLogin, runSweep } from "./cli/live.ts";
 import { runMcp } from "./cli/mcp.ts";
 import { runTail } from "./cli/watch.ts";
+import { appWebhookVariable } from "./core/apps/index.ts";
 import { rotateCa } from "./core/ca/index.ts";
 import { homeDir } from "./core/home/index.ts";
 import { parseSeed } from "./core/ids/index.ts";
@@ -34,6 +35,8 @@ Usage:
                                   webhook, to <dir>/shapes.jsonl (structure only, never a value)
   channelstack env                Print .env lines for the agent, from the running server
       --proxy                     For proxy mode: HTTPS_PROXY and the CA the agent trusts, instead of the API URLs
+      --app <name>                Another app's lines, under the same keys (made the first time it is asked for)
+      --channel <name>            Only that channel's lines
   channelstack ca rotate          Replace proxy mode's CA (<home>/ca); restart the server and run \`channelstack env --proxy\`
 
   Attached to the running server (a shared "dev" session; people and places are created on first use).
@@ -75,6 +78,7 @@ Environment:
   CHANNELSTACK_HOME               State directory (default ~/.channelstack)
   CHANNELSTACK_SEED               Makes generated ids reproducible
   CHANNELSTACK_<DRIVER>_WEBHOOK_URL   Where the agent receives that driver's events
+  CHANNELSTACK_<DRIVER>_APP_<NAME>_WEBHOOK_URL   Where another app's events go (coder is CODER)
 `;
 
 const DEFAULT_PORT = 4500;
@@ -136,6 +140,7 @@ async function runStart(flags: {
         process.env[`CHANNELSTACK_${driver.name.toUpperCase()}_WEBHOOK_URL`] || undefined,
       ]),
     ),
+    appWebhooks: (driver, app) => process.env[appWebhookVariable(driver, app)] || undefined,
   }).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
 
   const lines = [
@@ -167,8 +172,15 @@ async function runStart(flags: {
 }
 
 /** `channelstack env`: asks the running server, so the URLs match how it was started. */
-async function runEnv(server: Attached, proxy: boolean) {
-  const env = await server.request<Record<string, string>>("GET", proxy ? "/env?proxy=true" : "/env");
+async function runEnv(
+  server: Attached,
+  options: { proxy: boolean; app: string | undefined; channel: string | undefined },
+) {
+  const query = new URLSearchParams();
+  if (options.proxy) query.set("proxy", "true");
+  if (options.app !== undefined) query.set("app", options.app);
+  if (options.channel !== undefined) query.set("channel", options.channel);
+  const env = await server.request<Record<string, string>>("GET", query.size > 0 ? `/env?${query}` : "/env");
   return `${Object.entries(env)
     .map(([key, value]) => `${key}=${value}`)
     .join("\n")}\n`;
@@ -206,6 +218,8 @@ async function main() {
       "server-file": { type: "string" },
       "log-level": { type: "string" },
       proxy: { type: "boolean" },
+      app: { type: "string" },
+      channel: { type: "string" },
       "proxy-port": { type: "string" },
       record: { type: "string" },
       server: { type: "string" },
@@ -262,7 +276,11 @@ async function main() {
 
   // Everything else attaches to the running server.
   const print = (text: string) => void process.stdout.write(text);
-  if (command === "env") return print(await runEnv(attach(values), values.proxy === true));
+  if (command === "env") {
+    return print(
+      await runEnv(attach(values), { proxy: values.proxy === true, app: values.app, channel: values.channel }),
+    );
+  }
   if (DEV_CHANNELS.some((channel) => channel.name === command))
     return print(await runChannel(attach(values), command, action, rest, values));
   if (command === "ui") {

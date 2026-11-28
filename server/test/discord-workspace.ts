@@ -20,10 +20,13 @@ export interface TestGateway {
  * A guild for a unit test: the app, a session with Ana in a channel with the bot, and the bot's
  * REST calls and Gateway as discord.js makes them. Every answer is held to Discord's description.
  * With `interactions`, the app has an interactions endpoint: a stand-in agent that records them.
+ * `appWebhooks` gives other apps theirs (decision 0027).
  */
-export async function discordWorkspace(options: { interactions?: boolean } = {}) {
+export async function discordWorkspace(
+  options: { interactions?: boolean; appWebhooks?: (driver: string, app: string) => string | undefined } = {},
+) {
   const agent: RecordingAgent | undefined = options.interactions ? await recordingAgent() : undefined;
-  const h = harness({ discord: agent?.url });
+  const h = harness({ discord: agent?.url }, options.appWebhooks ? { appWebhooks: options.appWebhooks } : {});
   const { sessionId } = (await h.call("POST", "/sessions")).body;
   const control = (method: string, path: string, body?: unknown) =>
     h.call(method, `/sessions/${sessionId}/discord${path}`, body);
@@ -70,10 +73,13 @@ export async function discordWorkspace(options: { interactions?: boolean } = {})
     return gateway;
   };
 
-  /** Connect and identify with these intents (every one the reference agent asks for by default). */
-  const identify = async (intents = (1 << 0) | (1 << 9) | (1 << 10) | (1 << 12) | (1 << 13) | (1 << 15)) => {
+  /** Connect and identify with these intents (every one the reference agent asks for by default), as a bot: the agent's unless another token is given. */
+  const identify = async (
+    intents = (1 << 0) | (1 << 9) | (1 << 10) | (1 << 12) | (1 << 13) | (1 << 15),
+    as: string = token,
+  ) => {
     const gateway = await connect();
-    gateway.send({ op: 2, d: { token, intents, properties: { os: "linux", browser: "test", device: "test" } } });
+    gateway.send({ op: 2, d: { token: as, intents, properties: { os: "linux", browser: "test", device: "test" } } });
     return gateway;
   };
 

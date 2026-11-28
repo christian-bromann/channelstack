@@ -45,7 +45,8 @@ async function reply(prompt: string, user: string, say: Say, thread: string, tim
 
 app.event("app_mention", async ({ event, body, context, say }) => {
   // Bug: answers other bots.
-  if ("bot_id" in event && !broken("slack.ignores-bots")) return;
+  // Answering other bots: the bug of `slack.ignores-bots`, and with an app that answers back, of `slack.no-reply-loop`.
+  if ("bot_id" in event && !broken("slack.ignores-bots") && !broken("slack.no-reply-loop")) return;
   if (!fresh(body.event_id, context.retryNum)) return;
   if (broken("slack.ack")) await pause(3500);
   const deploy = deployRequest(event.text);
@@ -78,7 +79,7 @@ app.event("agent_session_stopped", async ({ event }) => {
 
 app.message(async ({ message, body, context, client, say }) => {
   if (message.subtype !== undefined || message.channel_type !== "im") return;
-  if ("bot_id" in message && !broken("slack.ignores-bots")) return;
+  if ("bot_id" in message && !broken("slack.ignores-bots") && !broken("slack.no-reply-loop")) return;
   if (!fresh(body.event_id, context.retryNum)) return;
   if (broken("slack.ack")) await pause(3500);
   const thread = message.thread_ts ?? message.ts;

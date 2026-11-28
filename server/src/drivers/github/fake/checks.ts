@@ -1,6 +1,7 @@
 import { GITHUB_IDS } from "../ids.ts";
 import type {
   GitHubAnnotationRecord,
+  GitHubAppRecord,
   GitHubCheckConclusion,
   GitHubCheckRunRecord,
   GitHubRepoRecord,
@@ -33,8 +34,20 @@ export function createChecks(kit: GitHubKit) {
   const { context, store, objects } = kit;
   const { ids, clock } = context;
 
+  /**
+   * `check_run` about a run. `created` and `completed` go to every App subscribed to it; what a
+   * person asks of a run (`rerequested`, `requested_action`) goes to the App that made it alone.
+   */
   const event = (run: GitHubCheckRunRecord, sender: number, action: string, extra: object = {}) =>
-    kit.emit(store.repo(run.repo), "check_run", sender, { action, check_run: objects.checkRun(run), ...extra });
+    kit.emit(
+      store.repo(run.repo),
+      "check_run",
+      sender,
+      { action, check_run: objects.checkRun(run), ...extra },
+      action === "created" || action === "completed" ? undefined : store.appNamed(run.app),
+    );
+  /** The bot of the App that made a run: who creates and completes it. */
+  const owner = (run: GitHubCheckRunRecord) => store.appNamed(run.app).botId;
 
   /** Apply what a create or an update says. A conclusion means the run is completed. */
   const apply = (run: GitHubCheckRunRecord, input: GitHubCheckRunInput): void => {
@@ -79,18 +92,49 @@ export function createChecks(kit: GitHubKit) {
     }
   };
 
+  /** Each App has its own check suite on a commit: made the first time it is needed. */
+  const suiteOf = (repo: GitHubRepoRecord, sha: string, app: GitHubAppRecord): number => {
+    const key = `${repo.id}:${sha}:${app.name}`;
+    const suite = store.suites.get(key) ?? Number(ids.next(GITHUB_IDS.checkRun));
+    store.suites.set(key, suite);
+    return suite;
+  };
+
   return {
-    /** `POST /repos/{owner}/{repo}/check-runs`, as the App. */
+    /**
+     * Code was pushed: GitHub makes a check suite for the head commit for each App installed on the
+     * repository with the checks write permission, and sends that App alone `check_suite`
+     * `requested`, when it subscribes to `check_suite`.
+     */
+    requestSuites(
+      repo: GitHubRepoRecord,
+      sender: number,
+      push: { branch: string; before: string | null; after: string; headCommit: Record<string, unknown> },
+    ): void {
+      for (const app of store.apps.all()) {
+        if (!repo.apps.has(app.name) || app.permissions.checks !== "write") continue;
+        const suite = suiteOf(repo, push.after, app);
+        kit.emit(
+          repo,
+          "check_suite",
+          sender,
+          { action: "requested", check_suite: objects.checkSuite(repo, suite, push, app) },
+          app,
+        );
+      }
+    },
+
+    /** `POST /repos/{owner}/{repo}/check-runs`, as the App whose token it is. */
     create(
       repo: GitHubRepoRecord,
       input: GitHubCheckRunInput & { name: string; headSha: string },
+      app: GitHubAppRecord,
     ): GitHubCheckRunRecord {
       validate(input);
-      const key = `${repo.id}:${input.headSha}`;
-      const suite = store.suites.get(key) ?? Number(ids.next(GITHUB_IDS.checkRun));
-      store.suites.set(key, suite);
+      const suite = suiteOf(repo, input.headSha, app);
       const run = store.add(store.checkRuns, store.sessionOf(repo), {
         id: Number(ids.next(GITHUB_IDS.checkRun)),
+        app: app.name,
         repo: repo.id,
         suite,
         headSha: input.headSha,
@@ -108,8 +152,8 @@ export function createChecks(kit: GitHubKit) {
         actions: [],
       });
       apply(run, input);
-      event(run, store.bot.id, "created");
-      if (run.status === "completed") event(run, store.bot.id, "completed");
+      event(run, owner(run), "created");
+      if (run.status === "completed") event(run, owner(run), "completed");
       return run;
     },
 
@@ -117,7 +161,7 @@ export function createChecks(kit: GitHubKit) {
       validate(input);
       const was = run.status;
       apply(run, input);
-      if (run.status === "completed" && was !== "completed") event(run, store.bot.id, "completed");
+      if (run.status === "completed" && was !== "completed") event(run, owner(run), "completed");
       return run;
     },
 
@@ -141,13 +185,17 @@ export function createChecks(kit: GitHubKit) {
       return event(run, actor, "requested_action", { requested_action: { identifier } });
     },
 
-    /** The newest check run of each name for a commit: what GitHub shows, and what its API lists by default. */
+    /**
+     * The newest check run of each App and name for a commit: what GitHub shows, and what its API
+     * lists by default. Two Apps' runs of one name are two checks, each in its App's suite.
+     */
     latest(repo: GitHubRepoRecord, sha: string): GitHubCheckRunRecord[] {
       const byName = new Map<string, GitHubCheckRunRecord>();
       // Taken out before it is put in again, so a name that reports again moves to the end.
       for (const run of store.checkRunsOf(repo, sha)) {
-        byName.delete(run.name);
-        byName.set(run.name, run);
+        const key = `${run.app}\u0000${run.name}`;
+        byName.delete(key);
+        byName.set(key, run);
       }
       return [...byName.values()];
     },
@@ -187,3 +235,5 @@ export function createChecks(kit: GitHubKit) {
     },
   };
 }
+
+export type GitHubChecks = ReturnType<typeof createChecks>;

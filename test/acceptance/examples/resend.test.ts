@@ -93,6 +93,37 @@ describe("inspecting what the agent did", () => {
   });
 });
 
+describe("several apps", () => {
+  // Decision 0027: the same agent runs a second time as the app `coder`, with its own mailbox, key and webhook.
+  test("an email to one app is answered by that app alone, marked as sent by a program", async ({ resend }) => {
+    const coder = await resend.createApp({ name: "coder" });
+    const ana = await resend.createUser({ name: "Ana" });
+
+    const email = await ana.send({ to: [coder], subject: "Refund", text: "Where is my refund?" });
+
+    const answer = await ana.waitForEmail({ from: coder });
+    expect(answer.thread.id).toBe(email.thread.id);
+    expect(answer.headers["auto-submitted"]).toBe("auto-replied");
+    await expect(email.thread).not.toHaveReplyFrom(resend.app);
+  });
+
+  test("mail another program sent on its own gets no answer, so two agents don't answer each other", async ({
+    resend,
+  }) => {
+    const billing = await resend.createApp({ name: "billing" });
+
+    const email = await billing.send({
+      to: [resend.app],
+      subject: "Invoice 1042 paid",
+      text: "Invoice 1042 was paid.",
+      headers: { "Auto-Submitted": "auto-generated" },
+    });
+
+    await expect(email.thread).toGoQuiet({ within: "10s", maxReplies: 1 });
+    await expect(email.thread).not.toHaveReplyFrom(resend.app);
+  });
+});
+
 describe("live mode", () => {
   // With the agent team's key and CHANNELSTACK_RESEND_USER_ANA_TOKEN (Ana's own team's key) set,
   // Ana's email goes through real Resend to the agent's receiving address, and Resend delivers to

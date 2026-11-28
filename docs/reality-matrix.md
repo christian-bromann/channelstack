@@ -69,6 +69,8 @@ Every feature runs in the fake server (in memory). The question this document an
 | "Agent is quiet" (negative and exact-count matchers) | Done | Yes, with proxy | Proxy | With proxy: no call in flight and no open stream. Live without proxy, nothing tells channelstack when the agent is done: a session that acted live gets `action_requires`, and those matchers skip. Positive matchers poll and work. A fallback (the transcript unchanged for `quietFor`) is possible later |
 | `transcript()` and all `toContainText…` matchers | Done | Built (Slack) | User token or App credentials | Built from the platform's read APIs, using the same renderer as the fake |
 | `channelstack.reset()` | Done | No | — | Live cleanup is per session (cleanup ledger) plus `channelstack sweep`. A real workspace is never wiped |
+| The loop guard (`bot_loop`) | Done | — (nothing to refuse: live, the platform delivers) | — | Fake only ([decision 0027](decisions/0027-multiple-apps.md), "The guard", has the table per channel): after 50 app writes in one conversation with no person's write between them, the fake keeps the writes and stops delivering the events they cause, records `bot_loop`, and the test fails at teardown. Slack: per thread (top-level messages share the channel's), messages, edits and reactions, a scripted bot user counting as a bot. Discord: per channel or thread, messages, edits, reactions and new threads, a scripted bot user counting as a bot. GitHub: per issue or pull request, comments, reviews, review comments and replies, edits and deletes, and every `issues` and `pull_request` event. Linear: per issue, comments. Notion: per page, comments in any discussion, property changes, renames, blocks and child pages. Resend and Google: per email thread, emails; Gmail's sender's own SENT copy pushes nothing once stopped. echo: per room, messages. It isn't platform realism: the real platforms throttle and never stop, and live, channelstack doesn't stand between the agents |
+| `toGoQuiet({ within, maxReplies })` | Done | Yes, with proxy | Proxy | Waits for quiet, as the negative matchers do, so live without proxy it reports `action_requires` |
 
 ---
 
@@ -110,6 +112,7 @@ Every feature runs in the fake server (in memory). The question this document an
 | `toHaveOpenedModal(title)` | Done | Yes, with proxy or browser | Same as `waitForModal` | |
 | `delivery.retry({ after: "3s" })` | Done | No | — | Fake-only. channelstack doesn't sit between the platform and the agent live |
 | Socket Mode delivery | Done | Agent's concern | — | Live, the agent connects to Slack itself |
+| Several apps: `slack.createApp({ name })`, `apps()`, a scripted app's `say` / `reply` / `react`, `msg.deliveryFor(app)` | Done | Not yet | A second sandbox app of its own, set up by hand ([live-mode.md](live-mode.md), section 4) | ([decision 0027](decisions/0027-multiple-apps.md)) Each app has its own bot user, tokens, signing secret and Request URL or Socket Mode connection. Another app's message reaches it with `bot_id`, `app_id` and `bot_profile` and no subtype; a mention of it is `app_mention` with the writer's `bot_id` (B1); a bot can't open a DM with another bot, `cannot_dm_bot` (B2); a click on an app's button goes to that app alone. Its routes don't declare live support yet, so don't use them in a live test |
 
 ---
 
@@ -148,6 +151,7 @@ Built (phase 5), and checked against the test organization on 2026-11-24: the Ap
 | `repo.readFile(path, { ref })` | Done | Built | User token | |
 | `github.appCalls()` | Done | Yes, with proxy | Proxy (sees the App's calls) | The App's calls about no repository: its own endpoints and the token exchange. Fake: the same list for every session |
 | `delivery.redeliver()` | Done | Built | App credentials (`POST /app/hook/deliveries/{id}/attempts`, App JWT) | Confirmed. GitHub redelivers to the agent's own webhook URL |
+| Several Apps: `github.createApp({ name })`, `apps()`, `createRepo({ apps })`, `repo.installApp(app)`, a scripted App's comments, issues and reviews | Done | Not yet | A second sandbox App of its own, set up by hand ([live-mode.md](live-mode.md), section 4) | ([decision 0027](decisions/0027-multiple-apps.md)) Each App has its own App id, slug, `<name>[bot]`, key, webhook secret and installation. An event two Apps hear is two deliveries, each with its own GUID, `installation.id` and secret; another App's action arrives with `sender.type: "Bot"`, and an App's own come back to it. `check_run` `created` and `completed` go to every subscribed App, `rerequested` and `requested_action` to the App that made the run alone (B3). Each delivery says which App it went to (`delivery.app`). Live, `unsupported_in_live` |
 | `delivery.attempts`, `status` for the agent's webhook | Done | Built | App credentials (`GET /app/hook/deliveries`, App JWT) | Read-only: GitHub's delivery log shows each delivery to the agent, its status code and duration. channelstack stays out of the path. The log lags: a delivery shows a few seconds after GitHub sent it, so a test polls `deliveries()` (the live example uses `expect.poll(…, { timeout: 30_000 })`) |
 
 ---
@@ -174,6 +178,7 @@ The live backend is built: people act with their personal API keys, reads go thr
 | `delivery.redeliver()` | Done | No | — | Fake-only. Linear has no redelivery mutation. The fake stamps a new `webhookTimestamp` into the body and signs it again, as Linear's own retries do |
 | An agent's `response`, `elicitation` and `error` as comments | Done | Yes | — | The fake writes them as the app's comments in the session's thread, with the activity's `sourceComment` on that comment: the mention, or for a delegation the thread Linear opens with a comment of its own ("This thread is for an agent session with …", no user, Linear's workflow as its `botActor`), which is also the session's `comment` and the opening prompt's source, and which `issue.comments()`, the comment matchers and the transcript leave out in both modes. The differential run saw that thread live (#26). The Chat SDK's Linear adapter relies on a response having a source comment |
 | Webhook deliveries to the agent | Done | Agent's concern | — | Linear delivers to the agent's own webhook URL |
+| Several apps: `linear.createApp({ name })`, `apps()`, delegating or mentioning one, a scripted app's `comment` / `reply`, `comment.deliveryFor(app)` | Done | Not yet | A second sandbox app of its own, set up by hand ([live-mode.md](live-mode.md), section 4) | ([decision 0027](decisions/0027-multiple-apps.md)) Each app has its own app user, token, client and webhook secret. An agent session is its app's: `AgentSessionEvent` goes to that app alone, and another app can't post into it (the error is B4). `Issue` and `Comment` webhooks go to every app, with the writing app's user as the actor (B5). Until B6 is answered, an app's mention of another app and its delegating to one are refused. Live, `unsupported_in_live` |
 
 ---
 
@@ -206,6 +211,7 @@ Notion now has **personal access tokens** that act as the person who created the
 | `delivery.resend()` / redelivery | Done | No | — | Fake-only. Notion has no redelivery API. A redelivery is the same event with the next `attempt_number`, signed again |
 | `notion.setContentUpdateDelay(delay)` | Done | No | — | Fake-only: how long `page.content_updated` is held to batch edits (default one second). Notion doesn't document its window |
 | `notion.sendVerification()` | Done | No | — | Fake-only: the `{ verification_token }` request Notion sends once when a subscription is created |
+| Several integrations: `notion.createApp({ name })`, `apps()`, `connections: [notion.app, writer]`, a scripted integration's `comment` / `reply` / `edit` / `rename` | Done | Not yet | A second sandbox integration of its own, set up by hand ([live-mode.md](live-mode.md), section 4) | ([decision 0027](decisions/0027-multiple-apps.md)) Each integration has its own bot user, token, webhook subscription and verification handshake, and sees only the pages connected to it. Another integration's comments and page changes reach every connected integration, itself included, with the writer's bot in `authors` (B7). An integration's mention of another's bot is refused with `validation_error` (B7). Live, `unsupported_in_live` |
 | Events the integration caused itself | Done | Yes | — | **unverified**: the fake sends them (its own comments, edits and property changes), with the bot in `authors`, so an agent must ignore its own. The checks assume that |
 
 ## Resend
@@ -225,6 +231,7 @@ Sent email can't be taken back. Live, every recipient must be at a domain in `CH
 | Webhook deliveries (`email.received`, `email.sent`, `email.delivered`, …) | Done | Agent's concern | — | Resend delivers to the agent's own URL. The fake signs as Svix does (`svix-id`, `svix-timestamp`, `svix-signature`) and retries on Resend's schedule (5 s, 5 min, 30 min, 2, 5, 10 and 10 h) |
 | `delivery.resend()` / redelivery | Done | No | — | Fake-only. Resend replays a webhook only from its dashboard |
 | `resend.calls()`, `waitForCall`, `toHaveReceivedCall` | Done | Yes, with proxy | Proxy mode | Resend doesn't report the team's calls |
+| Several apps: `resend.createApp({ name, domain })`, `apps()`, a scripted app's `send` / `reply` with its headers, `email.deliveryFor(app)` | Done | Not yet | A second sandbox team of its own, set up by hand ([live-mode.md](live-mode.md), section 4) | ([decision 0027](decisions/0027-multiple-apps.md)) Each app is a team of its own: its key, webhook secret and receiving domain (`<name>.acme.example` unless `domain` says), its address `<name>@<domain>`. An email one app sends another is an `email.received` on the other's webhook, threaded like a person's; the sender's team gets `email.sent` and `email.delivered`. The headers a sender sets are kept, so an agent's `Auto-Submitted` (RFC 3834) can be checked. Live, `unsupported_in_live` |
 
 ## Google
 
@@ -243,6 +250,7 @@ Sent email can't be taken back. Live, every recipient must be an address in `CHA
 | Push deliveries (`gmail.history`) | Done | Agent's concern | — | Pub/Sub pushes to the agent's own URL. The fake pushes in Pub/Sub's wrapped format with an RS256 OIDC token for the push endpoint, from a per-install key whose certificates it serves, at most once a second per mailbox and session ([decision 0022](decisions/0022-gmail-push-rate.md)), retried on Pub/Sub's backoff |
 | `delivery.resend()` / redelivery | Done | No | — | Fake-only. Pub/Sub pushes again only what wasn't acknowledged |
 | `google.calls()`, `waitForCall`, `toHaveReceivedCall` | Done | Yes, with proxy | Proxy mode | Gmail doesn't report the mailbox's calls |
+| Several apps: `google.createApp({ name })`, `apps()`, a scripted app's `send` / `reply` with its headers, `email.deliveryFor(app)` | Done | Not yet | A second sandbox mailbox of its own, set up by hand ([live-mode.md](live-mode.md), section 4) | ([decision 0027](decisions/0027-multiple-apps.md)) Each app is a mailbox of its own, `<name>@acme.example`, with its own OAuth client, refresh token, Pub/Sub topic and push endpoint (its tokens' audience). An app's email to another lands in the other's mailbox and pushes there; the sender's `SENT` change pushes to the sender. The headers a sender sets are kept, so `Auto-Submitted` can be checked. Live, `unsupported_in_live` |
 
 ## Discord
 
@@ -268,6 +276,7 @@ Discord has no API that acts as a person, and a user token or a scripted account
 | `delivery.resend({ badSignature })`, `redeliver()` | Done | No | — | Fake-only. Discord never sends an interaction twice; a replay after RESUME is the Gateway's |
 | `discord.fault({ type: "rate_limit" })`, `{ type: "drop_gateway" }` | Done | No | — | Fake-only. A fault changes what the bot's calls and its Gateway connection get; discord.js's Gateway doesn't go through the proxy ([decision 0026](decisions/0026-discord.md)), and Discord drops connections when it likes |
 | `discord.calls()`, `waitForCall`, `toHaveReceivedCall` | Done | Yes, with proxy | Proxy mode | Discord doesn't report the bot's calls |
+| Several apps: `discord.createApp({ name, privilegedIntents })`, `apps()`, a scripted app's `say` / `reply` / `react`, `msg.deliveryFor(app)`, `runCommand(…, { app })` | Done | Not yet | A second sandbox application of its own, set up by hand ([live-mode.md](live-mode.md), section 4) | ([decision 0027](decisions/0027-multiple-apps.md)) Each app is an application with its own bot user (its id is its token's), bot token, Ed25519 key and interactions endpoint, and its own Gateway sessions, which get only its own dispatches. Another bot's `MESSAGE_CREATE`, `MESSAGE_UPDATE`, `MESSAGE_DELETE` and reactions reach every bot that sees the channel, with `author.bot` and that bot's id; the content is empty without `MESSAGE_CONTENT` unless it mentions the bot (B9). No bot writes to another bot in a DM (50007). A person's command goes to its app (the built-in app's unless they pick another), a button press to the app whose message it is, signed with that app's key. Live, `unsupported_in_live` |
 
 ---
 
@@ -321,6 +330,20 @@ Still open:
    - Does an in-body mention of an integration reach the agent?
 
 5. **Browser sessions:** how long does a saved Slack session last with the longest session setting?
+6. **Several apps** ([decision 0027](decisions/0027-multiple-apps.md)). Until a channel's second sandbox app answers these, the fake does what the decision says, and its tests hold it to that. None has a second sandbox app yet, so all are open:
+
+   | # | To confirm live |
+   |---|---|
+   | B1 | Slack sends `app_mention` to an app that another app's message mentions, with the other's `bot_id` |
+   | B2 | Slack refuses a bot's `conversations.open` with another bot (`cannot_dm_bot`) |
+   | B3 | GitHub's `check_run` actions: which go to every subscribed App, and which only to the App that made the run |
+   | B4 | Linear's error for an app posting an activity into another app's agent session |
+   | B5 | The actor of a Linear `Issue` or `Comment` webhook for an app user's change |
+   | B6 | Whether a Linear app's comment mentioning another app opens a session for it, and whether an app may delegate an issue to another app |
+   | B7 | Whether Notion sends an integration events for another integration's changes, and for its own; and its refusal of a bot mention |
+   | B8 | Twilio delivers a text between two numbers of one account as an inbound message, with the same signature |
+   | B9 | Discord's `MESSAGE_CREATE` for another bot's message, with and without `MESSAGE_CONTENT` |
+   | B10 | GitHub's codes for one App's token or JWT used on another App's installation |
 
 ## Sources
 

@@ -1,3 +1,4 @@
+import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { notionDev } from "./dev.ts";
 import { createNotionFake } from "./fake/index.ts";
@@ -51,7 +52,7 @@ export const notion: DriverDefinition = {
           live,
           events: context.events,
           apiUrl: context.apiUrl,
-          secret: context.secret,
+          secret: (name, app) => context.apps.secret(app ?? BUILT_IN_APP, name),
         }),
       capabilities: () => ({}),
       // An edit Notion is still batching is an event on its way to the agent.
@@ -60,11 +61,16 @@ export const notion: DriverDefinition = {
           .pendingContent(session)
           .map((page) => `a page.content_updated for "${fake.world.titleOf(page)}" that Notion is still batching`),
       // Live, `channelstack env` prints nothing for Notion (app.ts): the agent talks to it with its own configuration.
-      env: () => ({
-        NOTION_BASE_URL: context.apiUrl(),
-        NOTION_TOKEN: context.secret("token"),
-        NOTION_VERIFICATION_TOKEN: context.secret("verificationToken"),
-      }),
+      env: (app) => {
+        // Another integration's lines have the built-in one's keys, so its agent starts from an .env of the same shape.
+        const { apps } = fake.store;
+        const name = apps.keyOf(apps.forEnv(app, (wanted) => fake.world.createApp(undefined, { name: wanted })));
+        return {
+          NOTION_BASE_URL: context.apiUrl(),
+          NOTION_TOKEN: context.apps.secret(name, "token"),
+          NOTION_VERIFICATION_TOKEN: context.apps.secret(name, "verificationToken"),
+        };
+      },
     };
   },
 };

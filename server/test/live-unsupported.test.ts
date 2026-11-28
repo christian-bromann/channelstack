@@ -55,6 +55,21 @@ const CASES: Record<string, Case | Case[]> = {
     { channel: "linear", method: "POST", path: "/deliveries/x/resend", body: { stale: true } },
   ],
   "`channelstack.reset()`": { channel: "", method: "POST", path: "/reset", reason: /never wiped/ },
+  // Decision 0027: another app is built in the fake; live, each needs a sandbox app of its own (#111).
+  "Several apps: `slack.createApp({ name })`, `apps()`, a scripted app's `say` / `reply` / `react`, `msg.deliveryFor(app)`":
+    { channel: "slack", method: "POST", path: "/apps", body: { name: "coder" } },
+  "Several Apps: `github.createApp({ name })`, `apps()`, `createRepo({ apps })`, `repo.installApp(app)`, a scripted App's comments, issues and reviews":
+    { channel: "github", method: "POST", path: "/apps", body: { name: "coder" } },
+  "Several apps: `linear.createApp({ name })`, `apps()`, delegating or mentioning one, a scripted app's `comment` / `reply`, `comment.deliveryFor(app)`":
+    { channel: "linear", method: "POST", path: "/apps", body: { name: "coder" } },
+  "Several integrations: `notion.createApp({ name })`, `apps()`, `connections: [notion.app, writer]`, a scripted integration's `comment` / `reply` / `edit` / `rename`":
+    { channel: "notion", method: "POST", path: "/apps", body: { name: "coder" } },
+  "Several apps: `resend.createApp({ name, domain })`, `apps()`, a scripted app's `send` / `reply` with its headers, `email.deliveryFor(app)`":
+    { channel: "resend", method: "POST", path: "/apps", body: { name: "coder" } },
+  "Several apps: `google.createApp({ name })`, `apps()`, a scripted app's `send` / `reply` with its headers, `email.deliveryFor(app)`":
+    { channel: "google", method: "POST", path: "/apps", body: { name: "coder" } },
+  "Several apps: `discord.createApp({ name, privilegedIntents })`, `apps()`, a scripted app's `say` / `reply` / `react`, `msg.deliveryFor(app)`, `runCommand(…, { app })`":
+    { channel: "discord", method: "POST", path: "/apps", body: { name: "coder" } },
   "`slack.createChannel({ shared: true })` (Slack Connect)": {
     channel: "slack",
     method: "POST",

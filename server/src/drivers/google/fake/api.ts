@@ -6,12 +6,14 @@ import type { DriverContext } from "../../../core/router/index.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { googlePayloads, type MessageFormat } from "../payloads.ts";
 import { GOOGLE_SECRETS } from "../secrets.ts";
-import type { GmailLabelRecord, GmailMessageRecord } from "../world.ts";
+import type { GmailLabelRecord, GmailMessageRecord, GoogleAppRecord } from "../world.ts";
 import type { PushCertificates } from "./certs.ts";
 import { type FakeGoogleWorld, GmailApiError, invalid, notFound } from "./world.ts";
 
 /** An access token is good for an hour, less the second Google takes off. */
 const TOKEN_LIFETIME_S = 3599;
+/** Where a call keeps the mailbox its token is for. */
+const MAILBOX = "channelstackGmailMailbox";
 /** What the agent's client may do: read, label and send the mailbox's mail. */
 const SCOPE = "https://www.googleapis.com/auth/gmail.modify";
 /** How long Google lets a client cache its certificates. */
@@ -104,7 +106,8 @@ function matches(world: FakeGoogleWorld, message: GmailMessageRecord, q: string,
       case "label":
         hit = value === "anywhere" || message.labels.some((label) => label.toLowerCase() === value);
         if (!hit && operator === "label") {
-          hit = message.labels.some((label) => world.store.labels.get(label)?.name.toLowerCase() === value);
+          const { labels } = world.store.mailbox(message.mailbox);
+          hit = message.labels.some((label) => labels.get(label)?.name.toLowerCase() === value);
         }
         break;
       case "newer_than":
@@ -136,10 +139,11 @@ function matches(world: FakeGoogleWorld, message: GmailMessageRecord, q: string,
 }
 
 /**
- * Gmail's REST API as the agent's mailbox sees it (`googleapis`, `rootUrl` from `GOOGLE_API_URL`),
- * Google's token endpoint for the agent's refresh token, and the certificates its push tokens are
- * checked with. Every Gmail call needs an access token the token endpoint handed out, and is on
- * record for the sessions whose mail it touched, by the SDK's method name (`users.messages.get`).
+ * Gmail's REST API as each app's mailbox sees it (`googleapis`, `rootUrl` from `GOOGLE_API_URL`),
+ * Google's token endpoint for each app's OAuth client and refresh token, and the certificates its
+ * push tokens are checked with. Every Gmail call needs an access token the token endpoint handed
+ * out, answers as that token's mailbox (decision 0027), and is on record for the sessions whose
+ * mail it touched, by the SDK's method name (`users.messages.get`).
  */
 export function createGoogleApi(
   context: DriverContext,
@@ -148,9 +152,11 @@ export function createGoogleApi(
 ): Hono {
   const { store } = world;
   const { clock } = context;
-  /** The access tokens handed out, and when each expires. */
-  const tokens = new Map<string, number>();
+  /** The access tokens handed out: whose mailbox each is for, by its app's name, and when it expires. */
+  const tokens = new Map<string, { app: string; expires: number }>();
   const unauthenticated = (operation: string) => operation.startsWith("oauth2.");
+  /** The mailbox whose token made the call: each token answers as its own mailbox (decision 0027). */
+  const meOf = (c: Context) => c.get(MAILBOX as never) as GoogleAppRecord;
 
   const { endpoint, finish } = restApi(context, {
     driver: "google",
@@ -169,8 +175,9 @@ export function createGoogleApi(
           ),
         );
       }
-      const expires = [...tokens].find(([issued]) => constantTimeEqual(issued, token))?.[1];
-      if (expires === undefined || expires < clock()) {
+      const issued = [...tokens].find(([one]) => constantTimeEqual(one, token))?.[1];
+      const me = issued === undefined ? undefined : store.apps.named(issued.app);
+      if (issued === undefined || me === undefined || issued.expires < clock()) {
         return errorAnswer(
           new GmailApiError(
             401,
@@ -182,11 +189,12 @@ export function createGoogleApi(
         );
       }
       const user = c.req.param("userId");
-      if (user !== undefined && user !== "me" && user.toLowerCase() !== store.app.address) {
+      if (user !== undefined && user !== "me" && user.toLowerCase() !== me.address) {
         return errorAnswer(
-          new GmailApiError(403, `Delegation denied for ${store.app.address}`, "forbidden", "PERMISSION_DENIED"),
+          new GmailApiError(403, `Delegation denied for ${me.address}`, "forbidden", "PERMISSION_DENIED"),
         );
       }
+      c.set(MAILBOX as never, me as never);
       return undefined;
     },
     refusal: (error) => (error instanceof GmailApiError ? errorAnswer(error) : undefined),
@@ -207,19 +215,19 @@ export function createGoogleApi(
       if (body.grant_type !== "refresh_token") {
         return oauthRefusal(400, "unsupported_grant_type", `Invalid grant_type: ${String(body.grant_type ?? "")}`);
       }
-      const same = (given: unknown, name: string) =>
-        typeof given === "string" && constantTimeEqual(given, context.secret(name));
-      if (!same(body.client_id, "clientId") || !same(body.client_secret, "clientSecret")) {
+      // Each app has its own OAuth client, and its mailbox's refresh token is that client's.
+      const same = (given: unknown, secret: string) => typeof given === "string" && constantTimeEqual(given, secret);
+      const client = store.apps.withSecret(body.client_id, (app) => context.apps.secret(app, "clientId"));
+      if (!client || !same(body.client_secret, world.credentials(client).clientSecret))
         return oauthRefusal(401, "invalid_client", "The OAuth client was not found.");
-      }
       if (typeof body.refresh_token !== "string" || body.refresh_token === "") {
         return oauthRefusal(400, "invalid_request", "Missing required parameter: refresh_token");
       }
-      if (!same(body.refresh_token, "refreshToken")) {
+      if (!same(body.refresh_token, world.credentials(client).refreshToken)) {
         return oauthRefusal(400, "invalid_grant", "Token has been expired or revoked.");
       }
       const token = GOOGLE_SECRETS.accessToken.generate();
-      tokens.set(token, clock() + TOKEN_LIFETIME_S * 1000);
+      tokens.set(token, { app: client.name, expires: clock() + TOKEN_LIFETIME_S * 1000 });
       return {
         body: { access_token: token, expires_in: TOKEN_LIFETIME_S, scope: SCOPE, token_type: "Bearer" },
         sessions: [],
@@ -244,18 +252,20 @@ export function createGoogleApi(
   // --- The mailbox --------------------------------------------------------------------------------
 
   const base = "/gmail/v1/users/:userId";
-  /** A message of the agent's mailbox by its id, as Gmail looks one up. */
+  /** The caller's mailbox: its labels, watch and history. */
+  const boxOf = (c: Context) => store.mailbox(meOf(c).name);
+  /** A message of the caller's mailbox by its id, as Gmail looks one up: another mailbox's isn't found. */
   const messageAt = (c: Context, name = "id") => {
     const id = c.req.param(name) ?? "";
     if (!/^[0-9a-f]{16}$/.test(id)) throw invalid("Invalid id value");
     const message = store.messages.find(id);
-    if (!message) throw notFound();
+    if (!message || message.mailbox !== meOf(c).name) throw notFound();
     return message;
   };
   const threadAt = (c: Context) => {
     const id = c.req.param("id") ?? "";
     if (!/^[0-9a-f]{16}$/.test(id)) throw invalid("Invalid id value");
-    const messages = store.messagesIn(id);
+    const messages = store.messagesIn(id).filter((message) => message.mailbox === meOf(c).name);
     if (messages.length === 0) throw notFound();
     return { id, messages };
   };
@@ -276,8 +286,8 @@ export function createGoogleApi(
       c.req.query("includeSpamTrash") === "true" ||
       /(^|\s)in:(trash|spam|anywhere)\b/i.test(q) ||
       labelIds.some((label) => label === "TRASH" || label === "SPAM");
-    return store.messages
-      .values()
+    return store
+      .messagesOf(meOf(c).name)
       .filter((message) => spamTrash || !message.labels.some((label) => label === "TRASH" || label === "SPAM"))
       .filter((message) => labelIds.every((label) => message.labels.includes(label)))
       .filter((message) => matches(world, message, q, clock()))
@@ -288,21 +298,22 @@ export function createGoogleApi(
       ? (body[name] as unknown[]).filter((label): label is string => typeof label === "string")
       : [];
 
-  endpoint("get", `${base}/profile`, "users.getProfile", () =>
-    answer({
-      emailAddress: store.app.address,
-      messagesTotal: store.messages.values().length,
-      threadsTotal: new Set(store.messages.values().map((message) => message.threadId)).size,
-      historyId: store.historyId,
-    }),
-  );
+  endpoint("get", `${base}/profile`, "users.getProfile", (c) => {
+    const mine = store.messagesOf(meOf(c).name);
+    return answer({
+      emailAddress: meOf(c).address,
+      messagesTotal: mine.length,
+      threadsTotal: new Set(mine.map((message) => message.threadId)).size,
+      historyId: boxOf(c).historyId,
+    });
+  });
 
-  endpoint("post", `${base}/watch`, "users.watch", (_c, body) => {
+  endpoint("post", `${base}/watch`, "users.watch", (c, body) => {
     if (typeof body.topicName !== "string")
       throw invalid("Invalid topicName does not match projects/SOME-PROJECT/topics/SOME-TOPIC");
     const behavior = String(body.labelFilterBehavior ?? body.labelFilterAction ?? "include").toLowerCase();
     return answer(
-      world.watch({
+      world.watch(meOf(c), {
         topicName: body.topicName,
         labelIds: labelsOf(body, "labelIds"),
         behavior: behavior === "exclude" ? "exclude" : "include",
@@ -310,19 +321,21 @@ export function createGoogleApi(
     );
   });
 
-  endpoint("post", `${base}/stop`, "users.stop", () => {
-    world.stop();
+  endpoint("post", `${base}/stop`, "users.stop", (c) => {
+    world.stop(meOf(c));
     return { body: undefined, sessions: [], status: 204 };
   });
 
   endpoint("get", `${base}/history`, "users.history.list", (c) => {
     const start = c.req.query("startHistoryId");
     if (start === undefined || !/^\d+$/.test(start)) throw invalid("Invalid startHistoryId");
-    if (BigInt(start) < BigInt(store.historyStart)) throw notFound();
+    const box = boxOf(c);
+    if (BigInt(start) < BigInt(box.historyStart)) throw notFound();
     const types = c.req.queries("historyTypes") ?? [];
     const label = c.req.query("labelId");
     const entries = store.history
       .values()
+      .filter((entry) => entry.mailbox === meOf(c).name)
       .filter((entry) => BigInt(entry.id) > BigInt(start))
       .filter((entry) => types.length === 0 || types.includes(entry.kind))
       .filter((entry) => label === undefined || entry.labelsAfter.includes(label) || entry.labels.includes(label))
@@ -333,7 +346,7 @@ export function createGoogleApi(
       {
         ...(items.length > 0 ? { history: items.map(googlePayloads.history) } : {}),
         ...(next ? { nextPageToken: next } : {}),
-        historyId: store.historyId,
+        historyId: box.historyId,
       },
       messages,
       world,
@@ -354,11 +367,11 @@ export function createGoogleApi(
     );
   });
 
-  endpoint("post", `${base}/messages/send`, "users.messages.send", async (_c, body) => {
+  endpoint("post", `${base}/messages/send`, "users.messages.send", async (c, body) => {
     if (typeof body.raw !== "string" || body.raw === "")
       throw invalid("'raw' RFC822 payload message string or uploading message via /upload/* URL required");
     const threadId = typeof body.threadId === "string" ? body.threadId : undefined;
-    const message = await world.appSends(Buffer.from(body.raw, "base64url").toString("utf8"), threadId);
+    const message = await world.appSends(Buffer.from(body.raw, "base64url").toString("utf8"), threadId, meOf(c));
     return answer({ id: message.id, threadId: message.threadId, labelIds: [...message.labels] }, [message], world);
   });
 
@@ -443,24 +456,24 @@ export function createGoogleApi(
 
   // --- Labels -------------------------------------------------------------------------------------
 
-  endpoint("get", `${base}/labels`, "users.labels.list", () =>
-    answer({ labels: [...store.labels.values()].map((label) => googlePayloads.label(label)) }),
+  endpoint("get", `${base}/labels`, "users.labels.list", (c) =>
+    answer({ labels: [...boxOf(c).labels.values()].map((label) => googlePayloads.label(label)) }),
   );
 
   endpoint("get", `${base}/labels/:id`, "users.labels.get", (c) => {
-    const label = store.labels.get(c.req.param("id") ?? "");
+    const label = boxOf(c).labels.get(c.req.param("id") ?? "");
     if (!label) throw notFound();
-    const messages = store.messages.values().filter((message) => message.labels.includes(label.id));
+    const messages = store.messagesOf(meOf(c).name).filter((message) => message.labels.includes(label.id));
     return answer(
       googlePayloads.label(label, { messages, threads: new Set(messages.map((message) => message.threadId)) }),
     );
   });
 
   /** A label's name as a request gives it: not empty, and no other label's (`except`: the one being changed). */
-  const labelName = (given: unknown, except?: string) => {
+  const labelName = (c: Context, given: unknown, except?: string) => {
     const name = typeof given === "string" ? given.trim() : "";
     if (name === "") throw invalid("Invalid label name");
-    const taken = [...store.labels.values()].some(
+    const taken = [...boxOf(c).labels.values()].some(
       (label) => label.id !== except && label.name.toLowerCase() === name.toLowerCase(),
     );
     if (taken) throw new GmailApiError(409, "Label name exists or conflicts", "duplicate", "ALREADY_EXISTS");
@@ -479,22 +492,22 @@ export function createGoogleApi(
         ? body.labelListVisibility
         : (was?.labelListVisibility ?? ("labelShow" as const)),
   });
-  /** A label the agent made: Gmail's own can't be changed or deleted. */
+  /** A label the app made: Gmail's own can't be changed or deleted. */
   const userLabelAt = (c: Context, refusal: string) => {
-    const label = store.labels.get(c.req.param("id") ?? "");
+    const label = boxOf(c).labels.get(c.req.param("id") ?? "");
     if (!label) throw notFound();
     if (label.type === "system") throw invalid(refusal);
     return label;
   };
 
-  endpoint("post", `${base}/labels`, "users.labels.create", (_c, body) => {
+  endpoint("post", `${base}/labels`, "users.labels.create", (c, body) => {
     const label: GmailLabelRecord = {
-      id: store.nextLabelId(),
-      name: labelName(body.name),
+      id: boxOf(c).nextLabelId(),
+      name: labelName(c, body.name),
       type: "user",
       ...visibilityOf(body),
     };
-    store.labels.set(label.id, label);
+    boxOf(c).labels.set(label.id, label);
     return answer(googlePayloads.label(label));
   });
 
@@ -505,9 +518,9 @@ export function createGoogleApi(
   ] as const) {
     endpoint(method, `${base}/labels/:id`, operation, (c, body) => {
       const was = userLabelAt(c, "Invalid update request");
-      const name = method === "patch" && body.name === undefined ? was.name : labelName(body.name, was.id);
+      const name = method === "patch" && body.name === undefined ? was.name : labelName(c, body.name, was.id);
       const label: GmailLabelRecord = { ...was, name, ...visibilityOf(body, was) };
-      store.labels.set(label.id, label);
+      boxOf(c).labels.set(label.id, label);
       return answer(googlePayloads.label(label));
     });
   }
@@ -515,9 +528,9 @@ export function createGoogleApi(
   endpoint("delete", `${base}/labels/:id`, "users.labels.delete", (c) => {
     const label = userLabelAt(c, "Invalid delete request");
     // Gmail takes it off every message that has it, and answers nothing.
-    const had = store.messages.values().filter((message) => message.labels.includes(label.id));
+    const had = store.messagesOf(meOf(c).name).filter((message) => message.labels.includes(label.id));
     for (const message of had) world.modify(message, [], [label.id]);
-    store.labels.delete(label.id);
+    boxOf(c).labels.delete(label.id);
     return { body: undefined, sessions: had.map((message) => store.messages.owner(message.id)), status: 204 };
   });
 

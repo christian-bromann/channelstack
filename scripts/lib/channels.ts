@@ -46,9 +46,16 @@ export const HARNESS = {
       "inspecting what the agent did > ",
       // Everything but the Socket Mode test, which needs an agent started in Socket Mode (exit check 2.2).
       "delivery and failures \\(fake only\\) > (?!reconnects after the Socket Mode)",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
     ],
     // Quiet and parallel sessions (not examples), and the standard checks as a developer adds them (exit check 2.3).
-    suites: ["test/acceptance/stack", "test/acceptance/checks/slack-checks.test.ts"],
+    suites: [
+      "test/acceptance/stack",
+      "test/acceptance/checks/slack-checks.test.ts",
+      // The checks against the second app, `coder` (exit check 12.7).
+      "test/acceptance/checks/slack-checks-coder.test.ts",
+    ],
     agents: { "bolt-ai-sdk": "/slack/events", "chat-sdk-slack": "/slack/events" },
     broken: { agent: "broken-slack", path: "/slack/events" },
   },
@@ -59,9 +66,17 @@ export const HARNESS = {
       "pushes and check runs > ",
       "delivery and failures \\(fake only\\) > ",
       "inspecting what the agent did > ",
+      // The same agent again, as the App `coder` (exit check 12.2).
+      "several apps > ",
     ],
     // The standard checks as a developer adds them (exit check 3.4).
-    suites: ["test/acceptance/checks/github-checks.test.ts"],
+    suites: [
+      "test/acceptance/checks/github-checks.test.ts",
+      // The checks against the second App, `coder` (exit check 12.7).
+      "test/acceptance/checks/github-checks-coder.test.ts",
+      // Twenty two-App sessions at once (exit check 12.10).
+      "test/acceptance/apps",
+    ],
     agents: { probot: "/api/github/webhooks", "chat-sdk-github": "/api/webhooks/github" },
     broken: { agent: "broken-github", path: "/api/webhooks/github" },
   },
@@ -72,9 +87,15 @@ export const HARNESS = {
       "issue workflow > ",
       "delivery and failures \\(fake only\\) > ",
       "inspecting what the agent did > ",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
     ],
     // The standard checks as a developer adds them (exit check 4.5).
-    suites: ["test/acceptance/checks/linear-checks.test.ts"],
+    suites: [
+      "test/acceptance/checks/linear-checks.test.ts",
+      // The checks against the second app, `coder` (exit check 12.7).
+      "test/acceptance/checks/linear-checks-coder.test.ts",
+    ],
     agents: { "linear-sdk": "/webhooks/linear", "chat-sdk-linear": "/api/webhooks/linear" },
     broken: { agent: "broken-linear", path: "/webhooks/linear" },
   },
@@ -84,22 +105,40 @@ export const HARNESS = {
       "connections > ",
       "pages and databases > ",
       "delivery and failures \\(fake only\\) > ",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
     ],
-    suites: ["test/acceptance/checks/notion-checks.test.ts"],
+    suites: [
+      "test/acceptance/checks/notion-checks.test.ts",
+      // The checks against the second app, `coder` (exit check 12.7).
+      "test/acceptance/checks/notion-checks-coder.test.ts",
+    ],
     agents: { "notion-sdk": "/webhooks/notion" },
     broken: { agent: "broken-notion", path: "/webhooks/notion" },
   },
   resend: {
-    enabled: ["email conversations > ", "delivery and failures \\(fake only\\) > ", "inspecting what the agent did > "],
-    // The standard checks as a developer adds them (exit check 8.5).
-    suites: ["test/acceptance/checks/resend-checks.test.ts"],
+    enabled: [
+      "email conversations > ",
+      "delivery and failures \\(fake only\\) > ",
+      "inspecting what the agent did > ",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
+    ],
+    // The standard checks as a developer adds them (exit check 8.5), and against `coder` (12.7).
+    suites: ["test/acceptance/checks/resend-checks.test.ts", "test/acceptance/checks/resend-checks-coder.test.ts"],
     agents: { "resend-node": "/webhooks/resend" },
     broken: { agent: "broken-resend", path: "/webhooks/resend" },
   },
   google: {
-    enabled: ["email conversations > ", "delivery and failures \\(fake only\\) > ", "inspecting what the agent did > "],
-    // The standard checks as a developer adds them (exit check 9.4).
-    suites: ["test/acceptance/checks/google-checks.test.ts"],
+    enabled: [
+      "email conversations > ",
+      "delivery and failures \\(fake only\\) > ",
+      "inspecting what the agent did > ",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
+    ],
+    // The standard checks as a developer adds them (exit check 9.4), and against `coder` (12.7).
+    suites: ["test/acceptance/checks/google-checks.test.ts", "test/acceptance/checks/google-checks-coder.test.ts"],
     agents: { "gmail-node": "/webhooks/google" },
     broken: { agent: "broken-google", path: "/webhooks/google" },
   },
@@ -111,9 +150,11 @@ export const HARNESS = {
       "reactions and edits > ",
       "delivery and failures \\(fake only\\) > ",
       "inspecting what the agent did > ",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
     ],
-    // The standard checks as a developer adds them (exit check 11.4).
-    suites: ["test/acceptance/checks/discord-checks.test.ts"],
+    // The standard checks as a developer adds them (exit check 11.4), and against `coder` (12.7).
+    suites: ["test/acceptance/checks/discord-checks.test.ts", "test/acceptance/checks/discord-checks-coder.test.ts"],
     agents: { "discord-node": "/interactions" },
     broken: { agent: "broken-discord", path: "/interactions" },
     unproxied: "discord.js's Gateway client (`ws`) connects directly, without HTTPS_PROXY",

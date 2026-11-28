@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import { afterAll, expect, test } from "vitest";
 
+import { CHANNEL_NAMES } from "../../../sdks/typescript/client.ts";
 import { PREFIXED_TOKENS } from "../prefixed-tokens.ts";
 import { type RunningBinary, startBinary } from "./harness.ts";
 
@@ -126,3 +127,107 @@ test("no fake secret and no live-shaped token reaches logs, errors, the event lo
   expect(JSON.stringify(errors)).not.toContain(email);
   expect(JSON.stringify(errors)).not.toContain(encodeURIComponent(email));
 });
+
+// Exit check 12.5: with two apps per channel, the extra apps' secrets are scrubbed the same way.
+// Each is made once per install and handed to the redactor as it is made (decision 0027).
+test("with two apps per channel, no extra app's secret reaches logs, errors, the event log or the UI", async () => {
+  // An agent that echoes what it was sent, headers and all: what is signed for each app must not show.
+  const echoing = createServer((request, response) => {
+    response.writeHead(500).end(`upstream said: ${JSON.stringify(request.headers)}`);
+  });
+  await new Promise<void>((resolve) => echoing.listen(0, "127.0.0.1", resolve));
+  const webhook = `http://127.0.0.1:${(echoing.address() as AddressInfo).port}/events`;
+  const apps = await startBinary({
+    args: ["--no-portless", "--port", "0", "--log-level", "debug"],
+    env: { CHANNELSTACK_ECHO_WEBHOOK_URL: webhook, CHANNELSTACK_ECHO_APP_CODER_WEBHOOK_URL: webhook },
+  });
+  try {
+    const { control } = apps;
+    const errors: unknown[] = [];
+    const note = (response: { status: number; body: unknown }) => {
+      if (response.status >= 400) errors.push(response.body);
+      return response.body as any;
+    };
+    const { sessionId } = note(await control("POST", "/sessions"));
+    // Two apps beside my-agent on every channel, one made by a test and one by `channelstack env --app`,
+    // and each app's lines printed, as its agent's `.env` would have them.
+    for (const channel of ["echo", ...CHANNEL_NAMES]) {
+      note(await control("POST", `/sessions/${sessionId}/${channel}/apps`, { name: "coder" }));
+      for (const app of ["coder", "reviewer"]) note(await control("GET", `/env?app=${app}&channel=${channel}`));
+    }
+    const stored = JSON.parse(readFileSync(join(apps.home, "secrets.json"), "utf8")).apps as Record<
+      string,
+      Record<string, Record<string, string>>
+    >;
+    const secrets = Object.values(stored).flatMap((byApp) => Object.values(byApp).flatMap(Object.values));
+    expect(Object.keys(stored).sort()).toEqual(["echo", ...CHANNEL_NAMES].sort());
+    for (const byApp of Object.values(stored)) expect(Object.keys(byApp).sort()).toEqual(["coder", "reviewer"]);
+
+    // Both echo apps hear Ana in a room, each signed with its own secret, at an agent that echoes it all.
+    const base = `/sessions/${sessionId}/echo`;
+    const fixture = note(await control("GET", base));
+    const coder = note(await control("POST", `${base}/apps`, { name: "coder" }));
+    const ana = note(await control("POST", `${base}/users`, { name: "Ana" }));
+    const room = note(await control("POST", `${base}/rooms`, { participants: [ana.id, fixture.app.id, coder.id] }));
+
+    // The same paths as above: content, ids, bodies that fail validation, and headers on every channel's API.
+    for (const secret of secrets) {
+      note(await control("POST", `${base}/users/${ana.id}/say`, { text: `a secret: ${secret}`, room: room.id }));
+      if (/^[\w.-]+$/.test(secret)) {
+        note(await control("GET", `${base}/rooms/${secret}/messages`));
+        note(await control("GET", `/sessions/${secret}/events`));
+      }
+      note(await control("POST", `${base}/users/${ana.id}/say`, { text: "x", room: secret }));
+      note(await control("POST", `${base}/apps`, { name: secret }));
+      // A header holds one line: a private key goes in the body only.
+      const header = secret.includes("\n") ? "multi-line" : secret;
+      note(await control("GET", "/status", undefined, header));
+      for (const channel of ["echo", ...CHANNEL_NAMES]) {
+        await fetch(`${apps.url}/${channel}/api/nothing-here`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${header}`, "content-type": "application/json" },
+          body: JSON.stringify({ text: secret }),
+        });
+      }
+    }
+
+    // Let every delivery's first attempt finish, so what the agent answered is in the log too.
+    await expect
+      .poll(
+        async () => {
+          const { events: logged } = (await control("GET", `/sessions/${sessionId}/events`)).body as {
+            events: Array<{ kind: string; data: { app?: string } }>;
+          };
+          const sent = logged.filter((event) => event.kind === "delivery");
+          const tried = logged.filter((event) => event.kind === "delivery_attempt");
+          return tried.length >= sent.length ? new Set(sent.map((event) => event.data.app)) : 0;
+        },
+        { timeout: 20_000 },
+      )
+      .toEqual(new Set(["my-agent", "coder"]));
+    const events = JSON.stringify((await control("GET", `/sessions/${sessionId}/events`)).body);
+
+    const link: string = note(await control("POST", "/ui/login-links")).url;
+    const opened = await fetch(link, { redirect: "manual" });
+    const cookie = (opened.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    const asBrowser = async (path: string) => (await fetch(`${apps.url}${path}`, { headers: { cookie } })).text();
+    const ui = [await asBrowser("/"), await asBrowser(`/_channelstack/sessions/${sessionId}/events`)].join("\n");
+    expect(ui).toContain("delivery_attempt");
+
+    await apps.stop();
+    const logs = apps.output();
+    expect(secrets.length).toBeGreaterThanOrEqual(2 * (CHANNEL_NAMES.length + 1));
+    expect(errors.length).toBeGreaterThan(secrets.length * 3);
+    expect(logs).toContain('"message":"delivery attempt"');
+    expect(events).toContain("[redacted]");
+    for (const secret of secrets) {
+      expect(logs, "logs").not.toContain(secret);
+      expect(JSON.stringify(errors), "error responses").not.toContain(secret);
+      expect(events, "event log").not.toContain(secret);
+      expect(ui, "the UI").not.toContain(secret);
+    }
+  } finally {
+    await apps.stop();
+    echoing.close();
+  }
+}, 60_000);

@@ -44,7 +44,12 @@ const auth = new OAuth2Client({
 auth.setCredentials({ refresh_token: GOOGLE_REFRESH_TOKEN });
 // `rootUrl` per API: googleapis ignores it in `google.options`.
 const gmail = google.gmail({ version: "v1", auth, ...(GOOGLE_API_URL ? { rootUrl: GOOGLE_API_URL } : {}) });
-const agent = gmailAgent(gmail, { address: GMAIL_ADDRESS, name: "my-agent", topic: GOOGLE_PUBSUB_TOPIC });
+// The app it runs as: the stack names another one in AGENT_NAME (decision 0027).
+const agent = gmailAgent(gmail, {
+  address: GMAIL_ADDRESS,
+  name: process.env.AGENT_NAME ?? "my-agent",
+  topic: GOOGLE_PUBSUB_TOPIC,
+});
 await agent.start();
 
 serve(Number(PORT), "/webhooks/google", async (request) => {

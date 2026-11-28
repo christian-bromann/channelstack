@@ -14,7 +14,9 @@ export class AccountInactiveError extends ChannelstackError {}
 export class ActionRequiresError extends ChannelstackError {}
 export class AlreadyInChannelError extends ChannelstackError {}
 export class AlreadyReactedError extends ChannelstackError {}
+export class CannotDmBotError extends ChannelstackError {}
 export class CannotEditOthersMessageError extends ChannelstackError {}
+export class CannotMessageUserError extends ChannelstackError {}
 export class CantDeleteMessageError extends ChannelstackError {}
 export class CantUpdateMessageError extends ChannelstackError {}
 export class CrossWorkspaceCredentialError extends ChannelstackError {}
@@ -39,6 +41,8 @@ export class NotAllowedError extends ChannelstackError {}
 export class NotFoundError extends ChannelstackError {}
 export class NotInChannelError extends ChannelstackError {}
 export class NotInRoomError extends ChannelstackError {}
+export class ObjectNotFoundError extends ChannelstackError {}
+export class RestrictedResourceError extends ChannelstackError {}
 export class SessionNotFoundError extends ChannelstackError {}
 export class SplitViewUnavailableError extends ChannelstackError {}
 export class StopUnavailableError extends ChannelstackError {}
@@ -46,6 +50,7 @@ export class ThreadAlreadyCreatedError extends ChannelstackError {}
 export class UnauthorizedError extends ChannelstackError {}
 export class UnsupportedInFakeError extends ChannelstackError {}
 export class UnsupportedInLiveError extends ChannelstackError {}
+export class ValidationErrorError extends ChannelstackError {}
 export class ValidationFailedError extends ChannelstackError {}
 
 const ERRORS: ErrorClasses = {
@@ -53,7 +58,9 @@ const ERRORS: ErrorClasses = {
   action_requires: ActionRequiresError,
   already_in_channel: AlreadyInChannelError,
   already_reacted: AlreadyReactedError,
+  cannot_dm_bot: CannotDmBotError,
   cannot_edit_others_message: CannotEditOthersMessageError,
+  cannot_message_user: CannotMessageUserError,
   cant_delete_message: CantDeleteMessageError,
   cant_update_message: CantUpdateMessageError,
   cross_workspace_credential: CrossWorkspaceCredentialError,
@@ -78,6 +85,8 @@ const ERRORS: ErrorClasses = {
   not_found: NotFoundError,
   not_in_channel: NotInChannelError,
   not_in_room: NotInRoomError,
+  object_not_found: ObjectNotFoundError,
+  restricted_resource: RestrictedResourceError,
   session_not_found: SessionNotFoundError,
   split_view_unavailable: SplitViewUnavailableError,
   stop_unavailable: StopUnavailableError,
@@ -85,6 +94,7 @@ const ERRORS: ErrorClasses = {
   unauthorized: UnauthorizedError,
   unsupported_in_fake: UnsupportedInFakeError,
   unsupported_in_live: UnsupportedInLiveError,
+  validation_error: ValidationErrorError,
   validation_failed: ValidationFailedError,
 };
 
@@ -102,7 +112,7 @@ export interface EventPage {
 export interface LogEvent {
   at: string;
   driver: string;
-  kind: "action" | "delivery" | "delivery_attempt" | "api_call";
+  kind: "action" | "delivery" | "delivery_attempt" | "api_call" | "bot_loop";
   data: Record<string, unknown>;
   summary?: { text: string; outcome: string; ok: boolean };
 }
@@ -111,9 +121,18 @@ export interface Quiet {
   busy: boolean;
   quietForMs: number;
   open: string[];
+  loops?: string[];
 }
 
 export type Env = Record<string, string>;
+
+export type EchoApps = EchoApp[];
+
+export type EchoAppsWire = EchoAppData[];
+
+function decodeEchoApps(ctx: HandleContext, data: EchoAppsWire): EchoApps {
+  return data.map((item) => new EchoApp(ctx, item));
+}
 
 export interface EchoMessage {
   id: string;
@@ -162,20 +181,12 @@ export interface SlackTeam {
   name: string;
 }
 
-export type SlackUsers = SlackUser[];
+export type SlackApps = SlackApp[];
 
-export type SlackUsersWire = SlackUserData[];
+export type SlackAppsWire = SlackAppData[];
 
-function decodeSlackUsers(ctx: HandleContext, data: SlackUsersWire): SlackUsers {
-  return data.map((item) => new SlackUser(ctx, item));
-}
-
-export type SlackConversations = SlackConversation[];
-
-export type SlackConversationsWire = SlackConversationData[];
-
-function decodeSlackConversations(ctx: HandleContext, data: SlackConversationsWire): SlackConversations {
-  return data.map((item) => new SlackConversation(ctx, item));
+function decodeSlackApps(ctx: HandleContext, data: SlackAppsWire): SlackApps {
+  return data.map((item) => new SlackApp(ctx, item));
 }
 
 export interface DeliveryAttempt {
@@ -200,6 +211,22 @@ export interface SlackMessageInput {
 export interface SlackMessageMetadata {
   event_type: string;
   event_payload: Record<string, unknown>;
+}
+
+export type SlackUsers = SlackUser[];
+
+export type SlackUsersWire = SlackUserData[];
+
+function decodeSlackUsers(ctx: HandleContext, data: SlackUsersWire): SlackUsers {
+  return data.map((item) => new SlackUser(ctx, item));
+}
+
+export type SlackConversations = SlackConversation[];
+
+export type SlackConversationsWire = SlackConversationData[];
+
+function decodeSlackConversations(ctx: HandleContext, data: SlackConversationsWire): SlackConversations {
+  return data.map((item) => new SlackConversation(ctx, item));
 }
 
 export interface SlackButtonRef {
@@ -406,6 +433,14 @@ function decodeGitHubIssueListing(ctx: HandleContext, data: GitHubIssueListingWi
   return { ...data, issue: new GitHubIssue(ctx, data.issue) };
 }
 
+export type GitHubApps = GitHubApp[];
+
+export type GitHubAppsWire = GitHubAppData[];
+
+function decodeGitHubApps(ctx: HandleContext, data: GitHubAppsWire): GitHubApps {
+  return data.map((item) => new GitHubApp(ctx, item));
+}
+
 export type GitHubCommits = GitHubCommit[];
 
 export type GitHubCommitsWire = GitHubCommitData[];
@@ -595,6 +630,14 @@ export interface GitHubApiCall {
 
 export type GitHubAppCalls = GitHubApiCall[];
 
+export type LinearApps = LinearApp[];
+
+export type LinearAppsWire = LinearAppData[];
+
+function decodeLinearApps(ctx: HandleContext, data: LinearAppsWire): LinearApps {
+  return data.map((item) => new LinearApp(ctx, item));
+}
+
 export type LinearUsers = LinearUser[];
 
 export type LinearUsersWire = LinearUserData[];
@@ -729,6 +772,16 @@ export interface LinearApiCall {
   error?: string;
 }
 
+export type NotionCapability = "read_content" | "update_content" | "insert_content" | "read_comments" | "insert_comments" | "read_user_info";
+
+export type NotionIntegrations = NotionIntegration[];
+
+export type NotionIntegrationsWire = NotionIntegrationData[];
+
+function decodeNotionIntegrations(ctx: HandleContext, data: NotionIntegrationsWire): NotionIntegrations {
+  return data.map((item) => new NotionIntegration(ctx, item));
+}
+
 export type NotionUsers = NotionUser[];
 
 export type NotionUsersWire = NotionUserData[];
@@ -852,6 +905,20 @@ export interface NotionApiCall {
   error?: string;
 }
 
+export type ResendApps = ResendApp[];
+
+export type ResendAppsWire = ResendAppData[];
+
+function decodeResendApps(ctx: HandleContext, data: ResendAppsWire): ResendApps {
+  return data.map((item) => new ResendApp(ctx, item));
+}
+
+export interface ResendPrincipal {
+  id: string;
+  name: string;
+  kind: "user" | "app";
+}
+
 export type ResendUsers = ResendUser[];
 
 export type ResendUsersWire = ResendUserData[];
@@ -866,12 +933,6 @@ export type ResendThreadsWire = ResendThreadData[];
 
 function decodeResendThreads(ctx: HandleContext, data: ResendThreadsWire): ResendThreads {
   return data.map((item) => new ResendThread(ctx, item));
-}
-
-export interface ResendPrincipal {
-  id: string;
-  name: string;
-  kind: "user" | "app";
 }
 
 export type ResendInbox = ResendEmail[];
@@ -947,6 +1008,20 @@ export interface ResendApiCall {
   error?: string;
 }
 
+export type GoogleApps = GoogleApp[];
+
+export type GoogleAppsWire = GoogleAppData[];
+
+function decodeGoogleApps(ctx: HandleContext, data: GoogleAppsWire): GoogleApps {
+  return data.map((item) => new GoogleApp(ctx, item));
+}
+
+export interface GooglePrincipal {
+  id: string;
+  name: string;
+  kind: "user" | "app";
+}
+
 export type GoogleUsers = GoogleUser[];
 
 export type GoogleUsersWire = GoogleUserData[];
@@ -961,12 +1036,6 @@ export type GoogleThreadsWire = GoogleThreadData[];
 
 function decodeGoogleThreads(ctx: HandleContext, data: GoogleThreadsWire): GoogleThreads {
   return data.map((item) => new GoogleThread(ctx, item));
-}
-
-export interface GooglePrincipal {
-  id: string;
-  name: string;
-  kind: "user" | "app";
 }
 
 export type GoogleInbox = GoogleEmail[];
@@ -1047,6 +1116,19 @@ export interface DiscordGuild {
   name: string;
 }
 
+export type DiscordApps = DiscordApp[];
+
+export type DiscordAppsWire = DiscordAppData[];
+
+function decodeDiscordApps(ctx: HandleContext, data: DiscordAppsWire): DiscordApps {
+  return data.map((item) => new DiscordApp(ctx, item));
+}
+
+export interface DiscordMessageInput {
+  content?: string;
+  embeds?: unknown[];
+}
+
 export type DiscordUsers = DiscordUser[];
 
 export type DiscordUsersWire = DiscordUserData[];
@@ -1061,11 +1143,6 @@ export type DiscordChannelsWire = DiscordChannelData[];
 
 function decodeDiscordChannels(ctx: HandleContext, data: DiscordChannelsWire): DiscordChannels {
   return data.map((item) => new DiscordChannel(ctx, item));
-}
-
-export interface DiscordMessageInput {
-  content?: string;
-  embeds?: unknown[];
 }
 
 export interface DiscordButtonRef {
@@ -1282,9 +1359,9 @@ export class Channelstack extends ClientBase {
   }
 
   /** Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints). With `proxy`, the proxy and the CA instead of the API URLs. */
-  async env(options: { proxy?: boolean } = {}): Promise<Env> {
+  async env(options: { proxy?: boolean; app?: string; channel?: string } = {}): Promise<Env> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/env`, { query: { proxy: options.proxy } })) as Env;
+    const data = (await ctx.transport.request("GET", `/env`, { query: { proxy: options.proxy, app: options.app, channel: options.channel } })) as Env;
     return data;
   }
 
@@ -1432,6 +1509,20 @@ export class EchoFixture {
     return new EchoUser(ctx, data);
   }
 
+  /** Make another app (decision 0027), or return the one with this name. Its events go to CHANNELSTACK_ECHO_APP_<NAME>_WEBHOOK_URL. Experimental. */
+  async createApp(options: { name: string }): Promise<EchoApp> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/echo/apps`, { body: { name: options.name } })) as EchoAppData;
+    return new EchoApp(ctx, data);
+  }
+
+  /** The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
+  async apps(): Promise<EchoApps> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/echo/apps`)) as EchoAppsWire;
+    return decodeEchoApps(ctx, data);
+  }
+
   /** Create a room. Only the listed participants are members; include the app for it to receive events. Experimental. */
   async createRoom(options: { name?: string; participants?: Array<EchoUser | EchoApp> } = {}): Promise<EchoRoom> {
     const ctx = this.#ctx;
@@ -1471,6 +1562,13 @@ export class EchoApp {
     this.id = data.id;
     this.name = data.name;
     this.kind = data.kind;
+  }
+
+  /** An app a test made posts in a room it is a member of, as its own call would. Experimental. */
+  async say(text: string, options: { room: EchoRoom }): Promise<EchoMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/echo/apps/${segment(this.id)}/say`, { body: { text, room: options.room.id } })) as EchoMessage;
+    return data;
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -1593,6 +1691,20 @@ export class SlackFixture {
     return decodeSlackUsers(ctx, data);
   }
 
+  /** Make another app in the workspace, with its own bot user, tokens and signing secret (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_SLACK_APP_<NAME>_WEBHOOK_URL, or over its own Socket Mode connection. Experimental. */
+  async createApp(options: { name: string; scopes?: string[]; botEvents?: string[] }): Promise<SlackApp> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/apps`, { body: { name: options.name, scopes: options.scopes, botEvents: options.botEvents } })) as SlackAppData;
+    return new SlackApp(ctx, data);
+  }
+
+  /** The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
+  async apps(): Promise<SlackApps> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/apps`)) as SlackAppsWire;
+    return decodeSlackApps(ctx, data);
+  }
+
   /** The session's conversations, the one with the newest message last. Experimental. */
   async conversations(): Promise<SlackConversations> {
     const ctx = this.#ctx;
@@ -1608,9 +1720,9 @@ export class SlackFixture {
   }
 
   /** Every event channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(): Promise<SlackDeliveries> {
+  async deliveries(options: { app?: SlackApp } = {}): Promise<SlackDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/deliveries`)) as SlackDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/deliveries`, { query: { app: options.app === undefined ? undefined : options.app.id } })) as SlackDeliveriesWire;
     return decodeSlackDeliveries(ctx, data);
   }
 
@@ -1621,17 +1733,17 @@ export class SlackFixture {
     return data;
   }
 
-  /** The workspace uninstalls the app. Undone when this session closes; run such tests on their own. Experimental. */
-  async uninstallApp(): Promise<SlackUninstallDeliveries> {
+  /** The workspace uninstalls an app: the built-in one, or the one given. Undone when this session closes; run such tests on their own. Experimental. */
+  async uninstallApp(options: { app?: SlackApp } = {}): Promise<SlackUninstallDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/uninstall`)) as SlackUninstallDeliveriesWire;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/uninstall`, { body: { app: options.app === undefined ? undefined : options.app.id } })) as SlackUninstallDeliveriesWire;
     return decodeSlackUninstallDeliveries(ctx, data);
   }
 
   /** Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once. Experimental. */
-  async fault(options: { type: "rate_limit" | "latency" | "error" | "drop_socket"; operation?: string; retryAfter?: Duration; delay?: Duration; after?: Duration; error?: string; times?: number }): Promise<SlackFault> {
+  async fault(options: { type: "rate_limit" | "latency" | "error" | "drop_socket"; operation?: string; retryAfter?: Duration; delay?: Duration; after?: Duration; error?: string; times?: number; app?: SlackApp }): Promise<SlackFault> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/faults`, { body: { type: options.type, operation: options.operation, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), delay: options.delay === undefined ? undefined : parseDuration(options.delay), after: options.after === undefined ? undefined : parseDuration(options.after), error: options.error, times: options.times } })) as SlackFaultData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/faults`, { body: { type: options.type, operation: options.operation, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), delay: options.delay === undefined ? undefined : parseDuration(options.delay), after: options.after === undefined ? undefined : parseDuration(options.after), error: options.error, times: options.times, app: options.app === undefined ? undefined : options.app.id } })) as SlackFaultData;
     return new SlackFault(ctx, data);
   }
 
@@ -1683,6 +1795,34 @@ export class SlackApp {
     this.appToken = data.appToken;
     this.signingSecret = data.signingSecret;
     this.scopes = data.scopes;
+  }
+
+  /** An app a test made writes a top-level message, as its own chat.postMessage would: in a conversation it is a member of, or in a DM with the people in `to`. Experimental. */
+  async say(message: string | SlackMessageInput, options: { channel?: SlackConversation; to?: SlackUser | SlackApp | Array<SlackUser | SlackApp> } = {}): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/apps/${segment(this.id)}/say`, { body: { message: typeof message === "string" ? { text: message } : message, channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : [options.to].flat().map((item) => item.id) } })) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** An app a test made replies in a thread: pass the message that starts it, or any reply in it. Experimental. */
+  async reply(message: string | SlackMessageInput, options: { thread: SlackThread | SlackMessage }): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/apps/${segment(this.id)}/reply`, { body: { message: typeof message === "string" ? { text: message } : message, thread: { channel: options.thread.channel, ts: options.thread.ts } } })) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** An app a test made reacts to a message. Experimental. */
+  async react(emoji: string, options: { message: SlackMessage }): Promise<SlackDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/apps/${segment(this.id)}/react`, { body: { emoji, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData | null;
+    return (data === null ? undefined : new SlackDelivery(ctx, data));
+  }
+
+  /** An app a test made takes its reaction back. Experimental. */
+  async unreact(emoji: string, options: { message: SlackMessage }): Promise<SlackDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/apps/${segment(this.id)}/unreact`, { body: { emoji, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData | null;
+    return (data === null ? undefined : new SlackDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -1769,17 +1909,17 @@ export class SlackUser {
     return new SlackDelivery(ctx, data);
   }
 
-  /** Run a message shortcut on a message. Experimental. */
-  async shortcut(callbackId: string, options: { message: SlackMessage }): Promise<SlackDelivery> {
+  /** Run an app's message shortcut on a message: it goes to that app alone. Experimental. */
+  async shortcut(callbackId: string, options: { message: SlackMessage; app?: SlackApp }): Promise<SlackDelivery> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/shortcut`, { body: { callbackId, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/shortcut`, { body: { callbackId, message: { channel: options.message.channel, ts: options.message.ts }, app: options.app === undefined ? undefined : options.app.id } })) as SlackDeliveryData;
     return new SlackDelivery(ctx, data);
   }
 
-  /** Run a slash command in a conversation, e.g. `/deploy web staging`. Experimental. */
-  async runCommand(command: string, options: { channel: SlackConversation }): Promise<SlackDelivery> {
+  /** Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone. Experimental. */
+  async runCommand(command: string, options: { channel: SlackConversation; app?: SlackApp }): Promise<SlackDelivery> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id } })) as SlackDeliveryData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id, app: options.app === undefined ? undefined : options.app.id } })) as SlackDeliveryData;
     return new SlackDelivery(ctx, data);
   }
 
@@ -1790,10 +1930,10 @@ export class SlackUser {
     return new SlackDelivery(ctx, data);
   }
 
-  /** Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at. Experimental. */
-  async openAgentThread(options: { from?: SlackConversation } = {}): Promise<SlackThread> {
+  /** Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at. Experimental. */
+  async openAgentThread(options: { from?: SlackConversation; app?: SlackApp } = {}): Promise<SlackThread> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/agent-threads`, { body: { from: options.from === undefined ? undefined : options.from.id } })) as SlackThreadData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/agent-threads`, { body: { from: options.from === undefined ? undefined : options.from.id, app: options.app === undefined ? undefined : options.app.id } })) as SlackThreadData;
     return new SlackThread(ctx, data);
   }
 
@@ -1862,67 +2002,6 @@ export class SlackUser {
   /** Wait for the next new open modal from the agent, after the last one this handle saw. */
   async waitForModal(options: { title?: string | RegExp } & WaitOptions = {}): Promise<SlackModal> {
     return waitForNext(this.#seen, "waitForModal", () => this.modals(), (item) => textMatches(item.title, options.title) && item.open === true, "an open modal from the agent", options);
-  }
-
-  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
-  [QUIET](): Promise<QuietState> {
-    return quietOf(this.#ctx);
-  }
-}
-
-/** Wire data of a {@link SlackConversation}. */
-export interface SlackConversationData {
-  id: string;
-  kind: "channel" | "private_channel" | "im" | "mpim";
-  name?: string;
-}
-
-export class SlackConversation {
-  readonly id: string;
-  readonly kind: "channel" | "private_channel" | "im" | "mpim";
-  readonly name: string | undefined;
-  readonly #ctx: HandleContext;
-  readonly #seen = new Map<string, number>();
-
-  /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: SlackConversationData) {
-    this.#ctx = ctx;
-    this.id = data.id;
-    this.kind = data.kind;
-    this.name = data.name;
-  }
-
-  /** The newest message of a conversation, replies included. Experimental. */
-  async latestMessage(): Promise<SlackMessage> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/latest`)) as SlackMessageData;
-    return new SlackMessage(ctx, data);
-  }
-
-  /** Top-level messages of a conversation, oldest first. Experimental. */
-  async messages(): Promise<SlackMessages> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/messages`)) as SlackMessagesWire;
-    return decodeSlackMessages(ctx, data);
-  }
-
-  /** The people and apps in a conversation. Experimental. */
-  async members(): Promise<SlackMembers> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/members`)) as SlackMembersWire;
-    return decodeSlackMembers(ctx, data);
-  }
-
-  /** The conversation as a person would read it, threads included. Experimental. */
-  async transcript(options: { as?: SlackUser | SlackApp } = {}): Promise<SlackTranscript> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as SlackTranscriptWire;
-    return decodeSlackTranscript(ctx, data);
-  }
-
-  /** Wait for the next new message matching `from` (anyone if omitted), after the last one this handle saw. */
-  async waitForMessage(options: { from?: SlackUser | SlackApp | string } & WaitOptions = {}): Promise<SlackMessage> {
-    return waitForNext(this.#seen, "waitForMessage", () => this.messages(), (item) => fromMatches(item.author, options.from), describeWait("a message", options.from), options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -2003,11 +2082,79 @@ export class SlackMessage {
     return decodeSlackTranscript(ctx, data);
   }
 
+  /** The first delivery this message caused to this app (decision 0027), or nothing when it wasn't told. Experimental. */
+  async deliveryFor(app: SlackApp): Promise<SlackDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/messages/${segment(this.ts)}/delivery-for`, { query: { app: app.id } })) as SlackDeliveryData | null;
+    return (data === null ? undefined : new SlackDelivery(ctx, data));
+  }
+
   /** Every delivery this message caused to the agent. Experimental. */
   async deliveries(): Promise<SlackMessageDeliveries> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/messages/${segment(this.ts)}/deliveries`)) as SlackMessageDeliveriesWire;
     return decodeSlackMessageDeliveries(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link SlackConversation}. */
+export interface SlackConversationData {
+  id: string;
+  kind: "channel" | "private_channel" | "im" | "mpim";
+  name?: string;
+}
+
+export class SlackConversation {
+  readonly id: string;
+  readonly kind: "channel" | "private_channel" | "im" | "mpim";
+  readonly name: string | undefined;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: SlackConversationData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.kind = data.kind;
+    this.name = data.name;
+  }
+
+  /** The newest message of a conversation, replies included. Experimental. */
+  async latestMessage(): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/latest`)) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** Top-level messages of a conversation, oldest first. Experimental. */
+  async messages(): Promise<SlackMessages> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/messages`)) as SlackMessagesWire;
+    return decodeSlackMessages(ctx, data);
+  }
+
+  /** The people and apps in a conversation. Experimental. */
+  async members(): Promise<SlackMembers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/members`)) as SlackMembersWire;
+    return decodeSlackMembers(ctx, data);
+  }
+
+  /** The conversation as a person would read it, threads included. Experimental. */
+  async transcript(options: { as?: SlackUser | SlackApp } = {}): Promise<SlackTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as SlackTranscriptWire;
+    return decodeSlackTranscript(ctx, data);
+  }
+
+  /** Wait for the next new message matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForMessage(options: { from?: SlackUser | SlackApp | string } & WaitOptions = {}): Promise<SlackMessage> {
+    return waitForNext(this.#seen, "waitForMessage", () => this.messages(), (item) => fromMatches(item.author, options.from), describeWait("a message", options.from), options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -2094,6 +2241,7 @@ export class SlackThread {
 export interface SlackDeliveryData {
   id: string;
   channel: "slack";
+  app: string;
   type: string;
   eventType?: string;
   eventId?: string;
@@ -2105,6 +2253,7 @@ export interface SlackDeliveryData {
 export class SlackDelivery {
   readonly id: string;
   readonly channel: "slack";
+  readonly app: string;
   readonly type: string;
   readonly eventType: string | undefined;
   readonly eventId: string | undefined;
@@ -2118,6 +2267,7 @@ export class SlackDelivery {
     this.#ctx = ctx;
     this.id = data.id;
     this.channel = data.channel;
+    this.app = data.app;
     this.type = data.type;
     this.eventType = data.eventType;
     this.eventId = data.eventId;
@@ -2357,10 +2507,31 @@ export class GitHubFixture {
     return decodeGitHubIssues(ctx, data);
   }
 
-  /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: GitHubRepo } = {}): Promise<GitHubDeliveries> {
+  /** The id of the built-in App's installation, for a repository it is installed on. The same as `github.app.installationId(repo)`. Experimental. */
+  async installationId(repo: GitHubRepo): Promise<number> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as GitHubDeliveriesWire;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/installation-id`, { body: { repo: repo.id } })) as number;
+    return data;
+  }
+
+  /** Make another GitHub App on the org, with its own App id, bot user, installation, private key and webhook secret (decision 0027), or return the one made with this name and settings. It reaches no repository until it is installed on one; its webhooks go to CHANNELSTACK_GITHUB_APP_<NAME>_WEBHOOK_URL. Experimental. */
+  async createApp(options: { name: string; permissions?: Record<string, "read" | "write">; events?: string[] }): Promise<GitHubApp> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps`, { body: { name: options.name, permissions: options.permissions, events: options.events } })) as GitHubAppData;
+    return new GitHubApp(ctx, data);
+  }
+
+  /** The Apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
+  async apps(): Promise<GitHubApps> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/apps`)) as GitHubAppsWire;
+    return decodeGitHubApps(ctx, data);
+  }
+
+  /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
+  async deliveries(options: { type?: string; resource?: GitHubRepo; app?: GitHubApp } = {}): Promise<GitHubDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as GitHubDeliveriesWire;
     return decodeGitHubDeliveries(ctx, data);
   }
 
@@ -2428,11 +2599,163 @@ export class GitHubApp {
     this.webhookSecret = data.webhookSecret;
   }
 
-  /** The id of the App's installation, for a repository it is installed on. Experimental. */
+  /** The id of this App's installation, for a repository it is installed on. Experimental. */
   async installationId(repo: GitHubRepo): Promise<number> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/installation-id`, { body: { repo: repo.id } })) as number;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/installation-id`, { body: { repo: repo.id } })) as number;
     return data;
+  }
+
+  /** Push a commit to a branch (created from the default branch if it isn't there). Sends `push`, and `pull_request` `synchronize` for open pull requests from it. Experimental. */
+  async push(changes: FileInput[] | Record<string, string | null>, options: { repo: GitHubRepo; branch: string; message?: string }): Promise<GitHubCommit> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/push`, { body: { changes: readChanges(changes), repo: options.repo.id, branch: options.branch, message: options.message } })) as GitHubCommitData;
+    return new GitHubCommit(ctx, data);
+  }
+
+  /** Open an issue. Sends `issues` (action `opened`). Experimental. */
+  async openIssue(issue: { title: string; body?: string; labels?: string[]; assignees?: Array<GitHubUser | GitHubApp> }, options: { repo: GitHubRepo }): Promise<GitHubIssue> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/issues`, { body: { issue: { ...issue, assignees: issue.assignees === undefined ? undefined : issue.assignees.map((item) => item.id) }, repo: options.repo.id } })) as GitHubIssueData;
+    return new GitHubIssue(ctx, data);
+  }
+
+  /** Open a pull request. With `changes`, they are pushed to `from` first; without, `from` is an existing branch. Sends `pull_request` (action `opened`). Experimental. */
+  async openPullRequest(pr: { from: string; to?: string; title?: string; body?: string; changes?: FileInput[] | Record<string, string | null>; draft?: boolean; reviewers?: Array<GitHubUser | GitHubApp> }, options: { repo: GitHubRepo }): Promise<GitHubPullRequest> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/pulls`, { body: { pr: { ...pr, changes: pr.changes === undefined ? undefined : readChanges(pr.changes), reviewers: pr.reviewers === undefined ? undefined : pr.reviewers.map((item) => item.id) }, repo: options.repo.id } })) as GitHubPullRequestData;
+    return new GitHubPullRequest(ctx, data);
+  }
+
+  /** Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`). Experimental. */
+  async editIssue(changes: { title?: string; body?: string }, options: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/edit-issue`, { body: { changes, issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`). Experimental. */
+  async close(options: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/close`, { body: { issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`). Experimental. */
+  async reopen(options: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/reopen`, { body: { issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Put labels on an issue or a pull request. Sends one `labeled` event per label. Experimental. */
+  async label(labels: string | string[], options: { issue: GitHubIssue }): Promise<GitHubLabelDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/label`, { body: { labels: [labels].flat(), issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubLabelDeliveriesWire;
+    return decodeGitHubLabelDeliveries(ctx, data);
+  }
+
+  /** Take labels off an issue or a pull request. Sends one `unlabeled` event per label. Experimental. */
+  async unlabel(labels: string | string[], options: { issue: GitHubIssue }): Promise<GitHubUnlabelDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/unlabel`, { body: { labels: [labels].flat(), issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubUnlabelDeliveriesWire;
+    return decodeGitHubUnlabelDeliveries(ctx, data);
+  }
+
+  /** Assign people or the App's bot. Sends one `assigned` event per assignee. Experimental. */
+  async assign(assignees: GitHubUser | GitHubApp | Array<GitHubUser | GitHubApp>, options: { issue: GitHubIssue }): Promise<GitHubAssignDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/assign`, { body: { assignees: [assignees].flat().map((item) => item.id), issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubAssignDeliveriesWire;
+    return decodeGitHubAssignDeliveries(ctx, data);
+  }
+
+  /** Comment on an issue or a pull request's conversation. Sends `issue_comment` (action `created`). Experimental. */
+  async comment(body: string, options: { issue: GitHubIssue }): Promise<GitHubComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/comment`, { body: { body, issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubCommentData;
+    return new GitHubComment(ctx, data);
+  }
+
+  /** Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`. Experimental. */
+  async edit(body: string, options: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/edit`, { body: { body, comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`. Experimental. */
+  async delete(options: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/delete`, { body: { comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction. Experimental. */
+  async react(content: "+1" | "-1" | "laugh" | "confused" | "heart" | "hooray" | "rocket" | "eyes", options: { issue?: GitHubIssue; comment?: GitHubComment | GitHubReviewComment } = {}): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/react`, { body: { content, issue: options.issue === undefined ? undefined : { repoId: options.issue.repoId, number: options.issue.number }, comment: options.comment === undefined ? undefined : options.comment.id } });
+  }
+
+  /** Hide a comment as outdated, spam, off-topic or resolved. GitHub sends no webhook for it. Experimental. */
+  async minimize(options: { comment: GitHubComment; reason?: "OUTDATED" | "SPAM" | "OFF_TOPIC" | "RESOLVED" }): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/minimize`, { body: { comment: options.comment.id, reason: options.reason } });
+  }
+
+  /** Submit a review, with comments on the diff if any. Sends `pull_request_review`, and one `pull_request_review_comment` per comment. Experimental. */
+  async review(review: { pr: GitHubPullRequest; event: "COMMENT" | "APPROVE" | "REQUEST_CHANGES"; body?: string; comments?: Array<{ path: string; line: number; side?: "LEFT" | "RIGHT"; startLine?: number; body: string }> }): Promise<GitHubReview> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/review`, { body: { review: { ...review, pr: { repoId: review.pr.repoId, number: review.pr.number } } } })) as GitHubReviewWire;
+    return decodeGitHubReview(ctx, data);
+  }
+
+  /** One comment on the diff, outside a review. Sends `pull_request_review_comment`. Experimental. */
+  async reviewComment(body: string, options: { pr: GitHubPullRequest; path: string; line: number; side?: "LEFT" | "RIGHT" }): Promise<GitHubReviewComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/review-comment`, { body: { body, pr: { repoId: options.pr.repoId, number: options.pr.number }, path: options.path, line: options.line, side: options.side } })) as GitHubReviewCommentData;
+    return new GitHubReviewComment(ctx, data);
+  }
+
+  /** Reply in a thread on the diff. Sends `pull_request_review_comment`. Experimental. */
+  async reply(body: string, options: { comment: GitHubReviewComment }): Promise<GitHubReviewComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/reply`, { body: { body, comment: options.comment.id } })) as GitHubReviewCommentData;
+    return new GitHubReviewComment(ctx, data);
+  }
+
+  /** Resolve a thread on the diff. Sends `pull_request_review_thread`. Experimental. */
+  async resolve(options: { comment: GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/resolve`, { body: { comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Reopen a thread on the diff. Sends `pull_request_review_thread`. Experimental. */
+  async unresolve(options: { comment: GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/unresolve`, { body: { comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer. Experimental. */
+  async requestReview(reviewers: GitHubUser | GitHubApp | Array<GitHubUser | GitHubApp>, options: { pr: GitHubPullRequest }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/request-review`, { body: { reviewers: [reviewers].flat().map((item) => item.id), pr: { repoId: options.pr.repoId, number: options.pr.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`). Experimental. */
+  async markReady(options: { pr: GitHubPullRequest }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/mark-ready`, { body: { pr: { repoId: options.pr.repoId, number: options.pr.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged). Experimental. */
+  async merge(options: { pr: GitHubPullRequest; method?: "merge" | "squash" | "rebase" }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/merge`, { body: { pr: { repoId: options.pr.repoId, number: options.pr.number }, method: options.method } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -2679,14 +3002,14 @@ export class GitHubRepo {
     this.private = data.private;
   }
 
-  /** Install the App on this repository. Sends `installation_repositories`. Experimental. */
+  /** Install an App on this repository. Sends that App `installation_repositories`. Experimental. */
   async installApp(app: GitHubApp): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/repos/${segment(this.id)}/install`, { body: { app: app.id } })) as GitHubDeliveryData | null;
     return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
-  /** Take the App off this repository. Sends `installation_repositories`. Experimental. */
+  /** Take an App off this repository. Sends that App `installation_repositories`. Experimental. */
   async uninstallApp(app: GitHubApp): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/repos/${segment(this.id)}/uninstall`, { body: { app: app.id } })) as GitHubDeliveryData | null;
@@ -2826,6 +3149,7 @@ export class GitHubIssue {
 export interface GitHubDeliveryData {
   id: string;
   channel: "github";
+  app: string;
   type: string;
   action?: string;
   guid: string;
@@ -2837,6 +3161,7 @@ export interface GitHubDeliveryData {
 export class GitHubDelivery {
   readonly id: string;
   readonly channel: "github";
+  readonly app: string;
   readonly type: string;
   readonly action: string | undefined;
   readonly guid: string;
@@ -2850,6 +3175,7 @@ export class GitHubDelivery {
     this.#ctx = ctx;
     this.id = data.id;
     this.channel = data.channel;
+    this.app = data.app;
     this.type = data.type;
     this.action = data.action;
     this.guid = data.guid;
@@ -3038,6 +3364,13 @@ export class GitHubComment {
     return decodeGitHubReactions(ctx, data);
   }
 
+  /** The `issue_comment` (`created`) delivery this comment caused to this App (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in App's. Experimental. */
+  async deliveryFor(app: GitHubApp): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/comments/${segment(this.id)}/delivery-for`, { query: { app: app.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
   [QUIET](): Promise<QuietState> {
     return quietOf(this.#ctx);
@@ -3141,6 +3474,20 @@ export class LinearFixture {
     return decodeLinearUsers(ctx, data);
   }
 
+  /** Make another OAuth app in the workspace, installed with `actor=app`: its own app user (mentionable and assignable), access token, client and webhook secret. Or return the one made with this name and settings. Its webhooks go to CHANNELSTACK_LINEAR_APP_<NAME>_WEBHOOK_URL. Experimental. */
+  async createApp(options: { name: string; events?: string[] }): Promise<LinearApp> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/apps`, { body: { name: options.name, events: options.events } })) as LinearAppData;
+    return new LinearApp(ctx, data);
+  }
+
+  /** The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
+  async apps(): Promise<LinearApps> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/apps`)) as LinearAppsWire;
+    return decodeLinearApps(ctx, data);
+  }
+
   /** The teams this session created. Experimental. */
   async teams(): Promise<LinearTeams> {
     const ctx = this.#ctx;
@@ -3163,9 +3510,9 @@ export class LinearFixture {
   }
 
   /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: LinearIssue } = {}): Promise<LinearDeliveries> {
+  async deliveries(options: { type?: string; resource?: LinearIssue; app?: LinearApp } = {}): Promise<LinearDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as LinearDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as LinearDeliveriesWire;
     return decodeLinearDeliveries(ctx, data);
   }
 
@@ -3221,6 +3568,20 @@ export class LinearApp {
     this.webhookSecret = data.webhookSecret;
     this.clientId = data.clientId;
     this.clientSecret = data.clientSecret;
+  }
+
+  /** An app a test made comments on an issue, as its own `commentCreate` would. Its mention of another app is refused (to confirm, B6). Experimental. */
+  async comment(body: string, options: { issue: LinearIssue }): Promise<LinearComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/apps/${segment(this.id)}/comment`, { body: { body, issue: options.issue.id } })) as LinearCommentData;
+    return new LinearComment(ctx, data);
+  }
+
+  /** An app a test made replies in a comment's thread, as its own `commentCreate` with a `parentId` would. Experimental. */
+  async reply(body: string, options: { comment: LinearComment }): Promise<LinearComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/apps/${segment(this.id)}/reply`, { body: { body, comment: options.comment.id } })) as LinearCommentData;
+    return new LinearComment(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -3304,7 +3665,7 @@ export class LinearUser {
     return (data === null ? undefined : new LinearDelivery(ctx, data));
   }
 
-  /** Delegate an issue to the app. Opens an agent session and sends `AgentSessionEvent` (`created`). Experimental. */
+  /** Delegate an issue to an app. Opens that app's agent session and sends it `AgentSessionEvent` (`created`); an issue delegated to another app moves. Experimental. */
   async delegate(app: LinearApp, options: { issue: LinearIssue }): Promise<LinearAgentSession> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/delegate`, { body: { app: app.id, issue: options.issue.id } })) as LinearAgentSessionData;
@@ -3372,32 +3733,62 @@ export class LinearUser {
   }
 }
 
-/** Wire data of a {@link LinearTeam}. */
-export interface LinearTeamData {
+/** Wire data of a {@link LinearComment}. */
+export interface LinearCommentData {
   id: string;
-  key: string;
-  name: string;
+  issue: LinearIssueData;
+  author: LinearUserData | LinearAppData;
+  body: string;
+  createdAt: string;
+  url: string;
+  session?: LinearAgentSessionData;
+  delivery?: LinearDeliveryData;
 }
 
-export class LinearTeam {
+export class LinearComment {
   readonly id: string;
-  readonly key: string;
-  readonly name: string;
+  readonly issue: LinearIssue;
+  readonly author: LinearUser | LinearApp;
+  readonly body: string;
+  readonly createdAt: string;
+  readonly url: string;
+  readonly session: LinearAgentSession | undefined;
+  readonly delivery: LinearDelivery | undefined;
   readonly #ctx: HandleContext;
 
   /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: LinearTeamData) {
+  constructor(ctx: HandleContext, data: LinearCommentData) {
     this.#ctx = ctx;
     this.id = data.id;
-    this.key = data.key;
-    this.name = data.name;
+    this.issue = new LinearIssue(ctx, data.issue);
+    this.author = data.author.kind === "user" ? new LinearUser(ctx, data.author) : new LinearApp(ctx, data.author);
+    this.body = data.body;
+    this.createdAt = data.createdAt;
+    this.url = data.url;
+    this.session = data.session === undefined ? undefined : new LinearAgentSession(ctx, data.session);
+    this.delivery = data.delivery === undefined ? undefined : new LinearDelivery(ctx, data.delivery);
   }
 
-  /** An issue of this team by its identifier (`ENG-12`). Experimental. */
-  async issue(identifier: string): Promise<LinearIssue> {
+  /** The replies in a comment's thread, once the agent is quiet. Experimental. */
+  async replies(): Promise<LinearCommentReplies> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/teams/${segment(this.id)}/issue`, { query: { identifier } })) as LinearIssueData;
-    return new LinearIssue(ctx, data);
+    await untilQuiet(() => quietOf(ctx));
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/comments/${segment(this.id)}/replies`)) as LinearCommentRepliesWire;
+    return decodeLinearCommentReplies(ctx, data);
+  }
+
+  /** The `Comment` (`create`) delivery this comment caused to this app (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in app's. Experimental. */
+  async deliveryFor(app: LinearApp): Promise<LinearDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/comments/${segment(this.id)}/delivery-for`, { query: { app: app.id } })) as LinearDeliveryData | null;
+    return (data === null ? undefined : new LinearDelivery(ctx, data));
+  }
+
+  /** A comment's thread as a person reads it. Experimental. */
+  async transcript(): Promise<LinearTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/comments/${segment(this.id)}/transcript`)) as LinearTranscriptWire;
+    return decodeLinearTranscript(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -3520,69 +3911,32 @@ export class LinearIssue {
   }
 }
 
-/** Wire data of a {@link LinearDelivery}. */
-export interface LinearDeliveryData {
+/** Wire data of a {@link LinearTeam}. */
+export interface LinearTeamData {
   id: string;
-  channel: "linear";
-  type: string;
-  action: string;
-  webhookId: string;
-  payload?: unknown;
-  attempts: DeliveryAttempt[];
-  status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+  key: string;
+  name: string;
 }
 
-export class LinearDelivery {
+export class LinearTeam {
   readonly id: string;
-  readonly channel: "linear";
-  readonly type: string;
-  readonly action: string;
-  readonly webhookId: string;
-  readonly payload: unknown | undefined;
-  readonly attempts: DeliveryAttempt[];
-  readonly status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+  readonly key: string;
+  readonly name: string;
   readonly #ctx: HandleContext;
 
   /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: LinearDeliveryData) {
+  constructor(ctx: HandleContext, data: LinearTeamData) {
     this.#ctx = ctx;
     this.id = data.id;
-    this.channel = data.channel;
-    this.type = data.type;
-    this.action = data.action;
-    this.webhookId = data.webhookId;
-    this.payload = data.payload;
-    this.attempts = data.attempts;
-    this.status = data.status;
+    this.key = data.key;
+    this.name = data.name;
   }
 
-  /** Re-read a delivery: its attempts and status. Experimental. */
-  async refresh(): Promise<LinearDelivery> {
+  /** An issue of this team by its identifier (`ENG-12`). Experimental. */
+  async issue(identifier: string): Promise<LinearIssue> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries/${segment(this.id)}`)) as LinearDeliveryData;
-    return new LinearDelivery(ctx, data);
-  }
-
-  /** Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental. */
-  async redeliver(): Promise<DeliveryAttempt> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries/${segment(this.id)}/redeliver`)) as DeliveryAttempt;
-    return data;
-  }
-
-  /** Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental. */
-  async resend(options: { badSignature?: boolean; stale?: boolean } = {}): Promise<DeliveryAttempt> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature, stale: options.stale } })) as DeliveryAttempt;
-    return data;
-  }
-
-  /** Wait for the delivery to settle, and resolve with the value as it is then. */
-  async settled(options: WaitOptions = {}): Promise<LinearDelivery> {
-    return waitFor("the delivery to settle", async () => {
-      const value = await this.refresh();
-      return value.status === "pending" ? undefined : value;
-    }, options);
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/teams/${segment(this.id)}/issue`, { query: { identifier } })) as LinearIssueData;
+    return new LinearIssue(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -3674,55 +4028,72 @@ export class LinearAgentSession {
   }
 }
 
-/** Wire data of a {@link LinearComment}. */
-export interface LinearCommentData {
+/** Wire data of a {@link LinearDelivery}. */
+export interface LinearDeliveryData {
   id: string;
-  issue: LinearIssueData;
-  author: LinearUserData | LinearAppData;
-  body: string;
-  createdAt: string;
-  url: string;
-  session?: LinearAgentSessionData;
-  delivery?: LinearDeliveryData;
+  channel: "linear";
+  app: string;
+  type: string;
+  action: string;
+  webhookId: string;
+  payload?: unknown;
+  attempts: DeliveryAttempt[];
+  status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
 }
 
-export class LinearComment {
+export class LinearDelivery {
   readonly id: string;
-  readonly issue: LinearIssue;
-  readonly author: LinearUser | LinearApp;
-  readonly body: string;
-  readonly createdAt: string;
-  readonly url: string;
-  readonly session: LinearAgentSession | undefined;
-  readonly delivery: LinearDelivery | undefined;
+  readonly channel: "linear";
+  readonly app: string;
+  readonly type: string;
+  readonly action: string;
+  readonly webhookId: string;
+  readonly payload: unknown | undefined;
+  readonly attempts: DeliveryAttempt[];
+  readonly status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
   readonly #ctx: HandleContext;
 
   /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: LinearCommentData) {
+  constructor(ctx: HandleContext, data: LinearDeliveryData) {
     this.#ctx = ctx;
     this.id = data.id;
-    this.issue = new LinearIssue(ctx, data.issue);
-    this.author = data.author.kind === "user" ? new LinearUser(ctx, data.author) : new LinearApp(ctx, data.author);
-    this.body = data.body;
-    this.createdAt = data.createdAt;
-    this.url = data.url;
-    this.session = data.session === undefined ? undefined : new LinearAgentSession(ctx, data.session);
-    this.delivery = data.delivery === undefined ? undefined : new LinearDelivery(ctx, data.delivery);
+    this.channel = data.channel;
+    this.app = data.app;
+    this.type = data.type;
+    this.action = data.action;
+    this.webhookId = data.webhookId;
+    this.payload = data.payload;
+    this.attempts = data.attempts;
+    this.status = data.status;
   }
 
-  /** The replies in a comment's thread, once the agent is quiet. Experimental. */
-  async replies(): Promise<LinearCommentReplies> {
+  /** Re-read a delivery: its attempts and status. Experimental. */
+  async refresh(): Promise<LinearDelivery> {
     const ctx = this.#ctx;
-    await untilQuiet(() => quietOf(ctx));
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/comments/${segment(this.id)}/replies`)) as LinearCommentRepliesWire;
-    return decodeLinearCommentReplies(ctx, data);
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries/${segment(this.id)}`)) as LinearDeliveryData;
+    return new LinearDelivery(ctx, data);
   }
 
-  /** A comment's thread as a person reads it. Experimental. */
-  async transcript(): Promise<LinearTranscript> {
+  /** Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental. */
+  async redeliver(): Promise<DeliveryAttempt> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/comments/${segment(this.id)}/transcript`)) as LinearTranscriptWire;
-    return decodeLinearTranscript(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries/${segment(this.id)}/redeliver`)) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental. */
+  async resend(options: { badSignature?: boolean; stale?: boolean } = {}): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature, stale: options.stale } })) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Wait for the delivery to settle, and resolve with the value as it is then. */
+  async settled(options: WaitOptions = {}): Promise<LinearDelivery> {
+    return waitFor("the delivery to settle", async () => {
+      const value = await this.refresh();
+      return value.status === "pending" ? undefined : value;
+    }, options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -3806,6 +4177,20 @@ export class NotionFixture {
     return decodeNotionUsers(ctx, data);
   }
 
+  /** Make another internal integration in the workspace, with its own bot user, token and webhook subscription (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_NOTION_APP_<NAME>_WEBHOOK_URL, and it sees only the pages connected to it. Experimental. */
+  async createApp(options: { name: string; capabilities?: NotionCapability[]; events?: string[] }): Promise<NotionIntegration> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/apps`, { body: { name: options.name, capabilities: options.capabilities, events: options.events } })) as NotionIntegrationData;
+    return new NotionIntegration(ctx, data);
+  }
+
+  /** The integrations this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
+  async apps(): Promise<NotionIntegrations> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/apps`)) as NotionIntegrationsWire;
+    return decodeNotionIntegrations(ctx, data);
+  }
+
   /** The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash. Experimental. */
   async pages(): Promise<NotionPages> {
     const ctx = this.#ctx;
@@ -3833,17 +4218,17 @@ export class NotionFixture {
     await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/content-delay`, { body: { delay: parseDuration(delay) } });
   }
 
-  /** Send the subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created. Experimental. */
-  async sendVerification(): Promise<NotionDelivery | undefined> {
+  /** Send a subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created: the built-in integration's, or the one given's. Experimental. */
+  async sendVerification(options: { app?: NotionIntegration } = {}): Promise<NotionDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/verification`)) as NotionDeliveryData | null;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/verification`, { body: { app: options.app === undefined ? undefined : options.app.id } })) as NotionDeliveryData | null;
     return (data === null ? undefined : new NotionDelivery(ctx, data));
   }
 
   /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: NotionPage } = {}): Promise<NotionDeliveries> {
+  async deliveries(options: { type?: string; resource?: NotionPage; app?: NotionIntegration } = {}): Promise<NotionDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as NotionDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as NotionDeliveriesWire;
     return decodeNotionDeliveries(ctx, data);
   }
 
@@ -3896,6 +4281,34 @@ export class NotionIntegration {
     this.botUserId = data.botUserId;
     this.token = data.token;
     this.webhookSecret = data.webhookSecret;
+  }
+
+  /** An integration a test made starts a discussion on a page, or anchored to the block with `anchor` in its text, as its own `comments.create` would: on a page connected to it, mentioning people only. Sends `comment.created` to every integration that sees the page. Experimental. */
+  async comment(text: string, options: { page: NotionPage; anchor?: string | RegExp }): Promise<NotionComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/apps/${segment(this.id)}/comment`, { body: { text, page: options.page.id, anchor: options.anchor === undefined ? undefined : patternOnWire(options.anchor) } })) as NotionCommentData;
+    return new NotionComment(ctx, data);
+  }
+
+  /** An integration a test made replies in a discussion, as `comments.create` with `discussion_id` would. Sends `comment.created`. Experimental. */
+  async reply(text: string, options: { discussion: NotionDiscussion }): Promise<NotionComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/apps/${segment(this.id)}/reply`, { body: { text, discussion: options.discussion.id } })) as NotionCommentData;
+    return new NotionComment(ctx, data);
+  }
+
+  /** An integration a test made edits a page's body, as its own block calls would: append, or replace it. Sends one `page.content_updated` once Notion's batching delay is over. Experimental. */
+  async edit(change: { append?: string | { path: string } | unknown[]; replace?: string | { path: string } | unknown[] }, options: { page: NotionPage }): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/apps/${segment(this.id)}/edit`, { body: { change: { ...change, append: change.append === undefined ? undefined : readDocument(change.append), replace: change.replace === undefined ? undefined : readDocument(change.replace) }, page: options.page.id } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
+  }
+
+  /** An integration a test made changes a page's title, as its own `pages.update` would. Sends `page.properties_updated`. Experimental. */
+  async rename(title: string, options: { page: NotionPage }): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/apps/${segment(this.id)}/rename`, { body: { title, page: options.page.id } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -4033,6 +4446,108 @@ export class NotionUser {
   }
 }
 
+/** Wire data of a {@link NotionComment}. */
+export interface NotionCommentData {
+  id: string;
+  discussion: NotionDiscussionData;
+  author: NotionUserData | NotionIntegrationData;
+  text: string;
+  createdAt: string;
+  delivery?: NotionDeliveryData;
+}
+
+export class NotionComment {
+  readonly id: string;
+  readonly discussion: NotionDiscussion;
+  readonly author: NotionUser | NotionIntegration;
+  readonly text: string;
+  readonly createdAt: string;
+  readonly delivery: NotionDelivery | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: NotionCommentData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.discussion = new NotionDiscussion(ctx, data.discussion);
+    this.author = data.author.kind === "user" ? new NotionUser(ctx, data.author) : new NotionIntegration(ctx, data.author);
+    this.text = data.text;
+    this.createdAt = data.createdAt;
+    this.delivery = data.delivery === undefined ? undefined : new NotionDelivery(ctx, data.delivery);
+  }
+
+  /** The `comment.created` delivery this comment caused to this integration (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in integration's. Experimental. */
+  async deliveryFor(app: NotionIntegration): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/comments/${segment(this.id)}/delivery-for`, { query: { app: app.id } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link NotionDiscussion}. */
+export interface NotionDiscussionData {
+  id: string;
+  page: NotionPageData;
+  anchor?: string;
+}
+
+export class NotionDiscussion {
+  readonly id: string;
+  readonly page: NotionPage;
+  readonly anchor: string | undefined;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: NotionDiscussionData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.page = new NotionPage(ctx, data.page);
+    this.anchor = data.anchor;
+  }
+
+  /** The discussion's comments, oldest first. Experimental. */
+  async comments(): Promise<NotionComments> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/discussions/${segment(this.id)}/comments`)) as NotionCommentsWire;
+    return decodeNotionComments(ctx, data);
+  }
+
+  /** Whether the discussion is resolved. Experimental. */
+  async resolved(): Promise<boolean> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/discussions/${segment(this.id)}/resolved`)) as boolean;
+    return data;
+  }
+
+  /** The discussion as a person reads it. Experimental. */
+  async transcript(): Promise<NotionTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/discussions/${segment(this.id)}/transcript`)) as NotionTranscriptWire;
+    return decodeNotionTranscript(ctx, data);
+  }
+
+  /** Wait for the next new comment matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForComment(options: { from?: NotionUser | NotionIntegration | string } & WaitOptions = {}): Promise<NotionComment> {
+    return waitForNext(this.#seen, "waitForComment", () => this.comments(), (item) => fromMatches(item.author, options.from), describeWait("a comment", options.from), options);
+  }
+
+  /** The latest comment matching `from`, once the agent is quiet. Waits for at least one. */
+  async latestComment(options: { from?: NotionUser | NotionIntegration | string } & QuietOptions = {}): Promise<NotionComment> {
+    return latestOnceQuiet(() => this.comments(), (item) => fromMatches(item.author, options.from), () => quietOf(this.#ctx), describeWait("a comment", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
 /** Wire data of a {@link NotionPage}. */
 export interface NotionPageData {
   id: string;
@@ -4113,47 +4628,11 @@ export class NotionPage {
   }
 }
 
-/** Wire data of a {@link NotionDatabase}. */
-export interface NotionDatabaseData {
-  id: string;
-  channel: "notion";
-  title: string;
-  url: string;
-}
-
-export class NotionDatabase {
-  readonly id: string;
-  readonly channel: "notion";
-  readonly title: string;
-  readonly url: string;
-  readonly #ctx: HandleContext;
-
-  /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: NotionDatabaseData) {
-    this.#ctx = ctx;
-    this.id = data.id;
-    this.channel = data.channel;
-    this.title = data.title;
-    this.url = data.url;
-  }
-
-  /** The rows of a database, optionally only those whose properties have these values. Experimental. */
-  async rows(filter?: Record<string, NotionPropertyValue>): Promise<NotionRows> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/databases/${segment(this.id)}/rows`, { body: { filter } })) as NotionRowsWire;
-    return decodeNotionRows(ctx, data);
-  }
-
-  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
-  [QUIET](): Promise<QuietState> {
-    return quietOf(this.#ctx);
-  }
-}
-
 /** Wire data of a {@link NotionDelivery}. */
 export interface NotionDeliveryData {
   id: string;
   channel: "notion";
+  app: string;
   type: string;
   entity: { type: string; id: string };
   payload?: unknown;
@@ -4164,6 +4643,7 @@ export interface NotionDeliveryData {
 export class NotionDelivery {
   readonly id: string;
   readonly channel: "notion";
+  readonly app: string;
   readonly type: string;
   readonly entity: { type: string; id: string };
   readonly payload: unknown | undefined;
@@ -4176,6 +4656,7 @@ export class NotionDelivery {
     this.#ctx = ctx;
     this.id = data.id;
     this.channel = data.channel;
+    this.app = data.app;
     this.type = data.type;
     this.entity = data.entity;
     this.payload = data.payload;
@@ -4218,93 +4699,35 @@ export class NotionDelivery {
   }
 }
 
-/** Wire data of a {@link NotionComment}. */
-export interface NotionCommentData {
+/** Wire data of a {@link NotionDatabase}. */
+export interface NotionDatabaseData {
   id: string;
-  discussion: NotionDiscussionData;
-  author: NotionUserData | NotionIntegrationData;
-  text: string;
-  createdAt: string;
-  delivery?: NotionDeliveryData;
+  channel: "notion";
+  title: string;
+  url: string;
 }
 
-export class NotionComment {
+export class NotionDatabase {
   readonly id: string;
-  readonly discussion: NotionDiscussion;
-  readonly author: NotionUser | NotionIntegration;
-  readonly text: string;
-  readonly createdAt: string;
-  readonly delivery: NotionDelivery | undefined;
+  readonly channel: "notion";
+  readonly title: string;
+  readonly url: string;
   readonly #ctx: HandleContext;
 
   /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: NotionCommentData) {
+  constructor(ctx: HandleContext, data: NotionDatabaseData) {
     this.#ctx = ctx;
     this.id = data.id;
-    this.discussion = new NotionDiscussion(ctx, data.discussion);
-    this.author = data.author.kind === "user" ? new NotionUser(ctx, data.author) : new NotionIntegration(ctx, data.author);
-    this.text = data.text;
-    this.createdAt = data.createdAt;
-    this.delivery = data.delivery === undefined ? undefined : new NotionDelivery(ctx, data.delivery);
+    this.channel = data.channel;
+    this.title = data.title;
+    this.url = data.url;
   }
 
-  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
-  [QUIET](): Promise<QuietState> {
-    return quietOf(this.#ctx);
-  }
-}
-
-/** Wire data of a {@link NotionDiscussion}. */
-export interface NotionDiscussionData {
-  id: string;
-  page: NotionPageData;
-  anchor?: string;
-}
-
-export class NotionDiscussion {
-  readonly id: string;
-  readonly page: NotionPage;
-  readonly anchor: string | undefined;
-  readonly #ctx: HandleContext;
-  readonly #seen = new Map<string, number>();
-
-  /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: NotionDiscussionData) {
-    this.#ctx = ctx;
-    this.id = data.id;
-    this.page = new NotionPage(ctx, data.page);
-    this.anchor = data.anchor;
-  }
-
-  /** The discussion's comments, oldest first. Experimental. */
-  async comments(): Promise<NotionComments> {
+  /** The rows of a database, optionally only those whose properties have these values. Experimental. */
+  async rows(filter?: Record<string, NotionPropertyValue>): Promise<NotionRows> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/discussions/${segment(this.id)}/comments`)) as NotionCommentsWire;
-    return decodeNotionComments(ctx, data);
-  }
-
-  /** Whether the discussion is resolved. Experimental. */
-  async resolved(): Promise<boolean> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/discussions/${segment(this.id)}/resolved`)) as boolean;
-    return data;
-  }
-
-  /** The discussion as a person reads it. Experimental. */
-  async transcript(): Promise<NotionTranscript> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/discussions/${segment(this.id)}/transcript`)) as NotionTranscriptWire;
-    return decodeNotionTranscript(ctx, data);
-  }
-
-  /** Wait for the next new comment matching `from` (anyone if omitted), after the last one this handle saw. */
-  async waitForComment(options: { from?: NotionUser | NotionIntegration | string } & WaitOptions = {}): Promise<NotionComment> {
-    return waitForNext(this.#seen, "waitForComment", () => this.comments(), (item) => fromMatches(item.author, options.from), describeWait("a comment", options.from), options);
-  }
-
-  /** The latest comment matching `from`, once the agent is quiet. Waits for at least one. */
-  async latestComment(options: { from?: NotionUser | NotionIntegration | string } & QuietOptions = {}): Promise<NotionComment> {
-    return latestOnceQuiet(() => this.comments(), (item) => fromMatches(item.author, options.from), () => quietOf(this.#ctx), describeWait("a comment", options.from), options);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/databases/${segment(this.id)}/rows`, { body: { filter } })) as NotionRowsWire;
+    return decodeNotionRows(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -4332,6 +4755,20 @@ export class ResendFixture {
     this.apiUrl = data.apiUrl;
   }
 
+  /** Make another app: a team of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_RESEND_APP_<NAME>_WEBHOOK_URL. Experimental. */
+  async createApp(options: { name: string; domain?: string }): Promise<ResendApp> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/apps`, { body: { name: options.name, domain: options.domain } })) as ResendAppData;
+    return new ResendApp(ctx, data);
+  }
+
+  /** The teams this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
+  async apps(): Promise<ResendApps> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/apps`)) as ResendAppsWire;
+    return decodeResendApps(ctx, data);
+  }
+
   /** Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental. */
   async createUser(options: { name: string; address?: string; token?: string }): Promise<ResendUser> {
     const ctx = this.#ctx;
@@ -4354,9 +4791,9 @@ export class ResendFixture {
   }
 
   /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: ResendThread } = {}): Promise<ResendDeliveries> {
+  async deliveries(options: { type?: string; resource?: ResendThread; app?: ResendApp } = {}): Promise<ResendDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as ResendDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as ResendDeliveriesWire;
     return decodeResendDeliveries(ctx, data);
   }
 
@@ -4386,6 +4823,9 @@ export interface ResendAppData {
   name: string;
   botUserId: string;
   address: string;
+  domain: string;
+  apiKey: string;
+  webhookSecret: string;
 }
 
 export class ResendApp {
@@ -4395,6 +4835,9 @@ export class ResendApp {
   readonly name: string;
   readonly botUserId: string;
   readonly address: string;
+  readonly domain: string;
+  readonly apiKey: string;
+  readonly webhookSecret: string;
   readonly #ctx: HandleContext;
 
   /** @internal Handles come from the SDK, never from `new`. */
@@ -4406,6 +4849,23 @@ export class ResendApp {
     this.name = data.name;
     this.botUserId = data.botUserId;
     this.address = data.address;
+    this.domain = data.domain;
+    this.apiKey = data.apiKey;
+    this.webhookSecret = data.webhookSecret;
+  }
+
+  /** An app a test made sends an email, through its own team's API, as its own call would. Experimental. */
+  async send(options: { to: Array<ResendUser | ResendApp>; cc?: Array<ResendUser | ResendApp>; subject: string; text?: string; html?: string; headers?: Record<string, string> }): Promise<ResendEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/apps/${segment(this.id)}/send`, { body: { to: options.to.map((item) => item.id), cc: options.cc === undefined ? undefined : options.cc.map((item) => item.id), subject: options.subject, text: options.text, html: options.html, headers: options.headers } })) as ResendEmailData;
+    return new ResendEmail(ctx, data);
+  }
+
+  /** An app a test made replies to an email, in its thread, as its own call would. Experimental. */
+  async reply(email: ResendEmail, options: { text?: string; html?: string; all?: boolean; headers?: Record<string, string> } = {}): Promise<ResendEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/apps/${segment(this.id)}/reply`, { body: { email: email.id, text: options.text, html: options.html, all: options.all, headers: options.headers } })) as ResendEmailData;
+    return new ResendEmail(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -4414,58 +4874,69 @@ export class ResendApp {
   }
 }
 
-/** Wire data of a {@link ResendUser}. */
-export interface ResendUserData {
+/** Wire data of a {@link ResendEmail}. */
+export interface ResendEmailData {
   id: string;
   channel: "resend";
-  kind: "user";
-  name: string;
-  address: string;
+  thread: ResendThreadData;
+  author: ResendPrincipal;
+  from: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  text: string;
+  at: string;
+  messageId: string;
+  headers: Record<string, string>;
+  delivery?: ResendDeliveryData;
 }
 
-export class ResendUser {
+export class ResendEmail {
   readonly id: string;
   readonly channel: "resend";
-  readonly kind: "user";
-  readonly name: string;
-  readonly address: string;
+  readonly thread: ResendThread;
+  readonly author: ResendPrincipal;
+  readonly from: string;
+  readonly to: string[];
+  readonly cc: string[];
+  readonly subject: string;
+  readonly text: string;
+  readonly at: string;
+  readonly messageId: string;
+  readonly headers: Record<string, string>;
+  readonly delivery: ResendDelivery | undefined;
   readonly #ctx: HandleContext;
-  readonly #seen = new Map<string, number>();
 
   /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: ResendUserData) {
+  constructor(ctx: HandleContext, data: ResendEmailData) {
     this.#ctx = ctx;
     this.id = data.id;
     this.channel = data.channel;
-    this.kind = data.kind;
-    this.name = data.name;
-    this.address = data.address;
+    this.thread = new ResendThread(ctx, data.thread);
+    this.author = data.author;
+    this.from = data.from;
+    this.to = data.to;
+    this.cc = data.cc;
+    this.subject = data.subject;
+    this.text = data.text;
+    this.at = data.at;
+    this.messageId = data.messageId;
+    this.headers = data.headers;
+    this.delivery = data.delivery === undefined ? undefined : new ResendDelivery(ctx, data.delivery);
   }
 
-  /** The person emails someone: the agent (`resend.app`), or another person. Experimental. */
-  async send(options: { to: Array<ResendUser | ResendApp>; cc?: Array<ResendUser | ResendApp>; subject: string; text?: string; html?: string }): Promise<ResendEmail> {
+  /** Re-read an email. Experimental. */
+  async refresh(): Promise<ResendEmail> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/users/${segment(this.id)}/send`, { body: { to: options.to.map((item) => item.id), cc: options.cc === undefined ? undefined : options.cc.map((item) => item.id), subject: options.subject, text: options.text, html: options.html } })) as ResendEmailData;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/emails/${segment(this.id)}`)) as ResendEmailData;
     return new ResendEmail(ctx, data);
   }
 
-  /** The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental. */
-  async reply(email: ResendEmail, options: { text?: string; html?: string; all?: boolean } = {}): Promise<ResendEmail> {
+  /** The delivery that told this app of the email (decision 0027), or nothing when it wasn't told. Experimental. */
+  async deliveryFor(app: ResendApp): Promise<ResendDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/users/${segment(this.id)}/reply`, { body: { email: email.id, text: options.text, html: options.html, all: options.all } })) as ResendEmailData;
-    return new ResendEmail(ctx, data);
-  }
-
-  /** What reached the person's mailbox, oldest first. Experimental. */
-  async inbox(): Promise<ResendInbox> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/users/${segment(this.id)}/inbox`)) as ResendInboxWire;
-    return decodeResendInbox(ctx, data);
-  }
-
-  /** Wait for the next new email matching `from` (anyone if omitted), after the last one this handle saw. */
-  async waitForEmail(options: { from?: ResendPrincipal | string } & WaitOptions = {}): Promise<ResendEmail> {
-    return waitForNext(this.#seen, "waitForEmail", () => this.inbox(), (item) => fromMatches(item.author, options.from), describeWait("an email", options.from), options);
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/emails/${segment(this.id)}/delivery-for`, { query: { app: app.id } })) as ResendDeliveryData | null;
+    return (data === null ? undefined : new ResendDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -4533,71 +5004,11 @@ export class ResendThread {
   }
 }
 
-/** Wire data of a {@link ResendEmail}. */
-export interface ResendEmailData {
-  id: string;
-  channel: "resend";
-  thread: ResendThreadData;
-  author: ResendPrincipal;
-  from: string;
-  to: string[];
-  cc: string[];
-  subject: string;
-  text: string;
-  at: string;
-  messageId: string;
-  delivery?: ResendDeliveryData;
-}
-
-export class ResendEmail {
-  readonly id: string;
-  readonly channel: "resend";
-  readonly thread: ResendThread;
-  readonly author: ResendPrincipal;
-  readonly from: string;
-  readonly to: string[];
-  readonly cc: string[];
-  readonly subject: string;
-  readonly text: string;
-  readonly at: string;
-  readonly messageId: string;
-  readonly delivery: ResendDelivery | undefined;
-  readonly #ctx: HandleContext;
-
-  /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: ResendEmailData) {
-    this.#ctx = ctx;
-    this.id = data.id;
-    this.channel = data.channel;
-    this.thread = new ResendThread(ctx, data.thread);
-    this.author = data.author;
-    this.from = data.from;
-    this.to = data.to;
-    this.cc = data.cc;
-    this.subject = data.subject;
-    this.text = data.text;
-    this.at = data.at;
-    this.messageId = data.messageId;
-    this.delivery = data.delivery === undefined ? undefined : new ResendDelivery(ctx, data.delivery);
-  }
-
-  /** Re-read an email. Experimental. */
-  async refresh(): Promise<ResendEmail> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/emails/${segment(this.id)}`)) as ResendEmailData;
-    return new ResendEmail(ctx, data);
-  }
-
-  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
-  [QUIET](): Promise<QuietState> {
-    return quietOf(this.#ctx);
-  }
-}
-
 /** Wire data of a {@link ResendDelivery}. */
 export interface ResendDeliveryData {
   id: string;
   channel: "resend";
+  app: string;
   type: string;
   email: string;
   payload?: unknown;
@@ -4608,6 +5019,7 @@ export interface ResendDeliveryData {
 export class ResendDelivery {
   readonly id: string;
   readonly channel: "resend";
+  readonly app: string;
   readonly type: string;
   readonly email: string;
   readonly payload: unknown | undefined;
@@ -4620,6 +5032,7 @@ export class ResendDelivery {
     this.#ctx = ctx;
     this.id = data.id;
     this.channel = data.channel;
+    this.app = data.app;
     this.type = data.type;
     this.email = data.email;
     this.payload = data.payload;
@@ -4662,6 +5075,66 @@ export class ResendDelivery {
   }
 }
 
+/** Wire data of a {@link ResendUser}. */
+export interface ResendUserData {
+  id: string;
+  channel: "resend";
+  kind: "user";
+  name: string;
+  address: string;
+}
+
+export class ResendUser {
+  readonly id: string;
+  readonly channel: "resend";
+  readonly kind: "user";
+  readonly name: string;
+  readonly address: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: ResendUserData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.kind = data.kind;
+    this.name = data.name;
+    this.address = data.address;
+  }
+
+  /** The person emails someone: the agent (`resend.app`), another app, or another person. Experimental. */
+  async send(options: { to: Array<ResendUser | ResendApp>; cc?: Array<ResendUser | ResendApp>; subject: string; text?: string; html?: string }): Promise<ResendEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/users/${segment(this.id)}/send`, { body: { to: options.to.map((item) => item.id), cc: options.cc === undefined ? undefined : options.cc.map((item) => item.id), subject: options.subject, text: options.text, html: options.html } })) as ResendEmailData;
+    return new ResendEmail(ctx, data);
+  }
+
+  /** The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental. */
+  async reply(email: ResendEmail, options: { text?: string; html?: string; all?: boolean } = {}): Promise<ResendEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/users/${segment(this.id)}/reply`, { body: { email: email.id, text: options.text, html: options.html, all: options.all } })) as ResendEmailData;
+    return new ResendEmail(ctx, data);
+  }
+
+  /** What reached the person's mailbox, oldest first. Experimental. */
+  async inbox(): Promise<ResendInbox> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/users/${segment(this.id)}/inbox`)) as ResendInboxWire;
+    return decodeResendInbox(ctx, data);
+  }
+
+  /** Wait for the next new email matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForEmail(options: { from?: ResendPrincipal | string } & WaitOptions = {}): Promise<ResendEmail> {
+    return waitForNext(this.#seen, "waitForEmail", () => this.inbox(), (item) => fromMatches(item.author, options.from), describeWait("an email", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
 /** Wire data of a {@link GoogleFixture}. */
 export interface GoogleFixtureData {
   app: GoogleAppData;
@@ -4679,6 +5152,20 @@ export class GoogleFixture {
     this.#ctx = ctx;
     this.app = new GoogleApp(ctx, data.app);
     this.apiUrl = data.apiUrl;
+  }
+
+  /** Make another app: a mailbox of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_GOOGLE_APP_<NAME>_WEBHOOK_URL. Experimental. */
+  async createApp(options: { name: string }): Promise<GoogleApp> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/apps`, { body: { name: options.name } })) as GoogleAppData;
+    return new GoogleApp(ctx, data);
+  }
+
+  /** The mailboxs this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
+  async apps(): Promise<GoogleApps> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/apps`)) as GoogleAppsWire;
+    return decodeGoogleApps(ctx, data);
   }
 
   /** Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental. */
@@ -4703,9 +5190,9 @@ export class GoogleFixture {
   }
 
   /** Every push channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: GoogleThread } = {}): Promise<GoogleDeliveries> {
+  async deliveries(options: { type?: string; resource?: GoogleThread; app?: GoogleApp } = {}): Promise<GoogleDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as GoogleDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as GoogleDeliveriesWire;
     return decodeGoogleDeliveries(ctx, data);
   }
 
@@ -4735,6 +5222,9 @@ export interface GoogleAppData {
   name: string;
   botUserId: string;
   address: string;
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
 }
 
 export class GoogleApp {
@@ -4744,6 +5234,9 @@ export class GoogleApp {
   readonly name: string;
   readonly botUserId: string;
   readonly address: string;
+  readonly clientId: string;
+  readonly clientSecret: string;
+  readonly refreshToken: string;
   readonly #ctx: HandleContext;
 
   /** @internal Handles come from the SDK, never from `new`. */
@@ -4755,6 +5248,23 @@ export class GoogleApp {
     this.name = data.name;
     this.botUserId = data.botUserId;
     this.address = data.address;
+    this.clientId = data.clientId;
+    this.clientSecret = data.clientSecret;
+    this.refreshToken = data.refreshToken;
+  }
+
+  /** An app a test made sends an email, through its own mailbox's API, as its own call would. Experimental. */
+  async send(options: { to: Array<GoogleUser | GoogleApp>; cc?: Array<GoogleUser | GoogleApp>; subject: string; text?: string; html?: string; headers?: Record<string, string> }): Promise<GoogleEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/apps/${segment(this.id)}/send`, { body: { to: options.to.map((item) => item.id), cc: options.cc === undefined ? undefined : options.cc.map((item) => item.id), subject: options.subject, text: options.text, html: options.html, headers: options.headers } })) as GoogleEmailData;
+    return new GoogleEmail(ctx, data);
+  }
+
+  /** An app a test made replies to an email, in its thread, as its own call would. Experimental. */
+  async reply(email: GoogleEmail, options: { text?: string; html?: string; all?: boolean; headers?: Record<string, string> } = {}): Promise<GoogleEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/apps/${segment(this.id)}/reply`, { body: { email: email.id, text: options.text, html: options.html, all: options.all, headers: options.headers } })) as GoogleEmailData;
+    return new GoogleEmail(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -4763,58 +5273,72 @@ export class GoogleApp {
   }
 }
 
-/** Wire data of a {@link GoogleUser}. */
-export interface GoogleUserData {
+/** Wire data of a {@link GoogleEmail}. */
+export interface GoogleEmailData {
   id: string;
   channel: "google";
-  kind: "user";
-  name: string;
-  address: string;
+  thread: GoogleThreadData;
+  author: GooglePrincipal;
+  from: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  text: string;
+  at: string;
+  messageId: string;
+  headers: Record<string, string>;
+  labels: string[];
+  delivery?: GoogleDeliveryData;
 }
 
-export class GoogleUser {
+export class GoogleEmail {
   readonly id: string;
   readonly channel: "google";
-  readonly kind: "user";
-  readonly name: string;
-  readonly address: string;
+  readonly thread: GoogleThread;
+  readonly author: GooglePrincipal;
+  readonly from: string;
+  readonly to: string[];
+  readonly cc: string[];
+  readonly subject: string;
+  readonly text: string;
+  readonly at: string;
+  readonly messageId: string;
+  readonly headers: Record<string, string>;
+  readonly labels: string[];
+  readonly delivery: GoogleDelivery | undefined;
   readonly #ctx: HandleContext;
-  readonly #seen = new Map<string, number>();
 
   /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: GoogleUserData) {
+  constructor(ctx: HandleContext, data: GoogleEmailData) {
     this.#ctx = ctx;
     this.id = data.id;
     this.channel = data.channel;
-    this.kind = data.kind;
-    this.name = data.name;
-    this.address = data.address;
+    this.thread = new GoogleThread(ctx, data.thread);
+    this.author = data.author;
+    this.from = data.from;
+    this.to = data.to;
+    this.cc = data.cc;
+    this.subject = data.subject;
+    this.text = data.text;
+    this.at = data.at;
+    this.messageId = data.messageId;
+    this.headers = data.headers;
+    this.labels = data.labels;
+    this.delivery = data.delivery === undefined ? undefined : new GoogleDelivery(ctx, data.delivery);
   }
 
-  /** The person emails someone: the agent (`google.app`), or another person. Experimental. */
-  async send(options: { to: Array<GoogleUser | GoogleApp>; cc?: Array<GoogleUser | GoogleApp>; subject: string; text?: string; html?: string }): Promise<GoogleEmail> {
+  /** Re-read an email. Experimental. */
+  async refresh(): Promise<GoogleEmail> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/users/${segment(this.id)}/send`, { body: { to: options.to.map((item) => item.id), cc: options.cc === undefined ? undefined : options.cc.map((item) => item.id), subject: options.subject, text: options.text, html: options.html } })) as GoogleEmailData;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/emails/${segment(this.id)}`)) as GoogleEmailData;
     return new GoogleEmail(ctx, data);
   }
 
-  /** The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental. */
-  async reply(email: GoogleEmail, options: { text?: string; html?: string; all?: boolean } = {}): Promise<GoogleEmail> {
+  /** The delivery that told this app of the email (decision 0027), or nothing when it wasn't told. Experimental. */
+  async deliveryFor(app: GoogleApp): Promise<GoogleDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/users/${segment(this.id)}/reply`, { body: { email: email.id, text: options.text, html: options.html, all: options.all } })) as GoogleEmailData;
-    return new GoogleEmail(ctx, data);
-  }
-
-  /** What reached the person's mailbox, oldest first. Experimental. */
-  async inbox(): Promise<GoogleInbox> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/users/${segment(this.id)}/inbox`)) as GoogleInboxWire;
-    return decodeGoogleInbox(ctx, data);
-  }
-
-  /** Wait for the next new email matching `from` (anyone if omitted), after the last one this handle saw. */
-  async waitForEmail(options: { from?: GooglePrincipal | string } & WaitOptions = {}): Promise<GoogleEmail> {
-    return waitForNext(this.#seen, "waitForEmail", () => this.inbox(), (item) => fromMatches(item.author, options.from), describeWait("an email", options.from), options);
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/emails/${segment(this.id)}/delivery-for`, { query: { app: app.id } })) as GoogleDeliveryData | null;
+    return (data === null ? undefined : new GoogleDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -4882,74 +5406,11 @@ export class GoogleThread {
   }
 }
 
-/** Wire data of a {@link GoogleEmail}. */
-export interface GoogleEmailData {
-  id: string;
-  channel: "google";
-  thread: GoogleThreadData;
-  author: GooglePrincipal;
-  from: string;
-  to: string[];
-  cc: string[];
-  subject: string;
-  text: string;
-  at: string;
-  messageId: string;
-  labels: string[];
-  delivery?: GoogleDeliveryData;
-}
-
-export class GoogleEmail {
-  readonly id: string;
-  readonly channel: "google";
-  readonly thread: GoogleThread;
-  readonly author: GooglePrincipal;
-  readonly from: string;
-  readonly to: string[];
-  readonly cc: string[];
-  readonly subject: string;
-  readonly text: string;
-  readonly at: string;
-  readonly messageId: string;
-  readonly labels: string[];
-  readonly delivery: GoogleDelivery | undefined;
-  readonly #ctx: HandleContext;
-
-  /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: GoogleEmailData) {
-    this.#ctx = ctx;
-    this.id = data.id;
-    this.channel = data.channel;
-    this.thread = new GoogleThread(ctx, data.thread);
-    this.author = data.author;
-    this.from = data.from;
-    this.to = data.to;
-    this.cc = data.cc;
-    this.subject = data.subject;
-    this.text = data.text;
-    this.at = data.at;
-    this.messageId = data.messageId;
-    this.labels = data.labels;
-    this.delivery = data.delivery === undefined ? undefined : new GoogleDelivery(ctx, data.delivery);
-  }
-
-  /** Re-read an email. Experimental. */
-  async refresh(): Promise<GoogleEmail> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/emails/${segment(this.id)}`)) as GoogleEmailData;
-    return new GoogleEmail(ctx, data);
-  }
-
-  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
-  [QUIET](): Promise<QuietState> {
-    return quietOf(this.#ctx);
-  }
-}
-
 /** Wire data of a {@link GoogleDelivery}. */
 export interface GoogleDeliveryData {
   id: string;
   channel: "google";
+  app: string;
   type: string;
   emailAddress: string;
   historyId: string;
@@ -4961,6 +5422,7 @@ export interface GoogleDeliveryData {
 export class GoogleDelivery {
   readonly id: string;
   readonly channel: "google";
+  readonly app: string;
   readonly type: string;
   readonly emailAddress: string;
   readonly historyId: string;
@@ -4974,6 +5436,7 @@ export class GoogleDelivery {
     this.#ctx = ctx;
     this.id = data.id;
     this.channel = data.channel;
+    this.app = data.app;
     this.type = data.type;
     this.emailAddress = data.emailAddress;
     this.historyId = data.historyId;
@@ -5009,6 +5472,66 @@ export class GoogleDelivery {
       const value = await this.refresh();
       return value.status === "pending" ? undefined : value;
     }, options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link GoogleUser}. */
+export interface GoogleUserData {
+  id: string;
+  channel: "google";
+  kind: "user";
+  name: string;
+  address: string;
+}
+
+export class GoogleUser {
+  readonly id: string;
+  readonly channel: "google";
+  readonly kind: "user";
+  readonly name: string;
+  readonly address: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: GoogleUserData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.kind = data.kind;
+    this.name = data.name;
+    this.address = data.address;
+  }
+
+  /** The person emails someone: the agent (`google.app`), another app, or another person. Experimental. */
+  async send(options: { to: Array<GoogleUser | GoogleApp>; cc?: Array<GoogleUser | GoogleApp>; subject: string; text?: string; html?: string }): Promise<GoogleEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/users/${segment(this.id)}/send`, { body: { to: options.to.map((item) => item.id), cc: options.cc === undefined ? undefined : options.cc.map((item) => item.id), subject: options.subject, text: options.text, html: options.html } })) as GoogleEmailData;
+    return new GoogleEmail(ctx, data);
+  }
+
+  /** The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental. */
+  async reply(email: GoogleEmail, options: { text?: string; html?: string; all?: boolean } = {}): Promise<GoogleEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/users/${segment(this.id)}/reply`, { body: { email: email.id, text: options.text, html: options.html, all: options.all } })) as GoogleEmailData;
+    return new GoogleEmail(ctx, data);
+  }
+
+  /** What reached the person's mailbox, oldest first. Experimental. */
+  async inbox(): Promise<GoogleInbox> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/users/${segment(this.id)}/inbox`)) as GoogleInboxWire;
+    return decodeGoogleInbox(ctx, data);
+  }
+
+  /** Wait for the next new email matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForEmail(options: { from?: GooglePrincipal | string } & WaitOptions = {}): Promise<GoogleEmail> {
+    return waitForNext(this.#seen, "waitForEmail", () => this.inbox(), (item) => fromMatches(item.author, options.from), describeWait("an email", options.from), options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -5056,6 +5579,20 @@ export class DiscordFixture {
     return decodeDiscordUsers(ctx, data);
   }
 
+  /** Make another app in the guild, with its own application, bot user, token and Ed25519 key (decision 0027), or return the one made with this name and settings. Its bot connects to the Gateway with its own token; its interactions go to CHANNELSTACK_DISCORD_APP_<NAME>_WEBHOOK_URL, or over its Gateway connection. Experimental. */
+  async createApp(options: { name: string; privilegedIntents?: Array<"GUILD_MEMBERS" | "GUILD_PRESENCES" | "MESSAGE_CONTENT"> }): Promise<DiscordApp> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/apps`, { body: { name: options.name, privilegedIntents: options.privilegedIntents } })) as DiscordAppData;
+    return new DiscordApp(ctx, data);
+  }
+
+  /** The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
+  async apps(): Promise<DiscordApps> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/apps`)) as DiscordAppsWire;
+    return decodeDiscordApps(ctx, data);
+  }
+
   /** Create a text channel. Only the listed participants see it (a private channel); include the app for the bot to hear it. Experimental. */
   async createChannel(options: { name?: string; participants?: Array<DiscordUser | DiscordApp>; readOnly?: boolean; topic?: string } = {}): Promise<DiscordChannel> {
     const ctx = this.#ctx;
@@ -5078,9 +5615,9 @@ export class DiscordFixture {
   }
 
   /** Every Gateway dispatch and interaction channelstack sent the bot for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: DiscordChannel } = {}): Promise<DiscordDeliveries> {
+  async deliveries(options: { type?: string; resource?: DiscordChannel; app?: DiscordApp } = {}): Promise<DiscordDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as DiscordDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as DiscordDeliveriesWire;
     return decodeDiscordDeliveries(ctx, data);
   }
 
@@ -5092,9 +5629,9 @@ export class DiscordFixture {
   }
 
   /** Inject a fault: rate-limit the bot's calls of a route (removed when this session closes), or drop its Gateway connection just before the next dispatch. Experimental. */
-  async fault(options: { type: "rate_limit" | "drop_gateway"; route?: string; retryAfter?: Duration; times?: number }): Promise<DiscordFault> {
+  async fault(options: { type: "rate_limit" | "drop_gateway"; route?: string; retryAfter?: Duration; times?: number; app?: DiscordApp }): Promise<DiscordFault> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/faults`, { body: { type: options.type, route: options.route, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), times: options.times } })) as DiscordFaultData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/faults`, { body: { type: options.type, route: options.route, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), times: options.times, app: options.app === undefined ? undefined : options.app.id } })) as DiscordFaultData;
     return new DiscordFault(ctx, data);
   }
 
@@ -5143,6 +5680,34 @@ export class DiscordApp {
     this.botToken = data.botToken;
     this.publicKey = data.publicKey;
     this.guildId = data.guildId;
+  }
+
+  /** An app a test made writes, as its own `POST /channels/{id}/messages` would: in a channel or thread its bot sees, or in a DM with the person in `to`. No bot writes to another bot in a DM (50007). Experimental. */
+  async say(text: string | DiscordMessageInput, options: { channel?: DiscordChannel; to?: DiscordUser | DiscordApp | Array<DiscordUser | DiscordApp> } = {}): Promise<DiscordMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/apps/${segment(this.id)}/say`, { body: { text: typeof text === "string" ? { content: text } : text, channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : [options.to].flat().map((item) => item.id) } })) as DiscordMessageData;
+    return new DiscordMessage(ctx, data);
+  }
+
+  /** An app a test made replies to a message: Discord's reply, in the message's channel, which quotes it. Experimental. */
+  async reply(text: string | DiscordMessageInput, options: { message: DiscordMessage }): Promise<DiscordMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/apps/${segment(this.id)}/reply`, { body: { text: typeof text === "string" ? { content: text } : text, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordMessageData;
+    return new DiscordMessage(ctx, data);
+  }
+
+  /** An app a test made reacts to a message. Experimental. */
+  async react(emoji: string, options: { message: DiscordMessage }): Promise<DiscordDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/apps/${segment(this.id)}/react`, { body: { emoji, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordDeliveryData | null;
+    return (data === null ? undefined : new DiscordDelivery(ctx, data));
+  }
+
+  /** An app a test made takes its reaction back. Experimental. */
+  async unreact(emoji: string, options: { message: DiscordMessage }): Promise<DiscordDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/apps/${segment(this.id)}/unreact`, { body: { emoji, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordDeliveryData | null;
+    return (data === null ? undefined : new DiscordDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -5245,10 +5810,10 @@ export class DiscordUser {
     await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/invite`, { body: { participants: [participants].flat().map((item) => item.id), channel: options.channel.id } });
   }
 
-  /** Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`. Experimental. */
-  async runCommand(command: string, options: { channel: DiscordChannel }): Promise<DiscordDelivery | undefined> {
+  /** Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it. Experimental. */
+  async runCommand(command: string, options: { channel: DiscordChannel; app?: DiscordApp }): Promise<DiscordDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id } }))) as DiscordDeliveryData | null;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id, app: options.app === undefined ? undefined : options.app.id } }))) as DiscordDeliveryData | null;
     return (data === null ? undefined : new DiscordDelivery(ctx, data));
   }
 
@@ -5265,76 +5830,6 @@ export class DiscordUser {
     await untilQuiet(() => quietOf(ctx));
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/ephemeral`)) as DiscordEphemeralMessagesWire;
     return decodeDiscordEphemeralMessages(ctx, data);
-  }
-
-  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
-  [QUIET](): Promise<QuietState> {
-    return quietOf(this.#ctx);
-  }
-}
-
-/** Wire data of a {@link DiscordChannel}. */
-export interface DiscordChannelData {
-  id: string;
-  kind: "text" | "dm" | "public_thread";
-  channel: "discord";
-  name?: string;
-  parentId?: string;
-  starterId?: string;
-}
-
-export class DiscordChannel {
-  readonly id: string;
-  readonly kind: "text" | "dm" | "public_thread";
-  readonly channel: "discord";
-  readonly name: string | undefined;
-  readonly parentId: string | undefined;
-  readonly starterId: string | undefined;
-  readonly #ctx: HandleContext;
-  readonly #seen = new Map<string, number>();
-
-  /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: DiscordChannelData) {
-    this.#ctx = ctx;
-    this.id = data.id;
-    this.kind = data.kind;
-    this.channel = data.channel;
-    this.name = data.name;
-    this.parentId = data.parentId;
-    this.starterId = data.starterId;
-  }
-
-  /** A channel's or thread's messages, oldest first. Experimental. */
-  async messages(): Promise<DiscordMessages> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/messages`)) as DiscordMessagesWire;
-    return decodeDiscordMessages(ctx, data);
-  }
-
-  /** Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed. Experimental. */
-  async members(): Promise<DiscordMembers> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/members`)) as DiscordMembersWire;
-    return decodeDiscordMembers(ctx, data);
-  }
-
-  /** The threads in a channel. Experimental. */
-  async threads(): Promise<DiscordThreads> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/threads`)) as DiscordThreadsWire;
-    return decodeDiscordThreads(ctx, data);
-  }
-
-  /** A channel or thread as a person reads it, each thread under the message that starts it. Experimental. */
-  async transcript(options: { as?: DiscordUser | DiscordApp } = {}): Promise<DiscordTranscript> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as DiscordTranscriptWire;
-    return decodeDiscordTranscript(ctx, data);
-  }
-
-  /** Wait for the next new message matching `from` (anyone if omitted), after the last one this handle saw. */
-  async waitForMessage(options: { from?: DiscordUser | DiscordApp | string } & WaitOptions = {}): Promise<DiscordMessage> {
-    return waitForNext(this.#seen, "waitForMessage", () => this.messages(), (item) => fromMatches(item.author, options.from), describeWait("a message", options.from), options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -5426,7 +5921,14 @@ export class DiscordMessage {
     return decodeDiscordReactions(ctx, data);
   }
 
-  /** Every Gateway dispatch this message caused to the bot. Experimental. */
+  /** The first Gateway dispatch this message caused to this app's bot (decision 0027), or nothing when it wasn't told. Experimental. */
+  async deliveryFor(app: DiscordApp): Promise<DiscordDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.channelId)}/messages/${segment(this.id)}/delivery-for`, { query: { app: app.id } })) as DiscordDeliveryData | null;
+    return (data === null ? undefined : new DiscordDelivery(ctx, data));
+  }
+
+  /** Every Gateway dispatch this message caused to the apps' bots. Experimental. */
   async deliveries(): Promise<DiscordMessageDeliveries> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.channelId)}/messages/${segment(this.id)}/deliveries`)) as DiscordMessageDeliveriesWire;
@@ -5449,10 +5951,81 @@ export class DiscordMessage {
   }
 }
 
+/** Wire data of a {@link DiscordChannel}. */
+export interface DiscordChannelData {
+  id: string;
+  kind: "text" | "dm" | "public_thread";
+  channel: "discord";
+  name?: string;
+  parentId?: string;
+  starterId?: string;
+}
+
+export class DiscordChannel {
+  readonly id: string;
+  readonly kind: "text" | "dm" | "public_thread";
+  readonly channel: "discord";
+  readonly name: string | undefined;
+  readonly parentId: string | undefined;
+  readonly starterId: string | undefined;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: DiscordChannelData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.kind = data.kind;
+    this.channel = data.channel;
+    this.name = data.name;
+    this.parentId = data.parentId;
+    this.starterId = data.starterId;
+  }
+
+  /** A channel's or thread's messages, oldest first. Experimental. */
+  async messages(): Promise<DiscordMessages> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/messages`)) as DiscordMessagesWire;
+    return decodeDiscordMessages(ctx, data);
+  }
+
+  /** Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed. Experimental. */
+  async members(): Promise<DiscordMembers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/members`)) as DiscordMembersWire;
+    return decodeDiscordMembers(ctx, data);
+  }
+
+  /** The threads in a channel. Experimental. */
+  async threads(): Promise<DiscordThreads> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/threads`)) as DiscordThreadsWire;
+    return decodeDiscordThreads(ctx, data);
+  }
+
+  /** A channel or thread as a person reads it, each thread under the message that starts it. Experimental. */
+  async transcript(options: { as?: DiscordUser | DiscordApp } = {}): Promise<DiscordTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as DiscordTranscriptWire;
+    return decodeDiscordTranscript(ctx, data);
+  }
+
+  /** Wait for the next new message matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForMessage(options: { from?: DiscordUser | DiscordApp | string } & WaitOptions = {}): Promise<DiscordMessage> {
+    return waitForNext(this.#seen, "waitForMessage", () => this.messages(), (item) => fromMatches(item.author, options.from), describeWait("a message", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
 /** Wire data of a {@link DiscordDelivery}. */
 export interface DiscordDeliveryData {
   id: string;
   channel: "discord";
+  app: string;
   type: string;
   payload?: unknown;
   attempts: DeliveryAttempt[];
@@ -5462,6 +6035,7 @@ export interface DiscordDeliveryData {
 export class DiscordDelivery {
   readonly id: string;
   readonly channel: "discord";
+  readonly app: string;
   readonly type: string;
   readonly payload: unknown | undefined;
   readonly attempts: DeliveryAttempt[];
@@ -5473,6 +6047,7 @@ export class DiscordDelivery {
     this.#ctx = ctx;
     this.id = data.id;
     this.channel = data.channel;
+    this.app = data.app;
     this.type = data.type;
     this.payload = data.payload;
     this.attempts = data.attempts;

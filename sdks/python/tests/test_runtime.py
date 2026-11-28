@@ -122,6 +122,8 @@ def email(channel: str, id: str, author: dict[str, str]) -> dict[str, object]:
         "text": f"from {author['name']}",
         "at": "2026-01-01T00:00:00Z",
         "messageId": f"<{id}@example.test>",
+        # Every header the sender set, by lower-case name (decision 0027).
+        "headers": {},
         "labels": [],
     }
 
@@ -139,7 +141,11 @@ def test_an_email_wait_takes_the_channels_own_handles_as_who_it_is_from(monkeypa
     monkeypatch.setattr(client, "_send", send)
     ctx = HandleContext(transport=client, session="ses_1")
     person = {"channel": "google", "kind": "user", "address": "x@example.test"}
-    app = GoogleApp(ctx, {**agent, "channel": "google", "botUserId": "b1", "address": "agent@example.test"})
+    # The app's handle carries its own mailbox's credentials (decision 0027).
+    credentials = {"clientId": "c1", "clientSecret": "s1", "refreshToken": "r1"}
+    app = GoogleApp(
+        ctx, {**agent, "channel": "google", "botUserId": "b1", "address": "agent@example.test", **credentials}
+    )
     ana = GoogleUser(ctx, {**person, "id": "user_1", "name": "Ana"})
     assert asyncio.run(ana.wait_for_email(from_=app, timeout="40ms")).id == "e2"
 

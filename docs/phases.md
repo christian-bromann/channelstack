@@ -20,6 +20,7 @@
 | 9 | done | 2026-11-26, [#66](https://github.com/christian-bromann/channelstack/pull/66) (Gmail verified live against two accounts and a Pub/Sub topic; conformance without a difference) |
 | 10 | deferred | Twilio isn't shipping for now: [#102](https://github.com/christian-bromann/channelstack/pull/102) is closed without merging, and its branch `phase-10-twilio` is kept, to reopen if users ask for it |
 | 11 | done | 2026-11-27, [#103](https://github.com/christian-bromann/channelstack/pull/103) (built in parallel with phase 10; Discord verified live with the agent's bot and two people's bots; conformance without a difference) |
+| 12 | done | 2026-11-28, [#107](https://github.com/christian-bromann/channelstack/pull/107) (any number of apps on every channel; live apps, 12.11 and 12.13, tracked in #111) |
 
 ## When a phase is done
 
@@ -388,15 +389,15 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ## Phase 12: any number of agent apps per channel
 
-[Decision 0027](decisions/0027-multiple-apps.md): a channel holds any number of people and apps, each app a real agent app with its own identity, and `my-agent` stays. Phase 12 covers the channels on `main`; Twilio is deferred, and the decision's Twilio section applies when phase 10 resumes. Its open questions are answered by the maintainer before it starts, or it takes their defaults.
+[Decision 0027](decisions/0027-multiple-apps.md): a channel holds any number of people and apps, each app a real agent app with its own identity, and `my-agent` stays. Phase 12 started before phases 10 (Twilio) and 11 (Discord) merged, at the maintainer's request. Phase 11 merged while it ran, so it covers the seven channels on `main` (Slack, GitHub, Linear, Notion, Resend, Google and Discord) and echo. Twilio is deferred: the decision's Twilio section applies when phase 10 resumes ([#113](https://github.com/christian-bromann/channelstack/issues/113)). Its open questions are answered by the maintainer before it starts, or it takes their defaults.
 
 **Build:**
 - **Apps by name, on every channel and echo:** `createApp({ name, … })` and `apps()` on each fixture; apps in the shared world, ids derived from `CHANNELSTACK_SEED` and the name, secrets per app in `secrets.json`, `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, `channelstack env --app` and `channelstack.env({ app })`.
-- **Each fake answers and delivers per app:** each token answers as its app; each delivery goes to one app, signed with its secret, at its URL or connection (Socket Mode, the Gateway), with `deliveries({ app })` and `msg.deliveryFor(app)`; faults and Slack's `uninstallApp` take an app.
+- **Each fake answers and delivers per app:** each token answers as its app; each delivery goes to one app, signed with its secret, at its URL or connection (Socket Mode, the Gateway), with `deliveries({ app })` on every channel's inspection routes and `msg.deliveryFor(app)`; faults (Slack's and Discord's, the channels that have them) and Slack's `uninstallApp` take an app: a fault that names one hits that app's calls or its connection only.
 - **What one app's actions send the others,** per channel, as the decision's tables say, including what the platforms refuse between bots (`cannot_dm_bot`, Discord's 50007, interactions and agent sessions of one app only).
 - **Scripted apps:** an extra app's handle has the acting methods a person has on its channel, through the fake's API with the app's token; refused for `my-agent`.
 - **The reply loop:** `toGoQuiet` in matchers-core, the pytest `expect` and the Rust crate; the loop guard and its `bot_loop` event; `<channel>.no-reply-loop` in every `<channel>Checks()`, and a variant of each broken agent that answers every app.
-- **Matchers and transcripts:** authors resolved among all of a channel's apps and people; the UI shows each app and its deliveries.
+- **Matchers and transcripts:** authors and mentions resolved among the session's people and the apps it used (`my-agent`, and each it got from `createApp`), so another session's apps never change a name; the UI shows each app by name, and the event log's delivery events and their one-line summaries (the inspector, `channelstack tail`) name the app each delivery went to (`→ slack app_mention to coder`).
 - **The examples:** a `describe("several apps")` block in each `test/acceptance/examples/<channel>.test.ts`, run against two instances of the channel's reference agent, as `my-agent` and as a second app, both in `scripts/lib/channels.ts`.
 - **Live:** per-app credentials (`CHANNELSTACK_<CHANNEL>_APP_<NAME>_*`), checked when the app is made; the second sandbox apps of the channels the maintainer chooses, their agents deployed with public URLs, and their Request URLs on the nightly run's internal receivers for B1–B10.
 

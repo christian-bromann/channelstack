@@ -40,7 +40,7 @@ One server process fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail) a
 
 ### 3.1 Sessions are scopes in one shared world
 
-The agent is configured once (one token and one base URL per channel), so there's **one** fake workspace, org and integration per server. A **session** is a scope inside it:
+Each agent process is configured once (its tokens and base URL per channel), so there's **one** fake workspace, org and integration per channel per server, and it holds the channel's apps: the built-in `my-agent`, and any app a test makes with `createApp({ name })` ([decision 0027](decisions/0027-multiple-apps.md)). Apps belong to the world, not to a session, so an agent's credentials outlive each test. A **session** is a scope inside it:
 
 - **Ownership.** A session owns what it creates (users, channels, repos, pages). Generated names (`test-<id>`) never collide, so parallel tests don't see each other.
 - **Scoped reads.** Each session's event log only holds deliveries and API calls caused by its own resources. The agent's `chat.postMessage` into a channel the session owns is attributed to that session.
@@ -91,6 +91,7 @@ Objects the platform identifies by more than one value get nested paths: a Slack
 | | Tokens | A bot token is `<the bot's id in base 64>.<6>.<38>`, so the bot's id is in it, as in Discord; an interaction's token `aW50ZXJhY3Rpb246…`; interactions are signed with a per-install Ed25519 key, whose public half is the app's |
 
 - **Generated from a seeded random source** per world, so ids are unique and realistic. `CHANNELSTACK_SEED` makes a run reproducible.
+- **Each app has its own:** an app a test makes gets every id the table lists for an app (Slack's app, bot and bot user; GitHub's App id, installation and `<name>[bot]`; Linear's and Notion's bot user; Resend's team and Google's mailbox), drawn from the seed and the app's name (`IdGenerator.named`), so they don't depend on the order tests make apps in.
 - **Sequential where the platform is:** GitHub issue numbers, Linear identifiers, Slack `ts`.
 - **Fixed ids on request:** `slack.createUser({ id: "U0ADMIN01" })` for agents that allowlist people. The id is checked against the platform's format.
 - **URLs look real too,** on the fake hosts: `https://slack.localhost/archives/C08E1F2G3H4/p1732101234567899`, `https://github.localhost/acme/web/pull/12`, `https://linear.localhost/acme/issue/ENG-123/checkout-fails`, `https://notion.localhost/Roadmap-1f2e3d4c5b6a47988a7b6c5d4e3f2a1b`.
@@ -142,7 +143,8 @@ A **provider** is a fake the agent calls but that has no people, apps, deliverie
 | Event log | Append-only per session: deliveries (with every attempt), the agent's API calls, actions. Feeds cursors, matchers, the UI inspector and `channelstack tail` |
 | Delivery queue | Signs and sends events to the agent the way each platform does: retries, timeouts, ack windows, Socket Mode. Faults and forged deliveries come from here |
 | Reality rules | Decides fake or live per object from credentials, and refuses mixes like a fake person in a live workspace |
-| Secrets | Fake tokens and signing secrets, generated once per install (`~/.channelstack/secrets.json`, mode 0600). Live credentials live only in memory and are never returned |
+| Secrets | Fake tokens and signing secrets, generated once per install (`~/.channelstack/secrets.json`, mode 0600), a set per app (`apps.<driver>.<name>`). Live credentials live only in memory and are never returned |
+| Loop guard | Fake only: counts the app writes in each conversation since a person last wrote there, and after 50 stops delivering the events those writes cause, records `bot_loop` and fails the test. A conversation is a Slack thread (top-level messages share the channel's), a Discord channel or thread, a GitHub issue or pull request, a Linear issue, a Notion page, an email thread or an echo room; the writes are messages and comments, and on Slack and Discord edits and reactions, on GitHub reviews, review comments and every `issues` and `pull_request` event, on Notion page edits, renames, blocks and child pages, on Gmail the sender's own SENT push. The table per channel is in [decision 0027](decisions/0027-multiple-apps.md), "The guard" |
 | Safety and ledger | Live allowlists; every live object is tagged and recorded so the session or `channelstack sweep` deletes it |
 | Proxy + CA | For agents with hard-coded hosts (`start --proxy`): a loopback proxy routes each driver's `hosts` (`slack.com`, `api.github.com`, `api.linear.app`, `api.notion.com`) to a TLS listener that serves the fakes, with a certificate from channelstack's own CA (name-constrained to those hosts, trusted only by the agent); other hosts tunnel through. A live driver's calls are passed on to the platform. `--record` writes every exchange's and webhook's shape for the shape differ ([decisions/0016](decisions/0016-proxy-mode-and-conformance.md)) |
 | Quiet detector | Knows when the agent is idle (no open stream, no call in flight, a short settle window). Negative and exact-count matchers wait for it |

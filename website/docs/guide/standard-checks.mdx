@@ -50,7 +50,7 @@ Call only the functions for the platforms your app is on. The checks are written
 
 | Option         | Default                | What it's for                                                                                                                                                                               |
 | -------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app`          | required               | The app's name as people mention it, `my-agent`                                                                                                                                             |
+| `app`          | required               | The app's name as people mention it: `my-agent`, or any app's. For another name the checks make that app (`createApp({ name })`) and run against the agent driving it, so `slackChecks({ app: "coder" })` checks a second agent ([several apps](/docs/guide/several-apps)) |
 | `prompt`       | `@<app> hello`         | Text that makes the app answer. For Linear it's the title of the issue that gets delegated, default `Look into this`                                                                        |
 | `streamPrompt` | none                   | Text that makes the app stream a longer answer in a DM. Without it, the two stream checks are left out                                                                                      |
 | `approval`     | none                   | `{ prompt, button }`: text that makes the app ask for an approval, and the label of the button it shows. Only a workspace admin may press it. Without it, the two click checks are left out |
@@ -58,6 +58,7 @@ Call only the functions for the platforms your app is on. The checks are written
 | `longPrompt`   | none                   | Discord: text that makes the app answer with more than one message may hold (2000 characters). Without it, the long-answer check is left out |
 | `skip`         | `[]`                   | Check ids to leave out, for example `["slack.stream-stop"]`. An id that no check has throws, with the list of ids                                                                           |
 | `timeout`      | the plugin's `timeout` | How long each check waits for the app                                                                                                                                                       |
+| `loopTurns`    | `3`                    | How many times the app may answer another app that answers everything, with no person between them, before `<platform>.no-reply-loop` fails. An app built to hand off to another sets it higher, or skips the check |
 
 Pick prompts your app answers quickly and in a single message. With a real model, a short, plain prompt keeps the checks fast. With a fake model, use one your script already handles.
 
@@ -78,6 +79,7 @@ Pick prompts your app answers quickly and in a single message. With a real model
 | `slack.stop`               | Needs `streamPrompt`. Ana presses Stop during the stream; expects the thread `stopped` and exactly one reply   | Writing on after Stop                                                                                                       |
 | `slack.click-unauthorized` | Needs `approval`. A non-admin presses the button; expects the thread to still hold only the ask                | Acting on, or answering publicly, a click from someone who may not act                                                      |
 | `slack.double-click`       | Needs `approval`. An admin presses the button twice at once; expects exactly one new message in the thread     | Acting twice on a double click                                                                                              |
+| `slack.no-reply-loop`      | Another app in the channel answers every reply of the app's, mentioning it; expects the thread to go quiet, the app answering it at most `loopTurns` times | Two agents answering each other without end. Ignoring bot messages only by `subtype: "bot_message"` misses a modern app's, which carry `bot_id` and no subtype |
 
 `slack.double-click` counts messages: the app should answer one approval with exactly one new message in the thread. Replacing the question as well is fine, and so is removing the button once it has acted. An app that answers only by editing the question, or with several messages, should skip this check.
 
@@ -95,6 +97,7 @@ Each check works in a fresh repository with the App installed and Ana as a colla
 | `github.redelivery`           | Redelivers the comment's webhook with the same GUID; expects one comment                                    | Handling a redelivery from the App's settings as a new event                                |
 | `github.check-run`            | Opens a pull request; once the app is quiet, expects every check run to be completed                        | Check runs left `queued` or `in_progress`, which block merging                              |
 | `github.bad-signature`        | Resends the webhook with a wrong signature; expects a 4xx                                                   | Turned-off webhook verification                                                             |
+| `github.no-reply-loop`        | Another App on the repository mentions the app after each of its comments; expects at most `loopTurns` answers to it | An App that answers every `issue_comment`, a bot's included: GitHub sends an App the other Apps' comments, and nothing stops the loop |
 
 `github.check-run` passes for an app that creates no check runs. Skip it if your App doesn't use them, to keep the report honest.
 
@@ -110,6 +113,7 @@ Each check creates an issue titled with `prompt` and delegates it to the app, wh
 | `linear.redelivery`     | After the turn ends, redelivers the webhook that opened the session; expects at most one `response` activity | Starting the work over on a redelivery                                                      |
 | `linear.stale`          | Resends that webhook with a `webhookTimestamp` two minutes old; expects a 4xx                                | Missing replay protection: Linear's receivers should refuse webhooks more than a minute old |
 | `linear.bad-signature`  | Resends it with a wrong signature; expects a 4xx                                                             | Turned-off webhook verification                                                             |
+| `linear.no-reply-loop`  | After the turn ends, another app comments on the issue after each of the app's comments; expects at most `loopTurns` answers | An app that answers every `Comment` webhook, another app's included |
 
 ## Notion checks
 
@@ -121,6 +125,7 @@ Each check has Ana post `prompt` as a comment on a page connected to the integra
 | `notion.ignores-own-comments` | Expects exactly one comment from the integration                         | An integration that answers its own comment                                         |
 | `notion.redelivery`           | Sends the comment's webhook again; expects one comment                   | Handling Notion's retry as a new comment                                            |
 | `notion.bad-signature`        | Resends the webhook with a wrong signature; expects a 4xx                | Turned-off `X-Notion-Signature` checks                                              |
+| `notion.no-reply-loop`        | Another integration on the page replies in the discussion after each of the integration's comments; expects at most `loopTurns` answers | An integration that answers every `comment.created`, another integration's included |
 
 ## Resend checks
 
@@ -132,6 +137,7 @@ Each check has Ana email `prompt` (default `hello`) to the agent's address.
 | `resend.redelivery`      | Sends the `email.received` webhook again, as Resend retries; expects one answer | Handling Resend's retry (the same `svix-id`) as a new email                |
 | `resend.bad-signature`   | Resends the webhook with a wrong signature; expects a 4xx                        | Turned-off `resend.webhooks.verify`                                       |
 | `resend.stale`           | Resends it signed more than five minutes ago; expects a 4xx                      | Missing replay protection on `svix-timestamp`                             |
+| `resend.no-reply-loop`   | Another app emails the agent, marked `Auto-Submitted: auto-replied`, and answers each answer the same way; expects at most `loopTurns` answers | An agent that answers mail a program sent on its own: the oldest email loop. Mark answers with `Auto-Submitted` (RFC 3834) and leave mail so marked unanswered |
 
 ## Google checks
 
@@ -145,16 +151,18 @@ Each check has Ana email `prompt` (default `hello`) to the agent's Gmail address
 | `google.bad-signature`   | Pushes it again with a token another key signed; expects a 4xx                                 | Turned-off `verifyIdToken`                                                       |
 | `google.wrong-audience`  | Pushes it again with a token for another endpoint; expects a 4xx                               | `verifyIdToken` without an `audience`                                            |
 | `google.stale`           | Pushes it again with a token that has expired; expects a 4xx                                   | A signature check that skips the token's `exp`                                   |
+| `google.no-reply-loop`   | As `resend.no-reply-loop`, to the agent's Gmail address                                        | Answering mail marked `Auto-Submitted`                                           |
 
 ## Discord checks
 
-Each check has Ana mention the app with `prompt` in a channel with the bot, or DM it, as the check says.
+Each check has Ana mention the app with `prompt` in a channel with the bot, or DM it, as the check says. With `app: "coder"`, the checks run against the bot of the app `coder`, and `command` is that app's command.
 
 | Id                        | What the test does                                                                                   | What it catches                                                                 |
 | ------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `discord.mention-once`    | Ana mentions the app in a channel; expects exactly one reply                                         | Answering both a mention and the message it is in, or answering twice            |
 | `discord.dm-once`         | Ana DMs the prompt; expects exactly one reply                                                        | Two answers to one DM                                                           |
 | `discord.ignores-bots`    | Another bot writes the prompt; expects no reply                                                      | A bot that answers bots (`author.bot`), and the loops that follow                |
+| `discord.no-reply-loop`   | Another app in the channel replies to each of the app's answers, mentioning it; expects at most `loopTurns` answers to it | Two bots answering each other without end: Discord sends a bot the other bots' messages, mentions included, with `author.bot` |
 | `discord.resume`          | Drops the Gateway connection just before Ana's DM; expects one reply once the bot resumes            | A bot that identifies anew instead of resuming, and loses or repeats what it missed |
 | `discord.long-answer`     | Ana sends `longPrompt`; expects the answer split over several messages, and no 50035 refusal          | An answer over 2000 characters, which Discord refuses, or one cut short          |
 | `discord.interaction-3s`  | Ana runs `command`; expects the answer within 3 seconds, and no "This interaction failed"            | An interaction answered late, after Discord has given up on it                    |
@@ -190,6 +198,7 @@ Most checks are about delivery: retries, redeliveries, forged signatures, acknow
 | `slack.msg-too-long`, `slack.stop` and the others that use a fault, Stop or an exact count | Skip, with the reason |
 | `slack.in-thread`, `slack.ignores-bots`, `slack.stream-stop` | Skip, with the reason: they wait for quiet, read the status line or create a bot user, which live mode can't do yet |
 | `github.review-thread`, `github.check-run` | Skip, with the reason: they open a pull request, and pull requests aren't built live yet |
+| `<platform>.no-reply-loop` | Skip, with the reason: they make a second app, or wait for quiet, which live mode can't do yet |
 | `discord.dm-once`, `discord.resume`, `discord.long-answer`, `discord.ignores-bots`, `discord.interaction-3s`, `discord.bad-signature` | Skip, with the reason: live, a person is a bot of their own, and Discord lets no bot DM another bot or run another app's command; another bot to ignore isn't built live; and the dropped connection is a fault |
 
 Six run against the real platform: `linear.first-activity`, `linear.ends-turn`, `notion.reply-in-discussion`, `resend.reply-in-thread`, `google.reply-in-thread` and `discord.mention-once`. The fake run on every pull request runs them all.

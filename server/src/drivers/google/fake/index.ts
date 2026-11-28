@@ -16,6 +16,7 @@ export interface GoogleFake extends FakeBackend {
 /** The Google fake: Gmail's API over an in-memory mailbox and the people's mail, wired to core. */
 export function createGoogleFake(context: DriverContext): GoogleFake {
   const store = new GoogleStore(context.registry);
+  store.loops = context.loops;
   const world = createFakeWorld(context, store);
   // Who the mailbox is, and where its history starts, are drawn once: a reset keeps them.
   const identity = { account: context.ids.next(GOOGLE_IDS.account), history: context.ids.next(GOOGLE_IDS.history) };

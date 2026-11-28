@@ -1,3 +1,4 @@
+import { AppRoster } from "../../../core/apps/index.ts";
 import { CursorList } from "../../../core/events/index.ts";
 import type { Collection, Registry } from "../../../core/registry/index.ts";
 import type { EchoApp, EchoMessage, EchoRoom, EchoUser } from "../world.ts";
@@ -7,20 +8,22 @@ export class EchoStore {
   readonly users: Collection<EchoUser>;
   readonly rooms: Collection<EchoRoom>;
   readonly #messages = new Map<string, CursorList<EchoMessage>>();
-  #app: EchoApp | undefined;
+  /** The built-in app and the ones tests made (decision 0027). */
+  readonly apps: AppRoster<EchoApp>;
 
   constructor(registry: Registry) {
+    this.apps = new AppRoster<EchoApp>("echo", registry, { refs: (app) => [app.id] });
     this.users = registry.collection<EchoUser>("echo", "user");
     this.rooms = registry.collection<EchoRoom>("echo", "room");
   }
 
+  /** The built-in app. */
   get app(): EchoApp {
-    if (!this.#app) throw new Error("The echo fake hasn't been seeded");
-    return this.#app;
+    return this.apps.builtIn;
   }
 
   set app(app: EchoApp) {
-    this.#app = app;
+    this.apps.seed(app);
   }
 
   messagesIn(room: string): CursorList<EchoMessage> {

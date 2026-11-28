@@ -132,8 +132,14 @@ export async function startDiscordAgent(options: DiscordAgentOptions): Promise<v
 
   client.on(Events.MessageCreate, async (message) => {
     if (message.author.id === client.user?.id) return;
-    // Bug: answers other bots too.
-    if (message.author.bot && !people.has(message.author.id) && !faulty("discord.ignores-bots")) return;
+    // Bug: answers other bots too: the bug of `discord.ignores-bots`, and with an app that answers back, of `discord.no-reply-loop`.
+    if (
+      message.author.bot &&
+      !people.has(message.author.id) &&
+      !faulty("discord.ignores-bots") &&
+      !faulty("discord.no-reply-loop")
+    )
+      return;
     if (answered.has(message.id)) return;
     const me = client.user?.id ?? "";
     const inDm = message.guild === null;

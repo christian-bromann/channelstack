@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
+import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { registerEmailRoutes } from "../../core/email/routes.ts";
 import type { EventLog } from "../../core/events/index.ts";
@@ -9,12 +10,14 @@ import { apiCallSchema, DeliveryAttempt, DeliveryStatus } from "../../core/route
 import type { GoogleWorld } from "./backend.ts";
 import type { FakeGoogleWorld } from "./fake/world.ts";
 import { GMAIL_API } from "./live/client.ts";
-import type { GoogleEmailRecord } from "./world.ts";
+import type { GoogleAppRecord, GoogleEmailRecord } from "./world.ts";
 
 const GoogleDelivery = z
   .object({
     id: z.string().openapi({ description: "The Pub/Sub message's id." }),
     channel: z.literal("google"),
+    /** The app whose push endpoint it went to, by name: `my-agent`, or one a test made. */
+    app: z.string(),
     type: z.string().openapi({ description: "`gmail.history`: the mailbox's history moved on." }),
     emailAddress: z.string().openapi({ description: "The mailbox the push is about." }),
     historyId: z.string().openapi({ description: "The mailbox's history id when the push was sent." }),
@@ -52,6 +55,7 @@ export function registerGoogleRoutes(
   const deliveryWire = ({ request, attempts }: DeliveryView) => ({
     id: request.id,
     channel: "google" as const,
+    app: request.app ?? BUILT_IN_APP,
     type: request.type,
     emailAddress: String(request.meta?.emailAddress ?? ""),
     historyId: String(request.meta?.historyId ?? ""),
@@ -79,6 +83,45 @@ export function registerGoogleRoutes(
         deps.live || email.delivery === undefined
           ? undefined
           : deliveryWire(fake.delivery(session, email.delivery) as DeliveryRecord),
+      // The first push to that app's endpoint that told of the email: of its copy in that app's mailbox.
+      wireFor: (session, email, app) => {
+        const found = fake
+          .deliveries(session)
+          .find(
+            ({ request }) =>
+              (request.app ?? BUILT_IN_APP) === app &&
+              ((request.meta?.emails as string[] | undefined) ?? []).includes(email.id),
+          );
+        return found === undefined ? undefined : deliveryWire(found);
+      },
+    },
+    // Every header of the message as it travelled, the sender's own (`Auto-Submitted`) among them.
+    headers: (email) => {
+      const headers: Record<string, string> = {};
+      for (const { name, value } of email.headers) headers[name.toLowerCase()] ??= value;
+      return headers;
+    },
+    apps: {
+      options: {},
+      fields: {
+        shape: {
+          clientId: z
+            .string()
+            .openapi({ description: "Its OAuth client's id (`GOOGLE_CLIENT_ID`). Fake only: empty live." }),
+          clientSecret: z
+            .string()
+            .openapi({ description: "Its OAuth client's secret (`GOOGLE_CLIENT_SECRET`). Fake only: empty live." }),
+          refreshToken: z
+            .string()
+            .openapi({ description: "Its mailbox's refresh token (`GOOGLE_REFRESH_TOKEN`). Fake only: empty live." }),
+        },
+        // A live mailbox's credentials stay on the server: the control API never returns them.
+        wire: (app: GoogleAppRecord) =>
+          deps.live ? { clientId: "", clientSecret: "", refreshToken: "" } : fake.credentials(app),
+      },
+      create: (session, input) => fake.createApp(session, { name: input.name }),
+      send: (session, app, input) => fake.sendAs(session, app, input),
+      reply: (session, app, to, input) => fake.replyAs(session, app, to, input),
     },
     emailFields: {
       shape: {
@@ -99,6 +142,7 @@ export function registerGoogleRoutes(
     stability,
     deliveries: fake,
     delivery: { schema: GoogleDelivery, wire: deliveryWire },
+    apps: { handle: "GoogleApp", roster: store.apps },
     listSummary: "Every push channelstack sent the agent for this session, with every attempt",
     filters: {
       type: "Only this kind: `gmail.history`.",

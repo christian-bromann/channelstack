@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 
+import { BUILT_IN_APP, checkAppName } from "./core/apps/index.ts";
 import { requireAccess } from "./core/auth/index.ts";
 import { UI_COOKIE, UiAccess } from "./core/auth/ui.ts";
 import { BrowserActors, type Launch } from "./core/browser/index.ts";
@@ -15,6 +16,7 @@ import { EventLog, WORLD_SCOPE } from "./core/events/index.ts";
 import { IdGenerator } from "./core/ids/index.ts";
 import { Ledger } from "./core/ledger/index.ts";
 import type { Logger } from "./core/log/index.ts";
+import { LoopGuard } from "./core/loops/index.ts";
 import { nodeOptions } from "./core/proxy/node.ts";
 import type { Recorder } from "./core/proxy/record.ts";
 import { QuietDetector } from "./core/quiet/index.ts";
@@ -104,6 +106,8 @@ export interface AppOptions {
   urls: () => ServerUrls;
   /** The agent's endpoint per driver, for the events that driver delivers. */
   webhooks: Readonly<Record<string, string | undefined>>;
+  /** Where an extra app's events go (`CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`). None when left out. */
+  appWebhooks?: (driver: string, app: string) => string | undefined;
   /**
    * The UI: one HTML page. `__NONCE__` in it becomes the response's CSP nonce and `__SESSION__`
    * the id of the shared `dev` session. Without it the server has no UI.
@@ -160,7 +164,7 @@ const LogEvent = z
   .object({
     at: z.string(),
     driver: z.string(),
-    kind: z.enum(["action", "delivery", "delivery_attempt", "api_call"]),
+    kind: z.enum(["action", "delivery", "delivery_attempt", "api_call", "bot_loop"]),
     data: z.record(z.string(), z.unknown()),
     summary: z.object({ text: z.string(), outcome: z.string(), ok: z.boolean() }).optional().openapi({
       description: "Delivery attempts and API calls in one line, e.g. `← slack chat.postMessage` and `200`.",
@@ -182,12 +186,18 @@ const Quiet = z
     open: z.array(z.string()).openapi({
       description: "What is still open, in words: deliveries in flight or about to be retried, streams never stopped.",
     }),
+    loops: z.array(z.string()).optional().openapi({
+      description:
+        "The bot loops the fake stopped in this session, in words (decision 0027), when there are any. The test fixtures fail a test that left one",
+    }),
   })
   .openapi("Quiet");
 
 export function createApp(options: AppOptions): App {
   const clock = options.clock ?? systemClock;
   const { log, redactor, secrets } = options;
+  // An extra app's secrets are made when it is (decision 0027): scrubbed from then on, like the rest.
+  secrets.onNew((values) => redactor.register(...values));
   const ids = new IdGenerator({ seed: options.seed, clock });
   const sessions = new Sessions(ids, clock);
   const registry = new Registry();
@@ -203,6 +213,7 @@ export function createApp(options: AppOptions): App {
   });
 
   const quiet = new QuietDetector(clock);
+  const loops = new LoopGuard(events);
   events.onAppend((session) => quiet.touch(session));
 
   const liveEnv = options.live?.env ?? {};
@@ -233,6 +244,13 @@ export function createApp(options: AppOptions): App {
       secret: (name) => secrets.get(definition.name, name),
       apiUrl: () => options.urls().driver(definition.name),
       webhookUrl: options.webhooks[definition.name],
+      apps: {
+        webhookUrl: (app) =>
+          app === BUILT_IN_APP ? options.webhooks[definition.name] : options.appWebhooks?.(definition.name, app),
+        secret: (app, name) => secrets.forApp(definition.name, app, name),
+        ids: (app) => ids.named(`${definition.name}:${app}`),
+      },
+      loops: loops.for(definition.name),
       live: {
         active: driverReality(liveEnv, definition.live?.credentials ?? [], undefined).mode === "live",
         strict: forcedReality(liveEnv) === "live",
@@ -267,6 +285,7 @@ export function createApp(options: AppOptions): App {
     registry.release(session.id);
     events.drop(session.id);
     quiet.forget(session.id);
+    loops.forget(session.id);
   });
 
   const control = new OpenAPIHono({
@@ -379,7 +398,8 @@ export function createApp(options: AppOptions): App {
       const pending = delivery.pending(session);
       const deliveries = `${pending} ${pending === 1 ? "delivery" : "deliveries"} in flight or about to be retried`;
       const open = [...(pending > 0 ? [deliveries] : []), ...drivers.flatMap((driver) => driver.openWork(session))];
-      return { ...quiet.state(session, open.length), open };
+      const stopped = loops.stopped(session);
+      return { ...quiet.state(session, open.length), open, ...(stopped.length === 0 ? {} : { loops: stopped }) };
     },
   });
 
@@ -421,16 +441,39 @@ export function createApp(options: AppOptions): App {
           param: { name: "proxy", in: "query" },
           description: "For proxy mode: `channelstack env --proxy`",
         }),
+      app: z
+        .string()
+        .min(1)
+        .optional()
+        .openapi({
+          param: { name: "app", in: "query" },
+          description:
+            "Another app's variables, under the keys the built-in app's are printed with: `channelstack env --app coder`. Makes the app the first time, with the channel's default settings",
+        }),
+      channel: z
+        .string()
+        .min(1)
+        .optional()
+        .openapi({
+          param: { name: "channel", in: "query" },
+          description: "Only this channel's variables: `channelstack env --channel slack`",
+        }),
     }),
     response: Env,
-    errors: ["action_requires"],
-    sdkMethod: { on: "Channelstack", name: "env", options: ["proxy"] },
+    errors: ["action_requires", "invalid_argument", "not_found"],
+    sdkMethod: { on: "Channelstack", name: "env", options: ["proxy", "app", "channel"] },
     stability: "stable",
     handler: ({ query }) => {
+      const chosen = query.channel === undefined ? drivers : drivers.filter((driver) => driver.name === query.channel);
+      if (chosen.length === 0) {
+        throw new ProtocolError("not_found", `There is no channel "${query.channel}"`, { channel: query.channel });
+      }
+      const app = query.app === BUILT_IN_APP ? undefined : query.app;
+      if (app !== undefined) checkAppName(app);
       // A live channel prints nothing: the agent talks to the platform with its own configuration, and
       // live credentials never leave the server.
-      const fake = drivers.filter((driver) => realities.get(driver.name)?.mode !== "live");
-      const env: Record<string, string> = Object.assign({}, ...fake.map((driver) => driver.env()));
+      const fake = chosen.filter((driver) => realities.get(driver.name)?.mode !== "live");
+      const env: Record<string, string> = Object.assign({}, ...fake.map((driver) => driver.env(app)));
       if (query.proxy !== true) return env;
       const proxy = options.urls().proxy;
       if (!proxy) {

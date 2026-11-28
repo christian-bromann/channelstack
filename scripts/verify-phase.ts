@@ -117,6 +117,10 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
       group: "static",
     },
   ],
+  // Phase 12 (decision 0027): 12.2 to 12.8 and 12.10 run in the acceptance and unit checks above,
+  // with each channel's agent started again as the app `coder`; 12.9 is `check:channels`; 12.11
+  // in the nightly live run.
+  12: [{ name: "12.1 No existing example or scenario changed", script: ["check:unchanged"], group: "static" }],
 };
 
 const phase = Number(process.argv[2]);

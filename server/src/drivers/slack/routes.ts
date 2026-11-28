@@ -1,6 +1,8 @@
 import { z } from "@hono/zod-openapi";
 
+import { BUILT_IN_APP, HANDLE_ONLY } from "../../core/apps/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
+import { deliveryTo } from "../../core/delivery/kit.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import {
@@ -53,9 +55,9 @@ const SlackApp = z
     kind: z.literal("app"),
     botUserId: z.string(),
     botId: z.string(),
-    botToken: z.string(),
-    appToken: z.string(),
-    signingSecret: z.string(),
+    botToken: z.string().openapi({ description: `Its bot token (\`xoxb-\`). ${HANDLE_ONLY}` }),
+    appToken: z.string().openapi({ description: `Its app-level token (\`xapp-\`), for Socket Mode. ${HANDLE_ONLY}` }),
+    signingSecret: z.string().openapi({ description: `Its signing secret. ${HANDLE_ONLY}` }),
     scopes: z.array(z.string()),
   })
   .openapi("SlackApp", { "x-channelstack-resource": { id: "id", role: "app" } });
@@ -90,6 +92,8 @@ const SlackDelivery = z
   .object({
     id: z.string(),
     channel: z.literal("slack"),
+    /** The app it went to, by name: `my-agent`, or one a test made. */
+    app: z.string(),
     type: z.string(),
     eventType: z.string().optional(),
     eventId: z.string().optional(),
@@ -189,6 +193,12 @@ const withFiles = (
     : { ...message, files: files.map((file) => ({ name: file.path, bytes: Buffer.from(file.content, "base64") })) };
 
 const participantRef = z.string().openapi(refTo("SlackUser", "SlackApp"));
+/** Which app a person's command, shortcut or split view is for: an interaction goes to its app alone (decision 0027). */
+const interactionApp = (what: string) =>
+  z
+    .string()
+    .optional()
+    .openapi({ description: `Whose ${what}: an app's id or name. Default: the built-in app's`, ...refTo("SlackApp") });
 /** One participant or several: `ana.invite(slack.app, …)` and `ana.invite([ben, slack.app], …)` both work. */
 const participants = () => z.array(participantRef).min(1).openapi({ "x-channelstack-one-or-many": true });
 const conversationRef = z.string().openapi(refTo("SlackConversation"));
@@ -196,9 +206,15 @@ const messageRef = z.object({ channel: z.string(), ts: z.string() }).openapi(ref
 const threadRef = z.object({ channel: z.string(), ts: z.string() }).openapi(refTo("SlackThread", "SlackMessage"));
 
 const UserParams = z.object({ user: z.string().openapi({ param: { name: "user", in: "path" } }) });
+const AppParams = z.object({ app: z.string().openapi({ param: { name: "app", in: "path" } }) });
 const ChannelParams = z.object({ channel: z.string().openapi({ param: { name: "channel", in: "path" } }) });
 const MessageParams = ChannelParams.extend({ ts: z.string().openapi({ param: { name: "ts", in: "path" } }) });
 const messageBinding = { channel: "channel", ts: "ts" };
+
+/** Live, the workspace holds only the app channelstack has credentials for: decision 0027's live apps aren't built yet (#111). */
+const APPS_NOT_YET: LiveSupport = {
+  unsupported: "not yet: live, the workspace holds only the app channelstack has credentials for",
+};
 
 /** What a person does only in Slack's client: live, the browser actor does it (live-mode.md, A3). */
 const IN_THE_CLIENT: LiveSupport = {
@@ -234,7 +250,8 @@ export function registerSlackRoutes(
     reality: () => Reality;
     events: EventLog;
     apiUrl: () => string;
-    secret: (name: string) => string;
+    /** One of an app's secrets: the built-in app's unless another is named. */
+    secret: (name: string, app?: string) => string;
   },
 ): void {
   const { fake } = deps;
@@ -243,20 +260,32 @@ export function registerSlackRoutes(
   const stability = "experimental";
 
   const userWire = (user: SlackUserRecord) => ({ ...user, kind: "user" as const });
+  /**
+   * An app as an author or a member: who it is, without its credentials. Only the app a test asks
+   * for (the fixture's, `createApp`, `apps()`) carries them: `appHandle`.
+   */
   const appWire = (app: SlackAppRecord) => ({
     id: app.id,
     name: app.name,
     kind: "app" as const,
     botUserId: app.botUserId,
     botId: app.botId,
-    // A live app's credentials stay on the server: the control API never returns them.
-    botToken: deps.reality() === "live" ? "" : deps.secret("botToken"),
-    appToken: deps.reality() === "live" ? "" : deps.secret("appToken"),
-    signingSecret: deps.reality() === "live" ? "" : deps.secret("signingSecret"),
+    botToken: "",
+    appToken: "",
+    signingSecret: "",
     scopes: [...app.scopes],
   });
-  const participantWire = (session: string, id: string) =>
-    id === world.app().botUserId ? appWire(world.app()) : userWire(world.user(session, id));
+  const appHandle = (app: SlackAppRecord) => ({
+    ...appWire(app),
+    // A live app's credentials stay on the server: the control API never returns them.
+    botToken: deps.reality() === "live" ? "" : deps.secret("botToken", app.name),
+    appToken: deps.reality() === "live" ? "" : deps.secret("appToken", app.name),
+    signingSecret: deps.reality() === "live" ? "" : deps.secret("signingSecret", app.name),
+  });
+  const participantWire = (session: string, id: string) => {
+    const app = id === world.app().botUserId ? world.app() : fake.appOf(id);
+    return app ? appWire(app) : userWire(world.user(session, id));
+  };
   const conversationWire = ({ id, kind, name }: SlackConversationRecord) => ({ id, kind, name });
   const messageWire = (session: string, message: SlackMessageRecord) => ({
     channel: message.conversation,
@@ -274,9 +303,9 @@ export function registerSlackRoutes(
       ts: message.threadTs ?? message.ts,
       conversation: conversationWire(world.conversation(session, message.conversation)),
     },
-    // Only the fake delivers: a live message never has a delivery here.
-    delivery:
-      message.deliveries[0] === undefined ? undefined : deliveryWire(fake.delivery(session, message.deliveries[0])),
+    // Only the fake delivers: a live message never has a delivery here. It is the first to the
+    // built-in app; another app's are `msg.deliveryFor(app)` (decision 0027).
+    delivery: deliveryOf(session, message.deliveries),
     stream:
       message.stream === undefined
         ? undefined
@@ -295,6 +324,7 @@ export function registerSlackRoutes(
     return {
       id: request.id,
       channel: "slack" as const,
+      app: request.app ?? BUILT_IN_APP,
       type: request.type,
       eventType: typeof meta.eventType === "string" ? meta.eventType : undefined,
       eventId: request.type === "event_callback" ? request.id : undefined,
@@ -302,6 +332,15 @@ export function registerSlackRoutes(
       attempts,
       status: attempts.at(-1)?.status ?? ("pending" as const),
     };
+  };
+
+  /** A message's delivery to this app (core's pick among those it caused), as a test reads it. */
+  const deliveryOf = (session: string, ids: readonly string[], app?: string) => {
+    const record = deliveryTo(
+      ids.map((id) => fake.delivery(session, id)),
+      app,
+    );
+    return record && deliveryWire(record);
   };
 
   const principal = (session: string) => (id: string) => {
@@ -326,7 +365,7 @@ export function registerSlackRoutes(
     factory: { on: "Session", name: "slack" },
     stability,
     handler: () => ({
-      app: appWire(world.app()),
+      app: appHandle(world.app()),
       apiUrl: deps.reality() === "live" ? "https://slack.com/api/" : deps.apiUrl(),
       team: world.team(),
       socketConnections: world.socketConnections(),
@@ -383,6 +422,108 @@ export function registerSlackRoutes(
     stability,
     handler: async ({ session, body }) => userWire(await world.createUser(session.id, body)),
   });
+
+  router.route({
+    method: "post",
+    path: "/apps",
+    summary:
+      "Make another app in the workspace, with its own bot user, tokens and signing secret (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_SLACK_APP_<NAME>_WEBHOOK_URL, or over its own Socket Mode connection",
+    body: z
+      .object({
+        name: z
+          .string()
+          .min(1)
+          .openapi({ description: "How people mention it: 1 to 32 lower-case letters, digits and hyphens" }),
+        scopes: z.array(z.string()).optional().openapi({ description: "Its bot scopes. Default: the built-in app's" }),
+        botEvents: z
+          .array(z.string())
+          .optional()
+          .openapi({ description: "The bot events it subscribes to. Default: the built-in app's" }),
+      })
+      .openapi("SlackAppOptions"),
+    response: SlackApp,
+    errors: ["invalid_argument"],
+    factory: { on: "SlackFixture", name: "createApp", options: ["name", "scopes", "botEvents"] },
+    live: APPS_NOT_YET,
+    stability,
+    handler: ({ session, body }) => appHandle(fake.createApp(session.id, body)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/apps",
+    summary:
+      "The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
+    response: z.array(SlackApp).openapi("SlackApps"),
+    sdkMethod: { on: "SlackFixture", name: "apps" },
+    live: APPS_NOT_YET,
+    stability,
+    handler: ({ session }) => fake.apps(session.id).map(appHandle),
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/say",
+    summary:
+      "An app a test made writes a top-level message, as its own chat.postMessage would: in a conversation it is a member of, or in a DM with the people in `to`",
+    params: AppParams,
+    body: z
+      .object({ message: MessageInput, channel: conversationRef.optional(), to: participants().optional() })
+      .openapi("SlackAppSayBody"),
+    response: SlackMessage,
+    errors: ["not_found", "not_in_channel", "cannot_dm_bot", "invalid_argument", "no_text", "msg_too_long"],
+    sdkMethod: { on: "SlackApp", name: "say", args: ["message"], options: ["channel", "to"] },
+    live: APPS_NOT_YET,
+    stability,
+    handler: ({ session, params, body }) => {
+      const where =
+        body.channel !== undefined ? { channel: body.channel } : body.to !== undefined ? { to: body.to } : undefined;
+      if (!where || (body.channel !== undefined && body.to !== undefined)) {
+        throw new ProtocolError("invalid_argument", "say needs exactly one of `channel` and `to`");
+      }
+      return messageWire(session.id, fake.sayAsApp(session.id, params.app, body.message, where));
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/reply",
+    summary: "An app a test made replies in a thread: pass the message that starts it, or any reply in it",
+    params: AppParams,
+    body: z.object({ message: MessageInput, thread: threadRef }).openapi("SlackAppReplyBody"),
+    response: SlackMessage,
+    errors: ["not_found", "not_in_channel", "invalid_argument", "no_text", "msg_too_long"],
+    sdkMethod: { on: "SlackApp", name: "reply", args: ["message"], options: ["thread"] },
+    live: APPS_NOT_YET,
+    stability,
+    handler: ({ session, params, body }) =>
+      messageWire(session.id, fake.replyAsApp(session.id, params.app, body.message, body.thread)),
+  });
+
+  for (const [name, action] of [
+    ["react", "add"],
+    ["unreact", "remove"],
+  ] as const) {
+    router.route({
+      method: "post",
+      path: `/apps/{app}/${name}`,
+      summary:
+        action === "add" ? "An app a test made reacts to a message" : "An app a test made takes its reaction back",
+      params: AppParams,
+      body: z
+        .object({ emoji: z.string().min(1), message: messageRef })
+        .openapi(action === "add" ? "SlackAppReactBody" : "SlackAppUnreactBody"),
+      response: SlackDelivery.nullable(),
+      errors: ["not_found", "not_in_channel", "invalid_argument", action === "add" ? "already_reacted" : "no_reaction"],
+      sdkMethod: { on: "SlackApp", name, args: ["emoji"], options: ["message"] },
+      live: APPS_NOT_YET,
+      stability,
+      handler: ({ session, params, body }) => {
+        const delivery = fake.reactAsApp(session.id, params.app, body.emoji, body.message, action);
+        return delivery === undefined ? null : deliveryWire(fake.delivery(session.id, delivery));
+      },
+    });
+  }
 
   router.route({
     method: "get",
@@ -636,31 +777,35 @@ export function registerSlackRoutes(
   router.route({
     method: "post",
     path: "/users/{user}/shortcut",
-    summary: "Run a message shortcut on a message",
+    summary: "Run an app's message shortcut on a message: it goes to that app alone",
     params: UserParams,
-    body: z.object({ callbackId: z.string().min(1), message: messageRef }).openapi("SlackShortcutBody"),
+    body: z
+      .object({ callbackId: z.string().min(1), message: messageRef, app: interactionApp("shortcut") })
+      .openapi("SlackShortcutBody"),
     response: SlackDelivery,
     errors: ["not_found", "not_in_channel", "dispatch_failed"],
-    sdkMethod: { on: "SlackUser", name: "shortcut", args: ["callbackId"], options: ["message"] },
+    sdkMethod: { on: "SlackUser", name: "shortcut", args: ["callbackId"], options: ["message", "app"] },
     live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      interaction(session.id, fake.shortcutAsUser(session.id, params.user, body.callbackId, body.message)),
+      interaction(session.id, fake.shortcutAsUser(session.id, params.user, body.callbackId, body.message, body.app)),
   });
 
   router.route({
     method: "post",
     path: "/users/{user}/commands",
-    summary: "Run a slash command in a conversation, e.g. `/deploy web staging`",
+    summary: "Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone",
     params: UserParams,
-    body: z.object({ command: z.string().regex(/^\/\S/), channel: conversationRef }).openapi("SlackCommandBody"),
+    body: z
+      .object({ command: z.string().regex(/^\/\S/), channel: conversationRef, app: interactionApp("command") })
+      .openapi("SlackCommandBody"),
     response: SlackDelivery,
     errors: ["not_found", "not_in_channel", "dispatch_failed"],
-    sdkMethod: { on: "SlackUser", name: "runCommand", args: ["command"], options: ["channel"] },
+    sdkMethod: { on: "SlackUser", name: "runCommand", args: ["command"], options: ["channel", "app"] },
     live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      interaction(session.id, fake.commandAsUser(session.id, params.user, body.command, body.channel)),
+      interaction(session.id, fake.commandAsUser(session.id, params.user, body.command, body.channel, body.app)),
   });
 
   router.route({
@@ -688,16 +833,18 @@ export function registerSlackRoutes(
     method: "post",
     path: "/users/{user}/agent-threads",
     summary:
-      "Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at",
+      "Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at",
     params: UserParams,
-    body: z.object({ from: conversationRef.optional() }).openapi("SlackAgentThreadOptions"),
+    body: z
+      .object({ from: conversationRef.optional(), app: interactionApp("split view") })
+      .openapi("SlackAgentThreadOptions"),
     response: SlackThread,
     errors: ["not_found", "split_view_unavailable"],
-    sdkMethod: { on: "SlackUser", name: "openAgentThread", args: [], options: ["from"] },
+    sdkMethod: { on: "SlackUser", name: "openAgentThread", args: [], options: ["from", "app"] },
     live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      threadWire(session.id, fake.openAgentThread(session.id, params.user, body.from)),
+      threadWire(session.id, fake.openAgentThread(session.id, params.user, body.from, body.app)),
   });
 
   router.route({
@@ -1137,6 +1284,23 @@ export function registerSlackRoutes(
 
   router.route({
     method: "get",
+    path: "/conversations/{channel}/messages/{ts}/delivery-for",
+    summary: "The first delivery this message caused to this app (decision 0027), or nothing when it wasn't told",
+    params: MessageParams,
+    query: z.object({ app: z.string().openapi({ param: { name: "app", in: "query" }, ...refTo("SlackApp") }) }),
+    response: SlackDelivery.nullable(),
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackMessage", name: "deliveryFor", args: ["app"], bind: messageBinding },
+    live: DELIVERY_IS_THE_PLATFORMS,
+    stability,
+    handler: ({ session, params, query }) => {
+      const app = fake.roster.get(session.id, query.app);
+      return deliveryOf(session.id, fake.message(session.id, params.channel, params.ts).deliveries, app.name) ?? null;
+    },
+  });
+
+  router.route({
+    method: "get",
     path: "/conversations/{channel}/messages/{ts}/deliveries",
     summary: "Every delivery this message caused to the agent",
     params: MessageParams,
@@ -1157,6 +1321,7 @@ export function registerSlackRoutes(
     stability,
     deliveries: fake,
     delivery: { schema: SlackDelivery, wire: deliveryWire },
+    apps: { handle: "SlackApp", roster: fake.roster },
     listSummary: "Every event channelstack sent the agent for this session, with every attempt",
     // Slack's own word is retry, with its options: registered below.
     redeliver: false,
@@ -1200,13 +1365,16 @@ export function registerSlackRoutes(
   router.route({
     method: "post",
     path: "/uninstall",
-    summary: "The workspace uninstalls the app. Undone when this session closes; run such tests on their own",
+    summary:
+      "The workspace uninstalls an app: the built-in one, or the one given. Undone when this session closes; run such tests on their own",
+    body: z.object({ app: z.string().optional().openapi(refTo("SlackApp")) }).openapi("SlackUninstallBody"),
     response: z.array(SlackDelivery).openapi("SlackUninstallDeliveries"),
-    errors: ["account_inactive"],
-    sdkMethod: { on: "SlackFixture", name: "uninstallApp" },
+    errors: ["account_inactive", "not_found"],
+    sdkMethod: { on: "SlackFixture", name: "uninstallApp", options: ["app"] },
     live: UNINSTALL,
     stability,
-    handler: ({ session }) => fake.uninstallApp(session.id).map((id) => deliveryWire(fake.delivery(session.id, id))),
+    handler: ({ session, body }) =>
+      fake.uninstallApp(session.id, body.app).map((id) => deliveryWire(fake.delivery(session.id, id))),
   });
 
   router.route({
@@ -1223,13 +1391,20 @@ export function registerSlackRoutes(
         after: duration("For drop_socket: how long until the connection drops. Default: now.").default(0),
         error: z.string().default("internal_error"),
         times: z.number().int().min(1).optional(),
+        app: z
+          .string()
+          .optional()
+          .openapi({
+            description: "Only this app's calls, or its Socket Mode connections; every app's when left out.",
+            ...refTo("SlackApp"),
+          }),
       })
       .openapi("SlackFaultBody"),
     response: z.object({ id: z.string() }).openapi("SlackFault", { "x-channelstack-resource": { id: "id" } }),
     sdkMethod: {
       on: "SlackFixture",
       name: "fault",
-      options: ["type", "operation", "retryAfter", "delay", "after", "error", "times"],
+      options: ["type", "operation", "retryAfter", "delay", "after", "error", "times", "app"],
     },
     live: FAULTS,
     stability,
@@ -1242,6 +1417,7 @@ export function registerSlackRoutes(
         // One delay field in the record: a latency fault's per-call delay, or how long until the socket drops.
         delayMs: body.type === "drop_socket" ? body.after : body.delay,
         error: body.error,
+        app: body.app,
       }),
     }),
   });

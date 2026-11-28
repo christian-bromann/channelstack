@@ -6,7 +6,7 @@ import type { DiscordMessageRecord } from "./world.ts";
 export interface DiscordTranscriptEntry extends TranscriptEntry {
   /** Discord's reply: whose message this one answers, as the line above it in the client says. */
   replyTo?: string;
-  /** A deferred response, shown as "my-agent is thinking…" until the app edits it. */
+  /** A deferred response, shown as "my-agent is thinking…" (its app's name) until the app edits it. */
   streaming?: "open";
   visibleTo?: TranscriptPrincipal;
 }
@@ -56,7 +56,6 @@ export function renderTranscript(
     mentionName(userId: string): string | undefined;
     /** Who wrote a message this one replies to. */
     replyAuthor(message: DiscordMessageRecord): string | undefined;
-    appName: string;
   },
 ): { entries: DiscordTranscriptEntry[]; text: string } {
   const named = (text: string) =>
@@ -70,7 +69,7 @@ export function renderTranscript(
       const loading = (message.flags & (1 << 7)) !== 0;
       const replyTo = message.replyTo === undefined ? undefined : options.replyAuthor(message);
       const text = loading
-        ? `${options.appName} is thinking…`
+        ? `${options.principal(message.authorId).name} is thinking…`
         : [named(message.content), ...embedText(message.embeds)].filter((line) => line !== "").join("\n");
       return {
         id: message.id,

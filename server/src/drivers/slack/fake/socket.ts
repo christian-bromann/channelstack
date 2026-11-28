@@ -18,7 +18,7 @@ const ENVELOPE_TYPE: Readonly<Record<string, string>> = {
 /** The kinds the app may answer in its acknowledgement: a command's reply, a submission's `response_action`. */
 const ANSWERED_IN_ACK = new Set(["slash_command", "view_submission", "block_actions", "message_action"]);
 
-export interface SocketMode {
+interface SocketMode {
   /** `apps.connections.open`: the WebSocket URL for one connection, with a ticket that works once. */
   ticket(): string;
   /** A WebSocket request from the agent: the connection, if it comes with a ticket this fake issued. */
@@ -34,11 +34,40 @@ export interface SocketMode {
   drop(): void;
 }
 
+/** Every app's Socket Mode: each app opens its own connections with its own app token, and gets only its own envelopes. */
+export interface SocketModes {
+  /** The app's Socket Mode, made the first time it is asked for. */
+  of(app: { readonly id: string; readonly name: string }): SocketMode;
+  /** A WebSocket request from an agent: the connection of whichever app issued its ticket. */
+  accept(request: Request): SocketSession | undefined;
+}
+
+export function createSocketModes(context: DriverContext): SocketModes {
+  const modes = new Map<string, SocketMode>();
+  return {
+    of(app) {
+      let mode = modes.get(app.name);
+      if (!mode) {
+        mode = createSocketMode(context, app.name, () => app.id);
+        modes.set(app.name, mode);
+      }
+      return mode;
+    },
+    accept(request) {
+      for (const mode of modes.values()) {
+        const session = mode.accept(request);
+        if (session) return session;
+      }
+      return undefined;
+    },
+  };
+}
+
 /**
- * Slack's Socket Mode: the app opens a WebSocket and receives events, interactions and commands
- * as envelopes on it, acknowledging each one, optionally with an answer.
+ * Slack's Socket Mode for one app: the app opens a WebSocket and receives events, interactions
+ * and commands as envelopes on it, acknowledging each one, optionally with an answer.
  */
-export function createSocketMode(context: DriverContext, appId: () => string): SocketMode {
+function createSocketMode(context: DriverContext, appName: string, appId: () => string): SocketMode {
   const { ids, clock } = context;
   const tickets = new Map<string, number>();
   const peers = new OpenConnections<SocketPeer>();
@@ -49,7 +78,7 @@ export function createSocketMode(context: DriverContext, appId: () => string): S
   let lastSeen = 0;
   /** An app that also has a request URL counts as back on HTTP once it has held no socket for this long. */
   const backOnHttp = () =>
-    context.webhookUrl !== undefined && peers.size === 0 && clock() - lastSeen > RECONNECT_WINDOW_MS;
+    context.apps.webhookUrl(appName) !== undefined && peers.size === 0 && clock() - lastSeen > RECONNECT_WINDOW_MS;
 
   const url = () => `${context.apiUrl().replace(/^http/, "ws")}/link`;
 

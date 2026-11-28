@@ -110,6 +110,8 @@ let env = channelstack.env().proxy(proxy).await?;
 | Parameter | Type | Required |  |
 |---|---|---|---|
 | `proxy` | `boolean` | no | option |
+| `app` | `string` | no | option |
+| `channel` | `string` | no | option |
 
 **Returns** [`Env`](/docs/reference/api/client#env-1).
 
@@ -469,7 +471,7 @@ Plain values the handles return and take.
 |---|---|
 | `at` | `string` |
 | `driver` | `string` |
-| `kind` | `"action" \| "delivery" \| "delivery_attempt" \| "api_call"` |
+| `kind` | `"action" \| "delivery" \| "delivery_attempt" \| "api_call" \| "bot_loop"` |
 | `data` | `Record<string, unknown>` |
 | `summary` | `{ text: string; outcome: string; ok: boolean } \| undefined` |
 
@@ -480,6 +482,7 @@ Plain values the handles return and take.
 | `busy` | `busy` | `boolean` |
 | `quietForMs` | `quiet_for_ms` | `number` |
 | `open` | `open` | `string[]` |
+| `loops` | `loops` | `string[] \| undefined` |
 
 ### Env
 

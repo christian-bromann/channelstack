@@ -4,11 +4,10 @@ import { bearerFrom } from "../../../../core/auth/index.ts";
 import { ProtocolError } from "../../../../core/errors/index.ts";
 import { bodyOf, wrapRest } from "../../../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../../../core/router/index.ts";
-import { constantTimeEqual } from "../../../../core/signing/hmac.ts";
 import { GITHUB_IDS } from "../../ids.ts";
 import { githubTime } from "../../payloads.ts";
 import { verifyGitHubAppJwt } from "../../signing.ts";
-import type { GitHubRepoRecord } from "../../world.ts";
+import type { GitHubAppRecord, GitHubRepoRecord } from "../../world.ts";
 import { GitHubRefusal } from "../kit.ts";
 import type { FakeGitHubWorld } from "../world.ts";
 import { registerChecks } from "./checks.ts";
@@ -47,54 +46,69 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
   };
   const unauthorized = (message = "Bad credentials") => new GitHubRefusal(401, message);
 
-  /** The App itself, by the JWT it signed with its private key. */
-  const asApp = async (c: Context): Promise<void> => {
-    const token = credential(c);
-    const app = { privateKey: context.secret("privateKey"), issuers: [String(store.app.id), store.app.clientId] };
-    if (token === undefined || !(await verifyGitHubAppJwt(token, app, clock()))) {
-      throw unauthorized("A JSON web token could not be decoded");
+  /** The App a JWT was signed by, with its private key and its id (or client id) as the issuer. */
+  const appOfJwt = async (token: string): Promise<GitHubAppRecord | undefined> => {
+    for (const app of store.apps.all()) {
+      const key = { privateKey: context.apps.secret(app.name, "privateKey"), issuers: [String(app.id), app.clientId] };
+      if (await verifyGitHubAppJwt(token, key, clock())) return app;
     }
-    c.set("authenticated", true);
+    return undefined;
   };
 
-  /** The App's installation, by the token `POST /app/installations/{id}/access_tokens` handed out. */
-  const asInstallation = (c: Context): void => {
+  /** The App whose installation a token is, compared in constant time. */
+  const appOfToken = (token: string): GitHubAppRecord | undefined =>
+    store.apps.withSecret(token, (app) => context.apps.secret(app, "installationToken"));
+
+  /** An App itself, by the JWT it signed with its private key. */
+  const asApp = async (c: Context): Promise<GitHubAppRecord> => {
+    const token = credential(c);
+    const app = token === undefined ? undefined : await appOfJwt(token);
+    if (!app) throw unauthorized("A JSON web token could not be decoded");
+    c.set("authenticated", true);
+    return app;
+  };
+
+  /** An App's installation, by the token `POST /app/installations/{id}/access_tokens` handed out. Each token is its own App's. */
+  const asInstallation = (c: Context): GitHubAppRecord => {
     const token = credential(c);
     if (token === undefined) throw unauthorized("Requires authentication");
-    if (!constantTimeEqual(token, context.secret("installationToken"))) throw unauthorized();
+    const app = appOfToken(token);
+    if (!app) throw unauthorized();
     c.set("authenticated", true);
+    return app;
   };
 
-  // --- The App's own endpoints -------------------------------------------------------------
+  // --- An App's own endpoints --------------------------------------------------------------
 
   routes.get("/app", async (c) => {
-    await asApp(c);
-    return c.json({ ...objects.integration(), installations_count: 1 });
+    const app = await asApp(c);
+    return c.json({ ...objects.integration(app), installations_count: 1 });
   });
 
   routes.get("/app/installations", async (c) => {
-    await asApp(c);
-    return c.json(page(c, [objects.installation()]));
+    const app = await asApp(c);
+    return c.json(page(c, [objects.installation(app)]));
   });
 
-  const installationOf = (c: Context): void => {
-    if (c.req.param("installation") !== String(store.app.installationId)) throw notFound();
+  /** An App sees its own installation only: another App's is not there for its JWT. */
+  const installationOf = (c: Context, app: GitHubAppRecord): void => {
+    if (c.req.param("installation") !== String(app.installationId)) throw notFound();
   };
 
   routes.get("/app/installations/:installation", async (c) => {
-    await asApp(c);
-    installationOf(c);
-    return c.json(objects.installation());
+    const app = await asApp(c);
+    installationOf(c, app);
+    return c.json(objects.installation(app));
   });
 
   routes.post("/app/installations/:installation/access_tokens", async (c) => {
-    await asApp(c);
-    installationOf(c);
+    const app = await asApp(c);
+    installationOf(c, app);
     return c.json(
       {
-        token: context.secret("installationToken"),
+        token: context.apps.secret(app.name, "installationToken"),
         expires_at: githubTime(clock() + TOKEN_LIFETIME_MS),
-        permissions: { metadata: "read", ...store.app.permissions },
+        permissions: { metadata: "read", ...app.permissions },
         repository_selection: "selected",
       },
       201,
@@ -102,18 +116,18 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
   });
 
   routes.get("/repos/:owner/:repo/installation", async (c) => {
-    await asApp(c);
+    const app = await asApp(c);
     const repo = store.repoNamed(c.req.param("owner"), c.req.param("repo"));
-    if (!repo?.installed) throw notFound();
+    if (!repo?.apps.has(app.name)) throw notFound();
     // About a repository, so on record for its session, like the calls made with the token.
     c.set("repo", repo);
-    return c.json(objects.installation());
+    return c.json(objects.installation(app));
   });
 
   routes.get("/orgs/:org/installation", async (c) => {
-    await asApp(c);
+    const app = await asApp(c);
     if (c.req.param("org").toLowerCase() !== store.org.login.toLowerCase()) throw notFound();
-    return c.json(objects.installation());
+    return c.json(objects.installation(app));
   });
 
   /** One entry of the delivery log, with how its attempt went. */
@@ -134,7 +148,7 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
       status_code: code,
       event: entry.event,
       action: entry.action,
-      installation_id: store.app.installationId,
+      installation_id: store.appNamed(entry.app).installationId,
       repository_id: entry.repo ?? null,
       throttled_at: null,
       ...(detailed
@@ -147,13 +161,17 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     };
   };
 
+  // Each App reads its own delivery log.
   routes.get("/app/hook/deliveries", async (c) => {
-    await asApp(c);
-    return c.json(page(c, [...store.hookDeliveries].reverse()).map((entry) => hookDelivery(entry, false)));
+    const app = await asApp(c);
+    const own = store.hookDeliveries.filter((entry) => entry.app === app.name);
+    return c.json(page(c, own.reverse()).map((entry) => hookDelivery(entry, false)));
   });
 
-  const hookEntry = (c: Context) => {
-    const entry = store.hookDeliveries.find((candidate) => String(candidate.id) === c.req.param("delivery"));
+  const hookEntry = (c: Context, app: GitHubAppRecord) => {
+    const entry = store.hookDeliveries.find(
+      (candidate) => String(candidate.id) === c.req.param("delivery") && candidate.app === app.name,
+    );
     if (!entry) throw notFound();
     // One delivery belongs to one session: reading it, or sending it again, is on that session's record.
     c.set("session", entry.session);
@@ -161,13 +179,13 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
   };
 
   routes.get("/app/hook/deliveries/:delivery", async (c) => {
-    await asApp(c);
-    return c.json(hookDelivery(hookEntry(c), true));
+    const app = await asApp(c);
+    return c.json(hookDelivery(hookEntry(c, app), true));
   });
 
   routes.post("/app/hook/deliveries/:delivery/attempts", async (c) => {
-    await asApp(c);
-    const entry = hookEntry(c);
+    const app = await asApp(c);
+    const entry = hookEntry(c, app);
     // GitHub accepts the request and redelivers on its own time.
     void world.redeliver(entry.session, entry.guid).catch(() => {});
     return c.json({}, 202);
@@ -176,8 +194,8 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
   // --- Everything an installation token reaches -----------------------------------------------
 
   routes.get("/installation/repositories", (c) => {
-    asInstallation(c);
-    const repositories = store.installedRepos().map((repo) => objects.propertiedRepository(repo));
+    const app = asInstallation(c);
+    const repositories = store.installedRepos(app).map((repo) => objects.propertiedRepository(repo));
     return c.json({ total_count: repositories.length, repositories: page(c, repositories) });
   });
 
@@ -195,15 +213,11 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
 
   const register: Register = (method, path, [permission, level], handler) => {
     routes.on(method.toUpperCase(), `/repos/:owner/:repo${path}`, async (c) => {
-      asInstallation(c);
-      // A repository the App isn't installed on doesn't exist for its token.
-      const repo = store.repoNamed(c.req.param("owner"), c.req.param("repo"));
-      if (!repo?.installed) throw notFound();
-      c.set("repo", repo);
-      const granted = permission === "metadata" ? "read" : store.app.permissions[permission];
-      if (granted === undefined || (level === "write" && granted !== "write")) {
-        throw new GitHubRefusal(403, "Resource not accessible by integration");
-      }
+      const app = asInstallation(c);
+      const named = store.repoNamed(c.req.param("owner"), c.req.param("repo"));
+      // On record for the repository's session only where the calling App reaches it.
+      if (named?.apps.has(app.name)) c.set("repo", named);
+      const repo = world.kit.allowApp(named, app, [permission, level]);
       // Any method may carry a body (GitHub's DELETE for assignees and files does): an object, or a
       // list where an endpoint takes one (labels).
       const parsed = method === "get" ? { body: {} } : await bodyOf(c);
@@ -212,7 +226,7 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
           ? new GitHubRefusal(400, "Problems parsing JSON")
           : new GitHubRefusal(400, "Invalid request.\n\nThe request body must be a JSON object or array.");
       }
-      return handler({ c, world, repo, body: parsed.body as Json, bot: store.bot.id });
+      return handler({ c, world, repo, body: parsed.body as Json, app, bot: app.botId });
     });
   };
   registerRepos(register);
@@ -225,15 +239,12 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     // Whoever asks gets the 404. It is on record when the App or its installation asked: for the
     // session that owns the repository the path names, or for no session when it names none.
     const token = credential(c) ?? "";
-    const app = { privateKey: context.secret("privateKey"), issuers: [String(store.app.id), store.app.clientId] };
-    if (
-      constantTimeEqual(token, context.secret("installationToken")) ||
-      (await verifyGitHubAppJwt(token, app, clock()))
-    ) {
+    const app = appOfToken(token) ?? (await appOfJwt(token));
+    if (app) {
       c.set("authenticated", true);
       const [, owner = "", name = ""] = /\/repos\/([^/]+)\/([^/]+)/.exec(c.req.path) ?? [];
       const repo = store.repoNamed(owner, name);
-      if (repo?.installed) c.set("repo", repo);
+      if (repo?.apps.has(app.name)) c.set("repo", repo);
     }
     throw notFound();
   });

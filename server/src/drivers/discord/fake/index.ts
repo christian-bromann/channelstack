@@ -4,7 +4,7 @@ import { applicationFlags, guildObject, JOINED_AT, memberObject, userObject } fr
 import { has } from "../permissions.ts";
 import { botIdOf } from "../secrets.ts";
 import { createDiscordApi } from "./api.ts";
-import { createGateway } from "./gateway.ts";
+import { createGateways } from "./gateway.ts";
 import { DiscordStore } from "./store.ts";
 import { createFakeWorld, type FakeDiscordWorld } from "./world.ts";
 
@@ -37,40 +37,49 @@ export function createDiscordFake(context: DriverContext): DiscordFake {
   const botId = () => botIdOf(context.secret("botToken")) ?? identity.owner;
 
   let world: FakeDiscordWorld;
-  const gateway = createGateway(context, {
-    botToken: () => context.secret("botToken"),
-    privilegedIntents: () => store.app.privilegedIntents,
-    takeDrop: (session) => {
-      const at = store.faults.findIndex((fault) => fault.type === "drop_gateway" && fault.session === session);
+  /** An app by name: the Gateway knows bots by their app's name. */
+  const named = (app: string) => store.apps.named(app) ?? store.app;
+  const gateway = createGateways(context, {
+    appWithToken: (token) => store.apps.withSecret(token, (app) => context.apps.secret(app, "botToken"))?.name,
+    privilegedIntents: (app) => named(app).privilegedIntents,
+    takeDrop: (session, app) => {
+      const at = store.faults.findIndex(
+        (fault) =>
+          fault.type === "drop_gateway" && fault.session === session && (fault.app === undefined || fault.app === app),
+      );
       if (at < 0) return false;
       store.faults.splice(at, 1);
       return true;
     },
-    ready: (session, resumeUrl) => ({
-      v: 10,
-      user_settings: {},
-      user: { ...userObject({ kind: "app", app: store.app }), verified: true, mfa_enabled: false, email: null },
-      guilds: [{ id: store.guild.id, unavailable: true }],
-      guild_join_requests: [],
-      presences: [],
-      private_channels: [],
-      relationships: [],
-      session_id: session,
-      session_type: "normal",
-      resume_gateway_url: resumeUrl,
-      shard: [0, 1],
-      application: {
-        id: store.app.id,
-        flags: applicationFlags(store.app.privilegedIntents),
-        // The same flags as a string, for flags past 2^53, as Discord's READY carries them.
-        flags_new: String(applicationFlags(store.app.privilegedIntents)),
-      },
-      auth: {},
-      geo_ordered_rtc_regions: [],
-      _trace: ['["gateway-prd-channelstack",{"micros":0}]'],
-    }),
-    afterReady: () => {
-      const visible = store.allChannels().filter((channel) => has(world.botPermissions(channel), "VIEW_CHANNEL"));
+    ready: (name, session, resumeUrl) => {
+      const app = named(name);
+      return {
+        v: 10,
+        user_settings: {},
+        user: { ...userObject({ kind: "app", app }), verified: true, mfa_enabled: false, email: null },
+        guilds: [{ id: store.guild.id, unavailable: true }],
+        guild_join_requests: [],
+        presences: [],
+        private_channels: [],
+        relationships: [],
+        session_id: session,
+        session_type: "normal",
+        resume_gateway_url: resumeUrl,
+        shard: [0, 1],
+        application: {
+          id: app.id,
+          flags: applicationFlags(app.privilegedIntents),
+          // The same flags as a string, for flags past 2^53, as Discord's READY carries them.
+          flags_new: String(applicationFlags(app.privilegedIntents)),
+        },
+        auth: {},
+        geo_ordered_rtc_regions: [],
+        _trace: ['["gateway-prd-channelstack",{"micros":0}]'],
+      };
+    },
+    afterReady: (name) => {
+      const app = named(name);
+      const visible = store.allChannels().filter((channel) => has(world.botPermissions(channel, app), "VIEW_CHANNEL"));
       return [
         {
           t: "GUILD_CREATE",
@@ -79,12 +88,14 @@ export function createDiscordFake(context: DriverContext): DiscordFake {
             joined_at: new Date(JOINED_AT).toISOString(),
             large: false,
             unavailable: false,
-            member_count: store.users.values().length + 2,
-            members: [
-              { ...memberObject([store.app.roleId], JOINED_AT), user: userObject({ kind: "app", app: store.app }) },
-            ],
-            channels: visible.filter((channel) => channel.kind === "text").map(world.channelWire),
-            threads: visible.filter((channel) => channel.kind === "public_thread").map(world.channelWire),
+            member_count: store.users.values().length + store.apps.all().length + 1,
+            members: [{ ...memberObject([app.roleId], JOINED_AT), user: userObject({ kind: "app", app }) }],
+            channels: visible
+              .filter((channel) => channel.kind === "text")
+              .map((channel) => world.channelWire(channel, app)),
+            threads: visible
+              .filter((channel) => channel.kind === "public_thread")
+              .map((channel) => world.channelWire(channel, app)),
             presences: [],
             voice_states: [],
             stage_instances: [],
@@ -99,7 +110,7 @@ export function createDiscordFake(context: DriverContext): DiscordFake {
       ];
     },
   });
-  world = createFakeWorld(context, store, gateway);
+  world = createFakeWorld(context, store, gateway, DEFAULT_APP);
 
   const fake = {
     api: createDiscordApi(context, world, gateway),

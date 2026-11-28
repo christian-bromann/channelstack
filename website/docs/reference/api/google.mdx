@@ -24,6 +24,56 @@ Returned by [`Session.google()`](/docs/reference/api/client#google).
 | `app` | `app` | `GoogleApp` |
 | `apiUrl` | `api_url` | `string` |
 
+### createApp()
+
+Make another app: a mailbox of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_GOOGLE_APP_&lt;NAME>_WEBHOOK_URL.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const app = await google.createApp({ name: "…" });
+```
+
+```python title="Python"
+app = await google.create_app(name="…")
+```
+
+```rust title="Rust"
+let app = google.create_app().name("…").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `name` | `string` | yes | option |
+
+**Returns** [`GoogleApp`](/docs/reference/api/google#googleapp).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027).
+
+### apps()
+
+The mailboxs this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const apps = await google.apps();
+```
+
+```python title="Python"
+apps = await google.apps()
+```
+
+```rust title="Rust"
+let apps = google.apps().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GoogleApps`](/docs/reference/api/google#googleapps).
+
 ### createUser()
 
 Create a person: a mailbox, at `<name>@example.com` unless a test gives the address.
@@ -120,6 +170,7 @@ let deliveries = google.deliveries().r#type("…").await?;
 |---|---|---|---|---|
 | `type` | `type` · `r#type` | `string` | no | option |
 | `resource` | `resource` | `GoogleThread` | no | option |
+| `app` | `app` | `GoogleApp` | no | option |
 
 **Returns** [`GoogleDeliveries`](/docs/reference/api/google#googledeliveries).
 
@@ -184,6 +235,8 @@ let api_call = google.wait_for_call().operation("…").await?;
 
 ## GoogleApp
 
+Returned by [`GoogleFixture.createApp()`](/docs/reference/api/google#createapp).
+
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
@@ -192,35 +245,26 @@ let api_call = google.wait_for_call().operation("…").await?;
 | `name` | `name` | `string` |
 | `botUserId` | `bot_user_id` | `string` |
 | `address` | `address` | `string` |
-
-## GoogleUser
-
-Returned by [`GoogleFixture.createUser()`](/docs/reference/api/google#createuser).
-
-| Field | Type |
-|---|---|
-| `id` | `string` |
-| `channel` | `"google"` |
-| `kind` | `"user"` |
-| `name` | `string` |
-| `address` | `string` |
+| `clientId` | `client_id` | `string` |
+| `clientSecret` | `client_secret` | `string` |
+| `refreshToken` | `refresh_token` | `string` |
 
 ### send()
 
-The person emails someone: the agent (`google.app`), or another person.
+An app a test made sends an email, through its own mailbox's API, as its own call would.
 
 <CodeGroup>
 
 ```ts title="TypeScript"
-const email = await user.send({ to, subject: "…" });
+const email = await app.send({ to, subject: "…" });
 ```
 
 ```python title="Python"
-email = await user.send(to=to, subject="…")
+email = await app.send(to=to, subject="…")
 ```
 
 ```rust title="Rust"
-let email = user.send().to(to).subject("…").await?;
+let email = app.send().to(to).subject("…").await?;
 ```
 
 </CodeGroup>
@@ -232,25 +276,28 @@ let email = user.send().to(to).subject("…").await?;
 | `subject` | `string` | yes | option |
 | `text` | `string` | no | option |
 | `html` | `string` | no | option |
+| `headers` | `Record<string, string>` | no | option |
 
 **Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail).
 
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027).
+
 ### reply()
 
-The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`.
+An app a test made replies to an email, in its thread, as its own call would.
 
 <CodeGroup>
 
 ```ts title="TypeScript"
-const result = await user.reply(email, { text: "…" });
+const result = await app.reply(email, { text: "…" });
 ```
 
 ```python title="Python"
-result = await user.reply(email, text="…")
+result = await app.reply(email, text="…")
 ```
 
 ```rust title="Rust"
-let result = user.reply(&email).text("…").await?;
+let result = app.reply(&email).text("…").await?;
 ```
 
 </CodeGroup>
@@ -261,57 +308,82 @@ let result = user.reply(&email).text("…").await?;
 | `text` | `string` | no | option |
 | `html` | `string` | no | option |
 | `all` | `boolean` | no | option |
+| `headers` | `Record<string, string>` | no | option |
 
 **Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail).
 
-### inbox()
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027).
 
-What reached the person's mailbox, oldest first.
+## GoogleEmail
+
+Returned by [`GoogleApp.send()`](/docs/reference/api/google#send), [`GoogleApp.reply()`](/docs/reference/api/google#reply), [`GoogleEmail.refresh()`](/docs/reference/api/google#refresh), [`GoogleUser.send()`](/docs/reference/api/google#send-1).
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `id` | `id` | `string` |
+| `channel` | `channel` | `"google"` |
+| `thread` | `thread` | `GoogleThread` |
+| `author` | `author` | `GooglePrincipal` |
+| `from` | `from_` · `from` | `string` |
+| `to` | `to` | `string[]` |
+| `cc` | `cc` | `string[]` |
+| `subject` | `subject` | `string` |
+| `text` | `text` | `string` |
+| `at` | `at` | `string` |
+| `messageId` | `message_id` | `string` |
+| `headers` | `headers` | `Record<string, string>` |
+| `labels` | `labels` | `string[]` |
+| `delivery` | `delivery` | `GoogleDelivery \| undefined` |
+
+### refresh()
+
+Re-read an email.
 
 <CodeGroup>
 
 ```ts title="TypeScript"
-const inbox = await user.inbox();
+const updated = await email.refresh();
 ```
 
 ```python title="Python"
-inbox = await user.inbox()
+updated = await email.refresh()
 ```
 
 ```rust title="Rust"
-let inbox = user.inbox().await?;
+let updated = email.refresh().await?;
 ```
 
 </CodeGroup>
 
-**Returns** [`GoogleInbox`](/docs/reference/api/google#googleinbox).
+**Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail).
 
-### waitForEmail()
+### deliveryFor()
 
-Waits for the next email after the last one this handle returned: it polls `inbox()` and never sleeps longer than it must.
+The delivery that told this app of the email (decision 0027), or nothing when it wasn't told.
 
 <CodeGroup>
 
 ```ts title="TypeScript"
-const email = await user.waitForEmail({ from: "my-agent" });
+const delivery = await email.deliveryFor(app);
 ```
 
 ```python title="Python"
-email = await user.wait_for_email(from_="my-agent")
+delivery = await email.delivery_for(app)
 ```
 
 ```rust title="Rust"
-let email = user.wait_for_email().from("my-agent").await?;
+let delivery = email.delivery_for(&app).await?;
 ```
 
 </CodeGroup>
 
-| Parameter | Python / Rust | Type | Required |  |
-|---|---|---|---|---|
-| `from` | `from_` · `from` | `GooglePrincipal \| string` | no | a handle, or a name |
-| `timeout` | `timeout` | `Duration` | no | default 10s |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `app` | `GoogleApp` | yes | positional |
 
-**Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail). When the time is up, it fails with what it was waiting for.
+**Returns** [`GoogleDelivery | undefined`](/docs/reference/api/google#googledelivery).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
 
 ## GoogleThread
 
@@ -442,56 +514,15 @@ let email = thread.latest_reply().from("my-agent").await?;
 
 **Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail). When the time is up, it fails with what it was waiting for.
 
-## GoogleEmail
-
-Returned by [`GoogleUser.send()`](/docs/reference/api/google#send), [`GoogleUser.reply()`](/docs/reference/api/google#reply), [`GoogleEmail.refresh()`](/docs/reference/api/google#refresh).
-
-| Field | Python / Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channel` | `channel` | `"google"` |
-| `thread` | `thread` | `GoogleThread` |
-| `author` | `author` | `GooglePrincipal` |
-| `from` | `from_` · `from` | `string` |
-| `to` | `to` | `string[]` |
-| `cc` | `cc` | `string[]` |
-| `subject` | `subject` | `string` |
-| `text` | `text` | `string` |
-| `at` | `at` | `string` |
-| `messageId` | `message_id` | `string` |
-| `labels` | `labels` | `string[]` |
-| `delivery` | `delivery` | `GoogleDelivery \| undefined` |
-
-### refresh()
-
-Re-read an email.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const updated = await email.refresh();
-```
-
-```python title="Python"
-updated = await email.refresh()
-```
-
-```rust title="Rust"
-let updated = email.refresh().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail).
-
 ## GoogleDelivery
 
-Returned by [`GoogleDelivery.refresh()`](/docs/reference/api/google#refresh-1).
+Returned by [`GoogleEmail.deliveryFor()`](/docs/reference/api/google#deliveryfor), [`GoogleDelivery.refresh()`](/docs/reference/api/google#refresh-1).
 
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"google"` |
+| `app` | `app` | `string` |
 | `type` | `type` · `r#type` | `string` |
 | `emailAddress` | `email_address` | `string` |
 | `historyId` | `history_id` | `string` |
@@ -603,9 +634,143 @@ let updated = delivery.settled().await?;
 
 **Returns** [`GoogleDelivery`](/docs/reference/api/google#googledelivery). When the time is up, it fails with what it was waiting for.
 
+## GoogleUser
+
+Returned by [`GoogleFixture.createUser()`](/docs/reference/api/google#createuser).
+
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `channel` | `"google"` |
+| `kind` | `"user"` |
+| `name` | `string` |
+| `address` | `string` |
+
+### send()
+
+The person emails someone: the agent (`google.app`), another app, or another person.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const email = await user.send({ to, subject: "…" });
+```
+
+```python title="Python"
+email = await user.send(to=to, subject="…")
+```
+
+```rust title="Rust"
+let email = user.send().to(to).subject("…").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `to` | `Array<GoogleUser \| GoogleApp>` | yes | option |
+| `cc` | `Array<GoogleUser \| GoogleApp>` | no | option |
+| `subject` | `string` | yes | option |
+| `text` | `string` | no | option |
+| `html` | `string` | no | option |
+
+**Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail).
+
+### reply()
+
+The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const result = await user.reply(email, { text: "…" });
+```
+
+```python title="Python"
+result = await user.reply(email, text="…")
+```
+
+```rust title="Rust"
+let result = user.reply(&email).text("…").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `email` | `GoogleEmail` | yes | positional |
+| `text` | `string` | no | option |
+| `html` | `string` | no | option |
+| `all` | `boolean` | no | option |
+
+**Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail).
+
+### inbox()
+
+What reached the person's mailbox, oldest first.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const inbox = await user.inbox();
+```
+
+```python title="Python"
+inbox = await user.inbox()
+```
+
+```rust title="Rust"
+let inbox = user.inbox().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GoogleInbox`](/docs/reference/api/google#googleinbox).
+
+### waitForEmail()
+
+Waits for the next email after the last one this handle returned: it polls `inbox()` and never sleeps longer than it must.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const email = await user.waitForEmail({ from: "my-agent" });
+```
+
+```python title="Python"
+email = await user.wait_for_email(from_="my-agent")
+```
+
+```rust title="Rust"
+let email = user.wait_for_email().from("my-agent").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `from` | `from_` · `from` | `GooglePrincipal \| string` | no | a handle, or a name |
+| `timeout` | `timeout` | `Duration` | no | default 10s |
+
+**Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail). When the time is up, it fails with what it was waiting for.
+
 ## Types
 
 Plain values the handles return and take.
+
+### GoogleApps
+
+```ts
+type GoogleApps = GoogleApp[];
+```
+
+### GooglePrincipal
+
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `name` | `string` |
+| `kind` | `"user" \| "app"` |
 
 ### GoogleUsers
 
@@ -618,14 +783,6 @@ type GoogleUsers = GoogleUser[];
 ```ts
 type GoogleThreads = GoogleThread[];
 ```
-
-### GooglePrincipal
-
-| Field | Type |
-|---|---|
-| `id` | `string` |
-| `name` | `string` |
-| `kind` | `"user" \| "app"` |
 
 ### GoogleInbox
 

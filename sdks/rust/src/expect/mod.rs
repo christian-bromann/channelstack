@@ -159,6 +159,10 @@ check!(
     ReplyFrom { text("text"): impl IntoArg }
 );
 check!(
+    /// [`Expectation::to_go_quiet`].
+    GoQuiet counts { within("within"): impl IntoArg }
+);
+check!(
     /// [`Expectation::to_have_replies_from`].
     RepliesFrom counts { text("text"): impl IntoArg }
 );
@@ -345,26 +349,30 @@ where
         return Ok(());
     }
     // A failed check also says what the agent left open (a stream it never stopped): often that is the bug.
-    let open = still_open(subject).await?;
-    let leftover = if open.is_empty() {
-        String::new()
-    } else {
-        format!("\nStill open: {}", open.join("; "))
-    };
+    let leftover = leftover(subject).await?;
     Err(Error::Expectation(format!(
         "{}{leftover}",
         describe(&value)
     )))
 }
 
-/// What the agent has left open in the subject's session, in words. Nothing where the server
-/// can't tell (live, without proxy mode): it only adds to a failure's message.
-async fn still_open<S: Subject + ?Sized>(subject: &S) -> Result<Vec<String>> {
-    match subject.quiet().await {
-        Ok(state) => Ok(state.open),
-        Err(Error::Api { .. }) => Ok(vec![]),
-        Err(error) => Err(error),
+/// What the agent has left open in the subject's session, and the bot loops the fake stopped there
+/// (decision 0027), in words, as matchers-core adds them to a failure's message. Nothing where the
+/// server can't tell (live, without proxy mode): it only adds to the message.
+async fn leftover<S: Subject + ?Sized>(subject: &S) -> Result<String> {
+    let state = match subject.quiet().await {
+        Ok(state) => state,
+        Err(Error::Api { .. }) => return Ok(String::new()),
+        Err(error) => return Err(error),
+    };
+    let mut words = String::new();
+    if !state.open.is_empty() {
+        words += &format!("\nStill open: {}", state.open.join("; "));
     }
+    if !state.loops.is_empty() {
+        words += &format!("\nStopped: {}", state.loops.join("; "));
+    }
+    Ok(words)
 }
 
 /// The items of a list the server answered.
@@ -507,6 +515,65 @@ fn negated(negate: bool, wanted: String) -> String {
 }
 
 impl<'a, S: Said + ?Sized> Expectation<'a, S> {
+    /// The conversation goes quiet within `within` (default: the timeout), with at most
+    /// `max_replies` app messages since a person last wrote, those before the check included:
+    /// apps that answer each other without end fail it (decision 0027).
+    pub fn to_go_quiet(self, max_replies: usize) -> GoQuiet<'a, false> {
+        let subject = self.subject;
+        GoQuiet(Check::new(move |options| async move {
+            let within = match options.get("within") {
+                Value::Null => options.or("timeout", DEFAULT_TIMEOUT),
+                given => given.clone(),
+            };
+            let quiet_for = options.or("quietFor", DEFAULT_QUIET_FOR);
+            let quiet = match until_quiet(|| subject.quiet(), &within, &quiet_for, true).await {
+                Ok(_) => true,
+                Err(Error::Timeout { .. }) => false,
+                Err(error) => return Err(error),
+            };
+            let writers: Vec<(String, bool)> = items(subject.read_said().await?)
+                .iter()
+                .map(|message| {
+                    let author = &message["author"];
+                    (
+                        author["name"].as_str().unwrap_or_default().to_owned(),
+                        author["kind"].as_str() == Some("app"),
+                    )
+                })
+                .collect();
+            let since = match writers.iter().rposition(|(_, app)| !app) {
+                Some(at) => &writers[at + 1..],
+                None => &writers[..],
+            };
+            if quiet && since.len() <= max_replies {
+                return Ok(());
+            }
+            let plural = |count: usize| if count == 1 { "message" } else { "messages" };
+            let turns = if since.is_empty() {
+                String::new()
+            } else {
+                let names: Vec<&str> = since.iter().map(|(name, _)| name.as_str()).collect();
+                format!(": {}", names.join(" → "))
+            };
+            let bound = match &within {
+                Value::String(text) => text.clone(),
+                other => format!("{other}ms"),
+            };
+            let leftover = leftover(subject).await?;
+            Err(Error::Expectation(format!(
+                "Expected the conversation to go quiet within {bound} with at most {max_replies} app {} since a person last wrote. {} with {} app {} and no person between them{turns}{leftover}",
+                plural(max_replies),
+                if quiet {
+                    "It went quiet"
+                } else {
+                    "It was still busy"
+                },
+                since.len(),
+                plural(since.len()),
+            )))
+        }))
+    }
+
     /// The thread (or DM) has a reply from this author, matching `text` if it is given.
     pub fn to_have_reply_from(self, author: impl IntoArg) -> ReplyFrom<'a, false> {
         self.reply_from(author.into_arg())

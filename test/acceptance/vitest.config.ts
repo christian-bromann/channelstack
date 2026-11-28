@@ -26,6 +26,7 @@ export default defineConfig({
       "test/acceptance/examples/shared.test.ts",
       "test/acceptance/stack/**/*.test.ts",
       "test/acceptance/checks/**/*.test.ts",
+      "test/acceptance/apps/**/*.test.ts",
     ],
     // Runs after each test, while its session is still open (the plugin closes it last).
     setupFiles: [fileURLToPath(new URL("./schemas.setup.ts", import.meta.url))],
