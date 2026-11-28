@@ -3,7 +3,7 @@
  * channel in the shared `dev` session by the names a person types (`ana`, `#support`, `Login
  * fails`) and by `last`, instead of by ids. Each channel's driver has one (`definition.dev`), written
  * against the channel's control API, so it works the same from the terminal, over MCP and in the
- * UI. What is the same for every channel is here, once; decision 0027 says why.
+ * UI. What is the same for every channel is here, once; decision 0028 says why.
  */
 
 /** A channel's control API in the dev session: paths are relative to `/sessions/<dev>/<channel>`. */
@@ -182,9 +182,7 @@ export async function devEnsurePlace(
     return { place: found, created: false };
   }
   const made = placeOf(adapter, await adapter.create({ ...acting, name: name.replace(/^#/, ""), text: acting.text }));
-  // As the list route has it now, with what only it says (when GitHub's issue last changed).
-  const listed = (await devPlaces(api, adapter)).find((place) => place.id === made.id);
-  return { place: listed ?? made, created: true };
+  return { place: made, created: true };
 }
 
 // --- Transcripts, `last` and references -----------------------------------------------------------

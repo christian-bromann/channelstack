@@ -55,7 +55,7 @@ export interface Harness {
   /** The app's timers: retries and pauses happen when the test advances them. */
   timers: ManualTimers;
   /** The app's clock: the real time, plus whatever the test let pass. */
-  clock: { advance(ms: number): void };
+  clock: { advance(ms: number): void; now(): number };
   secrets: Secrets;
   /** Every line the app logged. */
   logs: string[];
@@ -128,6 +128,7 @@ export function harness(
       advance(ms) {
         ahead += ms;
       },
+      now: () => Date.now() + ahead,
     },
     secrets,
     logs,
