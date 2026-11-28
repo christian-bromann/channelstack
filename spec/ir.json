@@ -2862,7 +2862,8 @@
             "cross_workspace_credential",
             "not_found",
             "not_in_channel",
-            "already_in_channel"
+            "already_in_channel",
+            "method_not_supported_for_channel_type"
           ],
           "dispose": false
         },
@@ -2926,7 +2927,8 @@
             "fake_actor_in_live_world",
             "cross_workspace_credential",
             "not_found",
-            "not_in_channel"
+            "not_in_channel",
+            "method_not_supported_for_channel_type"
           ],
           "dispose": false
         },
@@ -23475,6 +23477,7 @@
     "invalid_form_body",
     "live_misconfigured",
     "live_not_allowlisted",
+    "method_not_supported_for_channel_type",
     "missing_access",
     "missing_permissions",
     "msg_too_long",

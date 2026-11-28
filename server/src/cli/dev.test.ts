@@ -229,6 +229,11 @@ describe("the dev tools on every channel", () => {
     const session = await server.devSession();
     const places = (await server.h.call("GET", `/sessions/${session}/places`)).body as Array<{ name: string }>;
     expect(places.map(({ name }) => name)).toContainEqual(expect.stringMatching(/^Direct message D\w+$/));
+    // Nobody else joins it: a DM is between two.
+    const dm = places.map(({ name }) => name).find((name) => name.startsWith("Direct message")) ?? "";
+    await expect(runSay(server, devChannel("slack"), "me too", { as: "ben", in: dm })).rejects.toThrow(
+      `${dm} is a direct message, which can't take another person: open a group message with all of you (\`openDM\`).`,
+    );
 
     // Linear: delegating to the app (filled in), then Stop on the agent session it opened.
     await runSay(server, devChannel("linear"), "please", { as: "lu", in: "Crash" });
