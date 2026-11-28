@@ -5,6 +5,7 @@ import githubRs from "../../examples/rust/src/home_github.rs?sample";
 import gmailRs from "../../examples/rust/src/home_gmail.rs?sample";
 import linearRs from "../../examples/rust/src/home_linear.rs?sample";
 import notionRs from "../../examples/rust/src/home_notion.rs?sample";
+import modelRs from "../../examples/rust/src/home_openai.rs?sample";
 import resendRs from "../../examples/rust/src/home_resend.rs?sample";
 import slackRs from "../../examples/rust/src/home_slack.rs?sample";
 import type { Sample } from "../../plugins/samples-plugin";
@@ -14,9 +15,11 @@ import gmail from "../../samples/gmail.test.ts?sample";
 import slack from "../../samples/hero.test.ts?sample";
 import linear from "../../samples/linear.test.ts?sample";
 import notion from "../../samples/notion.test.ts?sample";
+import model from "../../samples/openai.test.ts?sample";
 import discordPy from "../../samples/python/test_build.py?sample";
 import notionPy from "../../samples/python/test_comments.py?sample";
 import slackPy from "../../samples/python/test_deploy.py?sample";
+import modelPy from "../../samples/python/test_incidents.py?sample";
 import gmailPy from "../../samples/python/test_invoice.py?sample";
 import githubPy from "../../samples/python/test_issues.py?sample";
 import resendPy from "../../samples/python/test_refund.py?sample";
@@ -31,6 +34,7 @@ import {
   GmailMock,
   LinearMock,
   type MockProps,
+  ModelMock,
   NotionMock,
   ResendMock,
   SlackMock,
@@ -225,6 +229,29 @@ const EXAMPLES: Example[] = [
       <>Signs slash commands with Ed25519, and gives up on them after 3 seconds</>,
     ],
   },
+  {
+    id: "model",
+    label: "The model",
+    host: "openai.localhost",
+    code: {
+      ts: { file: "incidents.test.ts", sample: model },
+      py: { file: "test_incidents.py", sample: modelPy },
+      rs: { file: "incidents.rs", sample: modelRs },
+    },
+    Mock: ModelMock,
+    checks: [
+      { step: 2, text: "the agent offered the model search_incidents" },
+      { step: 3, text: "the tool result went back to the model" },
+      { step: 5, text: "one answer in the thread, from two model calls" },
+    ],
+    notes: [
+      <>
+        Serves OpenAI’s API at <code>openai.localhost/v1</code>, from <code>OPENAI_BASE_URL</code>
+      </>,
+      <>Streams, tool calls, errors and rate-limit headers in OpenAI’s own shapes</>,
+      <>Fails the test on a model call no script answers</>,
+    ],
+  },
 ];
 
 /** The step after the last tagged line or check: the finished run. */
@@ -365,7 +392,7 @@ function Panel({
 }
 
 /**
- * One example per platform, in TypeScript or Python: the test on the left "plays" against the conversation it produces
+ * One example per platform, and one for the model, in TypeScript, Python or Rust: the test on the left "plays" against the conversation it produces
  * on the right. Tabs follow the WAI-ARIA pattern (arrow keys, Home and End). Everything renders
  * finished, so it reads without script; without script every example shows, one after the other.
  */

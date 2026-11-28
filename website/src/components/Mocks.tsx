@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 /**
  * What each example's test produces, drawn to look like the platform it runs on: a Slack
  * conversation, a GitHub issue, a Linear issue with an agent session, a Notion page with
- * comments, an email thread, a Discord channel. Every part carries the playback step at which it appears, so the mock-up plays
+ * comments, an email thread, a Discord channel, and a Slack thread with the model calls the fake
+ * OpenAI recorded. Every part carries the playback step at which it appears, so the mock-up plays
  * in step with the highlighted line of the test.
  */
 
@@ -596,6 +597,81 @@ export function DiscordMock({ step }: MockProps) {
       </div>
       <div className="dc-composer" aria-hidden="true">
         <span>Message #support</span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The model: a Slack thread, and below it the calls the fake OpenAI recorded, in the site's code
+// colours. No OpenAI artwork.
+
+function ModelCall({
+  step,
+  at,
+  dir,
+  children,
+}: {
+  step: number;
+  at: number;
+  dir: "request" | "answer";
+  children: ReactNode;
+}) {
+  return (
+    <li className={when(step, at, `md-row ${dir}`)}>
+      <span className="md-dir">{dir === "request" ? "agent →" : "← model"}</span>
+      <span className="md-what">{children}</span>
+    </li>
+  );
+}
+
+/** Ana asks in a channel; the model calls a tool, gets its result, and answers once. */
+export function ModelMock({ step }: MockProps) {
+  return (
+    <div className="app app-model">
+      <div className="app-slack md-thread">
+        <div className="sl-head">
+          <span className="md-hash" aria-hidden="true">
+            #
+          </span>
+          <b>ops</b>
+        </div>
+        <div className="sl-body">
+          <SlackMessage who="ana" time="9:30 AM" className={when(step, 1, "sl-msg")}>
+            <p>
+              <Mention>@my-agent</Mention> what broke yesterday?
+            </p>
+          </SlackMessage>
+          <SlackMessage who="my-agent" bot time="9:30 AM" className={when(step, 4, "sl-msg")}>
+            <p className={step === 4 ? "md-streaming" : undefined}>
+              Two incidents yesterday: the web deploy and a DNS blip.
+            </p>
+          </SlackMessage>
+        </div>
+      </div>
+      <div className="md-calls">
+        <p className="md-head">
+          <span>Model calls</span>
+          <span className="spacer" />
+          <code>POST /v1/chat/completions</code>
+        </p>
+        <ol>
+          <ModelCall step={step} at={1} dir="request">
+            #1 “what broke yesterday?” · tools: <b>search_incidents</b>
+          </ModelCall>
+          <ModelCall step={step} at={2} dir="answer">
+            tool_calls: <b>search_incidents</b>({"{"}"since":"yesterday"{"}"})
+          </ModelCall>
+          <ModelCall step={step} at={3} dir="request">
+            #2 tool result: "web deploy: migration failed", "DNS blip"
+          </ModelCall>
+          <ModelCall step={step} at={4} dir="answer">
+            stream: “Two incidents yesterday: …” · stop
+          </ModelCall>
+        </ol>
+        <p className={when(step, 5, "md-done")}>
+          <span className="md-pass">PASS</span>2 calls, both scripted · no secrets sent
+        </p>
       </div>
     </div>
   );

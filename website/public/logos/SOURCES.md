@@ -1,8 +1,9 @@
 # Logos
 
 Third-party logos on the site, each the unmodified official file, byte for byte, taken from its
-owner's own brand or media kit on 2026-11-20 (Resend's on 2026-11-25, Discord's on 2026-11-27): the six platform marks on
-the channel cards of the home page, to say "channelstack works with this platform". The example
+owner's own brand or media kit on 2026-11-20 (Resend's on 2026-11-25, Discord's on 2026-11-27, OpenAI's on 2026-11-28): the six platform marks on
+the channel cards of the home page, to say "channelstack works with this platform", and OpenAI's on the card for the
+model, to say that channelstack fakes OpenAI's API. The example
 player's language switch names its languages (TypeScript, Python, Rust) in text, with a dot in each
 one's GitHub colour, so it shows no logos.
 
@@ -17,6 +18,8 @@ one's GitHub colour, so it shows no logos.
 | `resend.svg` | Resend | https://cdn.resend.com/brand/resend-brand-assets.zip, linked from https://resend.com/brand | `resend-brand-assets/resend-icon-black.svg` | light | `7251dba7137e25a4117154bfdaef8333128a9dcc67446912ddcf6d6048573b12` |
 | `resend-white.svg` | Resend | https://cdn.resend.com/brand/resend-brand-assets.zip, linked from https://resend.com/brand | `resend-brand-assets/resend-icon-white.svg` | dark | `9d6a386b319b8d0f421918e270f843d9996e31021fad9e41bc4c10a8882b9908` |
 | `discord.svg` | Discord | https://cdn.discordapp.com/assets/content/a736b95923ddbc155e828651c92471292e40727655d770a06cec89c48ba0b41f.zip, the Symbol's colour kit linked from https://discord.com/branding | `Discord_Symbol_Color/Discord-Symbol-Blurple.svg` | light and dark | `d06eaa51e78a9984ebbd3fbc82f0245ac2ecb5bf0150f537204397c1da5c7bd8` |
+| `openai.svg` | OpenAI | https://cdn.openai.com/brand/openai-logos.zip, "Download logos" on https://openai.com/brand | `OpenAI-logos/SVGs/OAI_OpenAI-Blossom_Black.svg` | light | `75c1e9fffa5e8c437bec1d67197a73992bca45d166c6ff23215185dea8fae92a` |
+| `openai-white.svg` | OpenAI | https://cdn.openai.com/brand/openai-logos.zip, "Download logos" on https://openai.com/brand | `OpenAI-logos/SVGs/OAI_OpenAI-Blossom_White.svg` | dark | `01d158767c4eec0e47bd617e67759c33da0accd1438be1a8d29dfdb99ce87285` |
 
 To re-check a file, download the kit, and compare `shasum -a 256` of the file at that path with the sum above.
 
@@ -32,14 +35,22 @@ Summaries are paraphrased; read the linked page before changing how a mark is us
 | Notion | https://notion.notion.site/Notion-s-brand-usage-guidelines-How-to-use-Notion-s-brand-in-your-marketing-689045e1761348f887a3c5c80295e00f | Text statements that an integration works with Notion are allowed. The guidelines say not to use the standalone Notion logo. |
 | Discord | https://discord.com/branding ("Legal Brand Guidelines") | The logo may be used in colour, black or white, unedited ("do not edit, change, distort, recolor, or reconfigure"), digitally, to say you use Discord, without implying sponsorship; the Symbol is for where the Discord brand is clear, as on a card that names it. Not in a product's own name or logo. |
 | Resend | https://resend.com/brand | Use the files unaltered. The page recommends the wordmark "for stronger brand recognition"; the kit's icon is used here because every card shows a square mark next to the platform's name. |
+| OpenAI | https://openai.com/brand ("Design Guidelines", with its "Usage terms" and the "API Developers" and "Non-partnerships" notes) | Use the logo only where it relates directly to OpenAI's services, exactly as provided, in black or white, with the spacing built into the file, and never more prominently than your own name; don't imply sponsorship, endorsement or a partnership. Downloading the logos means agreeing to the usage terms, under which OpenAI can ask for changes or withdraw permission at any time. The page also lists using the logo without permission as a don't, says permission requests go to OpenAI's partner communications team, and tells API developers to keep OpenAI's logos out of their own product's name, logo, description and screenshots. The Blossom is not to be used as primary branding or together with the OpenAI wordmark. |
 
 **Decision.** The maintainer chose to show all six marks on the channel cards, knowing that
 Slack's and Notion's guidelines don't grant this use and GitHub's are ambiguous. Asking Slack and
 Notion for permission, or replacing those two marks with names, are the ways to close that gap.
+The maintainer also chose to show OpenAI's Blossom on the card for the model. OpenAI's guidelines
+are ambiguous for it: the card relates directly to OpenAI's API and shows the file unaltered, but
+the page also asks for permission before the logo is used and asks developers to keep OpenAI's
+logos out of how they describe their own product. Asking OpenAI (partnercomms@openai.com), or
+replacing the mark with the name, closes that gap. The site's copy avoids the partnership wording
+OpenAI rules out ("worked with", "partnered with", "building with").
 
 ## How the marks are shown
 
 - Unmodified files, rendered with `<img>` at 32 px: no recolouring, cropping, rotation, effects or animation of a mark.
-- "Works with" use only: one platform mark per channel card, next to the platform's name, and nowhere else on the site.
-- GitHub, Linear and Resend use their official dark-background files in the dark theme; Slack, Notion and Discord (its blurple Symbol) have one file for both.
-- The footer states that channelstack is not affiliated with or endorsed by the six platforms, and that all names and logos shown, including TypeScript (Microsoft), Python (Python Software Foundation) and Rust (Rust Foundation), are trademarks of their owners (`src/components/Footer.tsx`).
+- "Works with" use only: one platform mark per card, next to the platform's name, and nowhere else on the site. OpenAI's Blossom is the mark of the model's card, never the wordmark, and never part of channelstack's own branding.
+- GitHub, Linear, Resend and OpenAI use their official dark-background files in the dark theme; Slack, Notion and Discord (its blurple Symbol) have one file for both.
+- OpenAI's Blossom file carries its own clear space, so its symbol fills about half of the 32 px box: it is shown at the same 32 px as the other marks, not cropped or scaled up to fill it.
+- The footer states that channelstack is not affiliated with or endorsed by the six platforms or OpenAI, and that all names and logos shown, including TypeScript (Microsoft), Python (Python Software Foundation) and Rust (Rust Foundation), are trademarks of their owners (`src/components/Footer.tsx`).

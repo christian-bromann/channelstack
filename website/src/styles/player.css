@@ -509,7 +509,9 @@ html:not(.js) .lang {
       .gm-subject,
       .gm-count,
       .gm-msg,
-      .gm-actions
+      .gm-actions,
+      .md-row,
+      .md-done
     ) {
     transition:
       opacity 380ms var(--ease),
@@ -1745,4 +1747,117 @@ html:not(.js) .lang {
   background: var(--field);
   color: var(--dim);
   font-size: 14px;
+}
+
+/* ---------- The model: a Slack thread above the calls the fake OpenAI recorded ---------- */
+
+.app-model {
+  background: var(--code-bg);
+}
+
+.md-thread {
+  display: flex;
+  flex-direction: column;
+}
+
+.md-hash {
+  color: var(--dim);
+  font-size: 18px;
+}
+
+/* the answer while it streams: a caret after the text so far */
+.md-streaming::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 3px;
+  background: var(--fg);
+  vertical-align: -2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .js .md-streaming::after {
+    animation: caret 900ms steps(1) infinite;
+  }
+}
+
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.md-calls {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--code-line);
+  color: var(--code-fg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.md-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--code-dim);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.md-head code {
+  color: var(--code-fn);
+  font-size: 11.5px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.md-calls ol {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.md-row {
+  display: grid;
+  grid-template-columns: 7.5ch minmax(0, 1fr);
+  gap: 10px;
+}
+
+.md-dir {
+  color: var(--code-dim);
+}
+
+.md-row.answer .md-dir {
+  color: var(--code-key);
+}
+
+.md-what {
+  overflow-wrap: anywhere;
+}
+
+.md-calls b {
+  color: var(--code-str);
+  font-weight: 400;
+}
+
+.md-done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--code-dim);
+}
+
+.md-pass {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--code-ok) 18%, transparent);
+  color: var(--code-ok);
+  font-weight: 600;
 }
