@@ -203,18 +203,22 @@ Every event channelstack sent the agent for this session, with every attempt.
 <CodeGroup>
 
 ```ts title="TypeScript"
-const deliveries = await slack.deliveries();
+const deliveries = await slack.deliveries({ app });
 ```
 
 ```python title="Python"
-deliveries = await slack.deliveries()
+deliveries = await slack.deliveries(app=app)
 ```
 
 ```rust title="Rust"
-let deliveries = slack.deliveries().await?;
+let deliveries = slack.deliveries().app(&app).await?;
 ```
 
 </CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `app` | `SlackApp` | no | option |
 
 **Returns** [`SlackDeliveries`](/docs/reference/api/slack#slackdeliveries).
 
@@ -308,6 +312,7 @@ let fault = slack.fault().r#type(r#type).await?;
 | `after` | `after` | `Duration` | no | option |
 | `error` | `error` | `string` | no | option |
 | `times` | `times` | `number` | no | option |
+| `app` | `app` | `SlackApp` | no | option |
 
 **Returns** [`SlackFault`](/docs/reference/api/slack#slackfault).
 

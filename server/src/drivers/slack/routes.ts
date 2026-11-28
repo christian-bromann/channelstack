@@ -1271,7 +1271,7 @@ export function registerSlackRoutes(
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, params, query }) => {
-      const app = fake.appIn(session.id, query.app);
+      const app = fake.roster.get(session.id, query.app);
       return deliveryOf(session.id, fake.message(session.id, params.channel, params.ts).deliveries, app.name) ?? null;
     },
   });
@@ -1298,6 +1298,7 @@ export function registerSlackRoutes(
     stability,
     deliveries: fake,
     delivery: { schema: SlackDelivery, wire: deliveryWire },
+    apps: { handle: "SlackApp", roster: fake.roster },
     listSummary: "Every event channelstack sent the agent for this session, with every attempt",
     // Slack's own word is retry, with its options: registered below.
     redeliver: false,
@@ -1367,13 +1368,20 @@ export function registerSlackRoutes(
         after: duration("For drop_socket: how long until the connection drops. Default: now.").default(0),
         error: z.string().default("internal_error"),
         times: z.number().int().min(1).optional(),
+        app: z
+          .string()
+          .optional()
+          .openapi({
+            description: "Only this app's calls, or its Socket Mode connections; every app's when left out.",
+            ...refTo("SlackApp"),
+          }),
       })
       .openapi("SlackFaultBody"),
     response: z.object({ id: z.string() }).openapi("SlackFault", { "x-channelstack-resource": { id: "id" } }),
     sdkMethod: {
       on: "SlackFixture",
       name: "fault",
-      options: ["type", "operation", "retryAfter", "delay", "after", "error", "times"],
+      options: ["type", "operation", "retryAfter", "delay", "after", "error", "times", "app"],
     },
     live: FAULTS,
     stability,
@@ -1386,6 +1394,7 @@ export function registerSlackRoutes(
         // One delay field in the record: a latency fault's per-call delay, or how long until the socket drops.
         delayMs: body.type === "drop_socket" ? body.after : body.delay,
         error: body.error,
+        app: body.app,
       }),
     }),
   });

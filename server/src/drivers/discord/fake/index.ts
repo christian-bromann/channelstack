@@ -42,8 +42,11 @@ export function createDiscordFake(context: DriverContext): DiscordFake {
   const gateway = createGateways(context, {
     appWithToken: (token) => store.apps.withSecret(token, (app) => context.apps.secret(app, "botToken"))?.name,
     privilegedIntents: (app) => named(app).privilegedIntents,
-    takeDrop: (session) => {
-      const at = store.faults.findIndex((fault) => fault.type === "drop_gateway" && fault.session === session);
+    takeDrop: (session, app) => {
+      const at = store.faults.findIndex(
+        (fault) =>
+          fault.type === "drop_gateway" && fault.session === session && (fault.app === undefined || fault.app === app),
+      );
       if (at < 0) return false;
       store.faults.splice(at, 1);
       return true;

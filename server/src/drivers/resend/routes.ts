@@ -126,6 +126,7 @@ export function registerResendRoutes(
     stability,
     deliveries: fake,
     delivery: { schema: ResendDelivery, wire: deliveryWire },
+    apps: { handle: "ResendApp", roster: world.store.apps },
     listSummary: "Every webhook channelstack sent the agent for this session, with every attempt",
     filters: {
       type: "Only this event type, e.g. `email.received`.",

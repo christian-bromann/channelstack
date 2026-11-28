@@ -399,3 +399,36 @@ describe("exit check 12.4: each app's interactions are its own", () => {
     ).toBe(10015);
   });
 });
+
+describe("R1.12: faults by app", () => {
+  test("drop_gateway that names an app drops that app's bot's connection alone", async () => {
+    const space = await discordWorkspace();
+    const { control, identify, fixture, ana, say } = space;
+    const coder = (await control("POST", "/apps", { name: "coder" })).body;
+    const both = (await control("POST", "/channels", { participants: [ana.id, fixture.app.id, coder.id] })).body;
+    const intents = (1 << 0) | (1 << 9) | (1 << 15);
+    const mine = await identify(intents);
+    const theirs = await identify(intents, coder.botToken);
+
+    await control("POST", "/faults", { type: "drop_gateway", app: coder.id });
+    await say("hello both", { channel: both.id });
+    await space.h.app.settled();
+
+    expect(theirs.closed).toEqual({ code: null });
+    expect(mine.closed).toBeUndefined();
+    expect(mine.dispatches().some((payload) => payload.d?.content === "hello both")).toBe(true);
+  });
+
+  test("a rate_limit that names an app refuses that app's calls alone", async () => {
+    const space = await discordWorkspace();
+    const { control, api, h, ana, fixture } = space;
+    const coder = (await control("POST", "/apps", { name: "coder" })).body;
+    const both = (await control("POST", "/channels", { participants: [ana.id, fixture.app.id, coder.id] })).body;
+    await control("POST", "/faults", { type: "rate_limit", app: coder.id });
+    const asCoder = await h.provider("POST", `discord/api/v10/channels/${both.id}/messages`, { content: "hi" }, null, {
+      authorization: `Bot ${coder.botToken}`,
+    });
+    expect(asCoder.status).toBe(429);
+    expect((await api("POST", `/channels/${both.id}/messages`, { content: "hi" })).status).toBe(200);
+  });
+});

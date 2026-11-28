@@ -1720,9 +1720,9 @@ export class SlackFixture {
   }
 
   /** Every event channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(): Promise<SlackDeliveries> {
+  async deliveries(options: { app?: SlackApp } = {}): Promise<SlackDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/deliveries`)) as SlackDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/deliveries`, { query: { app: options.app === undefined ? undefined : options.app.id } })) as SlackDeliveriesWire;
     return decodeSlackDeliveries(ctx, data);
   }
 
@@ -1741,9 +1741,9 @@ export class SlackFixture {
   }
 
   /** Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once. Experimental. */
-  async fault(options: { type: "rate_limit" | "latency" | "error" | "drop_socket"; operation?: string; retryAfter?: Duration; delay?: Duration; after?: Duration; error?: string; times?: number }): Promise<SlackFault> {
+  async fault(options: { type: "rate_limit" | "latency" | "error" | "drop_socket"; operation?: string; retryAfter?: Duration; delay?: Duration; after?: Duration; error?: string; times?: number; app?: SlackApp }): Promise<SlackFault> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/faults`, { body: { type: options.type, operation: options.operation, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), delay: options.delay === undefined ? undefined : parseDuration(options.delay), after: options.after === undefined ? undefined : parseDuration(options.after), error: options.error, times: options.times } })) as SlackFaultData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/faults`, { body: { type: options.type, operation: options.operation, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), delay: options.delay === undefined ? undefined : parseDuration(options.delay), after: options.after === undefined ? undefined : parseDuration(options.after), error: options.error, times: options.times, app: options.app === undefined ? undefined : options.app.id } })) as SlackFaultData;
     return new SlackFault(ctx, data);
   }
 
@@ -2529,9 +2529,9 @@ export class GitHubFixture {
   }
 
   /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: GitHubRepo } = {}): Promise<GitHubDeliveries> {
+  async deliveries(options: { type?: string; resource?: GitHubRepo; app?: GitHubApp } = {}): Promise<GitHubDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as GitHubDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as GitHubDeliveriesWire;
     return decodeGitHubDeliveries(ctx, data);
   }
 
@@ -3503,9 +3503,9 @@ export class LinearFixture {
   }
 
   /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: LinearIssue } = {}): Promise<LinearDeliveries> {
+  async deliveries(options: { type?: string; resource?: LinearIssue; app?: LinearApp } = {}): Promise<LinearDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as LinearDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as LinearDeliveriesWire;
     return decodeLinearDeliveries(ctx, data);
   }
 
@@ -4219,9 +4219,9 @@ export class NotionFixture {
   }
 
   /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: NotionPage } = {}): Promise<NotionDeliveries> {
+  async deliveries(options: { type?: string; resource?: NotionPage; app?: NotionIntegration } = {}): Promise<NotionDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as NotionDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as NotionDeliveriesWire;
     return decodeNotionDeliveries(ctx, data);
   }
 
@@ -4777,9 +4777,9 @@ export class ResendFixture {
   }
 
   /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: ResendThread } = {}): Promise<ResendDeliveries> {
+  async deliveries(options: { type?: string; resource?: ResendThread; app?: ResendApp } = {}): Promise<ResendDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as ResendDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as ResendDeliveriesWire;
     return decodeResendDeliveries(ctx, data);
   }
 
@@ -5176,9 +5176,9 @@ export class GoogleFixture {
   }
 
   /** Every push channelstack sent the agent for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: GoogleThread } = {}): Promise<GoogleDeliveries> {
+  async deliveries(options: { type?: string; resource?: GoogleThread; app?: GoogleApp } = {}): Promise<GoogleDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as GoogleDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as GoogleDeliveriesWire;
     return decodeGoogleDeliveries(ctx, data);
   }
 
@@ -5601,9 +5601,9 @@ export class DiscordFixture {
   }
 
   /** Every Gateway dispatch and interaction channelstack sent the bot for this session, with every attempt. Experimental. */
-  async deliveries(options: { type?: string; resource?: DiscordChannel } = {}): Promise<DiscordDeliveries> {
+  async deliveries(options: { type?: string; resource?: DiscordChannel; app?: DiscordApp } = {}): Promise<DiscordDeliveries> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as DiscordDeliveriesWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id, app: options.app === undefined ? undefined : options.app.id } })) as DiscordDeliveriesWire;
     return decodeDiscordDeliveries(ctx, data);
   }
 
@@ -5615,9 +5615,9 @@ export class DiscordFixture {
   }
 
   /** Inject a fault: rate-limit the bot's calls of a route (removed when this session closes), or drop its Gateway connection just before the next dispatch. Experimental. */
-  async fault(options: { type: "rate_limit" | "drop_gateway"; route?: string; retryAfter?: Duration; times?: number }): Promise<DiscordFault> {
+  async fault(options: { type: "rate_limit" | "drop_gateway"; route?: string; retryAfter?: Duration; times?: number; app?: DiscordApp }): Promise<DiscordFault> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/faults`, { body: { type: options.type, route: options.route, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), times: options.times } })) as DiscordFaultData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/faults`, { body: { type: options.type, route: options.route, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), times: options.times, app: options.app === undefined ? undefined : options.app.id } })) as DiscordFaultData;
     return new DiscordFault(ctx, data);
   }
 

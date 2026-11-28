@@ -199,6 +199,11 @@ export class AppRoster<App extends Named> {
     return app === this.#builtIn ? BUILT_IN_APP : app.name;
   }
 
+  /** How core knows the app a session's handle or a name stands for: what a delivery records as its `app`. */
+  keyIn(session: string, ref: string): string {
+    return this.keyOf(this.get(session, ref));
+  }
+
   /**
    * The app a call's credential belongs to (a token, a key, a client id), compared in constant
    * time with each app's: `secret` is that credential of the app core knows by the name it is given.

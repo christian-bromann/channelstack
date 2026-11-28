@@ -230,6 +230,7 @@ let deliveries = discord.deliveries().r#type("…").await?;
 |---|---|---|---|---|
 | `type` | `type` · `r#type` | `string` | no | option |
 | `resource` | `resource` | `DiscordChannel` | no | option |
+| `app` | `app` | `DiscordApp` | no | option |
 
 **Returns** [`DiscordDeliveries`](/docs/reference/api/discord#discorddeliveries).
 
@@ -290,6 +291,7 @@ let fault = discord.fault().r#type(r#type).await?;
 | `route` | `route` | `string` | no | option |
 | `retryAfter` | `retry_after` | `Duration` | no | option |
 | `times` | `times` | `number` | no | option |
+| `app` | `app` | `DiscordApp` | no | option |
 
 **Returns** [`DiscordFault`](/docs/reference/api/discord#discordfault).
 

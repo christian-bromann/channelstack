@@ -1886,10 +1886,10 @@ class SlackFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/channels", body={"name": name, "private": private, "participants": None if participants is None else [item.id for item in participants], "topic": topic, "purpose": purpose, "shared": shared})
         return SlackConversation(ctx, data)
 
-    async def deliveries(self) -> SlackDeliveries:
+    async def deliveries(self, *, app: SlackApp | None = None) -> SlackDeliveries:
         """Every event channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries")
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries", query={"app": None if app is None else app.id})
         return [SlackDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> SlackApiCalls:
@@ -1904,10 +1904,10 @@ class SlackFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/uninstall", body={"app": None if app is None else app.id})
         return [SlackDelivery(ctx, item) for item in data]
 
-    async def fault(self, *, type: Literal["rate_limit", "latency", "error", "drop_socket"], operation: str | None = None, retry_after: Duration | None = None, delay: Duration | None = None, after: Duration | None = None, error: str | None = None, times: int | None = None) -> SlackFault:
+    async def fault(self, *, type: Literal["rate_limit", "latency", "error", "drop_socket"], operation: str | None = None, retry_after: Duration | None = None, delay: Duration | None = None, after: Duration | None = None, error: str | None = None, times: int | None = None, app: SlackApp | None = None) -> SlackFault:
         """Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults", body={"type": type, "operation": operation, "retryAfter": None if retry_after is None else parse_duration(retry_after), "delay": None if delay is None else parse_duration(delay), "after": None if after is None else parse_duration(after), "error": error, "times": times})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults", body={"type": type, "operation": operation, "retryAfter": None if retry_after is None else parse_duration(retry_after), "delay": None if delay is None else parse_duration(delay), "after": None if after is None else parse_duration(after), "error": error, "times": times, "app": None if app is None else app.id})
         return SlackFault(ctx, data)
 
     async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> SlackApiCall:
@@ -2385,10 +2385,10 @@ class GitHubFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps")
         return [GitHubApp(ctx, item) for item in data]
 
-    async def deliveries(self, *, type: str | None = None, resource: GitHubRepo | None = None) -> GitHubDeliveries:
+    async def deliveries(self, *, type: str | None = None, resource: GitHubRepo | None = None, app: GitHubApp | None = None) -> GitHubDeliveries:
         """Every webhook channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [GitHubDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> GitHubApiCalls:
@@ -3007,10 +3007,10 @@ class LinearFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues")
         return [LinearIssueListing._from_wire(ctx, item) for item in data]
 
-    async def deliveries(self, *, type: str | None = None, resource: LinearIssue | None = None) -> LinearDeliveries:
+    async def deliveries(self, *, type: str | None = None, resource: LinearIssue | None = None, app: LinearApp | None = None) -> LinearDeliveries:
         """Every webhook channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [LinearDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> LinearApiCalls:
@@ -3444,10 +3444,10 @@ class NotionFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/verification", body={"app": None if app is None else app.id})
         return (None if data is None else NotionDelivery(ctx, data))
 
-    async def deliveries(self, *, type: str | None = None, resource: NotionPage | None = None) -> NotionDeliveries:
+    async def deliveries(self, *, type: str | None = None, resource: NotionPage | None = None, app: NotionIntegration | None = None) -> NotionDeliveries:
         """Every webhook channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [NotionDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> NotionApiCalls:
@@ -3779,10 +3779,10 @@ class ResendFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/threads")
         return [ResendThread(ctx, item) for item in data]
 
-    async def deliveries(self, *, type: str | None = None, resource: ResendThread | None = None) -> ResendDeliveries:
+    async def deliveries(self, *, type: str | None = None, resource: ResendThread | None = None, app: ResendApp | None = None) -> ResendDeliveries:
         """Every webhook channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [ResendDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> ResendApiCalls:
@@ -3997,10 +3997,10 @@ class GoogleFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/threads")
         return [GoogleThread(ctx, item) for item in data]
 
-    async def deliveries(self, *, type: str | None = None, resource: GoogleThread | None = None) -> GoogleDeliveries:
+    async def deliveries(self, *, type: str | None = None, resource: GoogleThread | None = None, app: GoogleApp | None = None) -> GoogleDeliveries:
         """Every push channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [GoogleDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> GoogleApiCalls:
@@ -4231,10 +4231,10 @@ class DiscordFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/verify-endpoint")
         return DiscordEndpointCheck._from_wire(ctx, data)
 
-    async def deliveries(self, *, type: str | None = None, resource: DiscordChannel | None = None) -> DiscordDeliveries:
+    async def deliveries(self, *, type: str | None = None, resource: DiscordChannel | None = None, app: DiscordApp | None = None) -> DiscordDeliveries:
         """Every Gateway dispatch and interaction channelstack sent the bot for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [DiscordDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> DiscordApiCalls:
@@ -4243,10 +4243,10 @@ class DiscordFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/calls", query={"operation": operation, "error": error})
         return [DiscordApiCall._from_wire(ctx, item) for item in data]
 
-    async def fault(self, *, type: Literal["rate_limit", "drop_gateway"], route: str | None = None, retry_after: Duration | None = None, times: int | None = None) -> DiscordFault:
+    async def fault(self, *, type: Literal["rate_limit", "drop_gateway"], route: str | None = None, retry_after: Duration | None = None, times: int | None = None, app: DiscordApp | None = None) -> DiscordFault:
         """Inject a fault: rate-limit the bot's calls of a route (removed when this session closes), or drop its Gateway connection just before the next dispatch. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/faults", body={"type": type, "route": route, "retryAfter": None if retry_after is None else parse_duration(retry_after), "times": times})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/faults", body={"type": type, "route": route, "retryAfter": None if retry_after is None else parse_duration(retry_after), "times": times, "app": None if app is None else app.id})
         return DiscordFault(ctx, data)
 
     async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> DiscordApiCall:

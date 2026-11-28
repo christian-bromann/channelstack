@@ -1142,6 +1142,7 @@ export function registerLinearRoutes(
     stability,
     deliveries: fake,
     delivery: { schema: LinearDelivery, wire: deliveryWire },
+    apps: { handle: "LinearApp", roster: store.apps },
     listSummary: "Every webhook channelstack sent the agent for this session, with every attempt",
     filters: {
       type: "Only this resource type, e.g. `AgentSessionEvent`.",

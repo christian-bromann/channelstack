@@ -124,8 +124,8 @@ export interface GatewayWorld {
   privilegedIntents(app: string): readonly string[];
   /** READY's `d`, for a new session of this app's bot. */
   ready(app: string, session: string, resumeUrl: string): Record<string, unknown>;
-  /** Whether a test session asked for a drop before its next dispatch: if so, it is taken (it fires once). */
-  takeDrop(session: string): boolean;
+  /** Whether a test session asked for a drop of this app's connection before its next dispatch: if so, it is taken (it fires once). */
+  takeDrop(session: string, app: string): boolean;
   /** What is dispatched right after READY: the guild, as GUILD_CREATE, as this app's bot sees it. */
   afterReady(app: string): Array<{ t: string; d: unknown }>;
 }
@@ -185,7 +185,7 @@ export function createGateways(context: DriverContext, world: GatewayWorld): Gat
       if (session.peer === undefined) session.overflowed = true;
     }
     // A test session's `drop_gateway`: the connection drops just before its next dispatch, which a resuming bot still gets.
-    if (cause !== undefined && session.peer && world.takeDrop(cause)) {
+    if (cause !== undefined && session.peer && world.takeDrop(cause, session.app)) {
       const peer = session.peer;
       leave(session);
       peer.close();

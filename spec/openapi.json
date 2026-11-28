@@ -2292,6 +2292,13 @@
           "times": {
             "type": "integer",
             "minimum": 1
+          },
+          "app": {
+            "type": "string",
+            "description": "Only this app's calls, or its Socket Mode connections; every app's when left out.",
+            "x-channelstack-ref": [
+              "SlackApp"
+            ]
           }
         },
         "required": [
@@ -9280,6 +9287,13 @@
           "times": {
             "type": "integer",
             "minimum": 1
+          },
+          "app": {
+            "type": "string",
+            "description": "Only this app's bot: its calls, or its Gateway connection. Every app's when left out.",
+            "x-channelstack-ref": [
+              "DiscordApp"
+            ]
           }
         },
         "required": [
@@ -14554,7 +14568,10 @@
         ],
         "x-channelstack-method": {
           "on": "SlackFixture",
-          "name": "deliveries"
+          "name": "deliveries",
+          "options": [
+            "app"
+          ]
         },
         "x-channelstack-error-codes": [
           "unauthorized",
@@ -14581,6 +14598,19 @@
             "required": true,
             "name": "session",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only the deliveries to this app; every app's when left out.",
+              "x-channelstack-ref": [
+                "SlackApp"
+              ]
+            },
+            "required": false,
+            "description": "Only the deliveries to this app; every app's when left out.",
+            "name": "app",
+            "in": "query"
           }
         ],
         "responses": {
@@ -15063,7 +15093,8 @@
             "delay",
             "after",
             "error",
-            "times"
+            "times",
+            "app"
           ]
         },
         "x-channelstack-error-codes": [
@@ -22228,7 +22259,8 @@
           "name": "deliveries",
           "options": [
             "type",
-            "resource"
+            "resource",
+            "app"
           ]
         },
         "x-channelstack-error-codes": [
@@ -22253,6 +22285,19 @@
             "required": true,
             "name": "session",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only the deliveries to this app; every app's when left out.",
+              "x-channelstack-ref": [
+                "GitHubApp"
+              ]
+            },
+            "required": false,
+            "description": "Only the deliveries to this app; every app's when left out.",
+            "name": "app",
+            "in": "query"
           },
           {
             "schema": {
@@ -26205,7 +26250,8 @@
           "name": "deliveries",
           "options": [
             "type",
-            "resource"
+            "resource",
+            "app"
           ]
         },
         "x-channelstack-error-codes": [
@@ -26233,6 +26279,19 @@
             "required": true,
             "name": "session",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only the deliveries to this app; every app's when left out.",
+              "x-channelstack-ref": [
+                "LinearApp"
+              ]
+            },
+            "required": false,
+            "description": "Only the deliveries to this app; every app's when left out.",
+            "name": "app",
+            "in": "query"
           },
           {
             "schema": {
@@ -29773,7 +29832,8 @@
           "name": "deliveries",
           "options": [
             "type",
-            "resource"
+            "resource",
+            "app"
           ]
         },
         "x-channelstack-error-codes": [
@@ -29801,6 +29861,19 @@
             "required": true,
             "name": "session",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only the deliveries to this app; every app's when left out.",
+              "x-channelstack-ref": [
+                "NotionIntegration"
+              ]
+            },
+            "required": false,
+            "description": "Only the deliveries to this app; every app's when left out.",
+            "name": "app",
+            "in": "query"
           },
           {
             "schema": {
@@ -31409,7 +31482,8 @@
           "name": "deliveries",
           "options": [
             "type",
-            "resource"
+            "resource",
+            "app"
           ]
         },
         "x-channelstack-error-codes": [
@@ -31437,6 +31511,19 @@
             "required": true,
             "name": "session",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only the deliveries to this app; every app's when left out.",
+              "x-channelstack-ref": [
+                "ResendApp"
+              ]
+            },
+            "required": false,
+            "description": "Only the deliveries to this app; every app's when left out.",
+            "name": "app",
+            "in": "query"
           },
           {
             "schema": {
@@ -33045,7 +33132,8 @@
           "name": "deliveries",
           "options": [
             "type",
-            "resource"
+            "resource",
+            "app"
           ]
         },
         "x-channelstack-error-codes": [
@@ -33073,6 +33161,19 @@
             "required": true,
             "name": "session",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only the deliveries to this app; every app's when left out.",
+              "x-channelstack-ref": [
+                "GoogleApp"
+              ]
+            },
+            "required": false,
+            "description": "Only the deliveries to this app; every app's when left out.",
+            "name": "app",
+            "in": "query"
           },
           {
             "schema": {
@@ -36288,7 +36389,8 @@
           "name": "deliveries",
           "options": [
             "type",
-            "resource"
+            "resource",
+            "app"
           ]
         },
         "x-channelstack-error-codes": [
@@ -36316,6 +36418,19 @@
             "required": true,
             "name": "session",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only the deliveries to this app; every app's when left out.",
+              "x-channelstack-ref": [
+                "DiscordApp"
+              ]
+            },
+            "required": false,
+            "description": "Only the deliveries to this app; every app's when left out.",
+            "name": "app",
+            "in": "query"
           },
           {
             "schema": {
@@ -36724,7 +36839,8 @@
             "type",
             "route",
             "retryAfter",
-            "times"
+            "times",
+            "app"
           ]
         },
         "x-channelstack-error-codes": [

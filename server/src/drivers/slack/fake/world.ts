@@ -1,4 +1,4 @@
-import { BUILT_IN_APP } from "../../../core/apps/index.ts";
+import { type AppRoster, BUILT_IN_APP } from "../../../core/apps/index.ts";
 import { delay } from "../../../core/clock/index.ts";
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
 import { deliveryKit, deliveryTo, fixedRetries, type SentDelivery } from "../../../core/delivery/kit.ts";
@@ -98,8 +98,8 @@ export interface FakeSlackWorld extends Immediate<SlackWorld> {
   /** The app answers an interaction through its `response_url`. False when the URL is unknown, used up or expired. */
   respond(key: string, body: Record<string, unknown>): boolean;
   /** Send an event about a conversation to every app that is subscribed, installed and a member. */
-  /** The app a session's handle or a name stands for: one of the apps it used (decision 0027). */
-  appIn(session: string, ref: string): SlackAppRecord;
+  /** The channel's apps (decision 0027): a session's handle of one is looked up here. */
+  readonly roster: AppRoster<SlackAppRecord>;
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): SentDelivery[];
   /**
    * Someone joins a channel, invited by `inviter` or by themselves (`conversations.join`). The app
@@ -474,7 +474,7 @@ export function createFakeWorld(
     app: () => store.app,
     apps: () => store.apps.all(),
     appOf: (id) => store.appOf(id),
-    appIn: (session, ref) => store.apps.get(session, ref),
+    roster: store.apps,
     emit,
     resolveName,
 
@@ -870,17 +870,22 @@ export function createFakeWorld(
     addFault(session, fault) {
       const id = `fault_${store.faults.length + 1}_${ids.next(SLACK_IDS.block)}`;
       // Dropping the socket happens once, now; the other faults stay until they are removed.
+      // A fault that names an app is about that app's calls or connections only (decision 0027).
       if (fault.type === "drop_socket") {
+        const dropped = fault.app === undefined ? store.apps.all() : [store.apps.get(session, fault.app)];
         if (fault.delayMs > 0) {
           // A drop that is still to come is called off with its fault, and with its session.
           const cancel = context.timers.after(fault.delayMs, () => {
             store.pendingDrops.delete(id);
-            for (const app of store.apps.all()) socket.of(app).drop();
+            for (const app of dropped) socket.of(app).drop();
           });
           store.pendingDrops.set(id, { session, cancel });
-        } else for (const app of store.apps.all()) socket.of(app).drop();
+        } else for (const app of dropped) socket.of(app).drop();
       }
-      if (fault.type !== "drop_socket") store.faults.push({ id, session, ...fault, type: fault.type });
+      if (fault.type !== "drop_socket") {
+        const app = fault.app === undefined ? undefined : store.apps.get(session, fault.app).name;
+        store.faults.push({ id, session, ...fault, app, type: fault.type });
+      }
       action(session, "fault", { fault: id, type: fault.type });
       return id;
     },

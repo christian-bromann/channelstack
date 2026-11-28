@@ -1,3 +1,4 @@
+import { BUILT_IN_APP } from "../core/apps/index.ts";
 import { CHANNEL_NAMES, CHANNELS } from "../drivers/index.ts";
 import { type Attached, CliError, segment } from "./attach.ts";
 
@@ -12,6 +13,8 @@ interface Delivery {
   /** Slack's inner event type, GitHub's and Linear's action. */
   eventType?: string;
   action?: string;
+  /** The app it went to (decision 0027). */
+  app?: string;
   status: string;
   attempts: Array<{ responseStatus?: number; sentAt?: string }>;
 }
@@ -47,7 +50,8 @@ async function allDeliveries(server: Attached): Promise<Array<{ channel: Channel
 const sentAt = (delivery: Delivery) => delivery.attempts[0]?.sentAt ?? "";
 
 function line(delivery: Delivery): string {
-  const what = [delivery.type, delivery.eventType ?? delivery.action].filter(Boolean).join(" ");
+  const to = delivery.app === undefined || delivery.app === BUILT_IN_APP ? undefined : `to ${delivery.app}`;
+  const what = [delivery.type, delivery.eventType ?? delivery.action, to].filter(Boolean).join(" ");
   const attempts = delivery.attempts.map((attempt) => attempt.responseStatus ?? "-").join(", ");
   return `${delivery.id}  ${what}  ${delivery.status}  (attempts: ${attempts})\n`;
 }

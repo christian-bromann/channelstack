@@ -1772,6 +1772,7 @@ export function registerGitHubRoutes(
     // Live, these read the App's delivery log on GitHub, and redeliver from it.
     deliveries: { ...world, resend: fake.resend },
     delivery: { schema: GitHubDelivery, wire: deliveryWire },
+    apps: { handle: "GitHubApp", roster: store.apps },
     listSummary: "Every webhook channelstack sent the agent for this session, with every attempt",
     filters: {
       type: "Only this event, e.g. `issue_comment`.",

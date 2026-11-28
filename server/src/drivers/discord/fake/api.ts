@@ -111,9 +111,13 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
    * Count a call against its route's bucket, or refuse it with a 429: a test's `rate_limit`
    * fault, or the route's own limit. Returns the headers every answer of the route carries.
    */
-  const limit = (route: string, major: string, bucket: Bucket, bot: string): Record<string, string> => {
+  const limit = (route: string, major: string, bucket: Bucket, by: DiscordAppRecord): Record<string, string> => {
+    const bot = by.id;
     const fault = store.faults.find(
-      (candidate) => candidate.type === "rate_limit" && (candidate.route === undefined || candidate.route === route),
+      (candidate) =>
+        candidate.type === "rate_limit" &&
+        (candidate.route === undefined || candidate.route === route) &&
+        (candidate.app === undefined || candidate.app === by.name),
     );
     const hash = createHash("sha1").update(route).digest("hex").slice(0, 32);
     if (fault) {
@@ -175,7 +179,7 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
       // A refusal is the channel's session's call too: a test sees the bot's 50001s and 429s.
       const sessions = c.req.param("channel") === undefined ? [] : [world.sessionOf(major)];
       try {
-        const headers = limit(operation, major, bucket, callerOf(c).id);
+        const headers = limit(operation, major, bucket, callerOf(c));
         const answer = handle(c, body);
         for (const session of answer.sessions) if (session !== undefined) context.arrived(session, operation);
         return { ...answer, headers: { ...headers, ...answer.headers } };

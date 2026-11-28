@@ -20,7 +20,7 @@ export type User = G.SlackUser | G.GitHubUser | G.LinearUser | G.NotionUser | G.
 export type App = G.SlackApp | G.GitHubApp | G.LinearApp | G.NotionIntegration | G.ResendApp | G.GoogleApp | G.DiscordApp;
 export type Resource = G.SlackConversation | G.GitHubRepo | G.LinearTeam | G.NotionPage | G.NotionDatabase | G.ResendThread | G.GoogleThread | G.DiscordChannel;
 export type AnyDelivery = G.SlackDelivery | G.GitHubDelivery | G.LinearDelivery | G.NotionDelivery | G.ResendDelivery | G.GoogleDelivery | G.DiscordDelivery;
-export type DeliveryFilter = Option<G.GitHubFixture["deliveries"]> | Option<G.LinearFixture["deliveries"]> | Option<G.NotionFixture["deliveries"]> | Option<G.ResendFixture["deliveries"]> | Option<G.GoogleFixture["deliveries"]> | Option<G.DiscordFixture["deliveries"]>;
+export type DeliveryFilter = Option<G.SlackFixture["deliveries"]> | Option<G.GitHubFixture["deliveries"]> | Option<G.LinearFixture["deliveries"]> | Option<G.NotionFixture["deliveries"]> | Option<G.ResendFixture["deliveries"]> | Option<G.GoogleFixture["deliveries"]> | Option<G.DiscordFixture["deliveries"]>;
 export type ApiCall = G.SlackApiCall | G.GitHubApiCall | G.LinearApiCall | G.NotionApiCall | G.ResendApiCall | G.GoogleApiCall | G.DiscordApiCall;
 export type Transcript = G.SlackTranscript | G.GitHubTranscript | G.LinearTranscript | G.NotionTranscript | G.ResendTranscript | G.GoogleTranscript | G.DiscordTranscript;
 /** What every channel fixture has to inspect what the agent did: the fixture whose deliveries are `TDelivery`. */

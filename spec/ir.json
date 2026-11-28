@@ -1551,7 +1551,19 @@
             ]
           },
           "args": [],
-          "options": [],
+          "options": [
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackApp"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
           "returns": {
             "kind": "named",
             "name": "SlackDeliveries"
@@ -1765,6 +1777,17 @@
               "name": "times",
               "type": {
                 "kind": "integer"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackApp"
+                ]
               },
               "optional": true,
               "in": "body"
@@ -5732,6 +5755,17 @@
                 "kind": "ref",
                 "resources": [
                   "GitHubRepo"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubApp"
                 ]
               },
               "optional": true,
@@ -11828,6 +11862,17 @@
               },
               "optional": true,
               "in": "query"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearApp"
+                ]
+              },
+              "optional": true,
+              "in": "query"
             }
           ],
           "returns": {
@@ -15304,6 +15349,17 @@
               },
               "optional": true,
               "in": "query"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionIntegration"
+                ]
+              },
+              "optional": true,
+              "in": "query"
             }
           ],
           "returns": {
@@ -18001,6 +18057,17 @@
               },
               "optional": true,
               "in": "query"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "ResendApp"
+                ]
+              },
+              "optional": true,
+              "in": "query"
             }
           ],
           "returns": {
@@ -19559,6 +19626,17 @@
                 "kind": "ref",
                 "resources": [
                   "GoogleThread"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GoogleApp"
                 ]
               },
               "optional": true,
@@ -21315,6 +21393,17 @@
               },
               "optional": true,
               "in": "query"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "DiscordApp"
+                ]
+              },
+              "optional": true,
+              "in": "query"
             }
           ],
           "returns": {
@@ -21452,6 +21541,17 @@
               "name": "times",
               "type": {
                 "kind": "integer"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "DiscordApp"
+                ]
               },
               "optional": true,
               "in": "body"

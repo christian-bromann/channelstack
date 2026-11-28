@@ -55,6 +55,8 @@ export interface DiscordFault {
   readonly type: "rate_limit" | "drop_gateway";
   /** For drop_gateway: the connection drops just before this session's next dispatch, once. For rate_limit: only this route (`POST /channels/{channel.id}/messages`); every route when left out. */
   readonly route: string | undefined;
+  /** Only this app's bot, by name (decision 0027): its calls, or its Gateway connection. Every app's when left out. */
+  readonly app: string | undefined;
   /** How many more calls it refuses; forever when left out. */
   remaining: number | undefined;
   readonly retryAfterMs: number;

@@ -1051,6 +1051,7 @@ export function registerNotionRoutes(
     stability,
     deliveries: fake,
     delivery: { schema: NotionDelivery, wire: deliveryWire },
+    apps: { handle: "NotionIntegration", roster: store.apps },
     listSummary: "Every webhook channelstack sent the agent for this session, with every attempt",
     filters: {
       type: "Only this event type, e.g. `comment.created`.",

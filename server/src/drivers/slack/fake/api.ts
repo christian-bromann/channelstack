@@ -715,10 +715,11 @@ export function createSlackApi(
       if (!calling.installed) throw new SlackApiError("account_inactive");
       if (!method) throw new SlackApiError("unknown_method", { req_method: name });
 
-      // A fault a test injected: it applies to the next matching calls, whoever makes them.
+      // A fault a test injected: it applies to the next matching calls, of every app or of the one it names.
       const fault = store.faults.find(
         (candidate) =>
           (candidate.operation === undefined || candidate.operation === name) &&
+          (candidate.app === undefined || candidate.app === calling?.name) &&
           (candidate.remaining === undefined || candidate.remaining > 0),
       );
       if (fault?.remaining !== undefined) fault.remaining -= 1;

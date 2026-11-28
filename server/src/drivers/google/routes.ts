@@ -142,6 +142,7 @@ export function registerGoogleRoutes(
     stability,
     deliveries: fake,
     delivery: { schema: GoogleDelivery, wire: deliveryWire },
+    apps: { handle: "GoogleApp", roster: store.apps },
     listSummary: "Every push channelstack sent the agent for this session, with every attempt",
     filters: {
       type: "Only this kind: `gmail.history`.",

@@ -18,6 +18,8 @@ export interface SlackFault {
   readonly type: "rate_limit" | "latency" | "error";
   /** Only calls to this method; every method when left out. */
   readonly operation: string | undefined;
+  /** Only this app's calls (decision 0027); every app's when left out. */
+  readonly app: string | undefined;
   /** How many more calls it applies to; forever when left out. */
   remaining: number | undefined;
   readonly retryAfterMs: number;

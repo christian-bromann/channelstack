@@ -1,3 +1,4 @@
+import { BUILT_IN_APP } from "../apps/index.ts";
 import type { Clock } from "../clock/index.ts";
 import { ProtocolError } from "../errors/index.ts";
 import type { Redactor } from "../redact/index.ts";
@@ -59,7 +60,10 @@ export type EventKind = "action" | "delivery" | "delivery_attempt" | "api_call" 
 
 /** An event in one line, for `channelstack tail` and the UI's inspector. */
 interface EventSummary {
-  /** What went where: `→ slack app_mention` (to the agent), `← slack chat.postMessage` (from it). */
+  /**
+   * What went where: `→ slack app_mention` (to the agent), `→ slack app_mention to coder` (to
+   * another app, decision 0027), `← slack chat.postMessage` (from it).
+   */
   readonly text: string;
   /** How it went: the HTTP status, with the platform's error code or the delivery's fate when it failed. */
   readonly outcome: string;
@@ -75,18 +79,25 @@ export interface LogEvent {
   readonly summary?: EventSummary;
 }
 
-/** The one-line summary of an event. `deliveryType` is what the delivery it belongs to carried. */
+/** What a delivery carried, announced once before its attempts, and the app it went to. */
+interface Announced {
+  readonly type: unknown;
+  readonly app: unknown;
+}
+
+/** The one-line summary of an event. `delivery` is what the delivery it belongs to carried, and to whom. */
 function summarize(
   driver: string,
   kind: EventKind,
   data: Record<string, unknown>,
-  deliveryType: unknown,
+  delivery: Announced | undefined,
 ): EventSummary | undefined {
   if (kind === "delivery_attempt") {
     const ok = data.status === "acknowledged";
     const retry = data.number === 1 ? "" : ` (attempt ${data.number})`;
+    const to = delivery?.app === undefined || delivery.app === BUILT_IN_APP ? "" : ` to ${String(delivery.app)}`;
     return {
-      text: `→ ${driver} ${deliveryType ?? "event"}${retry}`,
+      text: `→ ${driver} ${delivery?.type ?? "event"}${to}${retry}`,
       outcome: ok ? String(data.responseStatus) : String(data.status),
       ok,
     };
@@ -115,7 +126,7 @@ export class EventLog {
   readonly #redactor: Redactor;
   readonly #logs = new Map<string, CursorList<LogEvent>>();
   /** Per session: what each delivery carried, announced once before its attempts. */
-  readonly #deliveryTypes = new Map<string, Map<unknown, unknown>>();
+  readonly #deliveryTypes = new Map<string, Map<unknown, Announced>>();
   readonly #listeners: Array<(session: string) => void> = [];
 
   constructor(clock: Clock, redactor: Redactor) {
@@ -134,7 +145,7 @@ export class EventLog {
       types = new Map();
       this.#deliveryTypes.set(session, types);
     }
-    if (kind === "delivery") types.set(data.id, data.eventType ?? data.type);
+    if (kind === "delivery") types.set(data.id, { type: data.eventType ?? data.type, app: data.app });
     const summary = summarize(driver, kind, data, types.get(data.id));
     log.append({
       at: new Date(this.#clock()).toISOString(),

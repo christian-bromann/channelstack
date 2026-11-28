@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
+import { BUILT_IN_APP } from "../apps/index.ts";
 import type { DeliveryAttempt as Attempt, DeliveryRecord } from "../delivery/index.ts";
 import type { EventLog } from "../events/index.ts";
 import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../reality/index.ts";
@@ -60,6 +61,11 @@ export interface InspectionSpec<Wire> {
   readonly delivery: { readonly schema: z.ZodType<Wire>; wire(record: DeliveryView): Wire };
   /** What `/deliveries` says it lists: "Every webhook channelstack sent the agent…". */
   readonly listSummary: string;
+  /**
+   * The channel's apps, for `deliveries({ app })` (decision 0027): the handle an app is
+   * (`SlackApp`), and the name core records a delivery's app under, for a session's handle or a name.
+   */
+  readonly apps: { readonly handle: string; readonly roster: { keyIn(session: string, ref: string): string } };
   /** Filters of `/deliveries`: by event type, and by the resource a delivery is about. None for a channel without them. */
   readonly filters?: {
     /** "Only this event type, e.g. `comment.created`." */
@@ -102,6 +108,20 @@ export function registerInspectionRoutes<Wire>(router: DriverRouter, spec: Inspe
   const live = (support: LiveSupport | undefined) => (support === undefined ? {} : { live: support });
   const DeliveryParams = z.object({ delivery: pathParam("delivery") });
 
+  /** `deliveries({ app })`: only the deliveries to one app. One without an app went to the built-in one. */
+  const appQuery = z
+    .string()
+    .optional()
+    .openapi({
+      param: { name: "app", in: "query" },
+      description: "Only the deliveries to this app; every app's when left out.",
+      ...refTo(spec.apps.handle),
+    });
+  const toApp = (session: string, app: string | undefined) => {
+    const key = app === undefined ? undefined : spec.apps.roster.keyIn(session, app);
+    return ({ request }: DeliveryView) => key === undefined || (request.app ?? BUILT_IN_APP) === key;
+  };
+
   const { filters } = spec;
   if (filters) {
     router.route({
@@ -109,6 +129,7 @@ export function registerInspectionRoutes<Wire>(router: DriverRouter, spec: Inspe
       path: "/deliveries",
       summary: spec.listSummary,
       query: z.object({
+        app: appQuery,
         type: z
           .string()
           .optional()
@@ -123,11 +144,12 @@ export function registerInspectionRoutes<Wire>(router: DriverRouter, spec: Inspe
           }),
       }),
       response: z.array(spec.delivery.schema).openapi(`${title}Deliveries`),
-      sdkMethod: { on: fixture, name: "deliveries", options: ["type", "resource"] },
+      sdkMethod: { on: fixture, name: "deliveries", options: ["type", "resource", "app"] },
       ...live(reads),
       stability,
       handler: async ({ session, query }) =>
         (await deliveries.deliveries(session.id))
+          .filter(toApp(session.id, query.app))
           .filter(({ request }) => query.type === undefined || request.type === query.type)
           .filter((record) => query.resource === undefined || filters.resource.matches(record, query.resource))
           .map(spec.delivery.wire),
@@ -137,11 +159,13 @@ export function registerInspectionRoutes<Wire>(router: DriverRouter, spec: Inspe
       method: "get",
       path: "/deliveries",
       summary: spec.listSummary,
+      query: z.object({ app: appQuery }),
       response: z.array(spec.delivery.schema).openapi(`${title}Deliveries`),
-      sdkMethod: { on: fixture, name: "deliveries" },
+      sdkMethod: { on: fixture, name: "deliveries", options: ["app"] },
       ...live(reads),
       stability,
-      handler: async ({ session }) => (await deliveries.deliveries(session.id)).map(spec.delivery.wire),
+      handler: async ({ session, query }) =>
+        (await deliveries.deliveries(session.id)).filter(toApp(session.id, query.app)).map(spec.delivery.wire),
     });
   }
 

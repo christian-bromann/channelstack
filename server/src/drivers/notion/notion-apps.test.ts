@@ -325,3 +325,18 @@ describe("exit check 12.3: Notion integrations", () => {
     );
   });
 });
+
+describe("R1.12: deliveries by integration", () => {
+  test("deliveries({ app }) lists one integration's, beside the type and resource filters", async () => {
+    const { h, post, get, app, writer, ana } = await twoIntegrations();
+    const shared = await post("/pages", { title: "Shared", connections: [app.id, writer.id] });
+    await post(`/users/${ana.id}/comment`, { text: "please draft", page: shared.id });
+    await h.app.settled();
+
+    const apps = (query: string) =>
+      get(`/deliveries?${query}`).then((list: { app: string; type: string }[]) => list.map((one) => one.app));
+    expect(await apps(`app=${writer.id}&type=comment.created`)).toEqual(["writer"]);
+    expect(await apps(`app=my-agent&resource=${shared.id}&type=comment.created`)).toEqual(["my-agent"]);
+    expect(new Set(await apps(`resource=${shared.id}`))).toEqual(new Set(["my-agent", "writer"]));
+  });
+});

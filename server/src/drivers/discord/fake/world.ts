@@ -1,3 +1,4 @@
+import type { AppRoster } from "../../../core/apps/index.ts";
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
 import { deliveryKit, deliveryTo, type SentDelivery } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
@@ -125,8 +126,8 @@ export interface FakeDiscordWorld extends DiscordWorld {
   apps(): DiscordAppRecord[];
   /** The app whose application or bot user this is. */
   appOf(id: string): DiscordAppRecord | undefined;
-  /** The app a session's handle or a name stands for: one of the apps it used (decision 0027). */
-  appIn(session: string, ref: string): DiscordAppRecord;
+  /** The channel's apps (decision 0027): a session's handle of one is looked up here. */
+  readonly roster: AppRoster<DiscordAppRecord>;
   /** Make an app by name, or return the one made with the same settings (decision 0027). */
   createApp(
     session: string | undefined,
@@ -681,7 +682,7 @@ export function createFakeWorld(
     mentionText,
     apps: () => store.apps.all(),
     appOf: (id) => store.appOf(id),
-    appIn: (session, ref) => store.apps.get(session, ref),
+    roster: store.apps,
 
     createApp(session, options) {
       const privilegedIntents = [...(options.privilegedIntents ?? defaults.privilegedIntents)];
@@ -935,7 +936,9 @@ export function createFakeWorld(
     addFault(session, fault) {
       // Each session's faults are its own: a drop fires before that session's next dispatch, and undo or the session's end removes it.
       const id = discordSnowflake(ids);
-      store.faults.push({ ...fault, id, session });
+      // A fault that names an app is about that app's bot alone: its calls, or its connection (decision 0027).
+      const app = fault.app === undefined ? undefined : store.apps.get(session, fault.app).name;
+      store.faults.push({ ...fault, app, id, session });
       return id;
     },
     removeFault(session, id) {

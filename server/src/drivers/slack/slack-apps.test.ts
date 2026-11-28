@@ -275,3 +275,56 @@ describe("exit check 12.3: Slack apps", () => {
     expect((await h.call("GET", "/env?app=Not_A_Name")).body.error).toBe("invalid_argument");
   });
 });
+
+describe("R1.12: deliveries, faults and the event log by app", () => {
+  test("deliveries({ app }) lists one app's deliveries, by its handle or its name", async () => {
+    const { h, post, get, app, coder, base } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id] });
+    await post(`/users/${ana.id}/say`, { message: { text: "@coder fix it" }, channel: channel.id });
+    await h.app.settled();
+
+    const apps = (path: string) => get(path).then((list: { app: string }[]) => list.map((one) => one.app));
+    expect(await apps(`/deliveries?app=${coder.id}`)).toEqual(["coder", "coder"]);
+    expect(await apps("/deliveries?app=coder")).toEqual(["coder", "coder"]);
+    expect(await apps(`/deliveries?app=${app.id}`)).toEqual(["my-agent"]);
+    expect(await apps("/deliveries")).toHaveLength(3);
+    expect((await h.call("GET", `${base}/deliveries?app=reviewer`)).body.error).toBe("not_found");
+  });
+
+  test("a fault that names an app is about that app's calls alone", async () => {
+    const { post, app, coder, web } = await twoApps();
+    const channel = await post("/channels", { participants: [app.id, coder.id] });
+    await post("/faults", { type: "error", error: "internal_error", app: coder.id });
+
+    expect(await web("chat.postMessage", { channel: channel.id, text: "hi" }, coder.botToken)).toMatchObject({
+      ok: false,
+      error: "internal_error",
+    });
+    expect(await web("chat.postMessage", { channel: channel.id, text: "hi" }, app.botToken)).toMatchObject({
+      ok: true,
+    });
+  });
+
+  test("the event log names the app a delivery went to, so tail and the inspector tell two apps apart", async () => {
+    const { h, post, app, coder, sessionId } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id] });
+    await post(`/users/${ana.id}/say`, { message: { text: "@coder fix it" }, channel: channel.id });
+    await h.app.settled();
+
+    const { events } = (await h.call("GET", `/sessions/${sessionId}/events`)).body as {
+      events: Array<{ kind: string; data: { app?: string }; summary?: { text: string } }>;
+    };
+    expect(events.filter((event) => event.kind === "delivery").map((event) => event.data.app)).toEqual([
+      "coder",
+      "my-agent",
+      "coder",
+    ]);
+    expect(events.filter((event) => event.kind === "delivery_attempt").map((event) => event.summary?.text)).toEqual([
+      "→ slack app_mention to coder",
+      "→ slack message",
+      "→ slack message to coder",
+    ]);
+  });
+});

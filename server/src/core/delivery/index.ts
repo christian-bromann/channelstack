@@ -156,11 +156,18 @@ export class DeliveryQueue {
 
   /** Record a delivery and send its first attempt. */
   enqueue(request: DeliveryRequest): DeliveryRecord {
-    const { id, session, driver, type, url } = request;
+    const { id, session, driver, type, url, app } = request;
     const record: DeliveryRecord = { request, attempts: [] };
     this.#observe?.(request);
     this.#session(session).records.set(id, record);
-    this.#events.append(session, driver, "delivery", { id, type, url, ...(request.meta ?? {}) });
+    // The event log says which app each delivery went to, so the inspector and `tail` tell two apps' apart.
+    this.#events.append(session, driver, "delivery", {
+      id,
+      type,
+      url,
+      ...(request.meta ?? {}),
+      ...(app === undefined ? {} : { app }),
+    });
     record.sent = this.#track(this.#chain(record, {}, 0));
     return record;
   }

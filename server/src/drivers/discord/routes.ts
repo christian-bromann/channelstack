@@ -915,7 +915,7 @@ export function registerDiscordRoutes(
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: async ({ session, params, query }) => {
-      const app = fake.appIn(session.id, query.app);
+      const app = fake.roster.get(session.id, query.app);
       const message = await fake.message(session.id, params.channel, params.message);
       return deliveryOf(session.id, message.deliveries, app.name) ?? null;
     },
@@ -961,6 +961,7 @@ export function registerDiscordRoutes(
     stability,
     deliveries: fake,
     delivery: { schema: DiscordDelivery, wire: deliveryWire },
+    apps: { handle: "DiscordApp", roster: fake.roster },
     listSummary:
       "Every Gateway dispatch and interaction channelstack sent the bot for this session, with every attempt",
     filters: {
@@ -1006,10 +1007,17 @@ export function registerDiscordRoutes(
           .openapi({ description: "For rate_limit: only this route, e.g. `POST /channels/{channel.id}/messages`." }),
         retryAfter: duration("For rate_limit: what `retry_after` says.").default(1000),
         times: z.number().int().min(1).optional(),
+        app: z
+          .string()
+          .optional()
+          .openapi({
+            description: "Only this app's bot: its calls, or its Gateway connection. Every app's when left out.",
+            ...refTo("DiscordApp"),
+          }),
       })
       .openapi("DiscordFaultBody"),
     response: z.object({ id: z.string() }).openapi("DiscordFault", { "x-channelstack-resource": { id: "id" } }),
-    sdkMethod: { on: "DiscordFixture", name: "fault", options: ["type", "route", "retryAfter", "times"] },
+    sdkMethod: { on: "DiscordFixture", name: "fault", options: ["type", "route", "retryAfter", "times", "app"] },
     live: FAULTS,
     stability,
     handler: ({ session, body }) => ({
@@ -1018,6 +1026,7 @@ export function registerDiscordRoutes(
         route: body.route,
         remaining: body.times,
         retryAfterMs: body.retryAfter,
+        app: body.app,
       }),
     }),
   });

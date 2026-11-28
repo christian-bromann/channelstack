@@ -811,11 +811,28 @@ fn run_slack_fixture_deliveries<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/deliveries",
             encode_segment(ctx.session()?)
         );
-        send(ctx, "GET", path, None, None, false, &[]).await
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -899,6 +916,7 @@ fn run_slack_fixture_fault<'a>(
         let p_after = options.get("after").cloned().unwrap_or(Value::Null);
         let p_error = options.get("error").cloned().unwrap_or(Value::Null);
         let p_times = options.get("times").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!("/sessions/{}/slack/faults", encode_segment(ctx.session()?));
         send(
             ctx,
@@ -916,6 +934,10 @@ fn run_slack_fixture_fault<'a>(
                 wire.insert("after".into(), (&|v: &Value| enc::duration(v))(&p_after)?);
                 wire.insert("error".into(), p_error.clone());
                 wire.insert("times".into(), p_times.clone());
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
                 wire
             }),
             None,
@@ -2577,6 +2599,7 @@ fn run_git_hub_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/github/deliveries",
             encode_segment(ctx.session()?)
@@ -2592,6 +2615,10 @@ fn run_git_hub_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -5227,6 +5254,7 @@ fn run_linear_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/linear/deliveries",
             encode_segment(ctx.session()?)
@@ -5242,6 +5270,10 @@ fn run_linear_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -6671,6 +6703,7 @@ fn run_notion_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/notion/deliveries",
             encode_segment(ctx.session()?)
@@ -6686,6 +6719,10 @@ fn run_notion_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -7863,6 +7900,7 @@ fn run_resend_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/resend/deliveries",
             encode_segment(ctx.session()?)
@@ -7878,6 +7916,10 @@ fn run_resend_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -8429,6 +8471,7 @@ fn run_google_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/google/deliveries",
             encode_segment(ctx.session()?)
@@ -8444,6 +8487,10 @@ fn run_google_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -9067,6 +9114,7 @@ fn run_discord_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/discord/deliveries",
             encode_segment(ctx.session()?)
@@ -9082,6 +9130,10 @@ fn run_discord_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -9135,6 +9187,7 @@ fn run_discord_fixture_fault<'a>(
         let p_route = options.get("route").cloned().unwrap_or(Value::Null);
         let p_retry_after = options.get("retryAfter").cloned().unwrap_or(Value::Null);
         let p_times = options.get("times").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/discord/faults",
             encode_segment(ctx.session()?)
@@ -9152,6 +9205,10 @@ fn run_discord_fixture_fault<'a>(
                     (&|v: &Value| enc::duration(v))(&p_retry_after)?,
                 );
                 wire.insert("times".into(), p_times.clone());
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
                 wire
             }),
             None,
@@ -11251,14 +11308,14 @@ impl SlackFixture {
     }
 
     /// Every event channelstack sent the agent for this session, with every attempt. Experimental.
-    pub fn deliveries(&self) -> Call<Value> {
-        Call::new(
+    pub fn deliveries(&self) -> SlackFixtureDeliveries {
+        SlackFixtureDeliveries(Call::new(
             &self.ctx,
             &self.data,
             vec![],
             run_slack_fixture_deliveries,
             as_value,
-        )
+        ))
     }
 
     /// The Web API calls the agent made about this session's conversations, people and files. Calls about nothing a session owns (auth.test, users.list) are in no session. Experimental.
@@ -11443,6 +11500,28 @@ impl IntoFuture for SlackFixtureCreateChannel {
     }
 }
 
+/// The options of [`SlackFixture::deliveries`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackFixtureDeliveries(Call<Value>);
+
+impl SlackFixtureDeliveries {
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackFixtureDeliveries {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
 /// The options of [`SlackFixture::calls`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct SlackFixtureCalls(Call<Value>);
 
@@ -11522,6 +11601,10 @@ impl SlackFixtureFault {
     /// `times`.
     pub fn times(self, value: impl IntoArg) -> Self {
         Self(self.0.option("times", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<SlackFault> {
@@ -14302,6 +14385,10 @@ impl GitHubFixtureDeliveries {
     /// `resource`.
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
@@ -17717,6 +17804,10 @@ impl LinearFixtureDeliveries {
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
     }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
         self.0.send().await
@@ -20172,6 +20263,10 @@ impl NotionFixtureDeliveries {
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
     }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
         self.0.send().await
@@ -22083,6 +22178,10 @@ impl ResendFixtureDeliveries {
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
     }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
         self.0.send().await
@@ -23522,6 +23621,10 @@ impl GoogleFixtureDeliveries {
     /// `resource`.
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
@@ -25068,6 +25171,10 @@ impl DiscordFixtureDeliveries {
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
     }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
         self.0.send().await
@@ -25127,6 +25234,10 @@ impl DiscordFixtureFault {
     /// `times`.
     pub fn times(self, value: impl IntoArg) -> Self {
         Self(self.0.option("times", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<DiscordFault> {
