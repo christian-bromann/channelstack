@@ -20,6 +20,8 @@ struct StandIn {
     said: Mutex<Vec<Value>>,
     /// What the session says the agent left open.
     open: Vec<String>,
+    /// The bot loops the session says the fake stopped.
+    loops: Vec<String>,
     /// The `error` the last read of the calls filtered by.
     filtered_by: Mutex<Value>,
 }
@@ -46,12 +48,13 @@ impl StandIn {
 impl Subject for StandIn {
     /// Always quiet for a minute, with what is open.
     fn quiet(&self) -> BoxFuture<'_, Result<QuietState>> {
-        let open = self.open.clone();
+        let (open, loops) = (self.open.clone(), self.loops.clone());
         Box::pin(async move {
             Ok(QuietState {
                 busy: false,
                 quiet_for_ms: 60_000.0,
                 open,
+                loops,
             })
         })
     }
@@ -1105,4 +1108,28 @@ async fn to_go_quiet_counts_app_messages_since_a_person_wrote() -> Result<()> {
         .to_go_quiet(1)
         .quiet_for(QUIET)
         .await
+}
+
+#[tokio::test]
+async fn to_go_quiet_reports_the_loops_the_fake_stopped() {
+    // As matchers-core does: the loop the guard stopped is named after the turns.
+    let stopped = "a bot loop in slack 1.2 was stopped after 50 app messages with no person between them (my-agent → coder …)";
+    let coder = || json!({ "id": "B02", "name": "coder", "kind": "app" });
+    let mut said = vec![says(ana(), "fix the login page")];
+    said.extend((0..3).map(|at| says(if at % 2 == 0 { agent() } else { coder() }, "turn")));
+    let subject = StandIn {
+        loops: vec![stopped.to_owned()],
+        ..StandIn::saying(said)
+    };
+    let failed = failure(
+        expect(&subject)
+            .to_go_quiet(2)
+            .within("1s")
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert!(
+        failed.ends_with(&format!("my-agent → coder → my-agent\nStopped: {stopped}")),
+        "{failed}"
+    );
 }

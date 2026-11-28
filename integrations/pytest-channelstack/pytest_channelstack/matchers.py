@@ -155,15 +155,18 @@ class Expectation:
     def __init__(self, subject: Any) -> None:
         self._subject = subject
 
-    async def _still_open(self) -> list[str]:
-        """What the agent left open in the subject's session, in words: it only adds to a failure's message.
+    async def _leftover(self) -> str:
+        """What the agent left open and the bot loops the fake stopped in the subject's session, in words.
 
-        Its refusal goes nowhere else: live, a refused read here must not turn the failure into a skip.
+        It only adds to a failure's message. Its refusal goes nowhere else: live, a refused read here
+        must not turn the failure into a skip.
         """
         try:
-            return list((await unreported_refusals(lambda: quiet_of(self._subject._ctx))).open)
+            state = await unreported_refusals(lambda: quiet_of(self._subject._ctx))
         except (ChannelstackError, AttributeError, RuntimeError):
-            return []
+            return ""
+        open_work = f"\nStill open: {'; '.join(state.open)}" if state.open else ""
+        return f"{open_work}\nStopped: {'; '.join(state.loops)}" if state.loops else open_work
 
     async def _settle[T](
         self,
@@ -199,9 +202,7 @@ class Expectation:
             except WaitTimeoutError:
                 value = last[0] if last else await read()
         if holds(value) == negate:
-            open_work = await self._still_open()
-            leftover = f"\nStill open: {'; '.join(open_work)}" if open_work else ""
-            raise AssertionError(f"{describe(value)}{leftover}")
+            raise AssertionError(f"{describe(value)}{await self._leftover()}")
 
     async def to_go_quiet(
         self, *, max_replies: int, within: Duration | None = None, quiet_for: Duration | None = None
@@ -222,8 +223,7 @@ class Expectation:
             return
         turns = f": {' → '.join(name for name, _ in since)}" if since else ""
         bound = f"within {within}" if within is not None else "within the timeout"
-        open_work = await self._still_open()
-        leftover = f"\nStill open: {'; '.join(open_work)}" if open_work else ""
+        leftover = await self._leftover()
         raise AssertionError(
             f"Expected the conversation to go quiet {bound} with at most {max_replies} app "
             f"{'message' if max_replies == 1 else 'messages'} since a person last wrote. "

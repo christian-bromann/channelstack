@@ -30,7 +30,10 @@ async def quiet_of(context: HandleContext) -> QuietState:
     session = quote(session_of(context), safe="")
     state = await context.transport.request("GET", f"/sessions/{session}/quiet")
     return QuietState(
-        busy=bool(state["busy"]), quiet_for_ms=float(state["quietForMs"]), open=tuple(state.get("open", ()))
+        busy=bool(state["busy"]),
+        quiet_for_ms=float(state["quietForMs"]),
+        open=tuple(state.get("open", ())),
+        loops=tuple(state.get("loops", ())),
     )
 
 

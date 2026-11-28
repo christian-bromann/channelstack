@@ -11,6 +11,7 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { type RecordingAgent, recordingAgent, refusal, watchCredentials } from "../../../test/app-harness.ts";
 import { discordWorkspace } from "../../../test/discord-workspace.ts";
+import { discordDispatchProblems } from "../../../test/schemas/discord.ts";
 import { LOOP_LIMIT } from "../../core/loops/index.ts";
 import { botIdOf } from "./secrets.ts";
 
@@ -151,6 +152,28 @@ describe("exit check 12.3: Discord apps", () => {
     expect(heard[3]?.d).toMatchObject({ id: written.id, channel_id: both.id });
     // Discord sends a bot its own messages too; discord.js's handlers check the author.
     expect(created(theirs)[0]?.d.author.id).toBe(coder.botUserId);
+  });
+
+  test("another bot's reaction removed reaches every bot in the channel as MESSAGE_REACTION_REMOVE", async () => {
+    const { h, identify, asCoder, coder, both } = await twoApps();
+    const mine = await identify();
+    closers.push(() => mine.disconnect());
+
+    const written = (await asCoder("POST", `/channels/${both.id}/messages`, { content: "opened #12" })).body;
+    const reaction = `/channels/${both.id}/messages/${written.id}/reactions/${encodeURIComponent("👀")}/@me`;
+    await asCoder("PUT", reaction);
+    await asCoder("DELETE", reaction);
+    await h.app.settled();
+
+    const heard = mine.dispatches().filter((payload) => payload.t.startsWith("MESSAGE_REACTION_"));
+    expect(heard.map((payload) => payload.t)).toEqual(["MESSAGE_REACTION_ADD", "MESSAGE_REACTION_REMOVE"]);
+    expect(heard[1]?.d).toMatchObject({
+      user_id: coder.botUserId,
+      message_id: written.id,
+      channel_id: both.id,
+      emoji: { name: "👀" },
+    });
+    for (const payload of heard) expect(discordDispatchProblems(payload.t, payload.d)).toEqual([]);
   });
 
   test("without MESSAGE_CONTENT, another bot's message is empty unless it mentions the bot", async () => {

@@ -14,13 +14,13 @@ import {
   type DiscordFixture,
   type Duration,
   type GitHubApp,
-  type GitHubDelivery,
+  type GitHubComment,
   type GitHubFixture,
   type GoogleApp,
   type GoogleFixture,
   type LinearApp,
   type LinearFixture,
-  type NotionDelivery,
+  type NotionComment,
   type NotionFixture,
   type NotionIntegration,
   type ResendApp,
@@ -31,6 +31,7 @@ import {
   waitFor,
   WaitTimeoutError,
 } from "../../sdks/typescript/client.ts";
+import { appTurns } from "../matchers-core/index.ts";
 // The fixtures and matchers the checks use come from the Vitest integration.
 import type {} from "../vitest/index.ts";
 
@@ -70,6 +71,29 @@ export interface ChecksOptions {
   loopTurns?: number;
 }
 
+/**
+ * How every `<channel>.no-reply-loop` ends. The conversation goes quiet with at most what a correct
+ * agent leaves (the `start` app messages there were when the peer began, then at most `turns`
+ * answers, each followed by the peer's): `toGoQuiet` fails otherwise. And the agent answered the
+ * other app at most `turns` times. Either failure names the authors in turn since a person last
+ * wrote (decision 0027).
+ */
+async function answeredAtMost(
+  conversation: unknown,
+  loop: { start: number; answered: number; turns: number; what: string; wait: { timeout?: Duration } },
+): Promise<void> {
+  const { start, answered, turns, what, wait } = loop;
+  await expect(conversation).toGoQuiet({
+    maxReplies: start + 2 * turns + 1,
+    ...(wait.timeout === undefined ? {} : { within: wait.timeout }),
+  });
+  const since = await appTurns(conversation);
+  expect(
+    answered,
+    `times it answered ${what}: ${since.count} app messages and no person between them: ${since.turns}`,
+  ).toBeLessThanOrEqual(turns);
+}
+
 /** What an email app does in `<channel>.no-reply-loop`: Resend's and Google's alike. */
 interface MailPeer<Email, Agent> {
   send(options: { to: Agent[]; subject: string; text: string; headers: Record<string, string> }): Promise<Email>;
@@ -96,7 +120,14 @@ async function autoMailLoop<
     const latest = (await answers()).at(-1) ?? first;
     await peer.reply(latest, { text: "Noted, thanks.", headers: auto });
   }
-  expect(seen, "times it answered mail another program sent on its own").toBeLessThanOrEqual(turns);
+  // The peer's first email starts the loop: no app message was there before it.
+  await answeredAtMost(first.thread, {
+    start: 0,
+    answered: seen,
+    turns,
+    what: "mail another program sent on its own",
+    wait,
+  });
 }
 
 /**
@@ -217,6 +248,25 @@ const deliveryOf = <D>(subject: { readonly delivery?: D | undefined }, { skip }:
   subject.delivery ?? skip(`live: ${platform} delivers to the agent itself, so delivery checks are fake-only`);
 
 /**
+ * The delivery an event caused to the app under test: the built-in app's `delivery`, or another
+ * app's `deliveryFor(app)` (decision 0027), waited for as a push may come a moment later. An app
+ * that was never sent it fails the check: that is the bug the delivery checks are there to find.
+ */
+async function deliveryTo<App extends { readonly id: string; readonly name: string }, D>(
+  subject: { readonly delivery?: D | undefined; deliveryFor(app: App): Promise<D | undefined> },
+  agent: App,
+  fixtureApp: { readonly id: string },
+  context: TestContext,
+  platform: string,
+  wait: { timeout?: Duration },
+): Promise<D> {
+  if (agent.id === fixtureApp.id) return deliveryOf(subject, context, platform);
+  return waitFor(`${platform}'s delivery of this event to ${agent.name}`, () => subject.deliveryFor(agent), {
+    timeout: wait.timeout ?? "5s",
+  });
+}
+
+/**
  * Registers one check as a test, with its id in the name. A check that was skipped, or whose
  * prompt wasn't given, is left out. An id in `skip` that no check has is a mistake worth hearing about.
  */
@@ -284,10 +334,8 @@ export function slackChecks(options: ChecksOptions): void {
   const agentOf = async (slack: SlackFixture): Promise<SlackApp> =>
     builtIn(app, slack.app) ? slack.app : slack.createApp({ name: app });
   /** The delivery a message caused to the app under test. */
-  const slackDelivery = async (msg: SlackMessage, agent: SlackApp, context: TestContext) =>
-    agent.id === context.slack.app.id
-      ? deliveryOf(msg, context, "Slack")
-      : ((await msg.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this message`));
+  const slackDelivery = (msg: SlackMessage, agent: SlackApp, context: TestContext) =>
+    deliveryTo(msg, agent, context.slack.app, context, "Slack", wait);
 
   describe(`slack checks: ${app}`, () => {
     check("slack.dm-once", "replies once to a DM", async ({ slack }) => {
@@ -356,6 +404,7 @@ export function slackChecks(options: ChecksOptions): void {
       // The agent's answer to Ana; then the peer answers each of its answers, mentioning it, as a
       // second agent without a loop guard would.
       const first = await answersAgain(replies, 0, wait);
+      const start = (await appTurns(msg.thread)).count;
       let seen = first;
       for (let turn = 0; turn <= turns; turn++) {
         await peer.reply(`@${agent.name} thanks! Anything else?`, { thread: msg.thread });
@@ -363,7 +412,7 @@ export function slackChecks(options: ChecksOptions): void {
         if (now === seen) break;
         seen = now;
       }
-      expect(seen - first, "times it answered the other app").toBeLessThanOrEqual(turns);
+      await answeredAtMost(msg.thread, { start, answered: seen - first, turns, what: "the other app", wait });
     });
 
     check("slack.bad-signature", "rejects a delivery with a bad signature", async (context) => {
@@ -502,11 +551,9 @@ export function githubChecks(options: ChecksOptions): void {
     const repo = await github.createRepo({ collaborators: [ana], apps: [agent, ...also] });
     return { ana, agent, repo };
   };
-  /** The delivery checks read the built-in App's delivery: another App's has no `delivery` on a comment yet. */
-  const githubDelivery = (comment: { readonly delivery?: GitHubDelivery | undefined }, context: TestContext) =>
-    builtIn(app, context.github.app)
-      ? deliveryOf(comment, context, "GitHub")
-      : context.skip(`the GitHub delivery checks read the built-in App's delivery, not ${app}'s`);
+  /** The delivery a comment caused to the App under test. */
+  const githubDelivery = (comment: GitHubComment, agent: GitHubApp, context: TestContext) =>
+    deliveryTo(comment, agent, context.github.app, context, "GitHub", wait);
   const pullRequest = async (context: TestContext) => {
     const { ana, repo } = await setup(context);
     const pr = await ana.openPullRequest(
@@ -544,10 +591,10 @@ export function githubChecks(options: ChecksOptions): void {
     });
 
     check("github.redelivery", "a redelivered webhook doesn't produce a second answer", async (context) => {
-      const { ana, repo } = await setup(context);
+      const { ana, agent, repo } = await setup(context);
       const issue = await ana.openIssue({ title: "Delivered twice" }, { repo });
       const comment = await ana.comment(prompt, { issue });
-      const delivery = githubDelivery(comment, context);
+      const delivery = await githubDelivery(comment, agent, context);
       await expect(issue).toHaveCommentFrom(app, wait);
       // GitHub redelivers with the same `X-GitHub-Delivery`, from its UI and its API.
       await delivery.redeliver();
@@ -563,9 +610,9 @@ export function githubChecks(options: ChecksOptions): void {
     });
 
     check("github.bad-signature", "rejects a webhook with a bad signature", async (context) => {
-      const { ana, repo } = await setup(context);
+      const { ana, agent, repo } = await setup(context);
       const issue = await ana.openIssue({ title: "Signed by someone else" }, { repo });
-      const delivery = githubDelivery(await ana.comment(prompt, { issue }), context);
+      const delivery = await githubDelivery(await ana.comment(prompt, { issue }), agent, context);
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
     });
@@ -582,6 +629,7 @@ export function githubChecks(options: ChecksOptions): void {
         const agentComments = async () => (await issue.comments()).filter((one) => one.author.id === agent.id).length;
         // The peer answers each comment of the agent's, mentioning it, as a second agent without a loop guard would.
         const before = await agentComments();
+        const start = (await appTurns(issue)).count;
         let seen = before;
         for (let turn = 0; turn <= turns; turn++) {
           await peer.comment(`@${agent.name} thanks! Anything else?`, { issue });
@@ -589,7 +637,7 @@ export function githubChecks(options: ChecksOptions): void {
           if (now === seen) break;
           seen = now;
         }
-        expect(seen - before, "times it answered the other App").toBeLessThanOrEqual(turns);
+        await answeredAtMost(issue, { start, answered: seen - before, turns, what: "the other App", wait });
       },
     );
   });
@@ -670,6 +718,7 @@ export function linearChecks(options: ChecksOptions): void {
       const agentComments = async () => (await issue.comments()).filter((one) => one.author.id === agent.id).length;
       // The peer comments after each comment of the agent's, as a second agent without a loop guard would.
       const before = await agentComments();
+      const start = (await appTurns(issue)).count;
       let seen = before;
       for (let turn = 0; turn <= turns; turn++) {
         await peer.comment("Thanks! Anything else?", { issue });
@@ -677,7 +726,7 @@ export function linearChecks(options: ChecksOptions): void {
         if (now === seen) break;
         seen = now;
       }
-      expect(seen - before, "times it answered the other app").toBeLessThanOrEqual(turns);
+      await answeredAtMost(issue, { start, answered: seen - before, turns, what: "the other app", wait });
     });
   });
 }
@@ -707,11 +756,9 @@ export function notionChecks(options: ChecksOptions): void {
     const comment = await ana.comment(prompt, { page });
     return { ana, agent, page, comment };
   };
-  /** The delivery checks read the built-in integration's delivery: another's has no `delivery` on a comment yet. */
-  const notionDelivery = (comment: { readonly delivery?: NotionDelivery | undefined }, context: TestContext) =>
-    builtIn(app, context.notion.app)
-      ? deliveryOf(comment, context, "Notion")
-      : context.skip(`the Notion delivery checks read the built-in integration's delivery, not ${app}'s`);
+  /** The delivery a comment caused to the integration under test. */
+  const notionDelivery = (comment: NotionComment, agent: NotionIntegration, context: TestContext) =>
+    deliveryTo(comment, agent, context.notion.app, context, "Notion", wait);
 
   describe(`notion checks: ${app}`, () => {
     check("notion.reply-in-discussion", "answers a comment in its discussion", async (context) => {
@@ -729,8 +776,8 @@ export function notionChecks(options: ChecksOptions): void {
     });
 
     check("notion.redelivery", "a webhook sent again doesn't produce a second answer", async (context) => {
-      const { comment } = await commented(context);
-      const delivery = notionDelivery(comment, context);
+      const { agent, comment } = await commented(context);
+      const delivery = await notionDelivery(comment, agent, context);
       await expect(comment.discussion).toHaveCommentFrom(app, wait);
       // Notion retries with the same event id.
       await delivery.redeliver();
@@ -738,7 +785,8 @@ export function notionChecks(options: ChecksOptions): void {
     });
 
     check("notion.bad-signature", "rejects a webhook with a bad signature", async (context) => {
-      const delivery = notionDelivery((await commented(context)).comment, context);
+      const { agent, comment } = await commented(context);
+      const delivery = await notionDelivery(comment, agent, context);
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
     });
@@ -751,6 +799,7 @@ export function notionChecks(options: ChecksOptions): void {
         (await comment.discussion.comments()).filter((one) => one.author.id === agent.id).length;
       // The peer answers each comment of the agent's in the discussion, as a second agent without a loop guard would.
       const before = await agentComments();
+      const start = (await appTurns(comment.discussion)).count;
       let seen = before;
       for (let turn = 0; turn <= turns; turn++) {
         await peer.reply("Thanks! Anything else?", { discussion: comment.discussion });
@@ -758,7 +807,13 @@ export function notionChecks(options: ChecksOptions): void {
         if (now === seen) break;
         seen = now;
       }
-      expect(seen - before, "times it answered the other integration").toBeLessThanOrEqual(turns);
+      await answeredAtMost(comment.discussion, {
+        start,
+        answered: seen - before,
+        turns,
+        what: "the other integration",
+        wait,
+      });
     });
   });
 }
@@ -786,10 +841,7 @@ export function resendChecks(options: ChecksOptions): void {
   /** The delivery an email caused to the app under test. */
   const delivered = async (context: TestContext) => {
     const { agent, email } = await emailed(context);
-    const delivery =
-      agent.id === context.resend.app.id
-        ? deliveryOf(email, context, "Resend")
-        : ((await email.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this email`));
+    const delivery = await deliveryTo(email, agent, context.resend.app, context, "Resend", wait);
     return { email, delivery };
   };
 
@@ -854,10 +906,7 @@ export function googleChecks(options: ChecksOptions): void {
   /** The delivery an email caused to the app under test. */
   const delivered = async (context: TestContext) => {
     const { agent, email } = await emailed(context);
-    const delivery =
-      agent.id === context.google.app.id
-        ? deliveryOf(email, context, "Gmail")
-        : ((await email.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this email`));
+    const delivery = await deliveryTo(email, agent, context.google.app, context, "Gmail", wait);
     return { email, delivery };
   };
 
@@ -976,6 +1025,7 @@ export function discordChecks(options: ChecksOptions): void {
         // The agent's answer to Ana; then the peer answers each of its answers, mentioning it, as a
         // second agent without a loop guard would.
         const first = await answersAgain(count, 0, wait);
+        const start = (await appTurns(channel)).count;
         let seen = first;
         for (let turn = 0; turn <= turns; turn++) {
           const latest = (await answers()).at(-1);
@@ -985,7 +1035,7 @@ export function discordChecks(options: ChecksOptions): void {
           if (now === seen) break;
           seen = now;
         }
-        expect(seen - first, "times it answered the other app").toBeLessThanOrEqual(turns);
+        await answeredAtMost(channel, { start, answered: seen - first, turns, what: "the other app", wait });
       },
     );
 

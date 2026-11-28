@@ -1053,6 +1053,35 @@ export function registerNotionRoutes(
     },
   });
 
+  router.route({
+    method: "get",
+    path: "/comments/{comment}/delivery-for",
+    summary:
+      "The `comment.created` delivery this comment caused to this integration (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in integration's",
+    params: z.object({ comment: pathParam("comment") }),
+    query: z.object({
+      app: z.string().openapi({ param: { name: "app", in: "query" }, ...refTo("NotionIntegration") }),
+    }),
+    response: NotionDelivery.nullable(),
+    errors: ["not_found"],
+    sdkMethod: { on: "NotionComment", name: "deliveryFor", args: ["app"] },
+    live: APPS,
+    stability,
+    handler: ({ session, params, query }) => {
+      const comment = commentOf(session.id, params.comment);
+      const app = store.apps.get(session.id, query.app);
+      const found = fake
+        .deliveries(session.id)
+        .find(
+          ({ request }) =>
+            request.app === app.name &&
+            request.type === "comment.created" &&
+            (request.meta?.entity as { id?: string } | undefined)?.id === comment.id,
+        );
+      return found ? deliveryWire(found) : null;
+    },
+  });
+
   // --- Deliveries and calls ---------------------------------------------------------------------
 
   registerInspectionRoutes(router, {

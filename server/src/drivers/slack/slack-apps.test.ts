@@ -4,8 +4,7 @@
  * Slack sends it: their messages with `bot_id`, `app_id` and `bot_profile`, their mentions,
  * their reactions. What Slack refuses between bots, the fake refuses.
  */
-import { createHmac } from "node:crypto";
-
+import { isValidSlackRequest } from "@slack/bolt";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { harness, type RecordingAgent, recordingAgent, refusal, watchCredentials } from "../../../test/app-harness.ts";
@@ -116,17 +115,23 @@ describe("exit check 12.3: Slack apps", () => {
     const message = await post(`/users/${ana.id}/say`, { message: { text: "@coder fix it" }, channel: channel.id });
     await h.app.settled();
 
-    const verifies = (agent: RecordingAgent, secret: string) =>
-      agent.received.every((delivery) => {
-        const timestamp = String(delivery.headers["x-slack-request-timestamp"]);
-        const signature = createHmac("sha256", secret).update(`v0:${timestamp}:${delivery.body}`).digest("hex");
-        return delivery.headers["x-slack-signature"] === `v0=${signature}`;
+    // Bolt's own check, the one its receivers run on every request.
+    const verifies = (secret: string) => (delivery: RecordingAgent["received"][number]) =>
+      isValidSlackRequest({
+        signingSecret: secret,
+        body: delivery.body,
+        headers: {
+          "x-slack-signature": String(delivery.headers["x-slack-signature"]),
+          "x-slack-request-timestamp": Number(delivery.headers["x-slack-request-timestamp"]),
+        },
       });
     expect(mine.received.length).toBeGreaterThan(0);
     expect(theirs.received.length).toBeGreaterThan(0);
-    expect(verifies(mine, app.signingSecret)).toBe(true);
-    expect(verifies(theirs, coder.signingSecret)).toBe(true);
-    expect(verifies(theirs, app.signingSecret)).toBe(false);
+    expect(mine.received.every(verifies(app.signingSecret))).toBe(true);
+    expect(theirs.received.every(verifies(coder.signingSecret))).toBe(true);
+    // Each delivery fails against the other app's secret, not only one of them.
+    expect(theirs.received.some(verifies(app.signingSecret))).toBe(false);
+    expect(mine.received.some(verifies(coder.signingSecret))).toBe(false);
     expect(events(theirs).map((one) => one.event.type)).toEqual(["app_mention", "message"]);
     expect(events(mine).map((one) => one.event.type)).toEqual(["message"]);
     // The message's delivery is the built-in app's; another app's is asked for by app.
@@ -137,6 +142,49 @@ describe("exit check 12.3: Slack apps", () => {
     expect(forCoder).toMatchObject({ app: "coder", eventType: "app_mention" });
     const deliveries = (await h.call("GET", `${base}/deliveries`)).body as { app: string }[];
     expect(new Set(deliveries.map((one) => one.app))).toEqual(new Set(["my-agent", "coder"]));
+  });
+
+  test("another app's edit, delete and reaction_removed reach the app as Slack sends them, with that app's bot", async () => {
+    const { h, mine, post, app, coder, web } = await twoApps();
+    const channel = await post("/channels", { participants: [app.id, coder.id] });
+    const sent = await web("chat.postMessage", { channel: channel.id, text: "opened #12" }, coder.botToken);
+    await web("chat.update", { channel: channel.id, ts: sent.ts, text: "opened #12, ready" }, coder.botToken);
+    await web("reactions.add", { channel: channel.id, timestamp: sent.ts, name: "eyes" }, coder.botToken);
+    await web("reactions.remove", { channel: channel.id, timestamp: sent.ts, name: "eyes" }, coder.botToken);
+    await web("chat.delete", { channel: channel.id, ts: sent.ts }, coder.botToken);
+    await h.app.settled();
+
+    const heard = events(mine).map((one) => one.event);
+    expect(heard.map((event) => event.subtype ?? event.type)).toEqual([
+      "message",
+      "message_changed",
+      "reaction_added",
+      "reaction_removed",
+      "message_deleted",
+    ]);
+    const bot = { user: coder.botUserId, bot_id: coder.botId, app_id: coder.id };
+    expect(heard[1]).toMatchObject({ type: "message", message: { text: "opened #12, ready", ...bot } });
+    expect(heard[3]).toMatchObject({ user: coder.botUserId, reaction: "eyes", item: { ts: sent.ts } });
+    expect(heard[4]).toMatchObject({ type: "message", deleted_ts: sent.ts, previous_message: bot });
+  });
+
+  test("another app joining and leaving a channel reaches the app as member_joined_channel and member_left_channel", async () => {
+    const { h, mine, post, app, coder, web } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id] });
+    expect(await web("conversations.join", { channel: channel.id }, coder.botToken)).toMatchObject({ ok: true });
+    // An app leaves when a person removes it.
+    await post(`/users/${ana.id}/kick`, { participant: coder.id, channel: channel.id });
+    await h.app.settled();
+
+    const heard = events(mine).map((one) => one.event);
+    // Joining also posts Slack's `channel_join` message, by the app's bot.
+    expect(heard.map((event) => event.subtype ?? event.type)).toEqual([
+      "member_joined_channel",
+      "channel_join",
+      "member_left_channel",
+    ]);
+    for (const event of heard) expect(event).toMatchObject({ user: coder.botUserId, channel: channel.id });
   });
 
   test("a bot can't open a DM with another bot", async () => {
@@ -227,11 +275,18 @@ describe("exit check 12.3: Slack apps", () => {
     };
     const payloadOf = (agent: RecordingAgent) =>
       JSON.parse(new URLSearchParams(agent.received.at(-1)?.body).get("payload") ?? "{}");
+    // Bolt's own check, as for events.
     const signedFor = (agent: RecordingAgent, secret: string) => {
       const delivery = agent.received.at(-1);
-      const timestamp = String(delivery?.headers["x-slack-request-timestamp"]);
-      const signature = createHmac("sha256", secret).update(`v0:${timestamp}:${delivery?.body}`).digest("hex");
-      return delivery?.headers["x-slack-signature"] === `v0=${signature}`;
+      if (!delivery) return false;
+      return isValidSlackRequest({
+        signingSecret: secret,
+        body: delivery.body,
+        headers: {
+          "x-slack-signature": String(delivery.headers["x-slack-signature"]),
+          "x-slack-request-timestamp": Number(delivery.headers["x-slack-request-timestamp"]),
+        },
+      });
     };
     const before = mine.received.length;
 

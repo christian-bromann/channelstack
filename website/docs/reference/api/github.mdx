@@ -2458,6 +2458,34 @@ let reactions = comment.reactions().await?;
 
 **Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: pull requests, reviews, pushes, checks and installs aren't built live.
 
+### deliveryFor()
+
+The `issue_comment` (`created`) delivery this comment caused to this App (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in App's.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await comment.deliveryFor(app);
+```
+
+```python title="Python"
+delivery = await comment.delivery_for(app)
+```
+
+```rust title="Rust"
+let delivery = comment.delivery_for(&app).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `app` | `GitHubApp` | yes | positional |
+
+**Returns** [`GitHubDelivery | undefined`](/docs/reference/api/github#githubdelivery).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
 ## GitHubReviewComment
 
 Returned by [`GitHubApp.reviewComment()`](/docs/reference/api/github#reviewcomment), [`GitHubApp.reply()`](/docs/reference/api/github#reply), [`GitHubUser.reviewComment()`](/docs/reference/api/github#reviewcomment-1), [`GitHubUser.reply()`](/docs/reference/api/github#reply-1).

@@ -36,8 +36,8 @@ interface App {
 }
 
 /** What an App received: the event, its GUID and headers, the exact body and the parsed payload. */
-const webhooks = (agent: RecordingAgent) =>
-  agent.received.map(({ headers, body }) => ({
+const webhooks = (agent: RecordingAgent | RecordingAgent["received"]) =>
+  ("received" in agent ? agent.received : agent).map(({ headers, body }) => ({
     event: String(headers["x-github-event"]),
     guid: String(headers["x-github-delivery"]),
     signature: String(headers["x-hub-signature-256"]),
@@ -58,8 +58,13 @@ async function twoApps() {
     { github: mine.url },
     { appWebhooks: (driver, app) => (driver === "github" && app !== "unreachable" ? theirs.url : undefined) },
   );
+  /** What a test set aside to look at what came after: held to the schemas all the same. */
+  const setAside: RecordingAgent["received"] = [];
+  const clear = (...cleared: RecordingAgent[]) => {
+    for (const agent of cleared) setAside.push(...agent.received.splice(0));
+  };
   checks.push(() => {
-    const issues = [...webhooks(mine), ...webhooks(theirs)].flatMap(({ event, payload }) =>
+    const issues = [...webhooks(setAside), ...webhooks(mine), ...webhooks(theirs)].flatMap(({ event, payload }) =>
       webhookProblems(event, payload),
     );
     expect(issues.join("\n")).toBe("");
@@ -80,8 +85,7 @@ async function twoApps() {
   const issueRef = { repoId: repo.id, number: issue.number as number };
   await h.app.settled();
   // What each App has heard so far is its install and the issue: tests look at what comes after.
-  mine.received.length = 0;
-  theirs.received.length = 0;
+  clear(mine, theirs);
 
   /** The JWT an App authenticates with, signed with its own private key. */
   const jwt = (of: App) => {
@@ -123,6 +127,7 @@ async function twoApps() {
     token,
     api,
     path,
+    clear,
   };
 }
 
@@ -260,13 +265,13 @@ describe("exit check 12.3: GitHub Apps", () => {
   });
 
   test("an App hears only the events it subscribed to, on repositories it is installed on, at its own URL", async () => {
-    const { h, theirs, post, ana, issueRef, app } = await twoApps();
+    const { h, theirs, post, ana, issueRef, app, clear } = await twoApps();
     const pusher = await post("/apps", { name: "pusher", events: ["push"] });
     const unreachable = await post("/apps", { name: "unreachable" });
     for (const one of [pusher, unreachable]) await post(`/repos/${issueRef.repoId}/install`, { app: one.id });
     const elsewhere = await post("/repos", { collaborators: [{ user: ana.id }], apps: [app.id] });
     await h.app.settled();
-    theirs.received.length = 0;
+    clear(theirs);
 
     await post(`/users/${ana.id}/comment`, { body: "hi", issue: issueRef });
     const other = await post(`/users/${ana.id}/issues`, { issue: { title: "Elsewhere" }, repo: elsewhere.id });
@@ -284,11 +289,11 @@ describe("exit check 12.3: GitHub Apps", () => {
   });
 
   test("installing an App on a repository tells that App alone, with its own installation", async () => {
-    const { h, mine, theirs, post, app, reviewer, ana } = await twoApps();
+    const { h, mine, theirs, post, app, reviewer, ana, clear } = await twoApps();
     const repo = await post("/repos", { collaborators: [{ user: ana.id }], apps: [app.id] });
     await h.app.settled();
     expect(webhooks(theirs)).toEqual([]);
-    mine.received.length = 0;
+    clear(mine);
 
     const added = await post(`/repos/${repo.id}/install`, { app: reviewer.id });
     await h.app.settled();
@@ -307,8 +312,63 @@ describe("exit check 12.3: GitHub Apps", () => {
     expect(webhooks(mine)).toEqual([]);
   });
 
+  test("uninstalling an App from a repository tells that App alone, with installation_repositories removed", async () => {
+    const { h, mine, theirs, post, reviewer, repo, clear } = await twoApps();
+    expect((await post(`/repos/${repo.id}/uninstall`, { app: reviewer.id })).app).toBe("reviewer");
+    await h.app.settled();
+
+    expect(webhooks(mine)).toEqual([]);
+    const told = webhooks(theirs);
+    expect(told.map((hook) => `${hook.event}.${hook.payload.action}`)).toEqual(["installation_repositories.removed"]);
+    expect(told[0]?.payload).toMatchObject({
+      installation: { app_id: reviewer.appId, app_slug: "reviewer" },
+      repositories_removed: [{ name: repo.name }],
+      repositories_added: [],
+    });
+    clear(theirs);
+  });
+
+  test("another App's labels, push, pull request and review comment reach the App with sender <slug>[bot] of type Bot", async () => {
+    const { h, mine, api, reviewer, path, issueRef } = await twoApps();
+    const bot = { login: "reviewer[bot]", type: "Bot", id: Number(reviewer.botUserId) };
+    const call = async (method: string, at: string, body: unknown, status: number) => {
+      const reply = await api(reviewer, method, `${path}${at}`, body);
+      expect(reply.status, JSON.stringify(reply.body)).toBe(status);
+      return reply.body;
+    };
+    await call("POST", "/labels", { name: "triaged", color: "0e8a16" }, 201);
+    await call("POST", `/issues/${issueRef.number}/labels`, { labels: ["triaged"] }, 200);
+    const main = (await call("GET", "/commits/main", undefined, 200)).sha as string;
+    await call("POST", "/git/refs", { ref: "refs/heads/fix", sha: main }, 201);
+    const content = Buffer.from("fixed\n").toString("base64");
+    const put = await call("PUT", "/contents/fix.txt", { message: "Fix it", content, branch: "fix" }, 201);
+    const pr = await call("POST", "/pulls", { title: "Fix it", head: "fix", base: "main" }, 201);
+    await call(
+      "POST",
+      `/pulls/${pr.number}/comments`,
+      { body: "Typo here", path: "fix.txt", line: 1, side: "RIGHT", commit_id: put.commit.sha },
+      201,
+    );
+    await h.app.settled();
+
+    const heard = webhooks(mine).filter((hook) => hook.payload.sender?.login === "reviewer[bot]");
+    const kinds = heard.map((hook) => `${hook.event}.${hook.payload.action ?? ""}`);
+    for (const kind of ["issues.labeled", "push.", "pull_request.opened", "pull_request_review_comment.created"]) {
+      expect(kinds, kinds.join(", ")).toContain(kind);
+    }
+    for (const hook of heard) expect(hook.payload.sender).toMatchObject(bot);
+    const labeled = heard.find((hook) => hook.event === "issues");
+    expect(labeled?.payload.label).toMatchObject({ name: "triaged" });
+    const pushed = heard.find((hook) => hook.event === "push");
+    expect(pushed?.payload).toMatchObject({ ref: "refs/heads/fix", pusher: { name: "reviewer[bot]" } });
+    const opened = heard.find((hook) => hook.event === "pull_request");
+    expect(opened?.payload.pull_request.user).toMatchObject({ login: "reviewer[bot]", type: "Bot" });
+    const inline = heard.find((hook) => hook.event === "pull_request_review_comment");
+    expect(inline?.payload.comment).toMatchObject({ body: "Typo here", user: { login: "reviewer[bot]", type: "Bot" } });
+  });
+
   test("check_run created and completed go to every subscribed App; rerequested and requested_action to the App that made the run alone", async () => {
-    const { h, mine, theirs, api, post, reviewer, path, ana } = await twoApps();
+    const { h, mine, theirs, api, post, reviewer, path, ana, clear } = await twoApps();
     const sha = (await api(reviewer, "GET", `${path}/commits/main`)).body.sha;
     const made = await api(reviewer, "POST", `${path}/check-runs`, {
       name: "review",
@@ -326,7 +386,7 @@ describe("exit check 12.3: GitHub Apps", () => {
         "check_run.created",
         "check_run.completed",
       ]);
-      agent.received.length = 0;
+      clear(agent);
     }
 
     const rerun = await post(`/users/${ana.id}/rerun`, { checkRun: made.body.id });

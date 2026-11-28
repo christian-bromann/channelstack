@@ -14,7 +14,15 @@ import { LOOP_LIMIT } from "../../core/loops/index.ts";
 
 const agents: RecordingAgent[] = [];
 afterEach(() => {
-  for (const agent of agents.splice(0)) agent.close();
+  const done = agents.splice(0);
+  for (const agent of done) agent.close();
+  // Every webhook any app got, whichever test looked at it, holds to Linear's schema.
+  const problems = done.flatMap((agent) =>
+    agent.received.flatMap(({ headers, body }) =>
+      linearWebhookProblems(String(headers["linear-event"]), JSON.parse(body)),
+    ),
+  );
+  expect(problems.join("\n")).toBe("");
 });
 
 /** A workspace with my-agent at one endpoint and `coder` at another, and Ana in a team. `watcher`, if made, has a third. */
@@ -212,18 +220,18 @@ describe("exit check 12.3: Linear apps", () => {
 
     // Linear's own receiver: each app's accepts its delivery and refuses the other app's.
     const receiver = (secret: string) => new LinearWebhookClient(secret);
-    const verifies = (agent: RecordingAgent, secret: string) =>
-      agent.received.every((delivery) => {
-        try {
-          return receiver(secret).verify(Buffer.from(delivery.body), String(delivery.headers["linear-signature"]));
-        } catch {
-          return false;
-        }
-      });
-    expect(verifies(mine, app.webhookSecret)).toBe(true);
-    expect(verifies(theirs, coder.webhookSecret)).toBe(true);
-    expect(verifies(theirs, app.webhookSecret)).toBe(false);
-    expect(verifies(mine, coder.webhookSecret)).toBe(false);
+    const verifies = (secret: string) => (delivery: RecordingAgent["received"][number]) => {
+      try {
+        return receiver(secret).verify(Buffer.from(delivery.body), String(delivery.headers["linear-signature"]));
+      } catch {
+        return false;
+      }
+    };
+    expect(mine.received.every(verifies(app.webhookSecret))).toBe(true);
+    expect(theirs.received.every(verifies(coder.webhookSecret))).toBe(true);
+    // Each delivery fails against the other app's secret, not only one of them.
+    expect(theirs.received.some(verifies(app.webhookSecret))).toBe(false);
+    expect(mine.received.some(verifies(coder.webhookSecret))).toBe(false);
 
     // The comment's delivery is the built-in app's; another app's is asked for by app.
     expect(comment.delivery).toMatchObject({ app: "my-agent", type: "Comment", action: "create" });

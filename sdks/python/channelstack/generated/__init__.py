@@ -2925,6 +2925,12 @@ class GitHubComment:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/comments/{quote(str(self.id), safe='')}/reactions")
         return [GitHubReaction._from_wire(ctx, item) for item in data]
 
+    async def delivery_for(self, app: GitHubApp) -> GitHubDelivery | None:
+        """The `issue_comment` (`created`) delivery this comment caused to this App (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in App's. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/comments/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
 
 class GitHubReviewComment:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
@@ -3598,6 +3604,12 @@ class NotionComment:
         self.text: str = data["text"]
         self.created_at: str = data["createdAt"]
         self.delivery: NotionDelivery | None = None if data.get("delivery") is None else NotionDelivery(ctx, data["delivery"])
+
+    async def delivery_for(self, app: NotionIntegration) -> NotionDelivery | None:
+        """The `comment.created` delivery this comment caused to this integration (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in integration's. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/comments/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else NotionDelivery(ctx, data))
 
 
 class NotionDiscussion:

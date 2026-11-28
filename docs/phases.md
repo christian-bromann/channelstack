@@ -385,7 +385,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ## Phase 12: any number of agent apps per channel
 
-[Decision 0027](decisions/0027-multiple-apps.md): a channel holds any number of people and apps, each app a real agent app with its own identity, and `my-agent` stays. Phase 12 started before phases 10 (Twilio) and 11 (Discord) merged, at the maintainer's request: it covers the six channels on `main`, and Twilio and Discord get their apps once they land. Its open questions are answered by the maintainer before it starts, or it takes their defaults.
+[Decision 0027](decisions/0027-multiple-apps.md): a channel holds any number of people and apps, each app a real agent app with its own identity, and `my-agent` stays. Phase 12 started before phases 10 (Twilio) and 11 (Discord) merged, at the maintainer's request. Phase 11 merged while it ran, so it covers the seven channels on `main` (Slack, GitHub, Linear, Notion, Resend, Google and Discord) and echo; Twilio gets its apps once phase 10 lands ([#113](https://github.com/christian-bromann/channelstack/issues/113)). Its open questions are answered by the maintainer before it starts, or it takes their defaults.
 
 **Build:**
 - **Apps by name, on every channel and echo:** `createApp({ name, … })` and `apps()` on each fixture; apps in the shared world, ids derived from `CHANNELSTACK_SEED` and the name, secrets per app in `secrets.json`, `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, `channelstack env --app` and `channelstack.env({ app })`.
