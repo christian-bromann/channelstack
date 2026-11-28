@@ -95,7 +95,7 @@ Don't reopen these without asking.
 |---|---|
 | Channels | Slack, GitHub, Linear, Notion, email (Resend and Google (Gmail), [decision 0021](docs/decisions/0021-email-channels.md)), and Discord ([decision 0026](docs/decisions/0026-discord.md), reopened on the maintainer's instruction). No Teams for now |
 | Addresses | portless names: `https://channelstack.localhost` (UI and control API at `/_channelstack`), `slack.localhost`, `github.localhost`, `linear.localhost`, `notion.localhost`, `resend.localhost`, `google.localhost`, `discord.localhost`; the fake model at `openai.localhost` |
-| World | One shared fake world per channel per server: the workspace, org or guild every app of the channel is installed in (for Resend, the teams; for Twilio, the account and its numbers). Sessions are scopes inside it, not separate worlds |
+| World | One shared fake world per channel per server: the workspace, org or guild every app of the channel is installed in (for Resend, the teams). Sessions are scopes inside it, not separate worlds |
 | State | In memory. A restart starts fresh |
 | The agent | channelstack never starts or wraps it. `channelstack env` prints what it needs |
 | Default mode | Base-URL mode through portless. Proxy mode is opt-in |
@@ -118,7 +118,7 @@ These are for the maintainer. Don't decide them alone; ask, or flag them in the 
 | # | Question | Default if unanswered |
 |---|---|---|
 | D5 | License | MIT |
-| D6 | Multiple apps: the loop guard, `createApp({ webhookUrl })`, the app limit, scripted apps, Slack's scripted bots, Resend teams, Twilio subaccounts, which channels get live sandbox apps | The defaults in [decision 0027](docs/decisions/0027-multiple-apps.md#open-questions-for-the-maintainer) |
+| D6 | Multiple apps: the loop guard, `createApp({ webhookUrl })`, the app limit, scripted apps, Slack's scripted bots, Resend teams, which channels get live sandbox apps | The defaults in [decision 0027](docs/decisions/0027-multiple-apps.md#open-questions-for-the-maintainer) |
 
 ## Conventions
 
