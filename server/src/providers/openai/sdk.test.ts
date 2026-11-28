@@ -886,6 +886,8 @@ describe("timing and breaks on the injected clock, as the SDK sees them", () => 
   test("firstToken holds the answer until that much time has passed", async () => {
     const { client, respond, h, prompt } = await setup();
     await respond({ turns: [{ text: "Two incidents.", timing: { firstToken: 2000 } }] });
+    // The server's clock moves only when the test moves it: the call's age is the timers' time alone.
+    vi.useFakeTimers({ toFake: ["Date"] });
     const before = h.timers.waiting();
 
     let answered = false;
@@ -905,6 +907,7 @@ describe("timing and breaks on the injected clock, as the SDK sees them", () => 
   test("firstToken holds a stream's headers too, and betweenChunks paces its chunks", async () => {
     const { client, respond, h, prompt } = await setup();
     await respond({ turns: [{ text: ["one", " two", " three"], timing: { firstToken: 1000, betweenChunks: 500 } }] });
+    vi.useFakeTimers({ toFake: ["Date"] });
     const before = h.timers.waiting();
 
     let started = false;
