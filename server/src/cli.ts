@@ -24,13 +24,16 @@ import { UI_PAGE } from "./ui/page.ts";
 const USAGE = `channelstack ${pkg.version}
 
 Usage:
-  channelstack [start]            Start the server (fake Slack, GitHub, Linear and Notion in memory)
+  channelstack [start]            Start the server (fake Slack, GitHub, Linear, Notion, Resend, Google, Discord
+                                  and OpenAI in memory)
       --no-portless               One loopback port with path prefixes, instead of *.localhost names
       --port <n>                  The loopback port (default 4500 without portless; 0 picks a free one)
       --server-file <path>        Where to write the control API's URL and token (default <home>/server.json)
       --log-level <level>         debug, info, warn, error or silent (default info)
       --proxy                     Also run an HTTP proxy for agents with hard-coded hosts: slack.com, api.github.com,
-                                  api.linear.app and api.notion.com go to the fakes, every other host passes through
+                                  api.linear.app, api.notion.com, api.resend.com, Google's googleapis.com hosts,
+                                  discord.com, gateway.discord.gg and api.openai.com go to the fakes, every other
+                                  host passes through
       --proxy-port <n>            The proxy's loopback port (default 7464; 0 picks a free one)
       --record <dir>              With --proxy: write the shape of every exchange with those hosts, and of every
                                   webhook, to <dir>/shapes.jsonl (structure only, never a value)

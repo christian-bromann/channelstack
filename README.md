@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  A test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord.
+  A test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord, and the OpenAI model behind them.
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 
 ---
 
-channelstack runs fake versions of Slack, GitHub, Linear, Notion, Resend, Gmail and Discord on your machine. It's for anyone whose code talks to those platforms' APIs and reacts to their events: a Slack or Discord bot, a GitHub App or Probot app, a Linear or Notion integration, an agent people email, a notification bot, or an AI agent. Tests script the people, your app answers through its real code path, and you assert on what a person would see:
+channelstack runs fake versions of Slack, GitHub, Linear, Notion, Resend, Gmail and Discord on your machine, and of OpenAI's API for your agent's model. It's for anyone whose code talks to those platforms' APIs and reacts to their events: a Slack or Discord bot, a GitHub App or Probot app, a Linear or Notion integration, an agent people email, a notification bot, or an AI agent. Tests script the people, your app answers through its real code path, and you assert on what a person would see:
 
 ```ts
 test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
@@ -83,7 +83,7 @@ There are no hand-built webhook payloads and no mocked SDK calls. Ana posts, the
 
 Apps that live in these platforms break in the gaps between systems: a webhook signed the wrong way, a payload shape that changed last month, a stray progress message nobody asserted on.
 
-- **Your app's real code path.** `channelstack env` prints the URLs and tokens that point your app's own SDKs at `slack.localhost`, `github.localhost`, `linear.localhost` and `notion.localhost`, and its model at `openai.localhost`. Apps that can't change their base URL send their traffic through channelstack's proxy instead ([proxy mode](docs/devx.md#9-proxy-mode-for-agents-that-cant-change-their-base-url)).
+- **Your app's real code path.** `channelstack env` prints the URLs and tokens that point your app's own SDKs at `slack.localhost`, `github.localhost`, `discord.localhost` and the other fakes, and its model at `openai.localhost`. Apps that can't change their base URL send their traffic through channelstack's proxy instead ([proxy mode](docs/devx.md#9-proxy-mode-for-agents-that-cant-change-their-base-url)).
 - **Shapes checked against the real platforms.** channelstack's own tests validate what the fakes send against the platforms' published schemas (GitHub, Linear) and against recorded real traffic where no usable schema exists (Slack). When a platform changes, channelstack's build goes red, instead of your tests passing against a stale fake.
 - **People, not payloads.** Write `ana.click("Approve", { message })` instead of hand-building a `block_actions` body. People post, reply, review, delegate and press Stop, with correct signatures, retries and delivery ids.
 - **Assert what people see.** Streams, status lines, edits and ephemeral messages render into one transcript. `toHaveRepliesFrom(…, { count: 1 })` catches the double post.
@@ -106,7 +106,7 @@ The same tests can also run against the real platforms in sandbox workspaces ([l
 
 ### The model
 
-An AI agent's model is faked too: channelstack serves OpenAI's API at `https://openai.localhost/v1` (Chat Completions, the Responses and Conversations APIs), and each test scripts what the model answers with the `openai` fixture. It's realistic on the wire, with OpenAI's event shapes, tool calls, errors, rate-limit headers and timing, and never in content. A call no script answers fails the test.
+An AI agent's model is faked too: channelstack serves OpenAI's API at `https://openai.localhost/v1` (Chat Completions, the Responses and Conversations APIs, images, audio, files and OpenAI's built-in tools), and each test scripts what the model answers with the `openai` fixture. It's realistic on the wire, with OpenAI's event shapes, tool calls, errors, rate-limit headers and timing, and never in content. A call no script answers fails the test.
 
 ```ts
 test("a tool loop ends in one answer, in the thread", async ({ slack, openai }) => {
@@ -124,7 +124,7 @@ test("a tool loop ends in one answer, in the thread", async ({ slack, openai }) 
 });
 ```
 
-Anything that takes an OpenAI base URL works: the official `openai` SDKs, the AI SDK's OpenAI provider, the OpenAI Agents SDK, and gateways such as OpenRouter, LiteLLM and Azure OpenAI. Images, audio, files and OpenAI's built-in tools come in [phase 14](docs/phases.md).
+Anything that takes an OpenAI base URL works: the official `openai` SDKs, the AI SDK's OpenAI provider, the OpenAI Agents SDK, and gateways such as OpenRouter, LiteLLM and Azure OpenAI. [docs/devx.md](docs/devx.md#6-the-model) has the rest: timing and failures, media, built-in tools, and what your agent sent.
 
 ## How it works
 

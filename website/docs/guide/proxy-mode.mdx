@@ -12,7 +12,7 @@ Proxy mode is for apps whose platform URL you can't change: an app that hard-cod
 
 ## When you need it
 
-If your app's SDK takes a base URL (`SLACK_API_URL`, Octokit's `baseUrl`, `LINEAR_API_URL`, `NOTION_BASE_URL`, `RESEND_BASE_URL`, `googleapis`' `rootUrl`, discord.js's `rest.api`), use that instead: it's simpler and needs no CA ([Connecting your app](/docs/guide/connecting-your-agent)). Reach for proxy mode when:
+If your app's SDK takes a base URL (`SLACK_API_URL`, Octokit's `baseUrl`, `LINEAR_API_URL`, `NOTION_BASE_URL`, `RESEND_BASE_URL`, `googleapis`' `rootUrl`, discord.js's `rest.api`, `OPENAI_BASE_URL` for the model), use that instead: it's simpler and needs no CA ([Connecting your app](/docs/guide/connecting-your-agent)). Reach for proxy mode when:
 
 - the app or a library it uses calls `https://slack.com/api/…` (or another platform host) directly;
 - you can set environment variables for the app, but not its code or config;
@@ -95,7 +95,7 @@ Importing the `undici` package installs its own global dispatcher, which replace
 channelstack has its own CA for proxy mode, separate from the one portless uses.
 
 - **Where:** made once per install in `<home>/ca/`, private (files 0600, directory 0700). `ca.pem` is the CA alone, `bundle.pem` the public roots plus the CA, and `ca.json` holds its key.
-- **What it may sign:** only the four routed hosts. Not their subdomains and no IP address: a certificate it signs for any other name fails verification, whoever made it. So even a leaked CA can't vouch for another site.
+- **What it may sign:** only the routed hosts (the platforms' and `api.openai.com`). Not their subdomains and no IP address: a certificate it signs for any other name fails verification, whoever made it. So even a leaked CA can't vouch for another site.
 - **Where it's trusted:** nowhere but the app's environment. It is never added to a system trust store.
 - **How long it lasts:** a year. It's replaced at the next start when it is about to expire or when the routed hosts change. The certificate for the hosts is made at each start and kept in memory.
 

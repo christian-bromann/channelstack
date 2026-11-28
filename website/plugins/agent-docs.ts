@@ -299,7 +299,7 @@ function chunksOf(tree: Root, entry: DocEntry): DocChunk[] {
 }
 
 const SUMMARY =
-  'channelstack is a test harness for apps and AI agents that live in Slack, GitHub, Linear and Notion. One server fakes those platforms in memory: tests act as people (`ana.say("@my-agent hi", { channel })`) and check what a person would see (`expect(thread).toHaveReplyFrom("my-agent")`). The same tests run against the real platforms in live mode. SDKs for TypeScript (Vitest), Python (pytest) and Rust.';
+  'channelstack is a test harness for apps and AI agents that live in Slack, GitHub, Linear, Notion, email (Resend and Gmail) and Discord. One server fakes those platforms in memory, and OpenAI\'s API for the agent\'s model: tests act as people (`ana.say("@my-agent hi", { channel })`) and check what a person would see (`expect(thread).toHaveReplyFrom("my-agent")`). The same tests run against the real platforms in live mode. SDKs for TypeScript (Vitest), Python (pytest) and Rust.';
 
 /** /llms.txt: the summary, then every page by section, linked to its Markdown. */
 export function llmsTxt(pages: AgentPage[]): string {

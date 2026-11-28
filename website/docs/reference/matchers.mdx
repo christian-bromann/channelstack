@@ -718,6 +718,27 @@ expect(subject).toHaveSentToolResult(name, options?)
   <dd>`to_have_sent_tool_result`</dd>
 </dl>
 
+### toHaveSentFile
+
+```ts
+expect(subject).toHaveSentFile(file, options?)
+```
+
+<dl className="facts">
+  <dt>Subject</dt>
+  <dd>`openai`, a script, or a call</dd>
+  <dt>Arguments and options</dt>
+  <dd>`file: string | Uint8Array`, a path read in the test process (from the test file's directory) or the bytes themselves; `timeout`</dd>
+  <dt>Waits</dt>
+  <dd>Polls</dd>
+  <dt>Fails with</dt>
+  <dd>`Expected the agent to send the model <file> (<size>, sha256 <hash>).` and the images, files and audio it did send, newest first, or `It sent no image, file or audio.`</dd>
+  <dt>Python and Rust</dt>
+  <dd>`to_have_sent_file`</dd>
+</dl>
+
+It compares the SHA-256 of what the agent sent as an image, file or audio part, on either endpoint or a media endpoint's upload, with the file's.
+
 ### toBeAborted
 
 ```ts
