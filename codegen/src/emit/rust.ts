@@ -99,8 +99,17 @@ export function emitRust(ir: Ir): Map<string, string> {
       case "duration":
         return "&|v: &Value| enc::duration(v)";
       case "files":
-        return `&|v: &Value| files::${{ tree: "read_tree", changes: "read_changes", document: "read_document" }[type.mode]}(v)`;
+        return `&|v: &Value| files::${{ tree: "read_tree", changes: "read_changes", document: "read_document", media: "read_media" }[type.mode]}(v)`;
+      case "named": {
+        // A named files type (`OpenAIMediaSource`) is read as the files it names.
+        const target = resolve(type);
+        return target.kind === "files" ? encoder(target) : undefined;
+      }
       case "array": {
+        const items = resolve(type.items);
+        // Bytes are a list of numbers: one media source, not a list of them.
+        if (type.oneOrMany === true && items.kind === "files" && items.mode === "media")
+          return "&|v: &Value| files::read_media_one_or_many(v)";
         const item = encoder(type.items);
         return item === undefined && !type.oneOrMany
           ? undefined

@@ -9,7 +9,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import { connectWith, sessionOf } from "./client.ts";
 import { credential } from "./credentials.ts";
 import { parseDuration } from "./duration.ts";
-import { readChanges, readDocument, readTree, setFilesRoot } from "./files.ts";
+import { readChanges, readDocument, readMedia, readTree, setFilesRoot } from "./files.ts";
 import { resolveServerBinary, serverBinaryName, serverPackageName } from "./launcher.ts";
 import { ChannelstackError, onRefusal, segment, Transport, unreportedRefusals } from "./transport.ts";
 import {
@@ -429,6 +429,29 @@ describe("files a test hands over", () => {
       "site/README.md",
       "site/src/app.ts",
     ]);
+  });
+
+  test("a media path is the file's bytes and its name, from the files root or absolute", () => {
+    const root = fixture();
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 255]);
+    mkdirSync(join(root, "media"));
+    writeFileSync(join(root, "media", "cat.png"), png);
+    setFilesRoot(root);
+    const read = readMedia("./media/cat.png");
+    expect(read).toEqual({ content: Buffer.from(png).toString("base64"), name: "cat.png" });
+    setFilesRoot(undefined);
+    expect(readMedia(join(root, "media", "cat.png"))).toEqual(read);
+    // A path that isn't there is an error, as for the other files.
+    setFilesRoot(root);
+    expect(() => readMedia("./media/dog.png")).toThrow(/ENOENT/);
+  });
+
+  test("media bytes are sent without a name, and a placeholder as it is", () => {
+    expect(readMedia(new Uint8Array([0, 1, 255]))).toEqual({ content: "AAH/" });
+    expect(readMedia(Buffer.from([0, 1, 255]))).toEqual({ content: "AAH/" });
+    const placeholder = { placeholder: { width: 64, height: 32 } };
+    expect(readMedia(placeholder)).toBe(placeholder);
+    expect(readMedia({ placeholder: { seconds: 1.5 } })).toEqual({ placeholder: { seconds: 1.5 } });
   });
 });
 

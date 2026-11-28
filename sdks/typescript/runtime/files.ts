@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 /** Files in a test: inline contents, or a path to a fixture file or directory. */
 export type FileInput =
@@ -60,4 +60,19 @@ export function readChanges(
 /** One text a test hands over: inline, or the contents of a fixture file (`{ path }`). Structured content passes as it is. */
 export function readDocument(input: string | { path: string } | unknown[]): string | unknown[] {
   return typeof input === "string" || Array.isArray(input) ? input : readFileSync(located(input.path), "utf8");
+}
+
+/** A placeholder picture, recording or video the server makes: its size, or its length in seconds. */
+interface Placeholder {
+  placeholder: { width?: number; height?: number; seconds?: number };
+}
+
+/** A picture, a recording or a video a test hands over: a fixture file's path, its bytes, or a placeholder. */
+export type MediaSource = string | Uint8Array | Placeholder;
+
+/** One media source as it travels to the server: a file's bytes in base64 (and its name), or a placeholder as it is. */
+export function readMedia(input: MediaSource): { content: string; name?: string } | Placeholder {
+  if (input instanceof Uint8Array) return { content: base64(input) };
+  if (typeof input !== "string") return input;
+  return { content: base64(readFileSync(located(input))), name: basename(input) };
 }

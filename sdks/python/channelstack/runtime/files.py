@@ -16,6 +16,9 @@ type TreeInput = str | list[FileInput]
 type ChangesInput = list[FileInput] | dict[str, str | None]
 # One text: inline, or a fixture file's contents (`{"path"}`). Structured content (a list) passes as it is.
 type DocumentInput = str | dict[str, Any] | list[Any]
+# A picture, a recording or a video: a fixture file's path, its bytes, or a placeholder the server makes
+# (`{"placeholder": {"width"?, "height"?, "seconds"?}}`).
+type MediaSource = str | os.PathLike[str] | bytes | bytearray | dict[str, Any]
 
 _root: Path | None = None
 
@@ -26,7 +29,7 @@ def set_files_root(directory: str | Path | None) -> None:
     _root = None if directory is None else Path(directory)
 
 
-def _located(path: str) -> Path:
+def _located(path: str | os.PathLike[str]) -> Path:
     given = Path(path)
     return given if given.is_absolute() else (_root or Path.cwd()) / given
 
@@ -75,3 +78,13 @@ def read_document(document: DocumentInput) -> str | list[Any]:
     if isinstance(document, (str, list)):
         return document
     return _located(str(document["path"])).read_text(encoding="utf-8")
+
+
+def read_media(media: MediaSource) -> dict[str, Any]:
+    """One media source as it goes to the server: a file's bytes in base64 (and its name), or a placeholder as it is."""
+    if isinstance(media, (bytes, bytearray)):
+        return {"content": _base64(bytes(media))}
+    if isinstance(media, dict):
+        return media
+    path = _located(media)
+    return {"content": _base64(path.read_bytes()), "name": path.name}

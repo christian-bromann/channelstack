@@ -111,9 +111,11 @@ export type IrType =
    * Files a test hands over. SDKs take a directory, files on disk or inline contents and send
    * paths with base64 contents: a whole tree (`tree`), or changes where `null` deletes (`changes`).
    * `document` is one text: inline, or a fixture file's contents (`{ path }`), sent as the text;
-   * anything else (structured content) is sent as it is.
+   * anything else (structured content) is sent as it is. `media` is one picture, recording or video:
+   * a fixture file's path or its bytes, sent as `{ content, name? }` in base64, or a placeholder the
+   * server makes (`{ placeholder: { width?, height?, seconds? } }`), sent as it is.
    */
-  | { kind: "files"; mode: "tree" | "changes" | "document" }
+  | { kind: "files"; mode: "tree" | "changes" | "document" | "media" }
   /** Text to find: a string, or a pattern (a `RegExp`), sent as `{ source, flags }`. */
   | { kind: "pattern" }
   /** A named data type from `types`. */
@@ -270,6 +272,7 @@ export function buildIr(openapi: Json): Ir {
     // Kinds the SDKs build from more than one shape: before the alternatives are read as a union.
     if (schema["x-channelstack-pattern"] === true) return { kind: "pattern" };
     if (schema["x-channelstack-files"] === "document") return { kind: "files", mode: "document" };
+    if (schema["x-channelstack-files"] === "media") return { kind: "files", mode: "media" };
     const alternatives: Json[] | undefined = schema.oneOf ?? schema.anyOf;
     if (Array.isArray(alternatives)) {
       // "One of these, or null": the alternatives that aren't null, marked as nullable.

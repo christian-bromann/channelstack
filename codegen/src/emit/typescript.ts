@@ -81,6 +81,10 @@ export function typeScriptTypes(index: IrIndex) {
         return short ? `${typeOf(short.type, side)} | ${whole}` : whole;
       }
       case "files":
+        if (type.mode === "media")
+          return side === "public"
+            ? "MediaSource"
+            : "{ content: string; name?: string } | { placeholder: { width?: number; height?: number; seconds?: number } }";
         if (type.mode === "document")
           return side === "public" ? "string | { path: string } | unknown[]" : "string | unknown[]";
         if (side === "public")
@@ -197,7 +201,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     }
     if (type.kind === "duration") return `parseDuration(${expr})`;
     if (type.kind === "files")
-      return `${{ tree: "readTree", changes: "readChanges", document: "readDocument" }[type.mode]}(${expr})`;
+      return `${{ tree: "readTree", changes: "readChanges", document: "readDocument", media: "readMedia" }[type.mode]}(${expr})`;
     if (type.kind === "pattern") return `patternOnWire(${expr})`;
     if (type.kind === "array") {
       const list = type.oneOrMany ? `[${expr}].flat()` : expr;
@@ -522,8 +526,10 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       ? [
           `import { ${[
             ...(spec.includes('"mode":"tree"') || spec.includes('"mode":"changes"') ? ["type FileInput"] : []),
+            ...(spec.includes('"mode":"media"') ? ["type MediaSource"] : []),
             ...(spec.includes('"mode":"changes"') ? ["readChanges"] : []),
             ...(spec.includes('"mode":"document"') ? ["readDocument"] : []),
+            ...(spec.includes('"mode":"media"') ? ["readMedia"] : []),
             ...(spec.includes('"mode":"tree"') ? ["readTree"] : []),
           ].join(", ")} } from "../runtime/files.ts";`,
         ]

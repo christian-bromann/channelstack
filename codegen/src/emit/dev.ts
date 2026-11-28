@@ -111,7 +111,7 @@ export type ActionType =
   | { readonly kind: "array"; readonly items: ActionType; readonly oneOrMany?: true }
   | { readonly kind: "record"; readonly values: ActionType }
   | { readonly kind: "object"; readonly fields: readonly ActionField[]; readonly shorthand?: string }
-  | { readonly kind: "files"; readonly mode: "tree" | "changes" | "document" }
+  | { readonly kind: "files"; readonly mode: "tree" | "changes" | "document" | "media" }
   | { readonly kind: "named"; readonly name: string }
   | { readonly kind: "resource"; readonly name: string }
   | { readonly kind: "ref"; readonly resources: readonly string[] }

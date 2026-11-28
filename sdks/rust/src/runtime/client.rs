@@ -102,7 +102,7 @@ macro_rules! numbers {
         }
     })*};
 }
-numbers!(i32, i64, u32, u64, usize, f64);
+numbers!(u8, i32, i64, u32, u64, usize, f64);
 impl<T: IntoArg> IntoArg for Vec<T> {
     fn into_arg(self) -> Value {
         Value::Array(self.into_iter().map(IntoArg::into_arg).collect())

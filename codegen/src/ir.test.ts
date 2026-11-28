@@ -536,3 +536,98 @@ describe("what the GitHub surface needed", () => {
     expect(code).toContain('wire.insert("changes".into(), (&|v: &Value| files::read_changes(v))(&p_changes)?);');
   });
 });
+
+describe("media a test hands over (14.5)", () => {
+  /** The wire shape of a media source: a file's bytes in base64, or a placeholder the server makes. */
+  const media = {
+    anyOf: [
+      {
+        type: "object",
+        required: ["content"],
+        properties: { content: { type: "string" }, name: { type: "string" } },
+      },
+      {
+        type: "object",
+        required: ["placeholder"],
+        properties: {
+          placeholder: {
+            type: "object",
+            properties: { width: { type: "integer" }, height: { type: "integer" }, seconds: { type: "number" } },
+          },
+        },
+      },
+    ],
+    "x-channelstack-files": "media",
+  };
+  const schemas = {
+    OpenAIMediaSource: media,
+    WidgetBody: {
+      type: "object",
+      required: ["label"],
+      properties: {
+        label: { type: "string" },
+        image: ref("OpenAIMediaSource"),
+        images: { type: "array", items: ref("OpenAIMediaSource"), "x-channelstack-one-or-many": true },
+        audio: media,
+      },
+    },
+  };
+  const operation = {
+    "x-channelstack-method": {
+      on: "Widget",
+      name: "update",
+      args: ["label"],
+      options: ["image", "images", "audio", "since"],
+    },
+  };
+  const ir = buildIr(spec({ schemas, operation }));
+  const option = (name: string) =>
+    ir.resources
+      .find((resource) => resource.name === "Widget")
+      ?.methods[0]?.options.find((candidate) => candidate.name === name)?.type;
+
+  test("the IR: a media source is a files kind, not a union of its wire shapes", () => {
+    expect(ir.types.find((type) => type.name === "OpenAIMediaSource")?.type).toEqual({ kind: "files", mode: "media" });
+    expect(option("image")).toEqual({ kind: "named", name: "OpenAIMediaSource" });
+    expect(option("images")).toEqual({
+      kind: "array",
+      items: { kind: "named", name: "OpenAIMediaSource" },
+      oneOrMany: true,
+    });
+    expect(option("audio")).toEqual({ kind: "files", mode: "media" });
+  });
+
+  test("TypeScript: a path, bytes or a placeholder, read by readMedia", () => {
+    const [[, code] = ["", ""]] = [...emitTypeScript(ir)];
+    expect(code).toContain('import { type MediaSource, readMedia } from "../runtime/files.ts";');
+    expect(code).toContain("export type OpenAIMediaSource = MediaSource;");
+    expect(code).toContain("audio?: MediaSource");
+    expect(code).toContain("images?: OpenAIMediaSource | OpenAIMediaSource[]");
+    expect(code).toContain("image: options.image === undefined ? undefined : readMedia(options.image)");
+    expect(code).toContain("audio: options.audio === undefined ? undefined : readMedia(options.audio)");
+    expect(code).toContain(
+      "images: options.images === undefined ? undefined : [options.images].flat().map((item) => readMedia(item))",
+    );
+  });
+
+  test("Python: the same, read by read_media", () => {
+    const [[, code] = ["", ""]] = [...emitPython(ir)];
+    expect(code).toContain("from ..runtime.files import MediaSource, read_media");
+    expect(code).toContain("type OpenAIMediaSource = MediaSource");
+    expect(code).toContain("audio: MediaSource | None = None");
+    expect(code).toContain('"image": None if image is None else read_media(image)');
+    expect(code).toContain('"audio": None if audio is None else read_media(audio)');
+    expect(code).toContain(
+      '"images": None if images is None else [read_media(item) for item in (images if isinstance(images, list) else [images])]',
+    );
+  });
+
+  test("Rust: read by files::read_media, bytes in a one-or-many list being one source", () => {
+    const code = [...emitRust(ir).values()].join("\n");
+    expect(code).toContain('wire.insert("image".into(), (&|v: &Value| files::read_media(v))(&p_image)?);');
+    expect(code).toContain('wire.insert("audio".into(), (&|v: &Value| files::read_media(v))(&p_audio)?);');
+    expect(code).toContain(
+      'wire.insert("images".into(), (&|v: &Value| files::read_media_one_or_many(v))(&p_images)?);',
+    );
+  });
+});
