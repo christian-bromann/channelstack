@@ -56,7 +56,10 @@ const refuse = (code: string, message: string, data: Record<string, unknown> = {
 /** A DM is between its two people, as on Slack: nobody joins or leaves it; a third is a group DM of its own. */
 function betweenTwo(conversation: SlackConversationRecord, change: string): void {
   if (conversation.kind === "im")
-    throw refuse("method_not_supported_for_channel_type", `${conversation.id} is a direct message, which can't ${change}`);
+    throw refuse(
+      "method_not_supported_for_channel_type",
+      `${conversation.id} is a direct message, which can't ${change}`,
+    );
 }
 
 /** What the fake `SlackWorld` adds for the provider API, where the agent acts as the app. */
