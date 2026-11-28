@@ -162,6 +162,8 @@ pub struct QuietState {
     pub busy: bool,
     pub quiet_for_ms: f64,
     pub open: Vec<String>,
+    /// The bot loops the fake stopped in the session (decision 0027), in words.
+    pub loops: Vec<String>,
 }
 
 impl QuietState {
@@ -172,17 +174,23 @@ impl QuietState {
                 .get("quietForMs")
                 .and_then(Value::as_f64)
                 .unwrap_or(0.0),
-            open: state
-                .get("open")
-                .and_then(Value::as_array)
-                .map(|open| {
-                    open.iter()
-                        .filter_map(|item| item.as_str().map(str::to_owned))
-                        .collect()
-                })
-                .unwrap_or_default(),
+            open: words(state, "open"),
+            loops: words(state, "loops"),
         }
     }
+}
+
+/// A list of words the server answered under `key`, or none.
+fn words(state: &Value, key: &str) -> Vec<String> {
+    state
+        .get(key)
+        .and_then(Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter_map(|item| item.as_str().map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Resolve once the agent has been quiet for `quiet_for`. A wait that gives up says what the agent
@@ -428,6 +436,7 @@ mod tests {
                 busy: true,
                 quiet_for_ms: 0.0,
                 open: vec!["a stream my-agent never stopped".into()],
+                loops: vec![],
             })
         };
         let gave_up = super::until_quiet(busy, &json!("120ms"), &json!("50ms"), false)
@@ -447,6 +456,7 @@ mod tests {
                 busy: false,
                 quiet_for_ms: 60_000.0,
                 open: vec![],
+                loops: vec![],
             })
         };
         let started = std::time::Instant::now();

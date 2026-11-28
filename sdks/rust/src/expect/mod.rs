@@ -349,26 +349,30 @@ where
         return Ok(());
     }
     // A failed check also says what the agent left open (a stream it never stopped): often that is the bug.
-    let open = still_open(subject).await?;
-    let leftover = if open.is_empty() {
-        String::new()
-    } else {
-        format!("\nStill open: {}", open.join("; "))
-    };
+    let leftover = leftover(subject).await?;
     Err(Error::Expectation(format!(
         "{}{leftover}",
         describe(&value)
     )))
 }
 
-/// What the agent has left open in the subject's session, in words. Nothing where the server
-/// can't tell (live, without proxy mode): it only adds to a failure's message.
-async fn still_open<S: Subject + ?Sized>(subject: &S) -> Result<Vec<String>> {
-    match subject.quiet().await {
-        Ok(state) => Ok(state.open),
-        Err(Error::Api { .. }) => Ok(vec![]),
-        Err(error) => Err(error),
+/// What the agent has left open in the subject's session, and the bot loops the fake stopped there
+/// (decision 0027), in words, as matchers-core adds them to a failure's message. Nothing where the
+/// server can't tell (live, without proxy mode): it only adds to the message.
+async fn leftover<S: Subject + ?Sized>(subject: &S) -> Result<String> {
+    let state = match subject.quiet().await {
+        Ok(state) => state,
+        Err(Error::Api { .. }) => return Ok(String::new()),
+        Err(error) => return Err(error),
+    };
+    let mut words = String::new();
+    if !state.open.is_empty() {
+        words += &format!("\nStill open: {}", state.open.join("; "));
     }
+    if !state.loops.is_empty() {
+        words += &format!("\nStopped: {}", state.loops.join("; "));
+    }
+    Ok(words)
 }
 
 /// The items of a list the server answered.
@@ -555,12 +559,7 @@ impl<'a, S: Said + ?Sized> Expectation<'a, S> {
                 Value::String(text) => text.clone(),
                 other => format!("{other}ms"),
             };
-            let open = still_open(subject).await?;
-            let leftover = if open.is_empty() {
-                String::new()
-            } else {
-                format!("\nStill open: {}", open.join("; "))
-            };
+            let leftover = leftover(subject).await?;
             Err(Error::Expectation(format!(
                 "Expected the conversation to go quiet within {bound} with at most {max_replies} app {} since a person last wrote. {} with {} app {} and no person between them{turns}{leftover}",
                 plural(max_replies),
