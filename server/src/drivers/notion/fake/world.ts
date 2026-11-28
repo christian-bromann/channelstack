@@ -214,8 +214,19 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     return builtIn;
   };
 
-  /** Hold a content update for the page's batch; the first one starts the delay. */
+  /**
+   * The loop guard (decision 0027) counts what integrations write on a page, its comments in any
+   * discussion and its edits, renames and blocks alike, until a person writes there. Answers
+   * whether the events the write causes are still delivered.
+   */
+  const wrote = (session: string, page: string, actor: string): boolean => {
+    const writer = store.integration(actor);
+    return context.loops.wrote(session, page, writer ? { kind: "app", name: writer.name } : { kind: "person" });
+  };
+
+  /** Hold a content update for the page's batch; the first one starts the delay. A stopped page's updates aren't held. */
   const contentUpdated = (session: string, page: NotionPageRecord, blocks: readonly string[], actor: string) => {
+    if (!wrote(session, page.id, actor)) return;
     let batch = pendingContent.get(page.id);
     if (!batch) {
       batch = { session, blocks: new Set(), authors: new Map() };
@@ -541,6 +552,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     addOptions(changed, values);
     for (const property of changed) page.properties[property.name] = values[property.name] as NotionValue;
     touch(page, actor);
+    if (!wrote(session, page.id, actor)) return undefined;
     return emit(session, page, "page.properties_updated", (id, payloads) =>
       payloads.propertiesUpdated(
         id,
@@ -614,10 +626,13 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     return page;
   };
 
-  const announcePage = (session: string, page: NotionPageRecord, actor: string) =>
-    emit(session, page, "page.created", (id, payloads) =>
+  /** `page.created`: for the loop guard, a write on the page or database the page is made in. */
+  const announcePage = (session: string, page: NotionPageRecord, actor: string) => {
+    if (!wrote(session, page.parent.type === "workspace" ? page.id : page.parent.id, actor)) return undefined;
+    return emit(session, page, "page.created", (id, payloads) =>
       payloads.pageCreated(id, clock(), [author(actor)], page.id, eventParent(page)),
     );
+  };
 
   const createPage = (session: string, input: PageInput, options: { announce: boolean }) => {
     const actor = input.createdBy ?? store.owner.id;
@@ -736,10 +751,8 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       session,
     );
     const page = store.page(discussion.page);
-    // The loop guard counts what integrations write in a discussion where no person writes in between (decision 0027).
-    const writer = store.integration(actor);
-    if (!context.loops.wrote(session, discussion.id, writer ? { kind: "app", name: writer.name } : { kind: "person" }))
-      return comment;
+    // Counted on the page: a page-level comment starts a discussion of its own each time.
+    if (!wrote(session, page.id, actor)) return comment;
     comment.delivery = emit(session, page, "comment.created", (eventId, payloads) =>
       payloads.commentCreated(eventId, now, [author(actor)], {
         id: comment.id,
@@ -783,6 +796,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   ) => {
     const discussion = store.discussion(comment.discussion);
     const page = store.page(comment.page);
+    if (!wrote(session, page.id, actor)) return undefined;
     return emit(session, page, type, (id, payloads) =>
       payloads.commentCreated(
         id,

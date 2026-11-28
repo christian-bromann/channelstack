@@ -10,6 +10,7 @@ import notionClient from "@notionhq/client";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
+import { LOOP_LIMIT } from "../../core/loops/index.ts";
 
 // The package is CommonJS: Node gives it to an ES module as its default export.
 const { verifyWebhookSignature } = notionClient;
@@ -45,7 +46,7 @@ async function twoIntegrations() {
   /** The REST API, as an integration calls it with its own token. */
   const api = (token: string, method: string, path: string, body?: unknown) =>
     h.provider(method, `notion/v1/${path}`, body, token, VERSION);
-  return { h, mine, theirs, base, post, get, app, writer, ana, api };
+  return { h, sessionId: sessionId as string, mine, theirs, base, post, get, app, writer, ana, api };
 }
 
 const events = (agent: RecordingAgent) =>
@@ -303,6 +304,75 @@ describe("exit check 12.3: Notion integrations", () => {
     expect(await refusal(post("/apps/my-agent/reply", { text: "hi", discussion: comment.discussion.id }))).toBe(
       "invalid_argument",
     );
+  });
+
+  test("exit check 12.6: integrations commenting at each other on a page are stopped at the guard's limit, their page writes too, and the session says so", async () => {
+    const { h, sessionId, mine, post, app, writer, ana, api } = await twoIntegrations();
+    const page = await post("/pages", { title: "Roadmap", connections: [app.id, writer.id] });
+    await post(`/users/${ana.id}/comment`, { text: "go", page: page.id });
+    // Page-level comments: each starts a discussion of its own, and all of them count on the page.
+    for (let i = 0; i < LOOP_LIMIT + 5; i++) {
+      const created = await api(i % 2 === 0 ? writer.token : app.token, "POST", "comments", {
+        parent: { page_id: page.id },
+        rich_text: [{ type: "text", text: { content: `turn ${i}` } }],
+      });
+      expect(created.status).toBe(200);
+    }
+    await h.app.settled();
+    const comments = () => events(mine).filter((event) => event.type === "comment.created").length;
+
+    // my-agent heard Ana, then each integration comment up to the limit (its own too), and nothing after.
+    expect(comments()).toBe(1 + LOOP_LIMIT);
+    const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
+    expect(quiet.loops).toEqual([
+      expect.stringMatching(/^a bot loop in notion [0-9a-f-]{36} was stopped after 50 app messages/),
+    ]);
+    // The stopped page's writes by integrations are kept, and cause nothing: a rename, blocks, a child page.
+    const before = events(mine).length;
+    const renamed = await api(writer.token, "PATCH", `pages/${page.id}`, {
+      properties: { title: { title: [{ text: { content: "Roadmap, again" } }] } },
+    });
+    expect(renamed.status).toBe(200);
+    const paragraph = { type: "paragraph", paragraph: { rich_text: [{ text: { content: "more" } }] } };
+    expect((await api(writer.token, "PATCH", `blocks/${page.id}/children`, { children: [paragraph] })).status).toBe(
+      200,
+    );
+    const child = await api(writer.token, "POST", "pages", {
+      parent: { page_id: page.id },
+      properties: { title: { title: [{ text: { content: "Child" } }] } },
+    });
+    expect(child.status).toBe(200);
+    await h.app.settled();
+    h.timers.advance(1000);
+    await h.app.settled();
+    expect(events(mine)).toHaveLength(before);
+
+    // A person writing again starts the page over.
+    await post(`/users/${ana.id}/comment`, { text: "again", page: page.id });
+    await api(writer.token, "POST", "comments", {
+      parent: { page_id: page.id },
+      rich_text: [{ type: "text", text: { content: "back" } }],
+    });
+    await h.app.settled();
+    expect(comments()).toBe(3 + LOOP_LIMIT);
+  });
+
+  test("exit check 12.6: integrations editing a page at each other are stopped at the guard's limit", async () => {
+    const { h, sessionId, mine, post, app, writer, ana, api } = await twoIntegrations();
+    const page = await post("/pages", { title: "Draft", connections: [app.id, writer.id] });
+    await post(`/users/${ana.id}/comment`, { text: "go", page: page.id });
+    for (let i = 0; i <= LOOP_LIMIT + 5; i++) {
+      await api(i % 2 === 0 ? writer.token : app.token, "PATCH", `pages/${page.id}`, {
+        properties: { title: { title: [{ text: { content: `Draft ${i}` } }] } },
+      });
+    }
+    await h.app.settled();
+    expect(events(mine).filter((event) => event.type === "page.properties_updated")).toHaveLength(LOOP_LIMIT);
+    expect((await h.call("GET", `/sessions/${sessionId}/quiet`)).body.loops).toEqual([
+      expect.stringMatching(
+        /^a bot loop in notion [0-9a-f-]{36} was stopped after 50 app messages .*\((my-agent → writer → )+my-agent/,
+      ),
+    ]);
   });
 
   test("a person and an integration of one session can't share a name", async () => {
