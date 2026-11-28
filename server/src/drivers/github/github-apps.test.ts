@@ -357,6 +357,31 @@ describe("exit check 12.3: GitHub Apps", () => {
     expect(await refusal(post(`/apps/${reader.id}/comment`, { body: "hi", issue: issueRef }))).toBe("forbidden");
   });
 
+  test("only the App that made a check run may change it; two Apps' runs of one name are both the latest", async () => {
+    const { api, app, reviewer, path } = await twoApps();
+    const sha = (await api(reviewer, "GET", `${path}/commits/main`)).body.sha;
+    const made = await api(reviewer, "POST", `${path}/check-runs`, { name: "lint", head_sha: sha });
+    expect(made.status).toBe(201);
+
+    const taken = await api(app, "PATCH", `${path}/check-runs/${made.body.id}`, { conclusion: "success" });
+    expect(taken.status).toBe(403);
+    expect(taken.body.message).toBe(
+      `Invalid app_id \`${app.appId}\` - check run can only be modified by the GitHub App that created it.`,
+    );
+    expect((await api(app, "GET", `${path}/check-runs/${made.body.id}`)).body.status).toBe("queued");
+    const done = await api(reviewer, "PATCH", `${path}/check-runs/${made.body.id}`, { conclusion: "success" });
+    expect(done.body).toMatchObject({ status: "completed", conclusion: "success" });
+
+    // my-agent's own "lint" doesn't hide reviewer's: each App's newest run of a name is listed.
+    await api(app, "POST", `${path}/check-runs`, { name: "lint", head_sha: sha });
+    const listed = (await api(app, "GET", `${path}/commits/${sha}/check-runs`)).body;
+    expect(listed.check_runs.map((run: { app: { slug: string } }) => run.app.slug).sort()).toEqual([
+      "my-agent",
+      "reviewer",
+    ]);
+    expect(listed.total_count).toBe(2);
+  });
+
   test("an App subscribes only to the events its permissions cover, and hears only those", async () => {
     const { h, theirs, post, ana, issueRef, reviewer } = await twoApps();
     const reader = await post("/apps", { name: "reader", permissions: { issues: "read" } });

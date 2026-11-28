@@ -185,13 +185,17 @@ export function createChecks(kit: GitHubKit) {
       return event(run, actor, "requested_action", { requested_action: { identifier } });
     },
 
-    /** The newest check run of each name for a commit: what GitHub shows, and what its API lists by default. */
+    /**
+     * The newest check run of each App and name for a commit: what GitHub shows, and what its API
+     * lists by default. Two Apps' runs of one name are two checks, each in its App's suite.
+     */
     latest(repo: GitHubRepoRecord, sha: string): GitHubCheckRunRecord[] {
       const byName = new Map<string, GitHubCheckRunRecord>();
       // Taken out before it is put in again, so a name that reports again moves to the end.
       for (const run of store.checkRunsOf(repo, sha)) {
-        byName.delete(run.name);
-        byName.set(run.name, run);
+        const key = `${run.app}\u0000${run.name}`;
+        byName.delete(key);
+        byName.set(key, run);
       }
       return [...byName.values()];
     },
