@@ -2,6 +2,7 @@ import type { AppRoster } from "../../../core/apps/index.ts";
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
 import { deliveryKit, deliveryTo, type SentDelivery } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
+import type { Writer } from "../../../core/loops/index.ts";
 import { richTextPieces } from "../../../core/rich-text/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { DISCORD_IDS, discordSnowflake } from "../ids.ts";
@@ -349,17 +350,28 @@ export function createFakeWorld(
     channel.kind === "dm" ? "DIRECT_MESSAGES" : "GUILD_MESSAGES";
 
   /**
-   * Tell every bot that sees the channel about a new message, unless it is for one person alone.
-   * The one message path: the loop guard counts here what apps write (decision 0027).
+   * The loop guard (decision 0027) counts what bots write, post, edit, react or start a thread
+   * with, per channel; a thread is a channel of its own. An app's bot counts by its name, a
+   * scripted bot user (`createUser({ bot: true })`) by its user's, and a person writing there
+   * starts it over. Answers whether the events the write causes are still delivered.
    */
+  const wrote = (channel: DiscordChannelRecord, by: string): boolean => {
+    const session = sessionOf(channel.id);
+    if (session === undefined) return true;
+    const app = store.appOf(by);
+    const user = app ? undefined : store.users.find(by);
+    const writer: Writer = app
+      ? { kind: "app", name: app.name }
+      : user?.bot === true
+        ? { kind: "app", name: user.name }
+        : { kind: "person" };
+    return context.loops.wrote(session, channel.id, writer);
+  };
+
+  /** Tell every bot that sees the channel about a new message, unless it is for one person alone. */
   const announce = (message: DiscordMessageRecord, channel: DiscordChannelRecord) => {
     if (message.ephemeralFor !== undefined) return;
-    const session = sessionOf(channel.id);
-    const writer = store.appOf(message.authorId);
-    if (session !== undefined) {
-      if (!context.loops.wrote(session, channel.id, writer ? { kind: "app", name: writer.name } : { kind: "person" }))
-        return;
-    }
+    if (!wrote(channel, message.authorId)) return;
     const sent = broadcast(
       channel,
       "MESSAGE_CREATE",
@@ -433,7 +445,8 @@ export function createFakeWorld(
     if (changes.flags !== undefined) message.flags = changes.flags;
     message.editedAt = clock();
     const channel = store.channels.find(message.channelId);
-    if (channel && message.ephemeralFor === undefined) {
+    // Only a message's author edits it, as Discord allows.
+    if (channel && message.ephemeralFor === undefined && wrote(channel, message.authorId)) {
       const sent = broadcast(
         channel,
         "MESSAGE_UPDATE",
@@ -474,6 +487,7 @@ export function createFakeWorld(
       reaction.users.splice(reaction.users.indexOf(who), 1);
       if (reaction.users.length === 0) message.reactions.splice(message.reactions.indexOf(reaction), 1);
     }
+    if (!wrote(channel, who)) return undefined;
     const guildId = channel.kind === "dm" ? undefined : guild().id;
     const sent = broadcast(
       channel,
@@ -522,6 +536,8 @@ export function createFakeWorld(
       session,
     );
     if (starter) starter.threadId = thread.id;
+    // Starting a thread is a write in the channel it starts from.
+    if (!wrote(parent, owner)) return thread;
     broadcast(
       thread,
       "THREAD_CREATE",

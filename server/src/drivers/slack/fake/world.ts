@@ -3,6 +3,7 @@ import { delay } from "../../../core/clock/index.ts";
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
 import { deliveryKit, deliveryTo, fixedRetries, type SentDelivery } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
+import type { Writer } from "../../../core/loops/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { identified } from "../blocks.ts";
 import { SLACK_IDS, slackTs } from "../ids.ts";
@@ -341,6 +342,27 @@ export function createFakeWorld(
     });
   };
 
+  /** Who wrote, for the loop guard: an app, a scripted bot user (`createUser({ bot: true })`) by its name, or a person. */
+  const writerOf = (userId: string): Writer => {
+    const app = store.apps.all().find((candidate) => candidate.botUserId === userId);
+    if (app) return { kind: "app", name: app.name };
+    const user = author(userId);
+    return user?.isBot === true ? { kind: "app", name: user.name } : { kind: "person" };
+  };
+
+  /**
+   * The loop guard (decision 0027) counts what apps write, post, edit or react, per thread: a
+   * thread's replies are a conversation of their own (`<channel>/<thread ts>`), and top-level
+   * messages share the channel's. A person writing there starts it over. Answers whether the
+   * events the write causes are still delivered.
+   */
+  const wrote = (conversation: SlackConversationRecord, threadTs: string | undefined, userId: string): boolean => {
+    const owner = store.conversations.owner(conversation.id);
+    if (owner === undefined) return true;
+    const key = threadTs === undefined ? conversation.id : `${conversation.id}/${threadTs}`;
+    return context.loops.wrote(owner, key, writerOf(userId));
+  };
+
   /** Write a message and tell the app: `message`, and `app_mention` when the text mentions it. */
   const post = (
     conversation: SlackConversationRecord,
@@ -375,13 +397,7 @@ export function createFakeWorld(
     store.messagesIn(conversation.id).push(message);
     // An ephemeral message exists only for its recipient: Slack sends no event for it.
     if (message.ephemeralFor !== undefined) return message;
-    // The loop guard counts what apps write where no person writes in between (decision 0027).
-    const owner = store.conversations.owner(conversation.id);
-    const writing = store.apps.all().find((app) => app.botUserId === userId);
-    if (owner !== undefined) {
-      const writer = writing ? { kind: "app" as const, name: writing.name } : { kind: "person" as const };
-      if (!context.loops.wrote(owner, conversation.id, writer)) return message;
-    }
+    if (!wrote(conversation, message.threadTs, userId)) return message;
     const { team } = store;
     const apps = store.apps.all();
     const mentions = mentionedUsers(message.text);
@@ -671,6 +687,8 @@ export function createFakeWorld(
       Object.assign(message, { text: body.text, blocks: identified(body.blocks, () => ids.next(SLACK_IDS.block)) });
       const eventTs = slackTs(ids);
       message.edited = eventTs;
+      // Only a message's author edits it, as Slack allows.
+      if (!wrote(conversation, message.threadTs, message.user)) return undefined;
       const current = messageObject(message, author(message.user), team, apps);
       const sent = emit(
         conversation,
@@ -701,6 +719,7 @@ export function createFakeWorld(
         reaction.users.splice(reaction.users.indexOf(userId), 1);
         if (reaction.users.length === 0) message.reactions.splice(message.reactions.indexOf(reaction), 1);
       }
+      if (!wrote(conversation, message.threadTs, userId)) return undefined;
       return deliveryTo(
         emit(
           conversation,
