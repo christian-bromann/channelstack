@@ -522,8 +522,8 @@ export function githubObjects(lookups: GitHubLookups) {
     };
   };
 
-  /** An App (the built-in one unless given), as `GET /app` answers and as check runs name it. */
-  const integration = (app: GitHubAppRecord = lookups.app()): Json => {
+  /** An App, as `GET /app` answers and as check runs name it. */
+  const integration = (app: GitHubAppRecord): Json => {
     return {
       id: app.id,
       client_id: app.clientId,
@@ -547,8 +547,8 @@ export function githubObjects(lookups: GitHubLookups) {
     return app ? integration(app) : null;
   };
 
-  /** An App's installation on the org (the built-in App's unless given): every App has its own. */
-  const installation = (app: GitHubAppRecord = lookups.app()): Json => {
+  /** An App's installation on the org: every App has its own. */
+  const installation = (app: GitHubAppRecord): Json => {
     const org = lookups.org();
     return {
       id: app.installationId,
@@ -575,7 +575,7 @@ export function githubObjects(lookups: GitHubLookups) {
   };
 
   /** The installation as every webhook of an App carries it: the receiving App's own. */
-  const installationLite = (app: GitHubAppRecord = lookups.app()): Json => {
+  const installationLite = (app: GitHubAppRecord): Json => {
     const { installationId } = app;
     return { id: installationId, node_id: githubLegacyNodeId("IntegrationInstallation", installationId) };
   };

@@ -379,7 +379,6 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
       webhookSecret: context.apps.secret(team.name, "webhookSecret"),
     }),
     principalOf: (email: ResendEmailRecord) => emailAuthor(email, store.apps.all(), (id) => store.users.find(id)),
-    isApp,
     createApp,
     checkSend,
     appSends,

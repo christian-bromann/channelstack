@@ -311,7 +311,8 @@ export function registerLinearRoutes(
     const app = store.appOf(ref);
     if (!app) throw new ProtocolError("not_found", `There is no Linear app "${ref}"`, { app: ref });
     return app;
-  }; /** A person may act in a team they are a member of; anyone but a guest may act in any team of the workspace. */
+  };
+  /** A person may act in a team they are a member of; anyone but a guest may act in any team of the workspace. */
   const mayAct = (user: LinearUserRecord, team: LinearTeamRecord) => {
     if (user.guest && !team.members.includes(user.id)) {
       throw new ProtocolError(

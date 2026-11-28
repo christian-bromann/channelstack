@@ -285,8 +285,6 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
   const conversationOf = (message: { id: string; inReplyTo?: string | undefined; references: readonly string[] }) =>
     threadOf(message, (id) => store.byMessageId(id)?.thread) ?? message.id;
 
-  const isApp = (mailbox: Mailbox) => store.appAt(mailbox.address) !== undefined;
-
   /** Another app's mailbox (`createApp`): `<name>@acme.example`, its own OAuth client and history. */
   const createApp = (session: string | undefined, input: { name: string }): GoogleAppRecord => {
     let historyStart: string | undefined;
@@ -443,7 +441,6 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
       clientSecret: context.apps.secret(app.name, "clientSecret"),
       refreshToken: context.apps.secret(app.name, "refreshToken"),
     }),
-    isApp,
     principalOf: (email: GoogleEmailRecord) => emailAuthor(email, store.apps.all(), (id) => store.users.find(id)),
     /** The id of the key the certificates serve. */
     keyId,

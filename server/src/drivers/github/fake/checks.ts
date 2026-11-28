@@ -124,11 +124,11 @@ export function createChecks(kit: GitHubKit) {
       }
     },
 
-    /** `POST /repos/{owner}/{repo}/check-runs`, as an App (the built-in one unless given). */
+    /** `POST /repos/{owner}/{repo}/check-runs`, as the App whose token it is. */
     create(
       repo: GitHubRepoRecord,
       input: GitHubCheckRunInput & { name: string; headSha: string },
-      app: GitHubAppRecord = store.app,
+      app: GitHubAppRecord,
     ): GitHubCheckRunRecord {
       validate(input);
       const suite = suiteOf(repo, input.headSha, app);
