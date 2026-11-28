@@ -681,17 +681,15 @@ export function createFakeWorld(
       roleObject({ id: store.everyoneRole, name: "@everyone", permissions: EVERYONE_PERMISSIONS, position: 0 }),
       roleObject({ id: store.adminRole, name: "Admin", permissions: ADMIN_PERMISSIONS, position: 2 }),
       // Each app's bot has the role Discord made for it when it joined.
-      ...store.apps
-        .all()
-        .map((bot) =>
-          roleObject({
-            id: bot.roleId,
-            name: bot.name,
-            permissions: BOT_PERMISSIONS,
-            position: 1,
-            managed: bot.botUserId,
-          }),
-        ),
+      ...store.apps.all().map((bot) =>
+        roleObject({
+          id: bot.roleId,
+          name: bot.name,
+          permissions: BOT_PERMISSIONS,
+          position: 1,
+          managed: bot.botUserId,
+        }),
+      ),
     ],
     postAsBot,
     update,

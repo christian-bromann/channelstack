@@ -93,7 +93,7 @@ interface GatewaySession {
 }
 
 /** One app's bot on the Gateway: its connections, and how dispatches reach them. */
-export interface Gateway {
+interface Gateway {
   /** How many connections are identified (or resumed) and receive dispatches. */
   connections(): number;
   /** The intents of the bot's newest session, or undefined before it has identified. */
