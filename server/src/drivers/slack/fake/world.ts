@@ -1,7 +1,7 @@
 import { BUILT_IN_APP } from "../../../core/apps/index.ts";
 import { delay } from "../../../core/clock/index.ts";
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
-import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
+import { deliveryKit, deliveryTo, fixedRetries, type SentDelivery } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { identified } from "../blocks.ts";
@@ -98,7 +98,9 @@ export interface FakeSlackWorld extends Immediate<SlackWorld> {
   /** The app answers an interaction through its `response_url`. False when the URL is unknown, used up or expired. */
   respond(key: string, body: Record<string, unknown>): boolean;
   /** Send an event about a conversation to every app that is subscribed, installed and a member. */
-  emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): Sent[];
+  /** The app a session's handle or a name stands for: one of the apps it used (decision 0027). */
+  appIn(session: string, ref: string): SlackAppRecord;
+  emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): SentDelivery[];
   /**
    * Someone joins a channel, invited by `inviter` or by themselves (`conversations.join`). The app
    * hears `member_joined_channel`, then the `channel_join` message Slack posts in the channel. The
@@ -178,15 +180,6 @@ const SLACK_RETRIES = fixedRetries(RETRY_DELAYS_MS, (attempt, retries, responseH
     attempt.status === "timed_out" ? "http_timeout" : attempt.status === "failed" ? "http_error" : "connection_failed";
   return { "x-slack-retry-num": String(retries + 1), "x-slack-retry-reason": reason };
 });
-
-/** A delivery an event caused, and the app it went to. */
-interface Sent {
-  readonly app: string;
-  readonly id: string;
-}
-
-/** The built-in app's delivery among those an event caused: what a message's `delivery` is. */
-const builtInDelivery = (sent: readonly Sent[]): string | undefined => sent.find((one) => one.app === BUILT_IN_APP)?.id;
 
 export function createFakeWorld(
   context: DriverContext,
@@ -268,7 +261,7 @@ export function createFakeWorld(
     subscription: string,
     event: Record<string, unknown>,
     app: SlackAppRecord,
-  ): Sent[] => {
+  ): SentDelivery[] => {
     const session = store.conversations.owner(conversation.id);
     if (session === undefined || !hears(conversation, subscription, app)) return [];
     const id = deliver(session, event, app);
@@ -386,8 +379,8 @@ export function createFakeWorld(
     const owner = store.conversations.owner(conversation.id);
     const writing = store.apps.all().find((app) => app.botUserId === userId);
     if (owner !== undefined) {
-      context.loops.wrote(owner, conversation.id, writing ? { kind: "app", name: writing.name } : { kind: "person" });
-      if (writing && !context.loops.allows(owner, conversation.id)) return message;
+      const writer = writing ? { kind: "app" as const, name: writing.name } : { kind: "person" as const };
+      if (!context.loops.wrote(owner, conversation.id, writer)) return message;
     }
     const { team } = store;
     const apps = store.apps.all();
@@ -447,17 +440,9 @@ export function createFakeWorld(
   const action = (session: string, name: string, data: Record<string, unknown>) =>
     events.append(session, "slack", "action", { action: name, ...data });
 
-  /** An app a test made and acts as: never the built-in one, which the agent under test acts as. */
-  const scripted = (id: string): SlackAppRecord => {
-    const app = store.appOf(id) ?? store.apps.named(id);
-    if (!app) throw new ProtocolError("not_found", `There is no Slack app "${id}"`, { app: id });
-    if (app === store.app) {
-      throw new ProtocolError(
-        "invalid_argument",
-        `${app.name} is the built-in app, which the agent under test acts as: script another app`,
-        { app: app.id },
-      );
-    }
+  /** An app a test made and acts as (core's guard), still installed: Slack refuses an uninstalled app's token. */
+  const scripted = (session: string, ref: string): SlackAppRecord => {
+    const app = store.apps.scripted(session, ref);
     if (!app.installed) throw refuse("account_inactive", `${app.name} is uninstalled`);
     return app;
   };
@@ -489,6 +474,7 @@ export function createFakeWorld(
     app: () => store.app,
     apps: () => store.apps.all(),
     appOf: (id) => store.appOf(id),
+    appIn: (session, ref) => store.apps.get(session, ref),
     emit,
     resolveName,
 
@@ -520,7 +506,7 @@ export function createFakeWorld(
     },
 
     sayAsApp(session, name, input, where) {
-      const app = scripted(name);
+      const app = scripted(session, name);
       const conversation =
         "channel" in where ? store.conversations.get(session, where.channel) : openForApp(session, app, where.to);
       appMember(app, conversation);
@@ -530,7 +516,7 @@ export function createFakeWorld(
     },
 
     replyAsApp(session, name, input, thread) {
-      const app = scripted(name);
+      const app = scripted(session, name);
       const conversation = store.conversations.get(session, thread.channel);
       appMember(app, conversation);
       const root = requireMessage(conversation, thread.ts);
@@ -545,7 +531,7 @@ export function createFakeWorld(
     },
 
     reactAsApp(session, name, emoji, target, direction) {
-      const app = scripted(name);
+      const app = scripted(session, name);
       const conversation = store.conversations.get(session, target.channel);
       appMember(app, conversation);
       const message = requireMessage(conversation, target.ts);
@@ -561,8 +547,7 @@ export function createFakeWorld(
 
     uninstallApp(session, name = BUILT_IN_APP) {
       const { team } = store;
-      const app = store.apps.named(name);
-      if (!app) throw new ProtocolError("not_found", `There is no Slack app "${name}"`, { app: name });
+      const app = store.apps.get(session, name);
       if (!app.installed) throw refuse("account_inactive", "The app is already uninstalled");
       const eventTs = Math.floor(clock() / 1000).toString();
       const sent = [
@@ -693,7 +678,7 @@ export function createFakeWorld(
         messageChangedEvent(current, previous, conversation, eventTs),
       );
       for (const one of sent) message.deliveries.push(one.id);
-      return builtInDelivery(sent);
+      return deliveryTo(sent)?.id;
     },
 
     remove(conversation, message) {
@@ -716,13 +701,13 @@ export function createFakeWorld(
         reaction.users.splice(reaction.users.indexOf(userId), 1);
         if (reaction.users.length === 0) message.reactions.splice(message.reactions.indexOf(reaction), 1);
       }
-      return builtInDelivery(
+      return deliveryTo(
         emit(
           conversation,
           direction === "add" ? "reaction_added" : "reaction_removed",
           reactionEvent(direction, { user: userId, reaction: name, message, eventTs: slackTs(ids) }),
         ),
-      );
+      )?.id;
     },
 
     editAsUser(session, userId, input, target) {

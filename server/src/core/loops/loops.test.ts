@@ -50,4 +50,14 @@ describe("exit check 12.6: the loop guard", () => {
     expect(loops.stopped("s1")).toEqual([]);
     expect(loops.allows("s1", "slack", "C1")).toBe(true);
   });
+
+  test("one call records who wrote and answers whether what it causes is still delivered", () => {
+    const { loops } = guard(2);
+    expect(loops.wrote("s1", "C1", { kind: "app", name: "coder" })).toBe(true);
+    expect(loops.wrote("s1", "C1", { kind: "app", name: "my-agent" })).toBe(true);
+    expect(loops.wrote("s1", "C1", { kind: "app", name: "coder" })).toBe(false);
+    expect(loops.wrote("s1", "C1", { kind: "app", name: "my-agent" })).toBe(false);
+    expect(loops.wrote("s1", "C1", { kind: "person" })).toBe(true);
+    expect(loops.wrote("s1", "C1", { kind: "app", name: "coder" })).toBe(true);
+  });
 });

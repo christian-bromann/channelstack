@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { bearerFrom } from "../../../core/auth/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { recordCall } from "../../../core/router/inspect.ts";
-import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { type GraphQLRequest, rootFields, runGraphQL } from "./graphql.ts";
 import type { LinearCallContext } from "./models.ts";
 import { linearResolvers } from "./resolvers.ts";
@@ -40,7 +39,7 @@ export function createLinearApi(context: DriverContext, world: FakeLinearWorld):
     const token = bearerFrom(c.req.header("authorization")) ?? c.req.header("authorization") ?? "";
     if (token === "") return c.json(authError("Authentication required, not authenticated"), 401);
     // Each app's token answers as that app (decision 0027); a personal API key or anything else is no app.
-    const caller = world.apps().find((app) => constantTimeEqual(token, context.apps.secret(app.name, "oauthToken")));
+    const caller = world.appWithToken(token);
     if (!caller) return c.json(authError("Authentication failed - invalid token"), 401);
     const root = linearResolvers(world, caller, sync);
 

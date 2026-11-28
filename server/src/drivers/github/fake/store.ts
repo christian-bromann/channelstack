@@ -42,7 +42,7 @@ export class GitHubStore {
   readonly #bots = new Map<string, GitHubUserRecord>();
 
   constructor(registry: Registry) {
-    this.apps = new AppRoster("GitHub", registry);
+    this.apps = new AppRoster<GitHubAppRecord>("GitHub", registry, { noun: "App", refs: (app) => [String(app.id)] });
     this.users = registry.collection("github", "user");
     this.repos = registry.collection("github", "repo");
     this.issues = registry.collection("github", "issue");
@@ -96,11 +96,6 @@ export class GitHubStore {
     const app = name === this.app.name ? this.app : this.apps.named(name);
     if (!app) throw new ProtocolError("not_found", `There is no GitHub App "${name}"`, { app: name });
     return app;
-  }
-
-  /** An App by the id its handle carries (the App id), or by name. */
-  appOf(ref: string): GitHubAppRecord {
-    return this.apps.all().find((app) => String(app.id) === ref) ?? this.appNamed(ref);
   }
 
   /** The bot of an App, by its login. */

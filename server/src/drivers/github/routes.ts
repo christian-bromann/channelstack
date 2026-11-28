@@ -456,7 +456,7 @@ export function registerGitHubRoutes(
   const actorOf = (by: Actor, session: string, params: Readonly<Record<string, string>>) => {
     if (by.kind === "user")
       return { id: person(session, params.user ?? ""), may: (_repo: GitHubRepoRecord, _needs: Needs) => {} };
-    const app = fake.scripted(params.app ?? "");
+    const app = store.apps.scripted(session, params.app ?? "");
     return { id: app.botId, may: (repo: GitHubRepoRecord, needs: Needs) => void kit.allowApp(repo, app, needs) };
   };
   /** The world an actor acts in: a person's works live too; a scripted App acts in the fake. */
@@ -588,7 +588,7 @@ export function registerGitHubRoutes(
             user: person(session.id, user),
             permission,
           })),
-          apps: body.apps?.map((app) => store.appOf(app).name),
+          apps: body.apps?.map((app) => store.apps.get(session.id, app).name),
           labels: body.labels,
         }),
       ),
@@ -682,7 +682,8 @@ export function registerGitHubRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "GitHubApp", name: "installationId", args: ["repo"] },
     stability,
-    handler: ({ session, params, body }) => installationIdOf(session.id, body.repo, store.appOf(params.app)),
+    handler: ({ session, params, body }) =>
+      installationIdOf(session.id, body.repo, store.apps.get(session.id, params.app)),
   });
 
   // --- Apps -------------------------------------------------------------------------------------
@@ -749,7 +750,10 @@ export function registerGitHubRoutes(
       live: NOT_YET,
       stability,
       handler: ({ session, params, body }) =>
-        caused(session.id, repos.setInstalled(repoOf(session.id, params.repo), store.appOf(body.app), installed)),
+        caused(
+          session.id,
+          repos.setInstalled(repoOf(session.id, params.repo), store.apps.get(session.id, body.app), installed),
+        ),
     });
   }
 

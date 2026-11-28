@@ -217,11 +217,9 @@ export function createGoogleApi(
       }
       // Each app has its own OAuth client, and its mailbox's refresh token is that client's.
       const same = (given: unknown, secret: string) => typeof given === "string" && constantTimeEqual(given, secret);
-      const client = store.apps.all().find((app) => {
-        const { clientId, clientSecret } = world.credentials(app);
-        return same(body.client_id, clientId) && same(body.client_secret, clientSecret);
-      });
-      if (!client) return oauthRefusal(401, "invalid_client", "The OAuth client was not found.");
+      const client = store.apps.withSecret(body.client_id, (app) => context.apps.secret(app, "clientId"));
+      if (!client || !same(body.client_secret, world.credentials(client).clientSecret))
+        return oauthRefusal(401, "invalid_client", "The OAuth client was not found.");
       if (typeof body.refresh_token !== "string" || body.refresh_token === "") {
         return oauthRefusal(400, "invalid_request", "Missing required parameter: refresh_token");
       }

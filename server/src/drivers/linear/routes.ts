@@ -403,7 +403,7 @@ export function registerLinearRoutes(
     live: ONE_LIVE_APP,
     stability,
     handler: async ({ session, params, body }) => {
-      const app = fake.scripted(params.app);
+      const app = store.apps.scripted(session.id, params.app);
       const issue = issueOf(session.id, body.issue);
       return commentWire(
         session.id,
@@ -424,7 +424,7 @@ export function registerLinearRoutes(
     live: ONE_LIVE_APP,
     stability,
     handler: async ({ session, params, body }) => {
-      const app = fake.scripted(params.app);
+      const app = store.apps.scripted(session.id, params.app);
       const parent = commentOf(session.id, body.comment);
       const issue = store.issue(parent.issue);
       return commentWire(
@@ -680,7 +680,7 @@ export function registerLinearRoutes(
     handler: async ({ session, params, body }) => {
       const issue = issueOf(session.id, body.issue);
       const user = actor(session.id, params.user, issue);
-      const app = appOf(body.app);
+      const app = store.apps.get(session.id, body.app);
       if (issue.delegate === app.userId)
         throw new ProtocolError("invalid_argument", `${issue.identifier} is already delegated to ${app.name}`);
       await asProtocol(() => world.updateIssue(issue, user.id, { delegateId: app.userId }));
@@ -1025,7 +1025,7 @@ export function registerLinearRoutes(
     stability,
     handler: ({ session, params, query }) => {
       const comment = commentOf(session.id, params.comment);
-      const app = appOf(query.app);
+      const app = store.apps.get(session.id, query.app);
       const found = fake.deliveries(session.id).find(({ request }) => {
         const payload = request.meta?.payload as { action?: string; data?: { id?: string } } | undefined;
         return (

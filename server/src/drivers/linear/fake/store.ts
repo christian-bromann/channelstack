@@ -28,7 +28,7 @@ export class LinearStore {
   readonly #appUsers = new Map<string, LinearUserRecord>();
 
   constructor(registry: Registry) {
-    this.apps = new AppRoster("Linear", registry);
+    this.apps = new AppRoster<LinearAppRecord>("Linear", registry, { refs: (app) => [app.userId] });
     this.users = registry.collection("linear", "user");
     this.teams = registry.collection("linear", "team");
     this.issues = registry.collection("linear", "issue");
@@ -78,12 +78,12 @@ export class LinearStore {
 
   /** The app whose user this is, if any. */
   appByUser(id: string): LinearAppRecord | undefined {
-    return this.apps.all().find((app) => app.userId === id);
+    return this.apps.byId(id);
   }
 
   /** The app a handle names: its user's id, or its name. */
   appOf(ref: string): LinearAppRecord | undefined {
-    return this.appByUser(ref) ?? this.apps.named(ref);
+    return this.apps.find(ref);
   }
 
   /** Keep a new object for its session. */

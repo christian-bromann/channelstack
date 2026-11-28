@@ -1,4 +1,3 @@
-import { BUILT_IN_APP } from "../../../core/apps/index.ts";
 import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
@@ -489,8 +488,8 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     issue.updatedAt = now;
     // The loop guard counts what apps write on an issue where no person writes in between (decision 0027).
     const writer = store.appByUser(user);
-    context.loops.wrote(session, issue.id, writer ? { kind: "app", name: writer.name } : { kind: "person" });
-    if (writer && !context.loops.allows(session, issue.id)) return record;
+    if (!context.loops.wrote(session, issue.id, writer ? { kind: "app", name: writer.name } : { kind: "person" }))
+      return record;
     record.delivery = entityEvent(
       session,
       "Comment",
@@ -731,6 +730,8 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
 
     /** The workspace's apps, the built-in one first. */
     apps: () => store.apps.all(),
+    /** The app an access token is the token of: each app's answers as that app (decision 0027). */
+    appWithToken: (token: string) => store.apps.withSecret(token, (app) => context.apps.secret(app, "oauthToken")),
 
     /**
      * Make an OAuth app installed with `actor=app` by name, or return the one made with the same
@@ -770,20 +771,6 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
         },
         by,
       );
-    },
-
-    /** An app a test made and acts as: never the built-in one, which the agent under test acts as. */
-    scripted(ref: string): LinearAppRecord {
-      const app = store.appOf(ref);
-      if (!app) throw new ProtocolError("not_found", `There is no Linear app "${ref}"`, { app: ref });
-      if (app === store.app) {
-        throw new ProtocolError(
-          "invalid_argument",
-          `${BUILT_IN_APP} is the built-in app, which the agent under test acts as: script another app`,
-          { app: app.userId },
-        );
-      }
-      return app;
     },
 
     createTeam(

@@ -25,7 +25,7 @@ export class NotionStore {
   #owner: NotionUserRecord | undefined;
 
   constructor(registry: Registry) {
-    this.apps = new AppRoster("Notion", registry);
+    this.apps = new AppRoster<NotionBotRecord>("Notion", registry, { noun: "integration", refs: (app) => [app.id] });
     this.users = registry.collection("notion", "user");
     this.pages = registry.collection("notion", "page");
     this.databases = registry.collection("notion", "database");
@@ -46,7 +46,7 @@ export class NotionStore {
 
   /** The integration whose bot user this is, if any. */
   integration(id: string): NotionBotRecord | undefined {
-    return this.apps.all().find((app) => app.id === id);
+    return this.apps.byId(id);
   }
 
   /** The workspace owner: who seed data is created by unless a test says otherwise. */

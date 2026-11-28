@@ -79,10 +79,8 @@ export const linear: DriverDefinition = {
       env: (app) => {
         // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same
         // shape; asking for them makes the app, so its agent can start before any test has.
-        const name =
-          app === undefined
-            ? BUILT_IN_APP
-            : (fake.store.apps.named(app) ?? fake.world.createApp(undefined, { name: app })).name;
+        const { apps } = fake.store;
+        const name = apps.keyOf(apps.forEnv(app, (wanted) => fake.world.createApp(undefined, { name: wanted })));
         return {
           LINEAR_API_URL: `${context.apiUrl()}/graphql`,
           LINEAR_ACCESS_TOKEN: context.apps.secret(name, "oauthToken"),

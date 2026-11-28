@@ -4,7 +4,6 @@ import { type Context, Hono } from "hono";
 
 import { type RestAnswer, restApi } from "../../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import {
   applicationFlags,
   applicationObject,
@@ -74,10 +73,7 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
       const header = c.req.header("authorization") ?? "";
       const token = /^Bot (.+)$/.exec(header)?.[1] ?? "";
       // Each app's token is its own (decision 0027): the call is answered as the bot it belongs to.
-      const caller =
-        token === ""
-          ? undefined
-          : store.apps.all().find((app) => constantTimeEqual(token, context.apps.secret(app.name, "botToken")));
+      const caller = store.apps.withSecret(token, (app) => context.apps.secret(app, "botToken"));
       if (!caller) return errorAnswer(401, 0, "401: Unauthorized");
       c.set(CALLER as never, caller as never);
       return undefined;

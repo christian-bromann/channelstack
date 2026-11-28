@@ -3,7 +3,6 @@ import type { Context, Hono } from "hono";
 import { bearerFrom } from "../../../core/auth/index.ts";
 import { type RestAnswer, restApi } from "../../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { NotionApiError, pagingOf } from "../errors.ts";
 import { NOTION_IDS } from "../ids.ts";
 import { NOTION_API_VERSION } from "../payloads.ts";
@@ -58,7 +57,7 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
   const bot = (c: Context) => caller(c).id;
   /** The integration a token belongs to, compared in constant time. */
   const tokenOwner = (token: string): NotionBotRecord | undefined =>
-    store.apps.all().find((app) => constantTimeEqual(token, context.apps.secret(app.name, "token")));
+    store.apps.withSecret(token, (app) => context.apps.secret(app, "token"));
   const requestId = () => context.ids.next(NOTION_IDS.uuid);
 
   const errorBody = (status: number, code: string, message: string) => ({

@@ -40,8 +40,7 @@ export function createDiscordFake(context: DriverContext): DiscordFake {
   /** An app by name: the Gateway knows bots by their app's name. */
   const named = (app: string) => store.apps.named(app) ?? store.app;
   const gateway = createGateways(context, {
-    apps: () => store.apps.all().map((app) => app.name),
-    botToken: (app) => context.apps.secret(app, "botToken"),
+    appWithToken: (token) => store.apps.withSecret(token, (app) => context.apps.secret(app, "botToken"))?.name,
     privilegedIntents: (app) => named(app).privilegedIntents,
     takeDrop: (session) => {
       const at = store.faults.findIndex((fault) => fault.type === "drop_gateway" && fault.session === session);

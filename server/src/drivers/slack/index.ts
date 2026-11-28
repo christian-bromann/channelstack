@@ -88,10 +88,8 @@ export const slack: DriverDefinition = {
       // Live, `channelstack env` prints nothing for Slack (app.ts): the agent talks to it with its own configuration.
       env: (app) => {
         // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same shape.
-        const name =
-          app === undefined
-            ? BUILT_IN_APP
-            : (fake.store.apps.named(app) ?? fake.world.createApp(undefined, { name: app })).name;
+        const { apps } = fake.store;
+        const name = apps.keyOf(apps.forEnv(app, (wanted) => fake.world.createApp(undefined, { name: wanted })));
         return {
           SLACK_API_URL: `${context.apiUrl()}/api/`,
           SLACK_BOT_TOKEN: context.apps.secret(name, "botToken"),

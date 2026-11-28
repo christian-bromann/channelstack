@@ -1,5 +1,4 @@
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
-import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { GITHUB_IDS } from "../ids.ts";
 import type { GitHubAppRecord } from "../world.ts";
@@ -30,19 +29,6 @@ export function createFakeWorld(
   const { ids, clock } = context;
   const { deliveries } = kit;
 
-  /** A test acts as an App it made, never as the built-in one: the agent under test acts as that. */
-  const scripted = (ref: string): GitHubAppRecord => {
-    const app = store.appOf(ref);
-    if (app === store.app) {
-      throw new ProtocolError(
-        "invalid_argument",
-        `${app.name} is the built-in App, which the agent under test acts as: script another App`,
-        { app: String(app.id) },
-      );
-    }
-    return app;
-  };
-
   /** Note a delivery sent again in the App's delivery log, as GitHub lists every attempt there. */
   const logged = (guid: string, attempt: Promise<DeliveryAttempt>): Promise<DeliveryAttempt> => {
     const original = store.hookDeliveries.find((entry) => entry.guid === guid);
@@ -58,7 +44,6 @@ export function createFakeWorld(
     issues,
     pulls,
     checks,
-    scripted,
 
     /** The org's Apps, the built-in one first. */
     apps: (): GitHubAppRecord[] => store.apps.all(),

@@ -1,4 +1,3 @@
-import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { capabilities } from "./capabilities.ts";
 import { createEchoFake } from "./fake/index.ts";
@@ -19,8 +18,6 @@ export const echo: DriverDefinition = {
   secrets: { appToken: ECHO_SECRETS.appToken, signingSecret: ECHO_SECRETS.signingSecret },
   create(context): Driver {
     const fake = createEchoFake(context);
-    /** An app asked for by name before any test made it. */
-    const makeApp = (name: string) => fake.world.createApp(undefined, { name }).name;
     return {
       name: "echo",
       fake,
@@ -29,8 +26,8 @@ export const echo: DriverDefinition = {
       openWork: () => [],
       // Another app's lines have the built-in app's keys (decision 0027).
       env: (app) => {
-        const name =
-          app === undefined ? BUILT_IN_APP : fake.world.apps().find((one) => one.name === app) ? app : makeApp(app);
+        const { apps } = fake.store;
+        const name = apps.keyOf(apps.forEnv(app, (wanted) => fake.world.createApp(undefined, { name: wanted })));
         return {
           ECHO_API_URL: context.apiUrl(),
           ECHO_APP_TOKEN: context.apps.secret(name, "appToken"),

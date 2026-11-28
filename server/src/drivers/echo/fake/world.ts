@@ -43,10 +43,10 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
         (app) =>
           app.id !== author.id &&
           room.members.includes(app.id) &&
-          context.apps.webhookUrl(store.keyOf(app)) !== undefined,
+          context.apps.webhookUrl(store.apps.keyOf(app)) !== undefined,
       )
       .map((app) => ({ app, id: ids.next(ECHO_IDS.delivery) }));
-    const own = hearing.find(({ app }) => store.keyOf(app) === BUILT_IN_APP)?.id;
+    const own = hearing.find(({ app }) => store.apps.keyOf(app) === BUILT_IN_APP)?.id;
     const message: EchoMessage = {
       id: ids.next(ECHO_IDS.message),
       room: room.id,
@@ -59,37 +59,21 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
     recorded?.(message);
     if (session === undefined) return message;
     // The loop guard counts what apps write where no person writes in between.
-    context.loops.wrote(
-      session,
-      room.id,
-      author.kind === "app" ? { kind: "app", name: author.name } : { kind: "person" },
-    );
-    if (author.kind === "app" && !context.loops.allows(session, room.id)) return message;
+    const writer = author.kind === "app" ? { kind: "app" as const, name: author.name } : { kind: "person" as const };
+    if (!context.loops.wrote(session, room.id, writer)) return message;
     for (const { app, id } of hearing) {
       const payload = messageCreated({ deliveryId: id, app, message, atMs: clock() });
       deliveries.send({
         id,
         session,
-        app: store.keyOf(app),
+        app: store.apps.keyOf(app),
         type: payload.type,
-        url: context.apps.webhookUrl(store.keyOf(app)) ?? "",
+        url: context.apps.webhookUrl(store.apps.keyOf(app)) ?? "",
         body: JSON.stringify(payload),
         meta: { payload },
       });
     }
     return message;
-  };
-
-  /** An app a test made, to act as: never the built-in one. */
-  const scripted = (id: string): EchoApp => {
-    const app = store.apps.all().find((candidate) => candidate.id === id);
-    if (!app) throw new ProtocolError("not_found", `There is no echo app "${id}"`, { app: id });
-    if (store.keyOf(app) === BUILT_IN_APP) {
-      throw new ProtocolError("invalid_argument", `${app.name} is the built-in app, which the agent acts as`, {
-        app: id,
-      });
-    }
-    return app;
   };
 
   return {
@@ -119,7 +103,7 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
     },
 
     sayAsApp(session, appId, roomId, text) {
-      const app = scripted(appId);
+      const app = store.apps.scripted(session, appId);
       const room = store.rooms.get(session, roomId);
       if (!room.members.includes(app.id)) {
         throw new ProtocolError(

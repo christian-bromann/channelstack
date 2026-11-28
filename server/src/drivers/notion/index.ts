@@ -63,10 +63,8 @@ export const notion: DriverDefinition = {
       // Live, `channelstack env` prints nothing for Notion (app.ts): the agent talks to it with its own configuration.
       env: (app) => {
         // Another integration's lines have the built-in one's keys, so its agent starts from an .env of the same shape.
-        const name =
-          app === undefined
-            ? BUILT_IN_APP
-            : (fake.store.apps.named(app) ?? fake.world.createApp(undefined, { name: app })).name;
+        const { apps } = fake.store;
+        const name = apps.keyOf(apps.forEnv(app, (wanted) => fake.world.createApp(undefined, { name: wanted })));
         return {
           NOTION_BASE_URL: context.apiUrl(),
           NOTION_TOKEN: context.apps.secret(name, "token"),

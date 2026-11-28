@@ -1,4 +1,4 @@
-import { AppRoster, BUILT_IN_APP } from "../../../core/apps/index.ts";
+import { AppRoster } from "../../../core/apps/index.ts";
 import { CursorList } from "../../../core/events/index.ts";
 import type { Collection, Registry } from "../../../core/registry/index.ts";
 import type { EchoApp, EchoMessage, EchoRoom, EchoUser } from "../world.ts";
@@ -12,7 +12,7 @@ export class EchoStore {
   readonly apps: AppRoster<EchoApp>;
 
   constructor(registry: Registry) {
-    this.apps = new AppRoster("echo", registry);
+    this.apps = new AppRoster<EchoApp>("echo", registry, { refs: (app) => [app.id] });
     this.users = registry.collection<EchoUser>("echo", "user");
     this.rooms = registry.collection<EchoRoom>("echo", "room");
   }
@@ -24,11 +24,6 @@ export class EchoStore {
 
   set app(app: EchoApp) {
     this.apps.seed(app);
-  }
-
-  /** How core knows an app: echo's built-in app is `echo-agent`, but its secrets and endpoint are the built-in app's. */
-  keyOf(app: EchoApp): string {
-    return app.id === this.app.id ? BUILT_IN_APP : app.name;
   }
 
   messagesIn(room: string): CursorList<EchoMessage> {

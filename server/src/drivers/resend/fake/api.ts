@@ -5,7 +5,6 @@ import type { Context, Hono } from "hono";
 import { bearerFrom } from "../../../core/auth/index.ts";
 import { type RestAnswer, restApi } from "../../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { resendPayloads } from "../payloads.ts";
 import type { ResendAppRecord, ResendEmailRecord } from "../world.ts";
 import { createDownloads } from "./downloads.ts";
@@ -204,7 +203,7 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
         );
       }
       // Each key is one team's: the call is that team's (decision 0027).
-      const team = store.apps.all().find((app) => constantTimeEqual(key, context.apps.secret(app.name, "apiKey")));
+      const team = store.apps.withSecret(key, (app) => context.apps.secret(app, "apiKey"));
       if (!team) return errorAnswer(400, "validation_error", "API key is invalid");
       c.set(TEAM as never, team as never);
       return undefined;

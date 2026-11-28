@@ -77,10 +77,7 @@ export const discord: DriverDefinition = {
       // Live, `channelstack env` prints nothing for Discord (app.ts): the agent talks to it with its own configuration.
       env: (name) => {
         // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same shape.
-        const app =
-          name === undefined
-            ? fake.store.app
-            : (fake.store.apps.named(name) ?? fake.world.createApp(undefined, { name }));
+        const app = fake.store.apps.forEnv(name, (wanted) => fake.world.createApp(undefined, { name: wanted }));
         return {
           DISCORD_API_URL: `${context.apiUrl()}/api`,
           DISCORD_TOKEN: context.apps.secret(app.name, "botToken"),

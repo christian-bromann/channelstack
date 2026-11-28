@@ -8,6 +8,7 @@ import { EventLog } from "../events/index.ts";
 import { createLogger } from "../log/index.ts";
 import { Redactor } from "../redact/index.ts";
 import { DeliveryQueue } from "./index.ts";
+import { deliveryTo } from "./kit.ts";
 
 const servers: Server[] = [];
 afterEach(() => {
@@ -85,5 +86,22 @@ describe("delivery queue", () => {
     send("ses_a", agent.url);
     await delivery.settled();
     expect(events.read("ses_a").events.at(-1)?.data).toMatchObject({ status: "acknowledged" });
+  });
+});
+
+describe("R1.2: a message's delivery to one app", () => {
+  test("the first that went to the app, the built-in one unless another is named", () => {
+    const sent = [
+      { app: "coder", id: "d1" },
+      { app: "my-agent", id: "d2" },
+      { app: "coder", id: "d3" },
+    ];
+    expect(deliveryTo(sent)?.id).toBe("d2");
+    expect(deliveryTo(sent, "coder")?.id).toBe("d1");
+    expect(deliveryTo(sent, "writer")).toBeUndefined();
+    // A record without an app went to the built-in one.
+    const records = [{ request: { app: "coder" } }, { request: {} }];
+    expect(deliveryTo(records)).toBe(records[1]);
+    expect(deliveryTo(records, "coder")).toBe(records[0]);
   });
 });

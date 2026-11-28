@@ -92,4 +92,44 @@ describe("exit check 12.12: names and limits", () => {
     expect(appVariableName("code-reviewer")).toBe("CODE_REVIEWER");
     expect(appWebhookVariable("slack", "coder")).toBe("CHANNELSTACK_SLACK_APP_CODER_WEBHOOK_URL");
   });
+
+  test("R1.2: one owner for acting as an app, finding it by a handle, its env and its credentials", () => {
+    const registry = new Registry();
+    type App = { name: string; id: string; bot: string };
+    const apps = new AppRoster<App>("Slack", registry, { refs: (app) => [app.id, app.bot] });
+    const builtIn = { name: "my-agent", id: "A0", bot: "U0" };
+    apps.seed(builtIn);
+    const coder = apps.make("coder", {}, () => ({ name: "coder", id: "A1", bot: "U1" }), { session: "s1", people: [] });
+
+    // A handle's id names its app anywhere; a name only among the apps its session used.
+    expect(apps.byId("U1")).toBe(coder);
+    expect(apps.find("coder")).toBe(coder);
+    expect(apps.get("s1", "A1")).toBe(coder);
+    expect(apps.get("s1", "coder")).toBe(coder);
+    expect(apps.get("s2", "my-agent")).toBe(builtIn);
+    expect(refusal(() => apps.get("s2", "coder"))).toBe("not_found");
+    expect(refusal(() => apps.get("s2", "A1"))).toBe("not_found");
+
+    // A test acts as an app its session made, never as my-agent.
+    expect(apps.scripted("s1", "coder")).toBe(coder);
+    expect(refusal(() => apps.scripted("s1", "A0"))).toBe("invalid_argument");
+    expect(refusal(() => apps.scripted("s2", "coder"))).toBe("not_found");
+
+    // `env --app` makes an app nobody asked for yet, and keys the built-in one as my-agent.
+    let made = 0;
+    const later = (name: string) => apps.make(name, {}, () => ({ name, id: `A${++made + 1}`, bot: "U9" }));
+    expect(apps.forEnv(undefined, later)).toBe(builtIn);
+    expect(apps.forEnv("coder", later)).toBe(coder);
+    expect(apps.forEnv("writer", later).name).toBe("writer");
+    expect(made).toBe(1);
+    expect(apps.keyOf(builtIn)).toBe("my-agent");
+
+    // A credential answers as the app whose it is, by the name core keeps its secrets under.
+    const secret = (app: string) => `token-of-${app}`;
+    expect(apps.withSecret("token-of-coder", secret)).toBe(coder);
+    expect(apps.withSecret("token-of-my-agent", secret)).toBe(builtIn);
+    expect(apps.withSecret("token-of-nobody", secret)).toBeUndefined();
+    expect(apps.withSecret("", secret)).toBeUndefined();
+    expect(apps.withSecret(undefined, secret)).toBeUndefined();
+  });
 });

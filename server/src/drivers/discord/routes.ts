@@ -2,6 +2,7 @@ import { z } from "@hono/zod-openapi";
 
 import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
+import { deliveryTo } from "../../core/delivery/kit.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport, type Reality } from "../../core/reality/index.ts";
@@ -273,16 +274,16 @@ export function registerDiscordRoutes(
       visibleTo: message.ephemeralFor === undefined ? undefined : userWire(world.user(session, message.ephemeralFor)),
       // Only the fake delivers: a live message never has a delivery here. It is the first to the
       // built-in app; another app's are `msg.deliveryFor(app)` (decision 0027).
-      delivery: deps.live ? undefined : firstDelivery(session, message.deliveries, BUILT_IN_APP),
+      delivery: deps.live ? undefined : deliveryOf(session, message.deliveries),
     };
   };
-  /** The first of a message's deliveries that went to this app, if any. */
-  const firstDelivery = (session: string, ids: readonly string[], app: string) => {
-    for (const id of ids) {
-      const record = fake.delivery(session, id);
-      if ((record.request.app ?? BUILT_IN_APP) === app) return deliveryWire(record);
-    }
-    return undefined;
+  /** A message's delivery to this app (core's pick among those it caused), as a test reads it. */
+  const deliveryOf = (session: string, ids: readonly string[], app?: string) => {
+    const record = deliveryTo(
+      ids.map((id) => fake.delivery(session, id)),
+      app,
+    );
+    return record && deliveryWire(record);
   };
   const messagesWire = (session: string, messages: readonly DiscordMessageRecord[]) =>
     Promise.all(messages.map((message) => messageWire(session, message)));
@@ -914,10 +915,9 @@ export function registerDiscordRoutes(
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: async ({ session, params, query }) => {
-      const app = fake.appOf(query.app) ?? fake.apps().find((candidate) => candidate.name === query.app);
-      if (!app) throw new ProtocolError("not_found", `There is no Discord app "${query.app}"`, { app: query.app });
+      const app = fake.appIn(session.id, query.app);
       const message = await fake.message(session.id, params.channel, params.message);
-      return firstDelivery(session.id, message.deliveries, app.name) ?? null;
+      return deliveryOf(session.id, message.deliveries, app.name) ?? null;
     },
   });
 

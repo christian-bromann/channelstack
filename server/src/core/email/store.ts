@@ -66,12 +66,14 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
 
   /** The loop guard, which the driver hands over from its context. */
   loops: DriverLoops | undefined;
+  /** The emails the loop guard stopped: kept, and delivered to nobody. */
+  readonly #halted = new WeakSet<Email>();
 
   constructor(registry: Registry, driver: string, title: string = driver) {
     this.users = registry.collection(driver, "user");
     this.emails = registry.collection(driver, "email");
     this.threads = registry.collection(driver, "thread");
-    this.apps = new AppRoster(title, registry);
+    this.apps = new AppRoster<App>(title, registry, { refs: (app) => [app.id] });
   }
 
   /** The agent's mailbox: the built-in app, `my-agent`. It belongs to no session. */
@@ -91,7 +93,7 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
 
   /** The app with this id, or this name. */
   appOf(handle: string): App | undefined {
-    return this.apps.all().find((app) => app.id === handle) ?? this.apps.named(handle);
+    return this.apps.find(handle);
   }
 
   /** The apps among these mailboxes, each once, in the order the channel's apps are. */
@@ -118,25 +120,6 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
       },
       by,
     );
-  }
-
-  /** The app `channelstack env --app` prints: the built-in one, or the one named, made by `make` if no test has yet. */
-  appForEnv(name: string | undefined, make: (name: string) => App): App {
-    return name === undefined ? this.app : (this.apps.named(name) ?? make(name));
-  }
-
-  /** An app a test made, to act as (a scripted app): never the built-in one, which the agent under test is. */
-  scripted(handle: string): App {
-    const app = this.appOf(handle);
-    if (!app) throw new ProtocolError("not_found", `There is no app "${handle}"`, { app: handle });
-    if (app === this.app) {
-      throw new ProtocolError(
-        "invalid_argument",
-        `${app.name} is the built-in app, which the agent under test acts as: script another app`,
-        { app: app.id },
-      );
-    }
-    return app;
   }
 
   /**
@@ -186,18 +169,15 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
       this.threads.add(email.id, { id: email.id, subject: email.subject, createdAt: email.createdAt }, session);
     }
     // The loop guard counts what apps write in a conversation where no person writes in between (decision 0027).
-    const app = this.apps.all().find((candidate) => candidate.id === email.author);
-    if (session !== undefined) {
-      this.loops?.wrote(session, email.thread, app ? { kind: "app", name: app.name } : { kind: "person" });
-    }
+    const app = email.author === undefined ? undefined : this.apps.byId(email.author);
+    const writer = app ? { kind: "app" as const, name: app.name } : { kind: "person" as const };
+    if (session !== undefined && this.loops?.wrote(session, email.thread, writer) === false) this.#halted.add(email);
     return this.emails.add(email.id, email, session);
   }
 
   /** The loop guard stopped this app email's conversation: it is kept, and nothing is delivered for it. */
-  halted(email: Email, session: string | undefined): boolean {
-    if (session === undefined || this.loops === undefined) return false;
-    const fromApp = this.apps.all().some((candidate) => candidate.id === email.author);
-    return fromApp && !this.loops.allows(session, email.thread);
+  halted(email: Email): boolean {
+    return this.#halted.has(email);
   }
 
   /**

@@ -81,7 +81,7 @@ export class DiscordStore {
   #adminRole = "";
 
   constructor(registry: Registry) {
-    this.apps = new AppRoster("Discord", registry);
+    this.apps = new AppRoster<DiscordAppRecord>("Discord", registry, { refs: (app) => [app.id, app.botUserId] });
     this.users = registry.collection<DiscordUserRecord>("discord", "user");
     this.channels = registry.collection<DiscordChannelRecord>("discord", "channel");
   }
@@ -98,7 +98,7 @@ export class DiscordStore {
 
   /** The app whose application or bot user this is (they have the same id), if any. */
   appOf(id: string): DiscordAppRecord | undefined {
-    return this.apps.all().find((app) => app.id === id || app.botUserId === id);
+    return this.apps.byId(id);
   }
 
   /** `@everyone`'s role, whose id is the guild's. */

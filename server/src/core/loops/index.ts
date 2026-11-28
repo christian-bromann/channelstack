@@ -25,8 +25,12 @@ interface Count {
 
 /** One driver's view of the guard, with its name filled in: what `DriverContext.loops` is. */
 export interface DriverLoops {
-  /** Someone wrote in `conversation`: a person starts the count over, an app adds to it. */
-  wrote(session: string, conversation: string, writer: Writer): void;
+  /**
+   * Someone wrote in `conversation`: a person starts the count over, an app adds to it. Answers
+   * whether the events this message causes may be delivered: false once apps looped there. The
+   * one call a driver's message path makes.
+   */
+  wrote(session: string, conversation: string, writer: Writer): boolean;
   /** May an event an app's message caused in `conversation` still be delivered? */
   allows(session: string, conversation: string): boolean;
 }
@@ -50,17 +54,18 @@ export class LoopGuard {
     };
   }
 
-  wrote(session: string, driver: string, conversation: string, writer: Writer): void {
+  wrote(session: string, driver: string, conversation: string, writer: Writer): boolean {
     const key = `${session}\u0000${driver}\u0000${conversation}`;
     if (writer.kind === "person") {
       this.#counts.delete(key);
-      return;
+      return true;
     }
     const count = this.#counts.get(key) ?? { messages: 0, authors: [], stopped: false };
     this.#counts.set(key, count);
     count.messages += 1;
     count.authors.push(writer.name);
-    if (count.stopped || count.messages <= this.#limit) return;
+    if (count.stopped) return false;
+    if (count.messages <= this.#limit) return true;
     count.stopped = true;
     const turns = count.authors.slice(-6).join(" → ");
     const text = `a bot loop in ${driver} ${conversation} was stopped after ${this.#limit} app messages with no person between them (${turns} …)`;
@@ -70,6 +75,7 @@ export class LoopGuard {
       messages: this.#limit,
       authors: [...new Set(count.authors)],
     });
+    return false;
   }
 
   allows(session: string, driver: string, conversation: string): boolean {

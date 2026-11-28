@@ -83,7 +83,7 @@ export const google: DriverDefinition = {
       // Live, `channelstack env` prints nothing for Gmail (app.ts): the agent talks to it with its own configuration.
       // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same shape.
       env: (app) => {
-        const mailbox = fake.store.appForEnv(app, (name) => fake.world.createApp(undefined, { name }));
+        const mailbox = fake.store.apps.forEnv(app, (name) => fake.world.createApp(undefined, { name }));
         const url = context.apiUrl();
         const audience = context.apps.webhookUrl(mailbox.name);
         const { clientId, clientSecret, refreshToken } = fake.world.credentials(mailbox);

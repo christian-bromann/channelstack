@@ -68,10 +68,7 @@ export const github: DriverDefinition = {
       env: (name) => {
         // Another App's lines have the built-in App's keys, so its agent starts from an .env of the
         // same shape. Asking for them makes the App, so its agent can start before any test has.
-        const app =
-          name === undefined
-            ? fake.store.app
-            : (fake.store.apps.named(name) ?? fake.world.createApp(undefined, { name }));
+        const app = fake.store.apps.forEnv(name, (wanted) => fake.world.createApp(undefined, { name: wanted }));
         return {
           GITHUB_API_URL: context.apiUrl(),
           GITHUB_APP_ID: String(app.id),

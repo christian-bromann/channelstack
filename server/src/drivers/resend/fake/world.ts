@@ -269,7 +269,7 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
       delivery: undefined,
     };
     store.keep(email, session);
-    if (store.halted(email, session)) return email;
+    if (store.halted(email)) return email;
     emit(session, team, "email.sent", email);
     if (lastEvent === "bounced") {
       emit(session, team, "email.bounced", email, {

@@ -4,7 +4,6 @@ import { bearerFrom } from "../../../core/auth/index.ts";
 import { delay } from "../../../core/clock/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { recordCall } from "../../../core/router/inspect.ts";
-import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { identified } from "../blocks.ts";
 import { SLACK_IDS } from "../ids.ts";
 import { handleOf } from "../interaction-payloads.ts";
@@ -678,7 +677,7 @@ export function createSlackApi(
 
   /** The app a token of this kind belongs to, compared in constant time. */
   const tokenOwner = (token: string, kind: "botToken" | "appToken"): SlackAppRecord | undefined =>
-    store.apps.all().find((candidate) => constantTimeEqual(token, context.apps.secret(candidate.name, kind)));
+    store.apps.withSecret(token, (app) => context.apps.secret(app, kind));
 
   const api = new Hono();
 

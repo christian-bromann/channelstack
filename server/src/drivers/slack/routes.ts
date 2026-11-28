@@ -2,6 +2,7 @@ import { z } from "@hono/zod-openapi";
 
 import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
+import { deliveryTo } from "../../core/delivery/kit.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import {
@@ -288,7 +289,7 @@ export function registerSlackRoutes(
     },
     // Only the fake delivers: a live message never has a delivery here. It is the first to the
     // built-in app; another app's are `msg.deliveryFor(app)` (decision 0027).
-    delivery: firstDelivery(session, message.deliveries, BUILT_IN_APP),
+    delivery: deliveryOf(session, message.deliveries),
     stream:
       message.stream === undefined
         ? undefined
@@ -317,13 +318,13 @@ export function registerSlackRoutes(
     };
   };
 
-  /** The first of a message's deliveries that went to this app, if any. */
-  const firstDelivery = (session: string, ids: readonly string[], app: string) => {
-    for (const id of ids) {
-      const record = fake.delivery(session, id);
-      if ((record.request.app ?? BUILT_IN_APP) === app) return deliveryWire(record);
-    }
-    return undefined;
+  /** A message's delivery to this app (core's pick among those it caused), as a test reads it. */
+  const deliveryOf = (session: string, ids: readonly string[], app?: string) => {
+    const record = deliveryTo(
+      ids.map((id) => fake.delivery(session, id)),
+      app,
+    );
+    return record && deliveryWire(record);
   };
 
   const principal = (session: string) => (id: string) => {
@@ -1270,11 +1271,8 @@ export function registerSlackRoutes(
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, params, query }) => {
-      const app = fake.appOf(query.app) ?? fake.apps().find((candidate) => candidate.name === query.app);
-      if (!app) throw new ProtocolError("not_found", `There is no Slack app "${query.app}"`, { app: query.app });
-      return (
-        firstDelivery(session.id, fake.message(session.id, params.channel, params.ts).deliveries, app.name) ?? null
-      );
+      const app = fake.appIn(session.id, query.app);
+      return deliveryOf(session.id, fake.message(session.id, params.channel, params.ts).deliveries, app.name) ?? null;
     },
   });
 
@@ -1352,9 +1350,7 @@ export function registerSlackRoutes(
     live: UNINSTALL,
     stability,
     handler: ({ session, body }) =>
-      fake
-        .uninstallApp(session.id, body.app === undefined ? undefined : (fake.appOf(body.app)?.name ?? body.app))
-        .map((id) => deliveryWire(fake.delivery(session.id, id))),
+      fake.uninstallApp(session.id, body.app).map((id) => deliveryWire(fake.delivery(session.id, id))),
   });
 
   router.route({

@@ -33,6 +33,26 @@ export function fixedRetries(
   };
 }
 
+/** A delivery an event caused, and the app it went to (decision 0027). */
+export interface SentDelivery {
+  readonly app: string;
+  readonly id: string;
+}
+
+/**
+ * The first of these deliveries that went to `app`, the built-in one unless another is named:
+ * what a message's `delivery` is, and what its `deliveryFor(app)` reads. They are the deliveries
+ * an event caused (`SentDelivery`), or the queue's records; one without an app went to the built-in app.
+ */
+export function deliveryTo<T extends SentDelivery | { readonly request: Pick<DeliveryRequest, "app"> }>(
+  deliveries: Iterable<T>,
+  app: string = BUILT_IN_APP,
+): T | undefined {
+  for (const one of deliveries)
+    if ((("request" in one ? one.request.app : one.app) ?? BUILT_IN_APP) === app) return one;
+  return undefined;
+}
+
 /** How one platform sends its events: everything about its deliveries a driver would otherwise write itself. */
 export interface PlatformDeliveries {
   /** The driver whose deliveries these are. */

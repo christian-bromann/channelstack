@@ -4,7 +4,6 @@ import { bearerFrom } from "../../../../core/auth/index.ts";
 import { ProtocolError } from "../../../../core/errors/index.ts";
 import { bodyOf, wrapRest } from "../../../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../../../core/router/index.ts";
-import { constantTimeEqual } from "../../../../core/signing/hmac.ts";
 import { GITHUB_IDS } from "../../ids.ts";
 import { githubTime } from "../../payloads.ts";
 import { verifyGitHubAppJwt } from "../../signing.ts";
@@ -58,7 +57,7 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
 
   /** The App whose installation a token is, compared in constant time. */
   const appOfToken = (token: string): GitHubAppRecord | undefined =>
-    store.apps.all().find((app) => constantTimeEqual(token, context.apps.secret(app.name, "installationToken")));
+    store.apps.withSecret(token, (app) => context.apps.secret(app, "installationToken"));
 
   /** An App itself, by the JWT it signed with its private key. */
   const asApp = async (c: Context): Promise<GitHubAppRecord> => {

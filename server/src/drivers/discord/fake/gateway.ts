@@ -1,6 +1,5 @@
 import type { DeliveryTransport } from "../../../core/delivery/index.ts";
 import type { DriverContext, SocketPeer, SocketSession } from "../../../core/router/index.ts";
-import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { OpenConnections } from "../../../core/socket/index.ts";
 import { DISCORD_IDS } from "../ids.ts";
 
@@ -119,9 +118,8 @@ export interface Gateways {
 
 /** What the Gateway needs of the world: the apps and their tokens, and what a new session is sent. */
 export interface GatewayWorld {
-  /** The names of the apps whose bots may identify. */
-  apps(): readonly string[];
-  botToken(app: string): string;
+  /** The name of the app whose bot token this is, if any: its bot may identify. */
+  appWithToken(token: string): string | undefined;
   /** The privileged intents the app has switched on. */
   privilegedIntents(app: string): readonly string[];
   /** READY's `d`, for a new session of this app's bot. */
@@ -172,9 +170,7 @@ export function createGateways(context: DriverContext, world: GatewayWorld): Gat
 
   /** The app a token is the bot token of, compared in constant time. */
   const appWithToken = (token: unknown): string | undefined =>
-    typeof token === "string"
-      ? world.apps().find((app) => constantTimeEqual(token.replace(/^Bot /, ""), world.botToken(app)))
-      : undefined;
+    typeof token === "string" ? world.appWithToken(token.replace(/^Bot /, "")) : undefined;
 
   const send = (session: GatewaySession, payload: Record<string, unknown>) =>
     session.peer?.send(JSON.stringify(payload));

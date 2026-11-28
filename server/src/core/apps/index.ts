@@ -1,6 +1,7 @@
 import { ProtocolError } from "../errors/index.ts";
 import type { NamedIds } from "../ids/index.ts";
 import type { Collection, Registry } from "../registry/index.ts";
+import { constantTimeEqual } from "../signing/hmac.ts";
 
 /**
  * A channel's apps (decision 0027): the built-in `my-agent` and the ones tests make by name.
@@ -42,6 +43,14 @@ interface Named {
   readonly name: string;
 }
 
+/** How a channel speaks of its apps. */
+interface RosterOptions<App> {
+  /** The platform's word for an app in a message: GitHub's `App`, Notion's `integration`. Default `app`. */
+  readonly noun?: string;
+  /** The ids a handle or a call may name an app by, its handle's id first (`A…`, its bot user's `U…`). Default none. */
+  readonly refs?: (app: App) => readonly string[];
+}
+
 /** Who asks for an app with `createApp`: a session, and the names of its people, which the app may not take. */
 interface Asker {
   readonly session: string;
@@ -60,11 +69,15 @@ export class AppRoster<App extends Named> {
   readonly #apps = new Map<string, { app: App; settings: string }>();
   #builtIn: App | undefined;
   readonly #channel: string;
+  readonly #noun: string;
+  readonly #refs: (app: App) => readonly string[];
   /** The names of the apps each session used beside the built-in one, in the order it first did. */
   readonly #used: Collection<string>;
 
-  constructor(channel: string, registry: Registry) {
+  constructor(channel: string, registry: Registry, options: RosterOptions<App> = {}) {
     this.#channel = channel;
+    this.#noun = options.noun ?? "app";
+    this.#refs = options.refs ?? (() => []);
     this.#used = registry.collection<string>(channel, "app in use");
   }
 
@@ -138,6 +151,61 @@ export class AppRoster<App extends Named> {
   checkPerson(session: string, ...names: string[]): void {
     const apps = this.of(session).map((app) => app.name);
     for (const name of names) checkNameFree(name, apps, "person");
+  }
+
+  /** The app one of whose ids (`refs`) this is, in the whole world: ids are the platform's, and name one app. */
+  byId(id: string): App | undefined {
+    return this.all().find((app) => this.#refs(app).includes(id));
+  }
+
+  /** The app a handle's id or a name stands for. */
+  find(ref: string): App | undefined {
+    return this.byId(ref) ?? this.named(ref);
+  }
+
+  /** The app a session's handle (its id) or a name stands for: one of the apps that session used, or `not_found`. */
+  get(session: string, ref: string): App {
+    const app = this.byId(ref) ?? this.namedIn(session, ref);
+    if (!app || !this.of(session).includes(app)) {
+      throw new ProtocolError("not_found", `There is no ${this.#channel} ${this.#noun} "${ref}"`, { app: ref });
+    }
+    return app;
+  }
+
+  /**
+   * The app a test acts as (a scripted app), by its handle's id or its name: one its session got
+   * from `createApp`, never the built-in one, which the agent under test acts as. What else the
+   * platform refuses (an app that isn't installed, isn't a member) is the driver's to check.
+   */
+  scripted(session: string, ref: string): App {
+    const app = this.get(session, ref);
+    if (app === this.builtIn) {
+      throw new ProtocolError(
+        "invalid_argument",
+        `${app.name} is the built-in ${this.#noun}, which the agent under test acts as: script another ${this.#noun}`,
+        { app: this.#refs(app)[0] ?? app.name },
+      );
+    }
+    return app;
+  }
+
+  /** The app `channelstack env --app` prints: the built-in one, or the one named, made by `make` if no test has yet. */
+  forEnv(name: string | undefined, make: (name: string) => App): App {
+    return name === undefined ? this.builtIn : (this.named(name) ?? make(name));
+  }
+
+  /** How core knows an app (its secrets, its endpoint): `my-agent` for the built-in one, whatever the platform calls it. */
+  keyOf(app: App): string {
+    return app === this.#builtIn ? BUILT_IN_APP : app.name;
+  }
+
+  /**
+   * The app a call's credential belongs to (a token, a key, a client id), compared in constant
+   * time with each app's: `secret` is that credential of the app core knows by the name it is given.
+   */
+  withSecret(given: unknown, secret: (app: string) => string): App | undefined {
+    if (typeof given !== "string" || given === "") return undefined;
+    return this.all().find((app) => constantTimeEqual(given, secret(this.keyOf(app))));
   }
 
   /** The built-in app first, then the others in the order they were made. */

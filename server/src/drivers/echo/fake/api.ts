@@ -4,7 +4,6 @@ import { z } from "zod";
 import { bearerFrom } from "../../../core/auth/index.ts";
 import { type RestAnswer, restApi } from "../../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import type { EchoApp, EchoRoom } from "../world.ts";
 import type { EchoStore } from "./store.ts";
 import type { FakeEchoWorld } from "./world.ts";
@@ -33,9 +32,7 @@ export function createEchoApi(context: DriverContext, store: EchoStore, world: F
   /** The app whose token a request carries: each app's token answers as that app (decision 0027). */
   const callerOf = (authorization: string | undefined): EchoApp | undefined => {
     const token = bearerFrom(authorization);
-    return token === undefined
-      ? undefined
-      : store.apps.all().find((app) => constantTimeEqual(token, context.apps.secret(store.keyOf(app), "appToken")));
+    return store.apps.withSecret(token, (app) => context.apps.secret(app, "appToken"));
   };
   /** What the platform refuses: a room that doesn't exist, or one the app isn't a member of. */
   const refusal = (room: EchoRoom | undefined, id: string, app: EchoApp): Outcome | undefined => {

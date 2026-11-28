@@ -329,7 +329,7 @@ export function registerEmailRoutes<Email extends EmailRecord, App extends Email
     live: APPS_ARE_FAKE,
     stability,
     handler: async ({ session, params, body }) => {
-      const app = store.scripted(params.app);
+      const app = store.apps.scripted(session.id, params.app);
       const email = await spec.apps.send(session.id, app, { ...message(session.id, body), headers: body.headers });
       return emailWire(session.id, email);
     },
@@ -361,7 +361,7 @@ export function registerEmailRoutes<Email extends EmailRecord, App extends Email
       if (body.text === undefined && body.html === undefined) {
         throw new ProtocolError("invalid_argument", "A reply needs `text` or `html`");
       }
-      const app = store.scripted(params.app);
+      const app = store.apps.scripted(session.id, params.app);
       const email = await spec.apps.reply(session.id, app, emailOf(session.id, body.email), {
         text: body.text,
         html: body.html,
@@ -517,8 +517,7 @@ export function registerEmailRoutes<Email extends EmailRecord, App extends Email
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, params, query }) => {
-      const app = store.appOf(query.app);
-      if (!app) throw new ProtocolError("not_found", `There is no ${channel} app "${query.app}"`, { app: query.app });
+      const app = store.apps.get(session.id, query.app);
       return spec.delivery.wireFor(session.id, emailOf(session.id, params.email), app.name) ?? null;
     },
   });

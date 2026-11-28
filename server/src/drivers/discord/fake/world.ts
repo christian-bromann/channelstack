@@ -1,6 +1,5 @@
-import { BUILT_IN_APP } from "../../../core/apps/index.ts";
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
-import { deliveryKit } from "../../../core/delivery/kit.ts";
+import { deliveryKit, deliveryTo, type SentDelivery } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import { richTextPieces } from "../../../core/rich-text/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
@@ -126,6 +125,8 @@ export interface FakeDiscordWorld extends DiscordWorld {
   apps(): DiscordAppRecord[];
   /** The app whose application or bot user this is. */
   appOf(id: string): DiscordAppRecord | undefined;
+  /** The app a session's handle or a name stands for: one of the apps it used (decision 0027). */
+  appIn(session: string, ref: string): DiscordAppRecord;
   /** Make an app by name, or return the one made with the same settings (decision 0027). */
   createApp(
     session: string | undefined,
@@ -161,15 +162,6 @@ export interface FakeDiscordWorld extends DiscordWorld {
 const mentionsIn = (content: string): string[] => [
   ...new Set([...content.matchAll(/<@!?(\d{17,20})>/g)].map((match) => match[1] as string)),
 ];
-
-/** A delivery an event caused, and the app it went to. */
-interface Sent {
-  readonly app: string;
-  readonly id: string;
-}
-
-/** The built-in app's delivery among those an event caused: what an action's delivery is. */
-const builtInDelivery = (sent: readonly Sent[]): string | undefined => sent.find((one) => one.app === BUILT_IN_APP)?.id;
 
 export function createFakeWorld(
   context: DriverContext,
@@ -317,7 +309,7 @@ export function createFakeWorld(
     payloadFor: (reader: DiscordAppRecord) => unknown,
     intent: Intent | undefined,
     sees: (reader: DiscordAppRecord) => boolean = (reader) => botSees(channel, reader),
-  ): Sent[] =>
+  ): SentDelivery[] =>
     store.apps.all().flatMap((reader) => {
       if (!sees(reader)) return [];
       const id = dispatchTo(reader, sessionOf(channel.id), type, payloadFor(reader), intent);
@@ -364,8 +356,8 @@ export function createFakeWorld(
     const session = sessionOf(channel.id);
     const writer = store.appOf(message.authorId);
     if (session !== undefined) {
-      context.loops.wrote(session, channel.id, writer ? { kind: "app", name: writer.name } : { kind: "person" });
-      if (writer && !context.loops.allows(session, channel.id)) return;
+      if (!context.loops.wrote(session, channel.id, writer ? { kind: "app", name: writer.name } : { kind: "person" }))
+        return;
     }
     const sent = broadcast(
       channel,
@@ -507,7 +499,7 @@ export function createFakeWorld(
       }),
       channel.kind === "dm" ? "DIRECT_MESSAGE_REACTIONS" : "GUILD_MESSAGE_REACTIONS",
     );
-    return builtInDelivery(sent);
+    return deliveryTo(sent)?.id;
   };
 
   const threadAs: FakeDiscordWorld["threadAs"] = (owner, parent, name, starter) => {
@@ -617,20 +609,6 @@ export function createFakeWorld(
     return message;
   };
 
-  /** An app a test made and acts as: never the built-in one, which the agent under test acts as. */
-  const scripted = (id: string): DiscordAppRecord => {
-    const found = store.appOf(id) ?? store.apps.named(id);
-    if (!found) throw new ProtocolError("not_found", `There is no Discord app "${id}"`, { app: id });
-    if (found === app()) {
-      throw new ProtocolError(
-        "invalid_argument",
-        `${found.name} is the built-in app, which the agent under test acts as: script another app`,
-        { app: found.id },
-      );
-    }
-    return found;
-  };
-
   /** A bot writes where it sees the channel and may send there, as Discord refuses its own call (50001, 50013). */
   const botWrites = (
     session: string,
@@ -703,6 +681,7 @@ export function createFakeWorld(
     mentionText,
     apps: () => store.apps.all(),
     appOf: (id) => store.appOf(id),
+    appIn: (session, ref) => store.apps.get(session, ref),
 
     createApp(session, options) {
       const privilegedIntents = [...(options.privilegedIntents ?? defaults.privilegedIntents)];
@@ -729,7 +708,7 @@ export function createFakeWorld(
     },
 
     sayAsApp(session, name, input, where) {
-      const by = scripted(name);
+      const by = store.apps.scripted(session, name);
       if ("channel" in where) return botWrites(session, by, store.channels.get(session, where.channel), input);
       const [other, ...more] = where.to;
       if (other === undefined || more.length > 0) {
@@ -741,13 +720,13 @@ export function createFakeWorld(
     },
 
     replyAsApp(session, name, input, to) {
-      const by = scripted(name);
+      const by = store.apps.scripted(session, name);
       const message = findMessage(session, to);
       return botWrites(session, by, store.channels.get(session, to.channel), input, message.id);
     },
 
     reactAsApp(session, name, emoji, ref, direction) {
-      const by = scripted(name);
+      const by = store.apps.scripted(session, name);
       const message = findMessage(session, ref);
       const channel = store.channels.get(session, ref.channel);
       requireBot(by, channel, "READ_MESSAGE_HISTORY");
@@ -907,9 +886,7 @@ export function createFakeWorld(
     },
 
     runCommand(session, user, command, channel, appId) {
-      const only = appId === undefined ? undefined : (store.appOf(appId) ?? store.apps.named(appId));
-      if (appId !== undefined && !only)
-        throw new ProtocolError("not_found", `There is no Discord app "${appId}"`, { app: appId });
+      const only = appId === undefined ? undefined : store.apps.get(session, appId);
       return interactions.command(session, user, command, visibleTo(session, user, channel), only);
     },
 

@@ -225,8 +225,8 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
       const writer = store.appOfBot(actor);
       const thread = `${repo.id}#${issue.number}`;
       if (session !== undefined) {
-        context.loops.wrote(session, thread, writer ? { kind: "app", name: writer.slug } : { kind: "person" });
-        if (writer && !context.loops.allows(session, thread)) return comment;
+        if (!context.loops.wrote(session, thread, writer ? { kind: "app", name: writer.slug } : { kind: "person" }))
+          return comment;
       }
       comment.delivery = kit.emit(repo, "issue_comment", actor, {
         action: "created",

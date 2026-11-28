@@ -67,7 +67,7 @@ export class SlackStore {
   readonly apps: AppRoster<SlackAppRecord>;
 
   constructor(registry: Registry) {
-    this.apps = new AppRoster("Slack", registry);
+    this.apps = new AppRoster<SlackAppRecord>("Slack", registry, { refs: (app) => [app.id, app.botUserId, app.botId] });
     this.users = registry.collection<SlackUserRecord>("slack", "user");
     this.conversations = registry.collection<SlackConversationRecord>("slack", "conversation");
   }
@@ -84,7 +84,7 @@ export class SlackStore {
 
   /** The app whose bot user, app id or bot id this is, if any. */
   appOf(id: string): SlackAppRecord | undefined {
-    return this.apps.all().find((app) => app.botUserId === id || app.id === id || app.botId === id);
+    return this.apps.byId(id);
   }
 
   /** Every app's bot user id: who writes as an app. */

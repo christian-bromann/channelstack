@@ -738,8 +738,8 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     const page = store.page(discussion.page);
     // The loop guard counts what integrations write in a discussion where no person writes in between (decision 0027).
     const writer = store.integration(actor);
-    context.loops.wrote(session, discussion.id, writer ? { kind: "app", name: writer.name } : { kind: "person" });
-    if (writer && !context.loops.allows(session, discussion.id)) return comment;
+    if (!context.loops.wrote(session, discussion.id, writer ? { kind: "app", name: writer.name } : { kind: "person" }))
+      return comment;
     comment.delivery = emit(session, page, "comment.created", (eventId, payloads) =>
       payloads.commentCreated(eventId, now, [author(actor)], {
         id: comment.id,
@@ -830,20 +830,6 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
 
   // --- Integrations (decision 0027) -----------------------------------------------------------
 
-  /** An integration a test made and acts as: never the built-in one, which the agent under test acts as. */
-  const scripted = (id: string): NotionBotRecord => {
-    const app = store.integration(id) ?? store.apps.named(id);
-    if (!app) throw new ProtocolError("not_found", `There is no Notion integration "${id}"`, { app: id });
-    if (app === store.bot) {
-      throw new ProtocolError(
-        "invalid_argument",
-        `${app.name} is the built-in integration, which the agent under test acts as: script another integration`,
-        { app: app.id },
-      );
-    }
-    return app;
-  };
-
   const integrations = {
     /** The workspace's integrations, the built-in one first. */
     apps: () => store.apps.all(),
@@ -885,7 +871,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
 
     /** An integration a test made starts a discussion, as its own `comments.create` would. */
     commentAsApp(session: string, name: string, page: NotionPageRecord, rich: RichTextItem[], anchor?: TextPattern) {
-      const app = scripted(name);
+      const app = store.apps.scripted(session, name);
       requireCapability(app, "insert_comments");
       visiblePage(page.id, app.id);
       checkMentions(rich, app.id);
@@ -894,7 +880,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
 
     /** An integration a test made replies in a discussion, as `comments.create` with `discussion_id` would. */
     replyAsApp(session: string, name: string, discussion: NotionDiscussionRecord, rich: RichTextItem[]) {
-      const app = scripted(name);
+      const app = store.apps.scripted(session, name);
       requireCapability(app, "insert_comments");
       if (!accessible(discussion.page, app.id)) throw unseen("discussion", discussion.id);
       checkMentions(rich, app.id);
@@ -908,7 +894,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       page: NotionPageRecord,
       change: { append?: string | unknown[] | undefined; replace?: string | unknown[] | undefined },
     ) {
-      const app = scripted(name);
+      const app = store.apps.scripted(session, name);
       requireCapability(app, "insert_content");
       if (change.replace !== undefined) requireCapability(app, "update_content");
       visiblePage(page.id, app.id);
@@ -917,7 +903,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
 
     /** An integration a test made renames a page, as its own `pages.update` would. */
     renameAsApp(session: string, name: string, page: NotionPageRecord, title: string) {
-      const app = scripted(name);
+      const app = store.apps.scripted(session, name);
       requireCapability(app, "update_content");
       visiblePage(page.id, app.id);
       return rename(session, page, title, app.id);
