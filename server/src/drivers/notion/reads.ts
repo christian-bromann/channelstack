@@ -1,12 +1,13 @@
 import { ProtocolError } from "../../core/errors/index.ts";
 import { richTextPieces } from "../../core/rich-text/index.ts";
+import { matchesText, patternName, type TextPattern } from "../../core/router/inspect.ts";
 import type { NotionStore } from "./fake/store.ts";
 import { blockToMarkdown } from "./markdown.ts";
 import { plainText, type RichTextItem, textItem, userMention } from "./rich-text.ts";
 import type { NotionBlockRecord, NotionDiscussionRecord, NotionPageRecord } from "./world.ts";
 
 /** Text to find in a page: a string it contains, or a pattern. */
-export type TextPattern = string | { source: string; flags: string };
+export type { TextPattern };
 
 /**
  * Reading a Notion workspace's records, written once for both worlds: the fake's own store, and
@@ -75,21 +76,9 @@ export function notionReads(
 
   /** The block of a page whose text has this in it: where a comment is anchored, or a mention goes. */
   const blockWith = (page: NotionPageRecord, text: TextPattern): NotionBlockRecord => {
-    let has: (block: string) => boolean;
-    if (typeof text === "string") has = (block) => block.includes(text);
-    else {
-      let pattern: RegExp;
-      try {
-        // `g` and `y` make a pattern remember where it stopped; finding a block needs neither.
-        pattern = new RegExp(text.source, text.flags.replace(/[gy]/g, ""));
-      } catch {
-        throw new ProtocolError("invalid_argument", `/${text.source}/${text.flags} is not a pattern`);
-      }
-      has = (block) => pattern.test(block);
-    }
+    const has = matchesText(text);
     const found = allBlocks(page).find((block) => has(blockText(block)));
-    const named = typeof text === "string" ? `"${text}"` : `/${text.source}/${text.flags}`;
-    if (!found) throw new ProtocolError("not_found", `"${titleOf(page)}" has no block with ${named} in it`);
+    if (!found) throw new ProtocolError("not_found", `"${titleOf(page)}" has no block with ${patternName(text)} in it`);
     return found;
   };
 

@@ -9,6 +9,8 @@ import {
   ChannelstackError,
   connect,
   onRefusal,
+  PROVIDER_NAMES,
+  type ProviderKind,
   type Session,
   setFilesRoot,
   setWaitDefaults,
@@ -81,7 +83,7 @@ function channelFixture(open: (session: Session) => Promise<unknown>) {
  * them (`ana: async ({ slack }, use) => …`). They are automatic: every test has its session,
  * opened before its hooks run and closed after them, whether it names a fixture or not.
  */
-type Fixtures = Pick<TestContext, "channelstack" | ChannelKind> & {
+type Fixtures = Pick<TestContext, "channelstack" | ChannelKind | ProviderKind> & {
   channelstackSession: Session;
 };
 const auto = { auto: true } as const;
@@ -113,14 +115,25 @@ async function failOnLoops(session: Session): Promise<void> {
       // A fixture path in a test (`files: "./fixtures/web"`) starts from the test file, like an import.
       setFilesRoot(dirname(task.file.filepath));
       skips.set(session.sessionId, skip);
+      let problems: readonly string[] = [];
       try {
         await use(session);
         await failOnLoops(session);
       } finally {
         skips.delete(session.sessionId);
+        // What went wrong with the model fails the test even if it asserted nothing about it
+        // (decision 0029): read before the session, and its record, are gone.
+        problems = await session
+          .quiet()
+          .then((state) => state.problems)
+          .catch(() => []);
         // Closing the session removes everything the test created. Disposing never fails a test.
         await session[Symbol.asyncDispose]();
       }
+      if (problems.length > 0)
+        throw new Error(
+          `The model calls of this test went wrong:\n${problems.map((problem) => `  ${problem}`).join("\n")}`,
+        );
     },
     auto,
   ],
@@ -129,6 +142,7 @@ async function failOnLoops(session: Session): Promise<void> {
       const channelstack = await connected();
       await use({
         url: server.url,
+        sessionId: session.sessionId,
         env: () => channelstack.env(),
         quiet: (options = {}) => untilQuiet(() => session.quiet(), options),
         reset: () => channelstack.reset(),
@@ -136,8 +150,10 @@ async function failOnLoops(session: Session): Promise<void> {
     },
     auto,
   ],
-  // One fixture per channel, by its name: `slack` opens `session.slack()`.
-  ...Object.fromEntries(CHANNEL_NAMES.map((name) => [name, [channelFixture((session) => session[name]()), auto]])),
+  // One fixture per channel, by its name: `slack` opens `session.slack()`; and one per provider (`openai`).
+  ...Object.fromEntries(
+    [...CHANNEL_NAMES, ...PROVIDER_NAMES].map((name) => [name, [channelFixture((session) => session[name]()), auto]]),
+  ),
 });
 
 expect.extend(

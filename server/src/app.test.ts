@@ -354,7 +354,12 @@ describe("the UI", () => {
     const as = (method: string, path: string) =>
       h.app.fetch(new Request(`http://127.0.0.1:4500/_channelstack${path}`, { method, headers: { cookie } }));
 
-    for (const path of ["/status", `/sessions/${sessionId}/events`, `/sessions/${sessionId}/places`]) {
+    for (const path of [
+      "/status",
+      `/sessions/${sessionId}/events`,
+      `/sessions/${sessionId}/places`,
+      `/sessions/${sessionId}/openai/calls`,
+    ]) {
       expect((await as("GET", path)).status, path).toBe(200);
     }
     // What the browser reads is scrubbed: a token someone pasted into a message doesn't show in the UI.
@@ -383,6 +388,10 @@ describe("the UI", () => {
       ["GET", `/sessions/${sessionId}/github/issues`],
       ["GET", `/sessions/${sessionId}/github/users`],
       ["GET", `/sessions/${sessionId}/slack/conversations`],
+      // The fake model's fixture and scripts: only its calls are the UI's to read.
+      ["GET", `/sessions/${sessionId}/openai`],
+      ["GET", `/sessions/${sessionId}/openai/sent-secrets`],
+      ["POST", `/sessions/${sessionId}/openai/scripts`],
       ["GET", transcript],
       ["POST", "/sessions"],
       ["POST", "/reset"],

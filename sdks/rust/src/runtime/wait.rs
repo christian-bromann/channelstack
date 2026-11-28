@@ -87,6 +87,43 @@ pub fn text_matches(text: &str, expected: &Value) -> bool {
     }
 }
 
+// The rules the spec publishes (`x-channelstack-text-normalisation`), generated with the SDK.
+include!("../generated/normalisation.rs");
+
+/// Text as the server compares it for attribution, by the rules the spec publishes
+/// (`generated/normalisation.rs`): what `to_have_sent` compares.
+pub fn normalised_text(text: &str) -> String {
+    static RULES: std::sync::OnceLock<Vec<(regex::Regex, String)>> = std::sync::OnceLock::new();
+    let rules = RULES.get_or_init(|| {
+        // `$1` in a rule's replacement is its pattern's first group; Rust writes it `${1}`.
+        let group = regex::Regex::new(r"\$(\d)").expect("a pattern");
+        NORMALISATION_RULES
+            .iter()
+            .map(|(pattern, replacement)| {
+                let regex = regex::Regex::new(pattern).expect("the generated rules compile");
+                (
+                    regex,
+                    group.replace_all(replacement, "$${${1}}").into_owned(),
+                )
+            })
+            .collect()
+    });
+    let mut normalised = text.to_owned();
+    for (pattern, replacement) in rules {
+        normalised = pattern
+            .replace_all(&normalised, replacement.as_str())
+            .into_owned();
+    }
+    if COLLAPSE_WHITESPACE {
+        normalised = normalised.split_whitespace().collect::<Vec<_>>().join(" ");
+    }
+    if LOWERCASE {
+        normalised.to_lowercase()
+    } else {
+        normalised
+    }
+}
+
 /// A `Regex` as it goes on the wire (`{ "source": …, "flags": "im" }`), as Python's `pattern_on_wire`
 /// sends one: the server's patterns are JavaScript's, which have no inline flags, so a leading flag
 /// group (`(?i)`, `(?ms)`) moves into `flags`. Any other group stays in the source.
@@ -162,8 +199,22 @@ pub struct QuietState {
     pub busy: bool,
     pub quiet_for_ms: f64,
     pub open: Vec<String>,
+    /// What should fail a test at once: a model call no script answered (decision 0029).
+    pub problems: Vec<String>,
     /// The bot loops the fake stopped in the session (decision 0027), in words.
     pub loops: Vec<String>,
+}
+
+/// The session's model problems as the error a wait stops with.
+pub fn model_problems(problems: &[String]) -> Error {
+    let lines: Vec<String> = problems
+        .iter()
+        .map(|problem| format!("  {problem}"))
+        .collect();
+    Error::Expectation(format!(
+        "The model calls of this test went wrong:\n{}",
+        lines.join("\n")
+    ))
 }
 
 impl QuietState {
@@ -175,6 +226,7 @@ impl QuietState {
                 .and_then(Value::as_f64)
                 .unwrap_or(0.0),
             open: words(state, "open"),
+            problems: words(state, "problems"),
             loops: words(state, "loops"),
         }
     }
@@ -221,6 +273,9 @@ where
             async move {
                 let state = state.await?;
                 *still_open.lock().expect("what is still open") = state.open.clone();
+                if !state.problems.is_empty() {
+                    return Err(model_problems(&state.problems));
+                }
                 if watching && started.elapsed().as_secs_f64() * 1000.0 < quiet_for_ms {
                     return Ok(None);
                 }
@@ -336,8 +391,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{check_text, pattern_on_wire, text_matches};
-    use serde_json::json;
+    use super::{check_text, normalised_text, pattern_on_wire, text_matches};
+    use serde_json::{Value, json};
+
+    #[test]
+    fn the_generated_rules_normalise_text_as_the_server_does() {
+        // The server's own cases (`server/src/core/attribution/attribution.test.ts` reads the same file).
+        let table: Value =
+            serde_json::from_str(include_str!("../../../../test/text-normalisation.json")).unwrap();
+        let cases = table["cases"].as_array().unwrap();
+        assert!(!cases.is_empty());
+        for case in cases {
+            let text = case["text"].as_str().unwrap();
+            assert_eq!(normalised_text(text), case["normalised"], "{text:?}");
+        }
+    }
 
     #[test]
     fn a_regex_goes_on_the_wire_with_its_inline_flags_as_flags() {
@@ -436,6 +504,7 @@ mod tests {
                 busy: true,
                 quiet_for_ms: 0.0,
                 open: vec!["a stream my-agent never stopped".into()],
+                problems: vec![],
                 loops: vec![],
             })
         };
@@ -456,6 +525,7 @@ mod tests {
                 busy: false,
                 quiet_for_ms: 60_000.0,
                 open: vec![],
+                problems: vec![],
                 loops: vec![],
             })
         };

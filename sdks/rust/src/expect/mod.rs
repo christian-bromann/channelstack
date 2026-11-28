@@ -33,8 +33,8 @@ use crate::runtime::client::{BoxFuture, IntoArg};
 use crate::runtime::duration::parse_duration;
 use crate::runtime::error::{Error, Result};
 use crate::runtime::wait::{
-    DEFAULT_QUIET_FOR, DEFAULT_TIMEOUT, check_text, from_matches, text_matches, until_quiet,
-    wait_for,
+    DEFAULT_QUIET_FOR, DEFAULT_TIMEOUT, check_text, from_matches, model_problems, normalised_text,
+    text_matches, until_quiet, wait_for,
 };
 
 pub mod subjects;
@@ -315,45 +315,151 @@ where
     H: Fn(&T) -> bool,
     D: Fn(&T) -> String,
 {
-    let timeout = options.or("timeout", DEFAULT_TIMEOUT);
-    let value = if once_quiet || negate {
-        // The check watches for the whole quiet window: what arrives while it looks counts.
-        let quiet_for = options.or("quietFor", DEFAULT_QUIET_FOR);
-        until_quiet(|| subject.quiet(), &timeout, &quiet_for, true).await?;
-        read().await?
-    } else {
-        let last = Mutex::new(None);
-        let held = wait_for("the condition", &timeout, || {
-            let attempt = read();
-            let (last, holds) = (&last, &holds);
-            async move {
-                let value = attempt.await?;
-                if holds(&value) {
-                    return Ok(Some(value));
+    let checked = async {
+        let timeout = options.or("timeout", DEFAULT_TIMEOUT);
+        let value = if once_quiet || negate {
+            // The check watches for the whole quiet window: what arrives while it looks counts.
+            let quiet_for = options.or("quietFor", DEFAULT_QUIET_FOR);
+            until_quiet(|| subject.quiet(), &timeout, &quiet_for, true).await?;
+            read().await?
+        } else {
+            let last = Mutex::new(None);
+            let polls = std::sync::atomic::AtomicUsize::new(0);
+            let held = wait_for("the condition", &timeout, || {
+                let attempt = read();
+                let (last, holds, polls) = (&last, &holds, &polls);
+                async move {
+                    let value = attempt.await?;
+                    if holds(&value) {
+                        return Ok(Some(value));
+                    }
+                    *last.lock().expect("the last value read") = Some(value);
+                    // A model call no script answered won't be answered by waiting: fail now, with why.
+                    if polls.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 5 == 4 {
+                        fail_on_problems(subject).await?;
+                    }
+                    Ok(None)
                 }
-                *last.lock().expect("the last value read") = Some(value);
-                Ok(None)
+            })
+            .await;
+            match held {
+                Ok(value) => value,
+                Err(Error::Timeout { .. }) => {
+                    fail_on_problems(subject).await?;
+                    last.into_inner()
+                        .expect("the last value read")
+                        .expect("a wait reads at least once")
+                }
+                Err(error) => return Err(error),
             }
-        })
-        .await;
-        match held {
-            Ok(value) => value,
-            Err(Error::Timeout { .. }) => last
-                .into_inner()
-                .expect("the last value read")
-                .expect("a wait reads at least once"),
-            Err(error) => return Err(error),
+        };
+        if holds(&value) != negate {
+            return Ok(());
         }
+        // A failed check also says what the agent left open (a stream it never stopped) and the bot
+        // loops the fake stopped: often that is the bug.
+        let leftover = leftover(subject).await?;
+        Err(Error::Expectation(format!(
+            "{}{leftover}",
+            describe(&value)
+        )))
     };
-    if holds(&value) != negate {
-        return Ok(());
+    match checked.await {
+        // A failed check also says what the session's model calls tell about it.
+        Err(Error::Expectation(message)) => {
+            let notes = model_notes_of(subject).await?;
+            Err(Error::Expectation(
+                std::iter::once(message)
+                    .chain(notes)
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ))
+        }
+        other => other,
     }
-    // A failed check also says what the agent left open (a stream it never stopped): often that is the bug.
-    let leftover = leftover(subject).await?;
-    Err(Error::Expectation(format!(
-        "{}{leftover}",
-        describe(&value)
-    )))
+}
+
+/// How recent a model call no session claimed must be for a failing check to name it (design §8.4).
+const UNATTRIBUTED_WITHIN_MS: u64 = 10_000;
+
+/// What the session's model calls add to a failing check's message. Nothing outside a session, or
+/// where the server can't tell (live).
+async fn model_notes_of<S: Subject + ?Sized>(subject: &S) -> Result<Vec<String>> {
+    match subject.model_reads(UNATTRIBUTED_WITHIN_MS).await {
+        Ok((unattributed, calls)) => Ok(model_notes(&items(unattributed), &items(calls))),
+        Err(Error::Api { .. } | Error::Invalid(_)) => Ok(vec![]),
+        Err(error) => Err(error),
+    }
+}
+
+/// The lines of `model_notes_of`, from what the server answered: the recent calls no session
+/// claimed, and the calls given to this session only by order, between sessions that sent the same text.
+fn model_notes(unattributed: &[Value], calls: &[Value]) -> Vec<String> {
+    let mut notes = vec![];
+    if !unattributed.is_empty() {
+        let count = match unattributed.len() {
+            1 => "1 model call".to_owned(),
+            n => format!("{n} model calls"),
+        };
+        let lines = unattributed.iter().map(|call| {
+            let said = match call["lastUserText"].as_str() {
+                Some(user) => Value::from(excerpt(user)).to_string(),
+                None => "no user message".to_owned(),
+            };
+            let ago = (call["sinceMs"].as_f64().unwrap_or(0.0) / 1000.0).round();
+            format!(
+                "{} ({said}, {ago}s ago): {}",
+                text_of(call, "id"),
+                text_of(call, "message")
+            )
+        });
+        notes.push(format!(
+            "{count} in the last {}s couldn't be attributed to a test:\n{}",
+            UNATTRIBUTED_WITHIN_MS / 1000,
+            listing(lines)
+        ));
+    }
+    // One line per text the sessions shared, naming every call it decided.
+    let mut tied: Vec<(String, Vec<String>, Vec<String>)> = vec![];
+    for call in calls {
+        let context = &call["request"]["context"];
+        let with: Vec<String> = items(context["tiedWith"].clone())
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect();
+        if context["attributedBy"] != "order" || with.is_empty() {
+            continue;
+        }
+        let text = text_of(context, "matched").to_owned();
+        let id = text_of(call, "id").to_owned();
+        match tied.iter_mut().find(|(shared, _, _)| *shared == text) {
+            Some((_, ids, _)) => ids.push(id),
+            None => tied.push((text, vec![id], with)),
+        }
+    }
+    for (text, ids, with) in tied {
+        let which = match ids.as_slice() {
+            [one] => format!("Model call {one} was"),
+            _ => format!("Model calls {} were", ids.join(", ")),
+        };
+        notes.push(format!(
+            "{which} attributed by order, between {} sessions that all sent {} (this one and {}): each went to the oldest unanswered message. Give each test's prompt something of its own, or have the agent send `user`.",
+            with.len() + 1,
+            Value::from(excerpt(&text)),
+            with.join(", ")
+        ));
+    }
+    notes
+}
+
+/// Fail with the session's model problems, if it has any. Nothing where the server can't tell.
+async fn fail_on_problems<S: Subject + ?Sized>(subject: &S) -> Result<()> {
+    match subject.quiet().await {
+        Ok(state) if !state.problems.is_empty() => Err(model_problems(&state.problems)),
+        Ok(_) | Err(Error::Api { .. }) => Ok(()),
+        Err(error) => Err(error),
+    }
 }
 
 /// What the agent has left open in the subject's session, and the bot loops the fake stopped there
@@ -373,6 +479,14 @@ async fn leftover<S: Subject + ?Sized>(subject: &S) -> Result<String> {
         words += &format!("\nStopped: {}", state.loops.join("; "));
     }
     Ok(words)
+}
+
+/// A channel's call has an operation; a model call has its endpoint (`chat.completions`).
+fn operation_of(call: &Value) -> &str {
+    match text_of(call, "operation") {
+        "" => text_of(call, "endpoint"),
+        operation => operation,
+    }
 }
 
 /// The items of a list the server answered.
@@ -1841,7 +1955,7 @@ impl<'a, S: Calls + ?Sized> Expectation<'a, S> {
             let matching = |calls: &[Value]| {
                 calls
                     .iter()
-                    .filter(|call| name_matches(text_of(call, "operation"), &operation))
+                    .filter(|call| name_matches(operation_of(call), &operation))
                     .count()
             };
             settle(
@@ -1868,9 +1982,336 @@ impl<'a, S: Calls + ?Sized> Expectation<'a, S> {
                         show(&operation),
                         matching(calls),
                         listing(calls.iter().map(|call| match text_of(call, "error") {
-                            "" => text_of(call, "operation").to_owned(),
-                            error => format!("{} → {error}", text_of(call, "operation")),
+                            "" => operation_of(call).to_owned(),
+                            error => format!("{} → {error}", operation_of(call)),
                         }))
+                    )
+                },
+            )
+            .await
+        }))
+    }
+}
+
+// --- The model (decision 0029) -------------------------------------------------------------------
+
+check!(
+    /// [`Expectation::to_have_sent`].
+    Sent { ordered("ordered"): bool }
+);
+check!(
+    /// [`Expectation::to_have_sent_secrets`].
+    SentSecrets {}
+);
+check!(
+    /// [`Expectation::to_have_offered_tool`].
+    OfferedTool {}
+);
+check!(
+    /// [`Expectation::to_have_sent_tool_result`].
+    SentToolResult { text("text"): impl IntoArg }
+);
+check!(
+    /// [`Expectation::to_be_aborted`].
+    Aborted {}
+);
+check!(
+    /// [`Expectation::to_have_answered`].
+    Answered counts { times("times"): usize }
+);
+
+/// How many of a script's calls its turn reached the agent in: an answer (text, tool calls, a
+/// refusal) or a scripted error. Not a call the fake refused for the script
+/// (`channelstack_no_script`: a turn the real API can't give, a list that ran out, a responder that
+/// panicked), nor one a responder still holds, nor one the agent hung up on before anything was
+/// sent (status 0 without a scripted error).
+fn answered(script: &Value) -> i64 {
+    let count = items(script["calls"].clone())
+        .iter()
+        .filter(|call| {
+            let response = &call["response"];
+            response["error"] != "channelstack_no_script"
+                && (!response["text"].is_null() || !response["error"].is_null())
+                && (response["status"] != 0 || !response["error"].is_null())
+        })
+        .count();
+    i64::try_from(count).unwrap_or(i64::MAX)
+}
+
+/// Whether a request's text has every wanted piece, in order when asked.
+fn sent_in(text: &str, wanted: &[Value], ordered: bool) -> bool {
+    let haystack = normalised_text(text);
+    let mut from = 0;
+    for piece in wanted {
+        if piece.get("source").is_some() {
+            if !text_matches(text, piece) {
+                return false;
+            }
+            continue;
+        }
+        let needle = normalised_text(piece.as_str().unwrap_or_else(|| text_of(piece, "text")));
+        let start = if ordered { from } else { 0 };
+        let Some(at) = haystack.get(start..).and_then(|rest| rest.find(&needle)) else {
+            return false;
+        };
+        from = start + at + needle.len();
+    }
+    true
+}
+
+/// A request's text, one line, short enough for a failure message.
+fn excerpt(text: &str) -> String {
+    let line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if line.chars().count() > 120 {
+        format!("{}…", line.chars().take(119).collect::<String>())
+    } else {
+        line
+    }
+}
+
+impl<'a, S: ModelCalls + ?Sized> Expectation<'a, S> {
+    /// Subject: the openai fixture, a script, or a call. The agent sent the model this text (a
+    /// string, a pattern, or a list of them: with `ordered`, in that order, as thread history is).
+    pub fn to_have_sent(self, expected: impl IntoArg) -> Sent<'a, false> {
+        self.sent(expected.into_arg())
+    }
+    /// Once the agent is quiet, it sent the model none of it: no text from a channel it shouldn't read.
+    pub fn not_to_have_sent(self, expected: impl IntoArg) -> Sent<'a, true> {
+        self.sent(expected.into_arg())
+    }
+    fn sent<const NOT: bool>(self, expected: Value) -> Sent<'a, NOT> {
+        let subject = self.subject;
+        Sent(Check::new(move |options| async move {
+            let list = matches!(expected, Value::Array(_));
+            let wanted = match &expected {
+                Value::Array(items) => items.clone(),
+                one => vec![one.clone()],
+            };
+            let ordered = options.get("ordered").as_bool().unwrap_or(list);
+            settle(
+                subject,
+                NOT,
+                false,
+                &options,
+                || async {
+                    Ok(items(subject.read_model_calls().await?)
+                        .iter()
+                        .map(|call| text_of(&call["request"], "text").to_owned())
+                        .collect::<Vec<_>>())
+                },
+                |texts| texts.iter().any(|text| sent_in(text, &wanted, ordered)),
+                |texts| {
+                    let shown: Vec<String> = wanted.iter().map(show).collect();
+                    let order = if ordered && wanted.len() > 1 {
+                        " in that order"
+                    } else {
+                        ""
+                    };
+                    let sent = if texts.is_empty() {
+                        "It made no model call.".to_owned()
+                    } else {
+                        format!(
+                            "What it sent, newest first:\n{}",
+                            listing(texts.iter().rev().map(|text| excerpt(text)))
+                        )
+                    };
+                    format!(
+                        "Expected the agent {}to send the model {}{order}. {sent}",
+                        not(NOT),
+                        shown.join(", then ")
+                    )
+                },
+            )
+            .await
+        }))
+    }
+
+    /// Subject: a call (or the fixture, a script). The agent offered the model this tool.
+    pub fn to_have_offered_tool(self, name: &str) -> OfferedTool<'a, false> {
+        let subject = self.subject;
+        let name = name.to_owned();
+        OfferedTool(Check::new(move |options| async move {
+            settle(
+                subject,
+                false,
+                false,
+                &options,
+                || async {
+                    Ok(items(subject.read_model_calls().await?)
+                        .iter()
+                        .flat_map(|call| items(call["request"]["tools"].clone()))
+                        .collect::<Vec<_>>())
+                },
+                |tools| tools.iter().any(|tool| tool_name(tool) == name),
+                |tools| {
+                    let mut offered: Vec<&str> = tools.iter().map(tool_name).collect();
+                    offered.sort_unstable();
+                    offered.dedup();
+                    format!(
+                        "Expected the agent to offer the model the tool {name:?}, it offered {}",
+                        if offered.is_empty() {
+                            "none".to_owned()
+                        } else {
+                            offered.join(", ")
+                        }
+                    )
+                },
+            )
+            .await
+        }))
+    }
+}
+
+/// A tool as a request offered it: a function by its name, a built-in by its type.
+fn tool_name(tool: &Value) -> &str {
+    match text_of(tool, "name") {
+        "" => text_of(tool, "type"),
+        name => name,
+    }
+}
+
+impl<'a, S: SentSecretsRead + ?Sized> Expectation<'a, S> {
+    /// Subject: the openai fixture. A secret channelstack knows was sent to the model (its kind, never its value).
+    pub fn to_have_sent_secrets(self) -> SentSecrets<'a, false> {
+        self.secrets()
+    }
+    /// Once the agent is quiet, no token, signing secret or key reached the model.
+    pub fn not_to_have_sent_secrets(self) -> SentSecrets<'a, true> {
+        self.secrets()
+    }
+    fn secrets<const NOT: bool>(self) -> SentSecrets<'a, NOT> {
+        let subject = self.subject;
+        SentSecrets(Check::new(move |options| async move {
+            settle(
+                subject,
+                NOT,
+                false,
+                &options,
+                || async { Ok(items(subject.read_sent_secrets().await?)) },
+                |sent| !sent.is_empty(),
+                |sent| {
+                    if sent.is_empty() {
+                        return "Expected the agent to send the model a secret, it sent none"
+                            .to_owned();
+                    }
+                    format!(
+                        "Expected the agent not to send the model any secret, it sent:\n{}",
+                        listing(sent.iter().map(|one| {
+                            let kinds: Vec<String> = items(one["kinds"].clone())
+                                .iter()
+                                .filter_map(Value::as_str)
+                                .map(str::to_owned)
+                                .collect();
+                            format!("{}: {}", text_of(one, "call"), kinds.join(", "))
+                        }))
+                    )
+                },
+            )
+            .await
+        }))
+    }
+}
+
+impl<'a, S: ModelToolCalls + ?Sized> Expectation<'a, S> {
+    /// Subject: the openai fixture or a script. The agent ran the model's call to this tool and
+    /// sent back its result (with this `text`, if given).
+    pub fn to_have_sent_tool_result(self, name: &str) -> SentToolResult<'a, false> {
+        let subject = self.subject;
+        let name = name.to_owned();
+        SentToolResult(Check::new(move |options| async move {
+            let text = options.text("text")?;
+            settle(
+                subject,
+                false,
+                false,
+                &options,
+                || async { Ok(items(subject.read_tool_calls(&name).await?)) },
+                |calls| {
+                    calls
+                        .iter()
+                        .any(|call| call.get("result").is_some_and(|result| text_matches(text_of(result, "text"), &text)))
+                },
+                |calls| {
+                    let answered = calls.iter().filter(|call| call.get("result").is_some()).count();
+                    format!(
+                        "Expected the agent to send back a result for {name:?}{}. The model called it {} times; {answered} got a result",
+                        if text.is_null() { String::new() } else { format!(" with {}", show(&text)) },
+                        calls.len()
+                    )
+                },
+            )
+            .await
+        }))
+    }
+}
+
+impl<'a, S: ModelCallRefresh + ?Sized> Expectation<'a, S> {
+    /// Subject: a model call. The agent hung up before the answer was complete: Stop, or its own timeout.
+    pub fn to_be_aborted(self) -> Aborted<'a, false> {
+        let subject = self.subject;
+        Aborted(Check::new(move |options| async move {
+            settle(
+                subject,
+                false,
+                false,
+                &options,
+                || async { Ok(subject.read_call().await?["response"].clone()) },
+                |response| response["aborted"].as_bool().unwrap_or(false),
+                |response| match text_of(response, "end") {
+                    "" => "Expected the model call to be aborted by the agent, it is still going"
+                        .to_owned(),
+                    end => format!(
+                        "Expected the model call to be aborted by the agent, it ended {end}"
+                    ),
+                },
+            )
+            .await
+        }))
+    }
+}
+
+impl<'a, S: ScriptRefresh + ?Sized> Expectation<'a, S> {
+    /// Subject: a script. It answered calls; with `times`, exactly that many, checked once the agent is quiet.
+    pub fn to_have_answered(self) -> Answered<'a, false> {
+        self.answered()
+    }
+    /// Once the agent is quiet, the script answered no call (not that many `times`, if given).
+    pub fn not_to_have_answered(self) -> Answered<'a, true> {
+        self.answered()
+    }
+    fn answered<const NOT: bool>(self) -> Answered<'a, NOT> {
+        let subject = self.subject;
+        Answered(Check::new(move |options| async move {
+            let times = options.number("times");
+            settle(
+                subject,
+                NOT,
+                times.is_some(),
+                &options,
+                || async { subject.read_script().await },
+                |script| {
+                    let count = answered(script);
+                    times.map_or(count > 0, |times| count == times)
+                },
+                |script| {
+                    let wanted = times.map_or_else(
+                        || "a call".to_owned(),
+                        |times| format!("{times} {}", if times == 1 { "call" } else { "calls" }),
+                    );
+                    let problems = items(script["problems"].clone());
+                    let problems = if problems.is_empty() {
+                        String::new()
+                    } else {
+                        format!(
+                            ". Its problems:\n{}",
+                            listing(problems.iter().filter_map(Value::as_str).map(str::to_owned))
+                        )
+                    };
+                    format!(
+                        "Expected script {} {}to answer {wanted}, it answered {}{problems}",
+                        text_of(script, "id"),
+                        not(NOT),
+                        answered(script)
                     )
                 },
             )

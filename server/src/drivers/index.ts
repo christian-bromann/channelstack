@@ -1,6 +1,7 @@
 import type { DevAdapter } from "../core/dev/index.ts";
 import type { DriverDefinition } from "../core/router/index.ts";
 import type { SecretSpec } from "../core/secrets/index.ts";
+import { openai } from "../providers/openai/index.ts";
 import { discord } from "./discord/index.ts";
 import { echo } from "./echo/index.ts";
 import { github } from "./github/index.ts";
@@ -11,10 +12,20 @@ import { resend } from "./resend/index.ts";
 import { slack } from "./slack/index.ts";
 
 /** Every driver in the binary. Core never imports a driver; drivers are handed to it from here. */
-export const DRIVERS: readonly DriverDefinition[] = [echo, slack, github, linear, notion, resend, google, discord];
+export const DRIVERS: readonly DriverDefinition[] = [
+  echo,
+  slack,
+  github,
+  linear,
+  notion,
+  resend,
+  google,
+  discord,
+  openai,
+];
 
-/** The channels people test against: every driver but channelstack's own (`echo`), in this order everywhere. */
-export const CHANNELS: readonly DriverDefinition[] = DRIVERS.filter((driver) => !driver.internal);
+/** The channels people test against: every driver but channelstack's own (`echo`) and the providers, in this order everywhere. */
+export const CHANNELS: readonly DriverDefinition[] = DRIVERS.filter((driver) => !driver.internal && !driver.provider);
 
 /** Each channel's name, for a CLI argument or a script's loop. */
 export const CHANNEL_NAMES: readonly string[] = CHANNELS.map((channel) => channel.name);
@@ -25,11 +36,12 @@ export const DEV_CHANNELS: ReadonlyArray<{ name: string; title: string; adapter:
 );
 
 /** What the spec says about each driver (`x-channelstack-channels`), for the code generators and the scripts. */
-export function channelsExtension(): Array<{ name: string; title: string; internal?: true }> {
-  return DRIVERS.map(({ name, title, internal }) => ({
+export function channelsExtension(): Array<{ name: string; title: string; internal?: true; provider?: true }> {
+  return DRIVERS.map(({ name, title, internal, provider }) => ({
     name,
     title,
     ...(internal ? { internal: true as const } : {}),
+    ...(provider ? { provider: true as const } : {}),
   }));
 }
 

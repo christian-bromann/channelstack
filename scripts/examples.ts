@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { AGENTS, examplesOf, HARNESS, HARNESS_CHANNELS, referenceOf } from "./lib/channels.ts";
+import { AGENTS, examplesOf, HARNESS, HARNESS_CHANNELS, PROVIDERS, referenceOf } from "./lib/channels.ts";
 import { ROOT } from "./lib/generate.ts";
 import { binaryPath } from "./lib/packages.ts";
 import { run } from "./lib/process.ts";
@@ -71,6 +71,88 @@ export async function runExamples(
   }
   if (!(options.shared ?? options.agents === undefined)) return;
   await runSharedExamples(bin);
+}
+
+/** A provider's examples against each of its agents (exit check 13.1): `test/acceptance/examples/<provider>.test.ts`. */
+export async function runProviderExamples(
+  provider: keyof typeof PROVIDERS,
+  options: { bin?: string } = {},
+): Promise<void> {
+  const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
+  if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
+  const { enabled, agents, suites } = PROVIDERS[provider];
+  for (const [name, { channel, path }] of Object.entries(agents)) {
+    console.log(`\ntest/acceptance/examples/${provider}.test.ts against ${name}`);
+    const agent = join(ROOT, "examples", "agents", name, "agent.ts");
+    await withStack({ bin, agent, webhook: { driver: channel, path } }, ({ env }) => {
+      run(
+        "pnpm",
+        [
+          "exec",
+          "vitest",
+          "run",
+          "--config",
+          "test/acceptance/vitest.config.ts",
+          `test/acceptance/examples/${provider}.test.ts`,
+          "-t",
+          `^(${enabled.join("|")})`,
+        ],
+        { cwd: ROOT, env },
+      );
+      for (const suite of suites) {
+        run("pnpm", ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts", suite], {
+          cwd: ROOT,
+          env,
+        });
+      }
+      // The pytest port (exit check 13.6), against the provider's first agent.
+      if (name === Object.keys(agents)[0]) {
+        const project = join(ROOT, "integrations", "pytest-channelstack");
+        const port = `test/acceptance/pytest/test_${provider}.py`;
+        run(
+          "uv",
+          ["run", "--project", project, "--frozen", "pytest", port, "-c", "test/acceptance/pytest/pytest.ini"],
+          {
+            cwd: ROOT,
+            env,
+          },
+        );
+      }
+    });
+  }
+}
+
+/**
+ * A provider in proxy mode (exit check 13.12): its first agent as it is, configured only from
+ * `channelstack env --proxy`. With no `OPENAI_BASE_URL` the official SDK calls `api.openai.com`,
+ * and the proxy sends that to the fake.
+ */
+export async function runProviderProxyExamples(
+  provider: keyof typeof PROVIDERS,
+  options: { bin?: string } = {},
+): Promise<void> {
+  const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
+  if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
+  const [name, where] = Object.entries(PROVIDERS[provider].agents)[0] ?? [];
+  if (name === undefined || where === undefined) return;
+  console.log(`\ntest/acceptance/examples/${provider}.test.ts against ${name} in proxy mode`);
+  const agent = join(ROOT, "examples", "agents", name, "agent.ts");
+  await withStack({ bin, agent, webhook: { driver: where.channel, path: where.path }, proxy: true }, ({ env }) => {
+    run(
+      "pnpm",
+      [
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "test/acceptance/vitest.config.ts",
+        `test/acceptance/examples/${provider}.test.ts`,
+        "-t",
+        "^scripting the model > ",
+      ],
+      { cwd: ROOT, env },
+    );
+  });
 }
 
 /** The phase 1 Slack examples in proxy mode (exit check 6.1). */
@@ -161,6 +243,11 @@ export async function runPytestExamples(options: { bin?: string } = {}): Promise
   const agent = join(ROOT, "examples", "agents", "bolt-ai-sdk", "agent.ts");
   await withStack({ bin, agent, webhook: { driver: channel, path } }, ({ env }) => {
     const project = join(ROOT, "integrations", "pytest-channelstack");
-    run("uv", ["run", "--project", project, "--frozen", "pytest", "test/acceptance/pytest"], { cwd: ROOT, env });
+    // The model's port runs against a model agent, with the provider's examples.
+    const ignored = Object.keys(PROVIDERS).map((provider) => `--ignore=test/acceptance/pytest/test_${provider}.py`);
+    run("uv", ["run", "--project", project, "--frozen", "pytest", "test/acceptance/pytest", ...ignored], {
+      cwd: ROOT,
+      env,
+    });
   });
 }

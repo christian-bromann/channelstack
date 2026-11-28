@@ -1,10 +1,11 @@
-import { spawnSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 import { describe, expect, test } from "vitest";
 
 import * as checkIds from "../../integrations/checks/index.ts";
-import { HARNESS, HARNESS_CHANNELS } from "../../scripts/lib/channels.ts";
+import { HARNESS, HARNESS_CHANNELS, PROVIDERS } from "../../scripts/lib/channels.ts";
 import { ROOT } from "../../scripts/lib/generate.ts";
 import { binaryPath } from "../../scripts/lib/packages.ts";
 import { withStack } from "../../scripts/lib/stack.ts";
@@ -26,28 +27,43 @@ async function checks(
   fault: string | undefined,
   only: string | undefined,
   agentEnv: Record<string, string> = {},
+  suite: { agent: string; path: string; file: string; driver: string } = {
+    ...(CHANNELS[channel] as { agent: string; path: string }),
+    file: `test/acceptance/checks/${channel}-checks.test.ts`,
+    driver: channel,
+  },
 ) {
-  const { agent, path } = CHANNELS[channel] as { agent: string; path: string };
+  const { agent, path } = suite;
   let run = { status: null as number | null, output: "" };
   await withStack(
     {
       bin: process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath(),
       agent: join(ROOT, "examples", "agents", agent, "agent.ts"),
-      webhook: { driver: channel, path },
+      webhook: { driver: suite.driver, path },
       agentEnv: { ...agentEnv, ...(fault ? { BROKEN: fault } : {}) },
     },
-    ({ env }) => {
-      const file = `test/acceptance/checks/${channel}-checks.test.ts`;
-      const result = spawnSync(
+    async ({ env }) => {
+      const { file } = suite;
+      // Without blocking this worker: a synchronous run would stall the tests beside it, and their
+      // waits for their own agents would time out on this run's time.
+      const result = await promisify(execFile)(
         "pnpm",
         ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts", file],
         {
           cwd: ROOT,
           env: { ...env, NO_COLOR: "1", ...(only ? { CHANNELSTACK_CHECKS_ONLY: only } : {}) },
           encoding: "utf8",
+          maxBuffer: 64 * 1024 * 1024,
+        },
+      ).then(
+        ({ stdout, stderr }) => ({ code: 0 as number | null, stdout, stderr }),
+        (error: { code?: number | string | null; stdout?: string; stderr?: string }) => {
+          // A run that couldn't start at all (no pnpm, ENOENT) is an error, not a failed check.
+          if (typeof error.code === "string") throw error;
+          return { code: error.code ?? null, stdout: error.stdout ?? "", stderr: error.stderr ?? "" };
         },
       );
-      run = { status: result.status, output: `${result.stdout}\n${result.stderr}` };
+      run = { status: result.code, output: `${result.stdout}\n${result.stderr}` };
     },
   );
   return run;
@@ -84,6 +100,24 @@ describe.for(channels)("the standard %s checks catch what they are for", ([name,
     expect(run.output).toMatch(/and no person between them: [^\n]*loop-peer[^\n]* → [^\n]*loop-peer/);
     expect(run.status).toBe(1);
   });
+});
+
+// Exit check 13.9: each model check fails against the agent on the fake OpenAI with that fault.
+// One after another: the model checks time the agent (a slow model against Slack's 3s retry, a
+// paused stream), and how many stacks run beside one is no part of what they check.
+const providers = Object.entries(PROVIDERS).filter(([name]) => only === undefined || only.includes(name));
+describe.for(providers)("the model checks of %s catch what they are for", ([name, { broken }]) => {
+  const suite = { ...broken, file: `test/acceptance/checks/${name}-checks.test.ts`, driver: broken.channel };
+  test.for([...checkIds.SLACK_MODEL_CHECKS])(
+    "%s fails against the agent with that fault",
+    { timeout: 120_000 },
+    async (id) => {
+      const run = await checks(name, id, id, {}, suite);
+      expect(run.output, run.output).toContain("1 failed");
+      expect(run.output).toContain(`[${id}]`);
+      expect(run.status).toBe(1);
+    },
+  );
 });
 
 test("an agent that takes the button away after the first click passes the double-click check", async () => {

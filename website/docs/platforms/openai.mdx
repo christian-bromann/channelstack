@@ -1,0 +1,88 @@
+---
+title: "OpenAI"
+order: 8
+description: "Script what your agent's model answers with the fake OpenAI: text, streams, tool calls and errors, a slow first token, a stream that breaks, and what your agent sent."
+---
+
+# OpenAI
+
+channelstack fakes OpenAI's API too, at `https://openai.localhost/v1`. Your agent talks to it the way it talks to OpenAI, and each test scripts what the model answers. It's realistic on the wire, with OpenAI's event shapes, ids, tool calls, errors, rate-limit headers and timing, and never in content: the model says what your test scripted.
+
+`channelstack env` prints what the agent needs, and the official SDKs read both by themselves:
+
+```bash
+OPENAI_BASE_URL=https://openai.localhost/v1
+OPENAI_API_KEY=sk-proj-…
+```
+
+Anything that takes an OpenAI base URL works: the official `openai` SDKs, the AI SDK's OpenAI provider, LangChain's `ChatOpenAI`, the OpenAI Agents SDK, and agents behind OpenRouter, LiteLLM, Groq, Together, Ollama, vLLM or Azure OpenAI. The fake answers any model name.
+
+## Scripting an answer
+
+Every test gets an `openai` fixture. `openai.respond(…)` scripts what the model answers: one turn, or a list used in order, one per call.
+
+```ts
+test("a tool loop ends in one answer, in the thread", async ({ slack, openai }) => {
+  const ana = await slack.createUser({ name: "Ana" });
+  const channel = await slack.createChannel({ participants: [ana, slack.app] });
+  const ai = await openai.respond([
+    { toolCalls: [{ name: "search_incidents", arguments: { since: "yesterday" } }] },
+    "Two incidents yesterday: the web deploy and a DNS blip.",
+  ]);
+
+  const msg = await ana.say("@my-agent what broke yesterday?", { channel });
+
+  await expect(msg.thread).toHaveReplyFrom("my-agent", { text: /DNS blip/ });
+  await expect(ai).toHaveAnswered({ times: 2 });
+});
+```
+
+A turn is a string, or an object with `text` (a string, or the chunks of a stream), `toolCalls`, `reasoning`, `refusal`, `finish`, `usage`, `timing`, `failAfter`, `pauseAfter`, or an `error`. `when` says which calls a script answers: `{ text }` (the newest user message), `{ prompt }`, `{ tools }`, `{ toolResult }`, `{ endpoint }`, `{ model }`, or `{ from }` and `{ in }` (the person and the place in the channel the call answers). Scripts are tried in the order they were added.
+
+**There is no default answer.** A model call no script answers gets a 400 (`channelstack_no_script`) naming the `respond(…)` that would have answered it, and your test fails, at once in the matcher that is waiting, or when its session closes. A list that runs out fails the same way.
+
+## An answer computed from the request
+
+Pass a function instead, and it answers each call from what the agent sent: the conversation so far, the tools offered, and where the call is in the channel. It runs in your test process.
+
+```ts
+await openai.respond((request) =>
+  request.context.from?.id === ana.id ? "Your deploy is green." : "Your migration is still running.",
+);
+```
+
+When two mentions are in flight at once, their order is the agent's, not the test's: a list answers whichever call arrives first. A function that reads `request.context`, or `when: { from: ana }`, answers each call for what it is.
+
+## Timing and failures
+
+```ts
+await openai.respond("Here's the summary.", { timing: { firstToken: "5s" } });          // a slow model
+await openai.respond({ text: ["The deploy", " failed at", " the migration"], failAfter: { chunks: 2, how: "drop" } });
+await openai.respond([{ error: "overloaded" }, { error: "overloaded" }, "All good now."]); // the SDK's retries
+await openai.respond({ error: "project_spend_limit_exceeded" }, { times: -1 });          // a plan limit
+const ai = await openai.respond({ text: "A long answer ".repeat(40), pauseAfter: 3 });   // hold the stream: Stop it
+```
+
+A stream breaks with an error event, a cut connection, or a stall. The errors are OpenAI's documented ones, with their status, `type` and `code`. `openai.rateLimit({ requests: { limit: 2, per: "10s" } })` counts the test's calls, and every answer carries truthful `x-ratelimit-*` headers.
+
+## What your agent sent
+
+```ts
+const call = await openai.latestCall();
+await expect(call).toHaveSent([first, second], { ordered: true }); // the thread history, in order
+await expect(openai).not.toHaveSent(privateMessage);              // no text from a channel it shouldn't read
+await expect(openai).not.toHaveSentSecrets();                     // no token, signing secret or key
+await expect(call).toHaveOfferedTool("search_incidents");
+await expect(ai).toHaveSentToolResult("search_incidents", { text: /migration/ });
+await expect(await ai.waitForPause()).toBeAborted();             // Stop cancelled the model's request
+```
+
+`openai.calls()`, `ai.toolCalls()` and `call.toolCalls` give you the calls and each tool call with the result your agent sent back.
+
+## How a call finds its test
+
+A model call carries no session. channelstack gives it to the test whose deliveries and API answers it repeats: an id the fake made for an earlier answer, a tag your agent sends (`user`, metadata, or the `x-channelstack-session` header), an id only that test's people and places have, or what its people wrote. Two tests running at once that send the same text can't be told apart: give each test's prompt something of its own, or have your agent send the person's id as `user`.
+
+## The standard checks
+
+`slackChecks({ app: "my-agent", model: "openai" })` scripts the model itself and adds the model checks: a slow model with Slack's retry, a model that fails, a call the SDK retries, a stream that breaks, Stop cancelling the model, and no secrets in the prompt.

@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
+import { ProtocolError } from "../errors/index.ts";
 import { type EventLog, WORLD_SCOPE } from "../events/index.ts";
 
 /**
@@ -22,6 +23,38 @@ export const DeliveryAttempt = z
     forgedSignature: z.boolean(),
   })
   .openapi("DeliveryAttempt");
+
+/** Text to find: a string, or a pattern (SDKs send a `RegExp` as its source and flags). */
+export type TextPattern = string | { source: string; flags: string };
+
+/** `TextPattern` in a request: the SDKs take a string or a `RegExp`. */
+export const textPattern = () =>
+  z
+    .union([z.string().min(1), z.object({ source: z.string().min(1), flags: z.string().regex(/^[dgimsuvy]*$/) })])
+    .openapi({ "x-channelstack-pattern": true });
+
+/**
+ * A test for text: a string is found anywhere in it (`ignoreCase` for case-insensitive), a pattern
+ * is matched. `g` and `y` are dropped, as they make a pattern remember where it stopped.
+ */
+export function matchesText(pattern: TextPattern, options: { ignoreCase?: boolean } = {}): (text: string) => boolean {
+  if (typeof pattern === "string") {
+    if (!options.ignoreCase) return (text) => text.includes(pattern);
+    const wanted = pattern.toLowerCase();
+    return (text) => text.toLowerCase().includes(wanted);
+  }
+  let compiled: RegExp;
+  try {
+    compiled = new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ""));
+  } catch {
+    throw new ProtocolError("invalid_argument", `/${pattern.source}/${pattern.flags} is not a pattern`);
+  }
+  return (text) => compiled.test(text);
+}
+
+/** A pattern as a message names it: `"text"` or `/source/flags`. */
+export const patternName = (pattern: TextPattern): string =>
+  typeof pattern === "string" ? `"${pattern}"` : `/${pattern.source}/${pattern.flags}`;
 
 /** A length of time in a request: SDKs take `"3s"` or milliseconds and send milliseconds. */
 export const duration = (description: string) =>

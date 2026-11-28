@@ -7,6 +7,7 @@ import { removeNotionEntry } from "./live/cleanup.ts";
 import { NotionRestClient } from "./live/client.ts";
 import { notionMaintenance } from "./live/maintenance.ts";
 import { createLiveNotionWorld } from "./live/world.ts";
+import { notionPlace } from "./place.ts";
 import { registerNotionRoutes } from "./routes.ts";
 import { NOTION_SECRETS } from "./secrets.ts";
 
@@ -14,6 +15,7 @@ import { NOTION_SECRETS } from "./secrets.ts";
 export const notion: DriverDefinition = {
   name: "notion",
   title: "Notion",
+  place: notionPlace,
   dev: notionDev,
   ids: NOTION_IDS,
   tokenPatterns: [/ntn_[A-Za-z0-9]{20,}/g, /secret_[A-Za-z0-9]{20,}/g],

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -13,6 +13,7 @@ import { readChanges, readDocument, readTree, setFilesRoot } from "./files.ts";
 import { resolveServerBinary, serverBinaryName, serverPackageName } from "./launcher.ts";
 import { ChannelstackError, onRefusal, segment, Transport, unreportedRefusals } from "./transport.ts";
 import {
+  normalisedText,
   patternOnWire,
   retryWhile,
   setWaitDefaults,
@@ -177,6 +178,17 @@ describe("waiting", () => {
   });
 });
 
+describe("text as the server compares it", () => {
+  // The server's own cases (`server/src/core/attribution/attribution.test.ts` reads the same file).
+  const { cases } = JSON.parse(
+    readFileSync(new URL("../../../test/text-normalisation.json", import.meta.url), "utf8"),
+  ) as { cases: Array<{ text: string; normalised: string }> };
+
+  test.each(cases)("the generated rules normalise %o as the server does", ({ text, normalised }) => {
+    expect(normalisedText(text)).toBe(normalised);
+  });
+});
+
 describe("transport", () => {
   class NotFoundError extends ChannelstackError {}
   const transport = (url: string) =>
@@ -334,7 +346,14 @@ describe("the server binary", () => {
 
   test("CHANNELSTACK_SERVER_BIN wins; without a binary the error says what to do", () => {
     expect(resolveServerBinary({ CHANNELSTACK_SERVER_BIN: "/opt/channelstack" })).toBe("/opt/channelstack");
-    expect(() => resolveServerBinary({})).toThrow(
+    // Whether this checkout has the published binary installed is beside the point: none is found here.
+    const missing = (specifier: string): string => {
+      throw new Error(`Cannot find module '${specifier}'`);
+    };
+    expect(resolveServerBinary({}, (specifier) => `/node_modules/${specifier}`)).toBe(
+      `/node_modules/${serverPackageName()}/bin/${serverBinaryName()}`,
+    );
+    expect(() => resolveServerBinary({}, missing)).toThrow(
       /optional dependency @channelstack\/server-.* isn't installed.*CHANNELSTACK_SERVER_BIN/,
     );
   });

@@ -17,6 +17,14 @@ import { DRIVERS, proxyHosts, secretSpecs, TOKEN_PATTERNS } from "./drivers/inde
 
 /** The only address the server binds: the control API is never reachable from another machine. */
 const LOOPBACK = "127.0.0.1";
+/**
+ * Bun closes a connection that sent no bytes for its `idleTimeout` (10s by default), even while
+ * a response is still open. The fakes hold answers longer than that on purpose (a model call's
+ * `firstToken`, a stream paused at `pauseAfter`, a scripted timeout, a responder's hold, the
+ * control API's long polls), and the real platforms don't cut them: 0 turns it off. A WebSocket
+ * has an idle timeout of its own (`websocket.idleTimeout`), which Bun's pings keep from running out.
+ */
+const NO_IDLE_TIMEOUT = 0;
 
 export interface StartOptions {
   version: string;
@@ -166,7 +174,12 @@ export async function start(options: StartOptions): Promise<RunningServer> {
       close: (socket: Bun.ServerWebSocket<{ session: SocketSession }>) => socket.data.session.closed(),
     },
   };
-  const server = Bun.serve<{ session: SocketSession }>({ hostname: LOOPBACK, port: options.port, ...handler });
+  const server = Bun.serve<{ session: SocketSession }>({
+    hostname: LOOPBACK,
+    port: options.port,
+    idleTimeout: NO_IDLE_TIMEOUT,
+    ...handler,
+  });
   const origin = `http://${LOOPBACK}:${server.port}`;
 
   let proxy: RunningProxy | undefined;
@@ -183,6 +196,7 @@ export async function start(options: StartOptions): Promise<RunningServer> {
       const tls = Bun.serve<{ session: SocketSession }>({
         hostname: LOOPBACK,
         port: 0,
+        idleTimeout: NO_IDLE_TIMEOUT,
         tls: { cert: leaf.cert, key: leaf.key },
         ...handler,
         fetch(request, listening) {

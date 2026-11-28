@@ -138,6 +138,28 @@ Retried Ev0A1B2C3D4E (slack)
 
 On Slack this is Slack's own retry, with its retry headers, so an app that answers twice doesn't handle retries. GitHub, Linear, Notion, Resend, Google and Discord redeliver the event instead (`Redelivered … (github)`; on Discord, the dispatch again, as after a RESUME). Without an id, `redeliver` sends the newest delivery again; without a channel, `deliveries` lists every channel's and `redeliver` finds the id in any. Both take `slack`, `github`, `linear` or `notion`, but only Slack has commands that act in the dev session so far, so the other lists stay empty there. For delivery failures in tests, see [Delivery and failures](/docs/guide/delivery-and-failures).
 
+## Script the model
+
+An app whose model is the [fake OpenAI](/docs/platforms/openai) (`OPENAI_BASE_URL` from `channelstack env`) needs a script before it can answer: the fake has no default answer, and a call nothing scripted gets a 400 (`channelstack_no_script`).
+
+```bash
+npx channelstack openai respond --times -1 "Here's what I found about {lastUserText}."
+```
+
+```
+ms_…: the model answers every matching call
+```
+
+`--when <text>` answers only calls whose newest user message has that text, and `--tool <name> --args <json>` has the model call a tool first and answer its result with the text (`{toolResult}` is what the app sent back). `openai calls` lists what the app asked and what the model answered, and `openai undo <script>` removes a script:
+
+```bash
+npx channelstack openai calls
+```
+
+```
+…  chat.completions gpt-5 "what broke?" → 200 "Here's what I found about what broke?" (ms_…)
+```
+
 ## The shared `dev` session
 
 Everything the CLI does happens in one long-lived session called `dev`. The UI shows the same session, and [`channelstack mcp`](/docs/guide/mcp) acts in it too, so a person at the terminal, a browser and a coding agent all see one conversation. It lives until the server stops; state is in memory, so a restart starts from nothing.

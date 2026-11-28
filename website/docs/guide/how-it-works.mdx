@@ -1,18 +1,18 @@
 ---
 title: "How it works"
 order: 1
-description: "One server fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail) and Discord; tests, the CLI, MCP and the UI drive it through one control API."
+description: "One server fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail), Discord and your agent's model; tests, the CLI, MCP and the UI drive it through one control API."
 ---
 
 # How it works
 
-This page explains the parts of channelstack and how they fit together: the server and its six fakes, the control API every client uses, sessions, and the transcript the matchers read. Read it when you want to know why a test behaves the way it does.
+This page explains the parts of channelstack and how they fit together: the server and its fakes, the control API every client uses, sessions, and the transcript the matchers read. Read it when you want to know why a test behaves the way it does.
 
 <RequestFlow />
 
-## One server, six fakes
+## One server, eight fakes
 
-channelstack is one server process. It fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail) and Discord in memory and serves each fake at a stable local address:
+channelstack is one server process. It fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail) and Discord in memory, and OpenAI's API for your agent's model, and serves each fake at a stable local address:
 
 | Address                          | What it is                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------- |
@@ -24,6 +24,7 @@ channelstack is one server process. It fakes Slack, GitHub, Linear, Notion, Rese
 | `https://resend.localhost`       | Resend's REST API; sends its webhooks, signed the Svix way                            |
 | `https://google.localhost`       | Gmail's API, Google's token endpoint and certificates; sends Pub/Sub pushes            |
 | `https://discord.localhost`      | Discord's REST API at `/api/v10` and its Gateway; sends interactions, signed with Ed25519 |
+| `https://openai.localhost`       | OpenAI's API at `/v1` for your agent's model: Chat Completions, Responses, Conversations. It sends nothing; each test scripts what it answers |
 
 The `*.localhost` names come from [portless](https://github.com/vercel-labs/portless). Without it, the server listens on one loopback port and puts each fake under a path prefix (`http://127.0.0.1:4500/slack`, `/github`, and so on). The [connecting your app](/docs/guide/connecting-your-agent) page shows both.
 
@@ -33,7 +34,9 @@ Your app talks to a fake as if it were the real platform. It uses the platform's
 - **Refusals are real.** A fake refuses what the platform refuses, with the same error code: `not_in_channel` when the bot posts where it isn't a member, `missing_scope`, `msg_too_long`.
 - **Deliveries are real.** Events arrive signed the way each platform signs them, within the same ack windows, and Slack retries the way Slack does. See [delivery and failures](/docs/guide/delivery-and-failures).
 
-Each fake has one built-in app, named `my-agent`, that your code acts as. A test can add more apps beside it, each a real app of its platform with its own credentials and endpoint, to test agents that work together; see [several apps](/docs/guide/several-apps). There is one workspace, org or integration per fake, holding all of its apps, and the state lives in memory: a restart starts a fresh world.
+The fake OpenAI isn't a platform: it has no people, apps or deliveries, and your agent only calls it. It's realistic on the wire, with OpenAI's event shapes, ids, tool calls, errors and rate-limit headers, and never in content: the model says what the test scripted with the `openai` fixture, and a call no script answers fails the test. A model call carries no session, so channelstack gives it to the test whose conversation it answers, from what the call carries. See [OpenAI](/docs/platforms/openai).
+
+Each platform's fake has one built-in app, named `my-agent`, that your code acts as. A test can add more apps beside it, each a real app of its platform with its own credentials and endpoint, to test agents that work together; see [several apps](/docs/guide/several-apps). There is one workspace, org or integration per fake, holding all of its apps, and the state lives in memory: a restart starts a fresh world.
 
 The fakes are channelstack's own implementation. They follow each platform's documentation, schemas and recorded traffic, and live runs against real sandboxes keep them honest.
 
@@ -64,7 +67,7 @@ The SDKs are generated from the server's routes, so they can't drift from what t
 
 ## Base-URL mode and proxy mode
 
-By default the app reaches the fakes because its SDK's base URL points at them (`SLACK_API_URL=https://slack.localhost/api/`). That's base-URL mode, and it needs no change beyond an option the SDK already has. Some apps hard-code `slack.com` or `api.github.com`; for those, `channelstack start --proxy` runs an HTTP proxy that sends the platforms' hosts to the fakes and passes every other host through. See [proxy mode](/docs/guide/proxy-mode).
+By default the app reaches the fakes because its SDK's base URL points at them (`SLACK_API_URL=https://slack.localhost/api/`). That's base-URL mode, and it needs no change beyond an option the SDK already has. Some apps hard-code `slack.com` or `api.github.com`; for those, `channelstack start --proxy` runs an HTTP proxy that sends the platforms' hosts (and `api.openai.com`) to the fakes and passes every other host through. See [proxy mode](/docs/guide/proxy-mode).
 
 ## Sessions: scopes in one shared world
 
@@ -105,6 +108,6 @@ An app answers when it's ready, so every matcher waits. A positive check passes 
 ## What channelstack doesn't do
 
 - **It doesn't start or wrap your app.** The app is a separate process that you run as usual. `channelstack env` prints the tokens, signing secrets and URLs it needs, and the server delivers to the URL you give it.
-- **It doesn't mock the model.** channelstack fakes the channel, not the LLM. Use your framework's own fake model (the AI SDK's mock models in `ai/test`, LangChain's `FakeListChatModel`) or a real one.
+- **It doesn't write your model's answers.** The fake OpenAI is realistic on the wire, never in content: it says what each test scripted, and it never judges an answer. An agent that doesn't talk to it keeps its own model, its framework's fake (the AI SDK's mock models in `ai/test`, LangChain's `FakeListChatModel`) or a real one, and the matchers work the same.
 - **It doesn't relay events in live mode.** Against real sandboxes, channelstack acts as people and reads the results back; the platform delivers to your app itself. Retries, bad signatures and other delivery chaos are fake only. See [live mode](/docs/guide/live-mode).
 - **It doesn't keep state.** Everything is in memory. Restart the server and the world is empty again.

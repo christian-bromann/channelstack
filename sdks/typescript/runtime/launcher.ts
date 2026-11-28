@@ -77,12 +77,18 @@ export function serverBinaryName(platform: string = process.platform): string {
   return platform === "win32" ? "channelstack.exe" : "channelstack";
 }
 
-/** The server binary: `CHANNELSTACK_SERVER_BIN`, or the one installed with the `channelstack` package. */
-export function resolveServerBinary(env: NodeJS.ProcessEnv = process.env): string {
+/**
+ * The server binary: `CHANNELSTACK_SERVER_BIN`, or the one installed with the `channelstack` package
+ * (found with `resolve`, Node's module resolution from this file).
+ */
+export function resolveServerBinary(
+  env: NodeJS.ProcessEnv = process.env,
+  resolve: (specifier: string) => string = createRequire(import.meta.url).resolve,
+): string {
   if (env.CHANNELSTACK_SERVER_BIN) return env.CHANNELSTACK_SERVER_BIN;
   const name = serverPackageName();
   try {
-    return createRequire(import.meta.url).resolve(`${name}/bin/${serverBinaryName()}`);
+    return resolve(`${name}/bin/${serverBinaryName()}`);
   } catch {
     throw new Error(
       `channelstack has no server binary for ${process.platform}-${process.arch}: the optional dependency ${name} isn't installed. ` +

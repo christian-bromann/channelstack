@@ -4,6 +4,14 @@ import { getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 
 import { BUILT_IN_APP, checkAppName } from "./core/apps/index.ts";
+import {
+  type Attribution,
+  Attributor,
+  bodyStrings,
+  type KnownString,
+  stringsOf,
+  TEXT_NORMALISATION,
+} from "./core/attribution/index.ts";
 import { requireAccess } from "./core/auth/index.ts";
 import { UI_COOKIE, UiAccess } from "./core/auth/ui.ts";
 import { BrowserActors, type Launch } from "./core/browser/index.ts";
@@ -40,7 +48,7 @@ import {
 import { Allowlist, runId, runTag } from "./core/safety/index.ts";
 import { LiveVault, randomString, randomToken, type Secrets } from "./core/secrets/index.ts";
 import { Sessions } from "./core/sessions/index.ts";
-import { channelsExtension, DEV_CHANNELS, DRIVERS } from "./drivers/index.ts";
+import { channelsExtension, DEV_CHANNELS, DRIVERS, secretSpecs } from "./drivers/index.ts";
 
 export const CONTROL_PREFIX = "/_channelstack";
 
@@ -186,6 +194,10 @@ const Quiet = z
     open: z.array(z.string()).openapi({
       description: "What is still open, in words: deliveries in flight or about to be retried, streams never stopped.",
     }),
+    problems: z.array(z.string()).openapi({
+      description:
+        "What should fail the test at once, in words: a model call no script answered. Waiting matchers fail on these instead of timing out.",
+    }),
     loops: z.array(z.string()).optional().openapi({
       description:
         "The bot loops the fake stopped in this session, in words (decision 0027), when there are any. The test fixtures fail a test that left one",
@@ -230,6 +242,88 @@ export function createApp(options: AppOptions): App {
   const vault = new LiveVault(liveEnv, (secret) => redactor.register(secret));
   const browsers = new BrowserActors(options.live?.launchBrowser);
 
+  // What each session's agent was told: its deliveries' bodies and its API calls' answers. A
+  // provider's request names no session; attribution finds it in these (decision 0029).
+  const knownCache = new Map<string, { at: number; strings: KnownString[] }>();
+  const attribution = new Attributor({
+    sessions: () => sessions.ids(),
+    known: (session) => {
+      const strings: KnownString[] = [];
+      for (const record of delivery.list(session)) {
+        const sent = record.attempts[0]?.sentAt;
+        const at = sent === undefined ? clock() : Date.parse(sent);
+        let cached = knownCache.get(record.request.id);
+        if (!cached) {
+          cached = {
+            at,
+            strings: bodyStrings(record.request.body).map((text) => ({
+              text,
+              driver: record.request.driver,
+              delivery: record.request.id,
+              at,
+            })),
+          };
+          knownCache.set(record.request.id, cached);
+        }
+        strings.push(...cached.strings);
+      }
+      for (const event of events.read(session).events) {
+        if (event.kind !== "api_call" || DRIVERS.find((definition) => definition.name === event.driver)?.provider)
+          continue;
+        const at = Date.parse(event.at);
+        for (const text of stringsOf(event.data.response)) strings.push({ text, driver: event.driver, at });
+      }
+      return strings;
+    },
+  });
+  sessions.onClose((session) => {
+    for (const record of delivery.list(session.id)) knownCache.delete(record.request.id);
+  });
+  /** Where an attributed call is in the channels: the delivery that decided it, as its driver reads it. */
+  const place = (attributed: Attribution | undefined) => {
+    const source = attributed?.source;
+    if (!attributed || !source) return {};
+    const definition = DRIVERS.find((candidate) => candidate.name === source.driver);
+    const records = delivery.list(attributed.session);
+    // A tag that is a person's id: the newest message that person wrote, not any delivery naming them.
+    const byAuthor =
+      attributed.by === "tag" && attributed.matched !== undefined
+        ? records
+            .toReversed()
+            .map((record) => ({ record, at: DRIVERS.find((candidate) => candidate.name === record.request.driver) }))
+            .map(({ record, at }) => ({ driver: record.request.driver, found: at?.place?.(record.request.body) }))
+            .find(({ found }) => found?.from === attributed.matched)
+        : undefined;
+    if (byAuthor?.found) return { channel: byAuthor.driver, ...byAuthor.found };
+    const record =
+      source.delivery === undefined ? undefined : records.find((candidate) => candidate.request.id === source.delivery);
+    const found = record ? definition?.place?.(record.request.body) : undefined;
+    return { channel: source.driver, ...(found ?? {}) };
+  };
+
+  /** Which secrets channelstack knows are in a text, by kind: fake ones by name, tokens by shape, the control token, live credentials. */
+  const findSecrets = (text: string): string[] => {
+    const kinds: string[] = [];
+    for (const [driver, spec] of Object.entries(secretSpecs())) {
+      for (const name of Object.keys(spec)) {
+        const value = secrets.get(driver, name);
+        if (value.length >= 8 && text.includes(value)) kinds.push(`${driver}.${name}`);
+      }
+    }
+    for (const definition of DRIVERS) {
+      const shaped = definition.tokenPatterns.some((pattern) =>
+        new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, "")).test(text),
+      );
+      if (shaped && !kinds.some((kind) => kind.startsWith(`${definition.name}.`)))
+        kinds.push(`a ${definition.title} token`);
+    }
+    if (text.includes(options.token)) kinds.push("the control API's token");
+    // Anything else the redactor knows: a live credential, registered when it was handed over.
+    if (kinds.length === 0 && JSON.stringify(redactor.tokens(text)) !== JSON.stringify(text))
+      kinds.push("a live credential");
+    return kinds;
+  };
+
   const drivers: Driver[] = DRIVERS.map((definition) =>
     definition.create({
       ids,
@@ -244,6 +338,10 @@ export function createApp(options: AppOptions): App {
       secret: (name) => secrets.get(definition.name, name),
       apiUrl: () => options.urls().driver(definition.name),
       webhookUrl: options.webhooks[definition.name],
+      attribution,
+      place,
+      findSecrets,
+      scrub: (value) => redactor.tokens(value),
       apps: {
         webhookUrl: (app) =>
           app === BUILT_IN_APP ? options.webhooks[definition.name] : options.appWebhooks?.(definition.name, app),
@@ -266,6 +364,7 @@ export function createApp(options: AppOptions): App {
     }),
   );
   const driverNames = drivers.map((driver) => driver.name);
+  const providers = new Set(drivers.filter((_, at) => DRIVERS[at]?.provider));
   const realities = new Map<string, DriverReality>(
     drivers.map((driver, at) => [
       driver.name,
@@ -398,8 +497,14 @@ export function createApp(options: AppOptions): App {
       const pending = delivery.pending(session);
       const deliveries = `${pending} ${pending === 1 ? "delivery" : "deliveries"} in flight or about to be retried`;
       const open = [...(pending > 0 ? [deliveries] : []), ...drivers.flatMap((driver) => driver.openWork(session))];
+      const problems = drivers.flatMap((driver) => driver.problems?.(session) ?? []);
       const stopped = loops.stopped(session);
-      return { ...quiet.state(session, open.length), open, ...(stopped.length === 0 ? {} : { loops: stopped }) };
+      return {
+        ...quiet.state(session, open.length),
+        open,
+        problems,
+        ...(stopped.length === 0 ? {} : { loops: stopped }),
+      };
     },
   });
 
@@ -579,9 +684,16 @@ export function createApp(options: AppOptions): App {
       const host = (request.headers.get("x-forwarded-host") ?? new URL(request.url).host).split(":")[0] ?? "";
       const driver =
         byHost.get(host) ?? rooted.find(({ path }) => new URL(request.url).pathname.startsWith(path))?.driver;
-      if (driver) return quiet.during(() => driver.fake.api.fetch(request));
+      // A provider's call is in flight for its session alone (its open work), not for every session.
+      if (driver)
+        return providers.has(driver)
+          ? driver.fake.api.fetch(request)
+          : quiet.during(() => driver.fake.api.fetch(request));
       // Anything outside the control API is the agent calling a fake: the agent isn't quiet while it runs.
-      const fromAgent = !new URL(request.url).pathname.startsWith(CONTROL_PREFIX);
+      const { pathname } = new URL(request.url);
+      const fromAgent =
+        !pathname.startsWith(CONTROL_PREFIX) &&
+        ![...providers].some((provider) => pathname.startsWith(`/${provider.name}/`));
       return fromAgent ? quiet.during(() => root.fetch(request)) : root.fetch(request);
     },
     openapi: () => ({
@@ -594,6 +706,8 @@ export function createApp(options: AppOptions): App {
       "x-channelstack-errors": CORE_ERRORS,
       // The drivers in the binary, so generators and scripts don't keep their own list.
       "x-channelstack-channels": channelsExtension(),
+      // How the server compares text for attribution, so every SDK's `toHaveSent` compares the same way.
+      "x-channelstack-text-normalisation": TEXT_NORMALISATION,
     }),
     hosts: () => ["channelstack", ...driverNames],
     settled: () => delivery.settled(),

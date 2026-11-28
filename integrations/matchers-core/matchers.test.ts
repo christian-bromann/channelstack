@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 
 import { ChannelstackError, QUIET } from "../../sdks/typescript/client.ts";
-import { matchers } from "./index.ts";
+import { CONTEXT } from "../../sdks/typescript/runtime/client.ts";
+import { matchers, modelNotes } from "./index.ts";
 
 const state = { isNot: false, timeout: "100ms", quietFor: "10ms" } as const;
 const negated = { ...state, isNot: true };
@@ -183,6 +184,150 @@ describe("comments", () => {
     const discussion = { ...quiet, comments: async () => [{ author: agent, text: "Summary: all green" }] };
     expect((await matchers.toHaveCommentFrom(state, discussion, agent, { text: /green/ })).pass).toBe(true);
     expect((await matchers.toHaveCommentsFrom(state, discussion, agent, { count: 1 })).pass).toBe(true);
+  });
+});
+
+describe("the model", () => {
+  /** A script whose calls are these: what `toHaveAnswered` counts. */
+  const script = (
+    responses: Array<{ status?: number; text?: string; error?: string; end?: string }>,
+    problems: string[] = [],
+  ) => ({
+    ...quiet,
+    id: "ms_1",
+    refresh: async () => ({ used: responses.length, problems }),
+    calls: async () => responses.map((response) => ({ response })),
+  });
+
+  test("toHaveAnswered counts the turns that reached the agent, not those the fake refused", async () => {
+    const refused = script(
+      [{ error: "channelstack_no_script" }],
+      ["ms_1 called `search_incidents`, but the request offered no tools"],
+    );
+    const result = await matchers.toHaveAnswered(state, refused);
+    expect(result.pass).toBe(false);
+    expect(result.message()).toBe(
+      "Expected script ms_1 to answer a call, it answered 0. Its problems:\n  ms_1 called `search_incidents`, but the request offered no tools",
+    );
+
+    // A held call (a responder still answering) isn't answered yet; a scripted error is an answer.
+    expect((await matchers.toHaveAnswered(state, script([{}]))).pass).toBe(false);
+    const answered = script([
+      { text: "All good." },
+      { error: "rate_limit_exceeded" },
+      { error: "channelstack_no_script" },
+    ]);
+    expect((await matchers.toHaveAnswered(state, answered, { times: 2 })).pass).toBe(true);
+  });
+
+  test("toHaveAnswered leaves out a call the agent hung up on before its first token, not a scripted timeout", async () => {
+    // The fake had the answer, but the agent was gone before a byte of it was sent.
+    const abandoned = script([{ status: 0, text: "Too late.", end: "aborted" }]);
+    const result = await matchers.toHaveAnswered(state, abandoned);
+    expect(result.pass).toBe(false);
+    expect(result.message()).toBe("Expected script ms_1 to answer a call, it answered 0");
+
+    const counted = script([
+      { status: 0, text: "Too late.", end: "aborted" },
+      { status: 0, error: "timeout", end: "aborted" },
+      { status: 200, text: "Half of it", end: "aborted" },
+    ]);
+    expect((await matchers.toHaveAnswered(state, counted, { times: 2 })).pass).toBe(true);
+  });
+
+  test("toHaveSent compares text as attribution does: a Slack link is its URL", async () => {
+    const call = {
+      ...quiet,
+      request: { text: "Ana: Deploy   https://example.com/runs/7 NOW", tools: [] },
+    };
+    const sent = await matchers.toHaveSent(state, call, {
+      text: "<@U08B5K2M9QX> deploy <https://example.com/runs/7|the run> now",
+    });
+    expect(sent.pass).toBe(true);
+  });
+
+  /** A handle in session `ses_1` whose server answers these model reads. */
+  const inSession = (reads: { unattributed?: unknown[]; calls?: unknown[] }, asked: unknown[] = []) => ({
+    ...quiet,
+    [CONTEXT]: () => ({
+      session: "ses_1",
+      transport: {
+        request: async (_method: string, path: string, options?: { query?: unknown }) => {
+          asked.push([path, options?.query]);
+          return path.endsWith("/unattributed") ? (reads.unattributed ?? []) : (reads.calls ?? []);
+        },
+      },
+    }),
+    replies: async () => [],
+  });
+
+  test("a failing check names the model calls no session claimed, recent ones only", async () => {
+    const asked: unknown[] = [];
+    const subject = inSession(
+      {
+        unattributed: [
+          {
+            id: "chatcmpl-1",
+            lastUserText: "summarise the backlog",
+            sinceMs: 2400,
+            message: "this call couldn't be attributed to any test: nothing in it matches.",
+          },
+        ],
+      },
+      asked,
+    );
+    const result = await matchers.toHaveReplyFrom(state, subject, "my-agent");
+    expect(result.pass).toBe(false);
+    expect(result.message()).toBe(
+      [
+        "Expected a reply from my-agent. The thread has:\n  (nothing)",
+        "1 model call in the last 10s couldn't be attributed to a test:",
+        '  chatcmpl-1 ("summarise the backlog", 2s ago): this call couldn\'t be attributed to any test: nothing in it matches.',
+      ].join("\n"),
+    );
+    expect(asked).toContainEqual(["/sessions/ses_1/openai/unattributed", { withinMs: 10_000 }]);
+
+    // A check that passes reads nothing more.
+    asked.length = 0;
+    expect((await matchers.toHaveReplyFrom(negated, subject, "my-agent")).pass).toBe(false);
+    expect(asked).toEqual([]);
+  });
+
+  test("a failing check names the sessions a call attributed by order tied with", async () => {
+    const byOrder = (id: string) => ({
+      id,
+      request: { context: { attributedBy: "order", matched: "@my-agent hello", tiedWith: ["ses_2"] } },
+    });
+    const subject = inSession({
+      calls: [byOrder("chatcmpl-1"), { id: "chatcmpl-2", request: { context: { attributedBy: "text" } } }],
+    });
+    const result = await matchers.toHaveReplyFrom(state, subject, "my-agent");
+    expect(result.message()).toBe(
+      [
+        "Expected a reply from my-agent. The thread has:\n  (nothing)",
+        'Model call chatcmpl-1 was attributed by order, between 2 sessions that all sent "@my-agent hello" (this one and ses_2): each went to the oldest unanswered message. Give each test\'s prompt something of its own, or have the agent send `user`.',
+      ].join("\n"),
+    );
+    const [both, ...more] = modelNotes([], [byOrder("chatcmpl-1"), byOrder("chatcmpl-3")]);
+    expect(both).toMatch(/^Model calls chatcmpl-1, chatcmpl-3 were attributed by order, between 2 sessions/);
+    expect(more).toEqual([]);
+  });
+
+  test("a failing check adds nothing when the server can't say (live)", async () => {
+    const subject = {
+      ...quiet,
+      [CONTEXT]: () => ({
+        session: "ses_1",
+        transport: {
+          request: async () => {
+            throw new ChannelstackError("unsupported_in_live", 422, "the fake OpenAI isn't live");
+          },
+        },
+      }),
+      replies: async () => [],
+    };
+    const result = await matchers.toHaveReplyFrom(state, subject, "my-agent");
+    expect(result.message()).toBe("Expected a reply from my-agent. The thread has:\n  (nothing)");
   });
 });
 

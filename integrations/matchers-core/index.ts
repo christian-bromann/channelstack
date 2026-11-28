@@ -12,6 +12,7 @@ import {
   type Duration,
   fromMatches,
   type InSession,
+  ModelProblemError,
   parseDuration,
   QUIET,
   type SlackConversation,
@@ -21,6 +22,9 @@ import {
   waitFor,
   WaitTimeoutError,
 } from "../../sdks/typescript/client.ts";
+import { CONTEXT, type WithContext } from "../../sdks/typescript/runtime/client.ts";
+import { segment } from "../../sdks/typescript/runtime/transport.ts";
+import { normalisedText } from "../../sdks/typescript/runtime/wait.ts";
 
 export interface MatcherResult {
   pass: boolean;
@@ -127,34 +131,155 @@ async function settle<T>(
     const handle = subject as Partial<InSession>;
     if (typeof handle[QUIET] !== "function") throw new TypeError("This matcher needs a channelstack handle");
     // The check watches for the whole quiet window: what arrives while it looks counts.
-    await untilQuiet(() => (handle as InSession)[QUIET](), {
-      timeout,
-      quietFor: timing?.quietFor ?? state.quietFor,
-      watching: true,
-    });
+    try {
+      await untilQuiet(() => (handle as InSession)[QUIET](), {
+        timeout,
+        quietFor: timing?.quietFor ?? state.quietFor,
+        watching: true,
+      });
+    } catch (error) {
+      if (error instanceof ModelProblemError) return failing(subject, state, error.message);
+      throw error;
+    }
     value = await options.read();
   } else {
     let last: T | undefined;
+    let polls = 0;
     try {
       value = await waitFor(
         "the condition",
         async () => {
           last = await options.read();
-          return options.holds(last) ? last : undefined;
+          if (options.holds(last)) return last;
+          // A model call no script answered won't be answered by waiting: fail now, with why.
+          polls += 1;
+          if (polls % 5 === 0) await failOnProblems(subject);
+          return undefined;
         },
         { timeout },
       );
     } catch (error) {
+      if (error instanceof ModelProblemError) return failing(subject, state, error.message);
       if (!(error instanceof WaitTimeoutError)) throw error;
       value = last as T;
+      // A timeout whose cause is a model problem says so.
+      try {
+        await failOnProblems(subject);
+      } catch (problem) {
+        if (problem instanceof ModelProblemError) return failing(subject, state, problem.message);
+        throw problem;
+      }
     }
   }
   const pass = options.holds(value);
+  if (pass !== state.isNot) return { pass, message: () => options.describe(value) };
   // A failed check also says what the agent left open (a stream it never stopped): often that is the bug.
-  const open = pass === state.isNot ? await stillOpen(subject) : [];
-  const loops = pass === state.isNot ? await stoppedLoops(subject) : [];
+  const open = await stillOpen(subject);
+  const loops = await stoppedLoops(subject);
   const leftover = `${open.length === 0 ? "" : `\nStill open: ${open.join("; ")}`}${loops.length === 0 ? "" : `\nStopped: ${loops.join("; ")}`}`;
-  return { pass, message: () => `${options.describe(value)}${leftover}` };
+  return failing(subject, state, `${options.describe(value)}${leftover}`);
+}
+
+/** A failed check, its message followed by what the session's model calls say about it. */
+async function failing(subject: unknown, state: MatcherState, message: string): Promise<MatcherResult> {
+  const notes = await modelNotesOf(subject);
+  const text = notes.length === 0 ? message : `${message}\n${notes.join("\n")}`;
+  return { pass: state.isNot, message: () => text };
+}
+
+/** How recent a model call no session claimed must be for a failing check to name it (design §8.4). */
+const UNATTRIBUTED_WITHIN_MS = 10_000;
+
+/** A model call no session claimed, as `GET /sessions/{sid}/openai/unattributed` lists it. */
+interface UnattributedCall {
+  readonly id: string;
+  readonly lastUserText?: string | undefined;
+  readonly sinceMs: number;
+  readonly message: string;
+}
+
+/** A model call of the session, as far as its attribution goes. */
+interface AttributedCall {
+  readonly id: string;
+  readonly request: {
+    readonly context: {
+      readonly attributedBy?: string | undefined;
+      readonly matched?: string | undefined;
+      readonly tiedWith?: readonly string[] | undefined;
+    };
+  };
+}
+
+/**
+ * What the session's model calls add to a failing check's message: the recent calls no session
+ * claimed, and the calls given to this session only by order, between sessions that sent the same
+ * text. Nothing for a subject outside a session, or where the server can't tell (live).
+ */
+async function modelNotesOf(subject: unknown): Promise<string[]> {
+  const handle = subject as Partial<WithContext>;
+  if (typeof handle[CONTEXT] !== "function") return [];
+  const context = handle[CONTEXT]();
+  if (context.session === undefined) return [];
+  const base = `/sessions/${segment(context.session)}/openai`;
+  try {
+    const [unattributed, calls] = await unreportedRefusals(() =>
+      Promise.all([
+        context.transport.request("GET", `${base}/unattributed`, { query: { withinMs: UNATTRIBUTED_WITHIN_MS } }),
+        context.transport.request("GET", `${base}/calls`),
+      ]),
+    );
+    return modelNotes(unattributed as UnattributedCall[], calls as AttributedCall[]);
+  } catch (error) {
+    if (error instanceof ChannelstackError) return [];
+    throw error;
+  }
+}
+
+/** The lines of `modelNotesOf`, from what the server answered. */
+export function modelNotes(unattributed: readonly UnattributedCall[], calls: readonly AttributedCall[]): string[] {
+  const notes: string[] = [];
+  if (unattributed.length > 0) {
+    const count = unattributed.length === 1 ? "1 model call" : `${unattributed.length} model calls`;
+    notes.push(
+      `${count} in the last ${UNATTRIBUTED_WITHIN_MS / 1000}s couldn't be attributed to a test:\n${listing(
+        unattributed.map(
+          (call) =>
+            `${call.id} (${call.lastUserText === undefined ? "no user message" : JSON.stringify(excerptOf(call.lastUserText))}, ${Math.round(call.sinceMs / 1000)}s ago): ${call.message}`,
+        ),
+      )}`,
+    );
+  }
+  // One line per text the sessions shared, naming every call it decided.
+  const tied = new Map<string, { ids: string[]; with: readonly string[] }>();
+  for (const call of calls) {
+    const { attributedBy, matched, tiedWith } = call.request.context;
+    if (attributedBy !== "order" || tiedWith === undefined || tiedWith.length === 0) continue;
+    const text = matched ?? "";
+    const entry = tied.get(text) ?? { ids: [], with: tiedWith };
+    entry.ids.push(call.id);
+    tied.set(text, entry);
+  }
+  for (const [text, entry] of tied) {
+    const ids = entry.ids.length === 1 ? `Model call ${entry.ids[0]} was` : `Model calls ${entry.ids.join(", ")} were`;
+    notes.push(
+      `${ids} attributed by order, between ${entry.with.length + 1} sessions that all sent ${JSON.stringify(excerptOf(text))} (this one and ${entry.with.join(", ")}): each went to the oldest unanswered message. Give each test's prompt something of its own, or have the agent send \`user\`.`,
+    );
+  }
+  return notes;
+}
+
+/** Throw `ModelProblemError` when the subject's session has model problems. Nothing for a subject outside a session. */
+async function failOnProblems(subject: unknown): Promise<void> {
+  const handle = subject as Partial<InSession>;
+  if (typeof handle[QUIET] !== "function") return;
+  let problems: readonly string[] | undefined;
+  try {
+    problems = (await unreportedRefusals(() => (handle as InSession)[QUIET]())).problems;
+  } catch (error) {
+    if (error instanceof ChannelstackError) return;
+    throw error;
+  }
+  if (problems !== undefined && problems.length > 0) throw new ModelProblemError(problems);
 }
 
 /**
@@ -772,9 +897,11 @@ export const matchers = {
     operation: string | RegExp,
     options?: Timing & { times?: number; error?: string },
   ) {
+    // A channel's calls have an operation; a model call has its endpoint (`chat.completions`).
     const fixture = subject as {
-      calls(options?: { error?: string }): Promise<Array<{ operation: string; error?: string }>>;
+      calls(options?: { error?: string }): Promise<Array<{ operation?: string; endpoint?: string; error?: string }>>;
     };
+    const named = (call: { operation?: string; endpoint?: string }) => call.operation ?? call.endpoint ?? "";
     return settle(subject, state, options, {
       onceQuiet: options?.times !== undefined,
       read: async () => {
@@ -782,15 +909,204 @@ export const matchers = {
         return {
           calls,
           matching: calls.filter((call) =>
-            typeof operation === "string" ? call.operation === operation : textMatches(call.operation, operation),
+            typeof operation === "string" ? named(call) === operation : textMatches(named(call), operation),
           ),
         };
       },
       holds: ({ matching }) => (options?.times === undefined ? matching.length > 0 : matching.length === options.times),
       describe: ({ calls, matching }) =>
-        `Expected the agent ${state.isNot ? "not " : ""}to call ${show(operation)}${options?.times === undefined ? "" : ` ${options.times} times`}${options?.error === undefined ? "" : ` with error ${options.error}`}, found ${matching.length}. Its calls:\n${listing(calls.map((call) => `${call.operation}${call.error ? ` → ${call.error}` : ""}`))}`,
+        `Expected the agent ${state.isNot ? "not " : ""}to call ${show(operation)}${options?.times === undefined ? "" : ` ${options.times} times`}${options?.error === undefined ? "" : ` with error ${options.error}`}, found ${matching.length}. Its calls:\n${listing(calls.map((call) => `${named(call)}${call.error ? ` → ${call.error}` : ""}`))}`,
     });
   },
+
+  // --- The model (decision 0029) ---------------------------------------------------------------
+
+  /**
+   * What the agent sent the model: text, a pattern, a message's text, or several messages in order
+   * (thread history). The subject is the `openai` fixture (any of the session's calls), a script
+   * (the calls it answered), or one call.
+   */
+  toHaveSent(
+    state: MatcherState,
+    subject: unknown,
+    expected: string | RegExp | Texted | readonly (string | Texted)[],
+    options?: Timing & { ordered?: boolean },
+  ) {
+    const wanted = (Array.isArray(expected) ? expected : [expected]) as readonly (string | RegExp | Texted)[];
+    const ordered = options?.ordered ?? Array.isArray(expected);
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: async () => (await modelCalls(subject)).map((call) => call.request.text),
+      holds: (texts) => texts.some((text) => sentIn(text, wanted, ordered)),
+      describe: (texts) =>
+        `Expected the agent ${state.isNot ? "not " : ""}to send the model ${wanted.map((item) => show(asText(item))).join(", then ")}${ordered && wanted.length > 1 ? " in that order" : ""}. ${texts.length === 0 ? "It made no model call." : `What it sent, newest first:\n${listing(texts.toReversed().map((text) => excerptOf(text)))}`}`,
+    });
+  },
+
+  /** A secret channelstack knows (a token, a signing secret, a key) was sent to the model. Use it as `not.`. */
+  toHaveSentSecrets(state: MatcherState, subject: unknown, options?: Timing) {
+    const fixture = subject as { sentSecrets(): Promise<ReadonlyArray<{ call: string; kinds: readonly string[] }>> };
+    if (typeof fixture.sentSecrets !== "function") throw new TypeError("toHaveSentSecrets needs the openai fixture");
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => fixture.sentSecrets(),
+      holds: (sent) => sent.length > 0,
+      describe: (sent) =>
+        sent.length === 0
+          ? "Expected the agent to send the model a secret, it sent none"
+          : `Expected the agent not to send the model any secret, it sent:\n${listing(sent.map((one) => `${one.call}: ${one.kinds.join(", ")}`))}`,
+    });
+  },
+
+  /** The call offered the model this tool (with this JSON Schema). */
+  toHaveOfferedTool(state: MatcherState, subject: unknown, name: string, options?: Timing & { schema?: unknown }) {
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: async () => (await modelCalls(subject)).flatMap((call) => call.request.tools),
+      holds: (tools) =>
+        tools.some(
+          (tool) =>
+            (tool.name ?? tool.type) === name &&
+            (options?.schema === undefined || (state.equals ?? Object.is)(tool.parameters, options.schema)),
+        ),
+      describe: (tools) =>
+        `Expected the agent ${state.isNot ? "not " : ""}to offer the model the tool ${JSON.stringify(name)}, it offered ${tools.length === 0 ? "none" : [...new Set(tools.map((tool) => tool.name ?? tool.type))].join(", ")}`,
+    });
+  },
+
+  /** The agent ran the model's call to this tool and sent its result back (with this text). */
+  toHaveSentToolResult(
+    state: MatcherState,
+    subject: unknown,
+    name: string,
+    options?: Timing & { text?: string | RegExp },
+  ) {
+    const handle = subject as { toolCalls(options?: { name?: string }): Promise<readonly ModelToolCall[]> };
+    if (typeof handle.toolCalls !== "function")
+      throw new TypeError("toHaveSentToolResult needs the openai fixture or a script");
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => handle.toolCalls({ name }),
+      holds: (calls) => calls.some((call) => call.result !== undefined && textMatches(call.result.text, options?.text)),
+      describe: (calls) =>
+        `Expected the agent ${state.isNot ? "not " : ""}to send back a result for ${JSON.stringify(name)}${options?.text === undefined ? "" : ` with ${show(options.text)}`}. The model called it ${calls.length} times; ${calls.filter((call) => call.result).length} got a result${calls.some((call) => call.result) ? `:\n${listing(calls.flatMap((call) => (call.result ? [excerptOf(call.result.text)] : [])))}` : ""}`,
+    });
+  },
+
+  /** The agent hung up before the model's answer was complete: it cancelled the request (Stop), or timed out. */
+  toBeAborted(state: MatcherState, subject: unknown, options?: Timing) {
+    const call = subject as { id: string; refresh(): Promise<{ response: { aborted: boolean; end?: string } }> };
+    if (typeof call.refresh !== "function") throw new TypeError("toBeAborted needs a model call");
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: async () => (await call.refresh()).response,
+      holds: (response) => response.aborted,
+      describe: (response) =>
+        `Expected model call ${call.id} ${state.isNot ? "not " : ""}to be aborted by the agent, it ${response.end === undefined ? "is still going" : `ended ${response.end}`}`,
+    });
+  },
+
+  /**
+   * The script answered calls (exactly `times` of them, once the agent is quiet): a call counts once
+   * the script's turn reached the agent, not one it was given and the fake refused.
+   */
+  toHaveAnswered(state: MatcherState, subject: unknown, options?: Timing & { times?: number }) {
+    const script = subject as {
+      id: string;
+      refresh(): Promise<{ problems: readonly string[] }>;
+      calls(): Promise<readonly ScriptCall[]>;
+    };
+    if (typeof script.refresh !== "function" || typeof script.calls !== "function")
+      throw new TypeError("toHaveAnswered needs a script");
+    return settle(subject, state, options, {
+      onceQuiet: options?.times !== undefined,
+      read: async () => {
+        const [calls, { problems }] = await Promise.all([script.calls(), script.refresh()]);
+        return { answered: calls.filter(answered).length, problems };
+      },
+      holds: ({ answered: count }) => (options?.times === undefined ? count > 0 : count === options.times),
+      describe: ({ answered: count, problems }) =>
+        `Expected script ${script.id} ${state.isNot ? "not " : ""}to answer ${options?.times === undefined ? "a call" : `${options.times} ${options.times === 1 ? "call" : "calls"}`}, it answered ${count}${problems.length === 0 ? "" : `. Its problems:\n${listing(problems)}`}`,
+    });
+  },
+};
+
+/** Something with text: a channel's message, comment or email. */
+interface Texted {
+  readonly text: string;
+}
+
+/** A call a script was given, as far as its answer goes. */
+interface ScriptCall {
+  readonly response: {
+    readonly status?: number | undefined;
+    readonly text?: string | undefined;
+    readonly error?: string | undefined;
+  };
+}
+
+/**
+ * Whether the script's turn reached the agent: an answer (text, tool calls, a refusal) or a
+ * scripted error. Not a call the fake refused for the script (`channelstack_no_script`: a turn the
+ * real API can't give, a list that ran out, a responder that threw), nor one a responder still
+ * holds, nor one the agent hung up on before anything was sent (status 0 without a scripted error).
+ */
+const answered = ({ response }: ScriptCall) =>
+  response.error !== "channelstack_no_script" &&
+  (response.text !== undefined || response.error !== undefined) &&
+  (response.status !== 0 || response.error !== undefined);
+
+interface ModelToolCall {
+  readonly name: string;
+  readonly result?: { readonly text: string };
+}
+
+interface ModelCallData {
+  readonly request: {
+    readonly text: string;
+    readonly tools: ReadonlyArray<{ readonly type: string; readonly name?: string; readonly parameters?: unknown }>;
+  };
+}
+
+/** The model calls a matcher reads: the fixture's or a script's (a list), or one call. */
+async function modelCalls(subject: unknown): Promise<readonly ModelCallData[]> {
+  const handle = subject as {
+    calls?: () => Promise<readonly ModelCallData[]>;
+    request?: ModelCallData["request"];
+    refresh?: () => Promise<ModelCallData>;
+  };
+  if (typeof handle.calls === "function") return handle.calls();
+  if (typeof handle.refresh === "function") return [await handle.refresh()];
+  if (handle.request !== undefined) return [handle as ModelCallData];
+  throw new TypeError("This matcher needs the openai fixture, a script or a model call");
+}
+
+const asText = (item: string | RegExp | Texted): string | RegExp =>
+  typeof item === "object" && "text" in item ? item.text : item;
+
+/** Whether a request's text has every wanted piece, in order when asked. */
+function sentIn(text: string, wanted: readonly (string | RegExp | Texted)[], ordered: boolean): boolean {
+  const haystack = normalisedText(text);
+  let from = 0;
+  for (const item of wanted) {
+    const piece = asText(item);
+    if (piece instanceof RegExp) {
+      piece.lastIndex = 0;
+      const match = piece.exec(text);
+      if (!match) return false;
+      continue;
+    }
+    const needle = normalisedText(piece);
+    const at = haystack.indexOf(needle, ordered ? from : 0);
+    if (at === -1) return false;
+    from = at + needle.length;
+  }
+  return true;
+}
+
+const excerptOf = (text: string) => {
+  const line = text.replace(/\s+/g, " ").trim();
+  return line.length > 120 ? `${line.slice(0, 119)}…` : line;
 };
 
 export type MatcherName = keyof typeof matchers;

@@ -164,6 +164,36 @@ export const HARNESS = {
 
 export type HarnessChannel = keyof typeof HARNESS;
 
+/** A provider's examples (`test/acceptance/examples/<provider>.test.ts`), and the agents they run against. */
+interface ProviderHarness {
+  readonly enabled: readonly string[];
+  /** Tests besides the examples that run against each of its agents: the standard checks with the model. */
+  readonly suites: readonly string[];
+  /** The agent with one fault per model check (`BROKEN=<check id>`), the channel it lives in, and where it takes webhooks. */
+  readonly broken: { readonly agent: string; readonly channel: HarnessChannel; readonly path: string };
+  /** The reference agents, the channel each lives in, and where it takes that channel's webhooks. */
+  readonly agents: Readonly<Record<string, { readonly channel: HarnessChannel; readonly path: string }>>;
+}
+
+/** The fakes the agent calls that aren't channels (decision 0029): their examples run against agents of a channel. */
+export const PROVIDERS = {
+  openai: {
+    enabled: [
+      "scripting the model > ",
+      "timing and failures \\(fake only\\) > ",
+      "several calls at once > ",
+      "what the agent sends the model > ",
+      "a missing script fails the test > ",
+    ],
+    suites: ["test/acceptance/checks/openai-checks.test.ts", "test/acceptance/providers/openai-parallel.test.ts"],
+    broken: { agent: "broken-openai", channel: "slack", path: "/slack/events" },
+    agents: {
+      "openai-node": { channel: "slack", path: "/slack/events" },
+      "openai-ai-sdk": { channel: "slack", path: "/slack/events" },
+    },
+  },
+} as const satisfies Readonly<Record<string, ProviderHarness>>;
+
 /** The channels the harness knows, in the drivers' order. */
 export const HARNESS_CHANNELS = Object.keys(HARNESS) as HarnessChannel[];
 

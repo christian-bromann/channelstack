@@ -121,6 +121,19 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   // with each channel's agent started again as the app `coder`; 12.9 is `check:channels`; 12.11
   // in the nightly live run.
   12: [{ name: "12.1 No existing example or scenario changed", script: ["check:unchanged"], group: "static" }],
+  // 13.1 and 13.6 (the examples and the pytest port against both OpenAI agents) run in the
+  // acceptance check's `openai` part; 13.2 to 13.5, 13.7, 13.8, 13.10 and 13.11 in the unit tests
+  // (`server/src/providers/openai`, `server/src/core/{attribution,stream}`) and `test/acceptance`;
+  // 13.6 in the Rust SDK's tests (7.1); 13.13 against the real API in the nightly job, and its
+  // fake side here.
+  13: [
+    { name: "13.2 OpenAI's description is the pinned one", script: ["openai:schema", "--check"], group: "static" },
+    {
+      name: "13.13 The shape lane's requests, against the fake",
+      script: ["openai:shapes", "--fake-only"],
+      group: "static",
+    },
+  ],
 };
 
 const phase = Number(process.argv[2]);

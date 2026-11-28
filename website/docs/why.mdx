@@ -43,11 +43,11 @@ Because the fake is the platform, a test can do what the platform does to your a
 - **Act as people, read as people.** A test is a script of people (`ana.say(…)`, `ben.click(…)`) and checks about what they would see. Resources are only read and waited on. That keeps tests close to the bug reports they prevent.
 - **Every test builds its own world.** People, channels, repositories and pages are created in the test, not in a config file. Tests run in parallel against one server, each in its own session, and clean up after themselves.
 - **Your app's access is explicit.** A bot only hears channels it's in, a GitHub App only sees repositories it's installed on, a Notion integration only sees pages connected to it, as on the real platforms. Leaving the app out is how you test the uninvited case.
-- **No model mocking.** If your app is an AI agent, the model belongs to its framework. The matchers check behaviour (one reply, in the thread, stopped in time), so they hold with a real model or a fake one.
+- **The model on the wire, never in content.** If your app is an AI agent, channelstack fakes OpenAI's API too, and each test scripts what the model answers: a slow first token, a stream that breaks, a tool call. It never writes or grades the answer. The matchers check behaviour (one reply, in the thread, stopped in time), so they hold with the fake OpenAI, a framework's fake model or a real one.
 - **Fake by default, live with credentials.** The same test runs against the fakes on every pull request and against real sandboxes nightly. Live mode acts on the real platform and reads back; it never relays or forges events to your app.
 
 ## When it isn't the right tool
 
-channelstack is for apps and agents that talk to these platforms over their APIs. If you're testing the quality of a model's answers, use an eval tool; channelstack can feed it transcripts, but doesn't grade them. If your app lives in a platform channelstack doesn't fake yet (Teams, Discord, email), it can't help there today.
+channelstack is for apps and agents that talk to these platforms over their APIs. If you're testing the quality of a model's answers, use an eval tool; channelstack can feed it transcripts, but doesn't grade them. If your app lives in a platform channelstack doesn't fake yet (Teams, for one), it can't help there today.
 
 Ready to try it? [Getting started](/docs/getting-started) takes about ten minutes.

@@ -392,6 +392,28 @@ let discord = session.discord().await?;
 
 **Returns** [`DiscordFixture`](/docs/reference/api/discord#discordfixture).
 
+### openai()
+
+The OpenAI fixture: where the agent reaches the fake model.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const openai = await session.openai();
+```
+
+```python title="Python"
+openai = await session.openai()
+```
+
+```rust title="Rust"
+let openai = session.openai().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`OpenAIFixture`](/docs/reference/api/openai#openaifixture).
+
 ### places()
 
 Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread, a Discord channel), the most recently active last.
@@ -482,6 +504,7 @@ Plain values the handles return and take.
 | `busy` | `busy` | `boolean` |
 | `quietForMs` | `quiet_for_ms` | `number` |
 | `open` | `open` | `string[]` |
+| `problems` | `problems` | `string[]` |
 | `loops` | `loops` | `string[] \| undefined` |
 
 ### Env

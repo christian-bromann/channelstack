@@ -1,12 +1,14 @@
 /**
- * `pnpm resend:schema --check`, `pnpm google:schema --check`, `pnpm discord:schema --check`: a
- * platform's own description of its API, as the tests hold its fake to it (exit checks 8.3, 9.2
- * and 11.2). Each is the platform's file, committed byte for byte from a repository at a commit;
- * `--check` fails when it isn't that file, and `--fetch` downloads it again.
+ * `pnpm resend:schema --check`, `pnpm google:schema --check`, `pnpm discord:schema --check`,
+ * `pnpm openai:schema --check`: a platform's own description of its API, as the tests hold its fake
+ * to it (exit checks 8.3, 9.2, 11.2 and 13.2). Each is the platform's file, committed byte for byte
+ * from a repository at a commit (gzipped, when it is large); `--check` fails when it isn't that file,
+ * and `--fetch` downloads it again.
  */
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 import { ROOT } from "./lib/generate.ts";
 
@@ -20,6 +22,8 @@ interface Pin {
   readonly blob: string;
   /** Where it is committed, under `server/test/schemas/`. */
   readonly path: string;
+  /** Committed gzipped: the file is large, and the check is on its bytes once unpacked. */
+  readonly gzip?: boolean;
 }
 
 const PINS: Readonly<Record<string, Pin>> = {
@@ -50,6 +54,16 @@ const PINS: Readonly<Record<string, Pin>> = {
     blob: "e82fca9268d9bbefaa38979fc005101e8d04b3fb",
     path: "discord-openapi.json",
   },
+  // OpenAI's OpenAPI description (5 MB, so gzipped).
+  openai: {
+    what: "OpenAI's openapi.json",
+    repository: "openai/openai-openapi",
+    file: "openapi.json",
+    commit: "abe304d1e5f1264fd3a11499ab57c0d17f5c1df3",
+    blob: "4e0f3ea999d13c6d4bc2ce357f0226653a9bac50",
+    path: "openai-openapi.json.gz",
+    gzip: true,
+  },
 };
 
 const name = process.argv[2] ?? "";
@@ -67,9 +81,10 @@ if (process.argv.includes("--fetch")) {
   const bytes = Buffer.from(await response.arrayBuffer());
   if (blobSha(bytes) !== pin.blob)
     throw new Error(`The file at ${pin.commit} isn't the blob ${pin.blob}: update both together`);
-  writeFileSync(path, bytes);
+  writeFileSync(path, pin.gzip ? gzipSync(bytes, { level: 9 }) : bytes);
 }
-if (blobSha(readFileSync(path)) !== pin.blob) {
+const stored = readFileSync(path);
+if (blobSha(pin.gzip ? gunzipSync(stored) : stored) !== pin.blob) {
   console.error(`${name}:schema: ${path} isn't ${pin.what} at ${pin.commit}. Run \`pnpm ${name}:schema --fetch\`.`);
   process.exit(1);
 }

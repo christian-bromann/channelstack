@@ -170,6 +170,13 @@
             },
             "description": "What is still open, in words: deliveries in flight or about to be retried, streams never stopped."
           },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What should fail the test at once, in words: a model call no script answered. Waiting matchers fail on these instead of timing out."
+          },
           "loops": {
             "type": "array",
             "items": {
@@ -181,7 +188,8 @@
         "required": [
           "busy",
           "quietForMs",
-          "open"
+          "open",
+          "problems"
         ]
       },
       "Env": {
@@ -9324,6 +9332,1065 @@
         "required": [
           "type"
         ]
+      },
+      "OpenAIFixture": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "description": "What the agent's OPENAI_BASE_URL should be."
+          }
+        },
+        "required": [
+          "baseUrl"
+        ],
+        "x-channelstack-resource": {}
+      },
+      "OpenAIScript": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "responder": {
+            "type": "boolean"
+          },
+          "times": {
+            "type": "number",
+            "description": "How many calls it answers (`-1`: unlimited)."
+          },
+          "used": {
+            "type": "integer"
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "responder",
+          "times",
+          "used",
+          "problems"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "OpenAIRespondBody": {
+        "type": "object",
+        "properties": {
+          "turns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAITurnInput"
+            },
+            "x-channelstack-one-or-many": true,
+            "description": "The turns, in order: one per matching call."
+          },
+          "responder": {
+            "type": "boolean",
+            "default": false,
+            "description": "The test answers each call itself (a function)."
+          },
+          "when": {
+            "$ref": "#/components/schemas/OpenAIMatch"
+          },
+          "times": {
+            "type": "integer",
+            "description": "How many calls it answers. Default: the number of turns; unlimited for a responder (`-1`)."
+          },
+          "timing": {
+            "$ref": "#/components/schemas/OpenAITiming"
+          }
+        }
+      },
+      "OpenAITurnInput": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "$ref": "#/components/schemas/OpenAITurn"
+          }
+        ]
+      },
+      "OpenAITurn": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "The answer. Streamed, a string goes in chunks of about four characters; an array gives the chunks exactly. Templates: `{lastUserText}`, `{toolResult}`, `{toolResult.<name>}`, `{model}`, `{call}`"
+          },
+          "toolCalls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAIToolCallSpec"
+            },
+            "description": "Tool calls, in order: more than one is parallel."
+          },
+          "reasoning": {
+            "type": "object",
+            "properties": {
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              },
+              "tokens": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "description": "Responses: a reasoning item with this summary. Chat Completions: only the reasoning token count (OpenRouter's and DeepSeek's dialects send the summary too)."
+          },
+          "refusal": {
+            "type": "string"
+          },
+          "finish": {
+            "type": "string",
+            "enum": [
+              "stop",
+              "length",
+              "content_filter"
+            ]
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "output": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reasoning": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cached": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "description": "Default: counted from the request and the answer, at about four characters a token."
+          },
+          "timing": {
+            "$ref": "#/components/schemas/OpenAITiming"
+          },
+          "failAfter": {
+            "type": "object",
+            "properties": {
+              "chunks": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "how": {
+                "type": "string",
+                "enum": [
+                  "error",
+                  "drop",
+                  "stall"
+                ],
+                "default": "error"
+              }
+            },
+            "required": [
+              "chunks"
+            ],
+            "description": "Break a stream after this many chunks: an error event, a cut connection, or a stall."
+          },
+          "pauseAfter": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Hold a stream after this many chunks until the script's `resume()`."
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "rate_limit",
+              "slow_down",
+              "insufficient_quota",
+              "credit_balance_exhausted",
+              "organization_spend_limit_exceeded",
+              "project_spend_limit_exceeded",
+              "organization_usage_limit_exceeded",
+              "server_error",
+              "overloaded",
+              "timeout",
+              "context_length_exceeded",
+              "content_policy",
+              "invalid_api_key",
+              "not_in_organization",
+              "ip_not_authorized",
+              "unsupported_region"
+            ],
+            "description": "An error the API answers with instead: OpenAI's documented errors."
+          },
+          "retryAfter": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)?(ms|s|m)$"
+              }
+            ],
+            "description": "For an error: what `retry-after` and `retry-after-ms` say. Default 0."
+          },
+          "shouldRetry": {
+            "type": "boolean",
+            "description": "For an error: `x-should-retry`, which the SDKs obey."
+          },
+          "message": {
+            "type": "string",
+            "description": "For an error: its message instead of OpenAI's."
+          }
+        }
+      },
+      "OpenAIToolCallSpec": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The tool's name: a function, or a custom tool."
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "A function's arguments: an object, or the JSON text exactly as the model sends it."
+          },
+          "input": {
+            "type": "string",
+            "description": "A custom tool's free-form input."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "OpenAITiming": {
+        "type": "object",
+        "properties": {
+          "firstToken": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)?(ms|s|m)$"
+              }
+            ],
+            "description": "From the request's arrival to the response headers and the first chunk (the whole body if not streaming)."
+          },
+          "betweenChunks": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)?(ms|s|m)$"
+              }
+            ],
+            "description": "Between the chunks of a stream."
+          }
+        }
+      },
+      "OpenAIMatch": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "flags": {
+                    "type": "string",
+                    "pattern": "^[dgimsuvy]*$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "flags"
+                ]
+              }
+            ],
+            "x-channelstack-pattern": true,
+            "description": "In the newest user message (a string ignores case)."
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "flags": {
+                    "type": "string",
+                    "pattern": "^[dgimsuvy]*$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "flags"
+                ]
+              }
+            ],
+            "x-channelstack-pattern": true,
+            "description": "Anywhere in the request: instructions, history, tool results."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The request offers all of these tools."
+          },
+          "toolResult": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "The newest input is a tool result: any (`true`), or of this tool."
+          },
+          "endpoint": {
+            "type": "string",
+            "enum": [
+              "chat.completions",
+              "responses"
+            ]
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "flags": {
+                    "type": "string",
+                    "pattern": "^[dgimsuvy]*$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "flags"
+                ]
+              }
+            ],
+            "x-channelstack-pattern": true
+          },
+          "stream": {
+            "type": "boolean"
+          },
+          "from": {
+            "type": "string",
+            "description": "The call answers this person's message: a person of any channel.",
+            "x-channelstack-ref-role": [
+              "user"
+            ]
+          },
+          "in": {
+            "type": "string",
+            "description": "The call answers a message in this place (a channel, an issue, a thread of email), or the thread with this id.",
+            "x-channelstack-ref-role": [
+              "resource"
+            ]
+          }
+        }
+      },
+      "OpenAICalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/OpenAICall"
+        }
+      },
+      "OpenAICall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The response's own id: `chatcmpl-…` or `resp_…`."
+          },
+          "endpoint": {
+            "type": "string",
+            "enum": [
+              "chat.completions",
+              "responses"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "stream": {
+            "type": "boolean"
+          },
+          "at": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "attempt": {
+            "type": "integer",
+            "description": "0 for a first try; the SDK's retry number when it sends one."
+          },
+          "done": {
+            "type": "boolean"
+          },
+          "request": {
+            "$ref": "#/components/schemas/OpenAIRequest"
+          },
+          "response": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer"
+              },
+              "text": {
+                "type": "string"
+              },
+              "finish": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "aborted": {
+                "type": "boolean",
+                "description": "The agent hung up before the answer was complete."
+              },
+              "chunksSent": {
+                "type": "integer"
+              },
+              "end": {
+                "type": "string",
+                "enum": [
+                  "completed",
+                  "errored",
+                  "dropped",
+                  "stalled",
+                  "aborted"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "aborted"
+            ]
+          },
+          "toolCalls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAIToolCall"
+            }
+          },
+          "script": {
+            "type": "string",
+            "description": "The script that answered. None: the call was refused for want of one."
+          }
+        },
+        "required": [
+          "id",
+          "endpoint",
+          "model",
+          "stream",
+          "at",
+          "durationMs",
+          "attempt",
+          "done",
+          "request",
+          "response",
+          "toolCalls"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "OpenAIRequest": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "enum": [
+              "chat.completions",
+              "responses"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "stream": {
+            "type": "boolean"
+          },
+          "instructions": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAIMessage"
+            }
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAITool"
+            }
+          },
+          "toolChoice": {},
+          "responseFormat": {},
+          "lastUserText": {
+            "type": "string"
+          },
+          "lastToolResults": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "callId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "callId",
+                "text"
+              ]
+            }
+          },
+          "text": {
+            "type": "string",
+            "description": "Everything the request says, as one text: what `toHaveSent` reads."
+          },
+          "context": {
+            "$ref": "#/components/schemas/OpenAIContext"
+          },
+          "body": {
+            "description": "The body exactly as the agent sent it."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Its headers, without the key."
+          }
+        },
+        "required": [
+          "endpoint",
+          "model",
+          "stream",
+          "messages",
+          "tools",
+          "lastToolResults",
+          "text",
+          "context",
+          "headers"
+        ]
+      },
+      "OpenAIMessage": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "developer",
+              "user",
+              "assistant",
+              "tool"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "toolCalls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "arguments": {}
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          },
+          "callId": {
+            "type": "string",
+            "description": "A tool result: the call it answers."
+          },
+          "name": {
+            "type": "string",
+            "description": "A tool result: the tool's name."
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "file",
+                    "audio"
+                  ]
+                },
+                "from": {
+                  "type": "string",
+                  "enum": [
+                    "data",
+                    "file_id",
+                    "url"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "from"
+              ]
+            }
+          }
+        },
+        "required": [
+          "role",
+          "text"
+        ]
+      },
+      "OpenAITool": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "parameters": {},
+          "strict": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "OpenAIContext": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "description": "The channel the call answers a message from (`slack`)."
+          },
+          "from": {
+            "$ref": "#/components/schemas/OpenAIRef"
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/OpenAIRef"
+          },
+          "thread": {
+            "$ref": "#/components/schemas/OpenAIRef"
+          },
+          "message": {
+            "$ref": "#/components/schemas/OpenAIRef"
+          },
+          "attributedBy": {
+            "type": "string",
+            "enum": [
+              "minted_id",
+              "tag",
+              "owned_id",
+              "text",
+              "order"
+            ],
+            "description": "The evidence that gave the call to this session, strongest first."
+          },
+          "matched": {
+            "type": "string",
+            "description": "The string that decided it: the minted id, the tag, the owned id, or the text the person wrote."
+          },
+          "tiedWith": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "With `attributedBy: \"order\"`: the other sessions whose people sent the same text. The call went to the oldest unanswered message."
+          }
+        }
+      },
+      "OpenAIRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "description": "The person whose message the call answers."
+      },
+      "OpenAIToolCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "function",
+              "custom"
+            ]
+          },
+          "hosted": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "arguments": {},
+          "madeIn": {
+            "type": "string",
+            "description": "The call whose answer made it."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "sentIn": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "text",
+              "sentIn"
+            ],
+            "description": "What the agent sent back, and in which call. None: the agent never answered it."
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "hosted",
+          "name",
+          "madeIn"
+        ]
+      },
+      "OpenAIPausedCalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/OpenAICall"
+        }
+      },
+      "OpenAIToolCalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/OpenAIToolCall"
+        }
+      },
+      "OpenAIHeldPage": {
+        "type": "object",
+        "properties": {
+          "held": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAIHeldCall"
+            }
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "held",
+          "cursor"
+        ]
+      },
+      "OpenAIHeldCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "request": {
+            "$ref": "#/components/schemas/OpenAIRequest"
+          }
+        },
+        "required": [
+          "id",
+          "request"
+        ]
+      },
+      "OpenAIAnswerBody": {
+        "type": "object",
+        "properties": {
+          "held": {
+            "type": "string"
+          },
+          "turn": {
+            "$ref": "#/components/schemas/OpenAITurnInput"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "held"
+        ]
+      },
+      "OpenAISessionCalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/OpenAICall"
+        }
+      },
+      "OpenAISessionToolCalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/OpenAIToolCall"
+        }
+      },
+      "OpenAIProblems": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "OpenAISentSecrets": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/OpenAISentSecret"
+        }
+      },
+      "OpenAISentSecret": {
+        "type": "object",
+        "properties": {
+          "call": {
+            "type": "string"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "call",
+          "kinds"
+        ]
+      },
+      "OpenAIUnattributedCalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/OpenAIUnattributedCall"
+        }
+      },
+      "OpenAIUnattributedCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string",
+            "enum": [
+              "chat.completions",
+              "responses"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "lastUserText": {
+            "type": "string"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sinceMs": {
+            "type": "number",
+            "description": "How long ago it arrived, on the server's clock."
+          },
+          "message": {
+            "type": "string",
+            "description": "What the agent was told: why no session claimed it."
+          }
+        },
+        "required": [
+          "id",
+          "endpoint",
+          "model",
+          "at",
+          "tools",
+          "sinceMs",
+          "message"
+        ]
+      },
+      "OpenAIRateLimit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "requests": {
+            "type": "integer"
+          },
+          "tokens": {
+            "type": "integer"
+          },
+          "resetsInMs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "resetsInMs"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "OpenAIRateLimitBody": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "per": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 60000,
+                "description": "The window. Default 1 minute.",
+                "x-channelstack-duration": true
+              }
+            },
+            "required": [
+              "limit"
+            ]
+          },
+          "tokens": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "per": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 60000,
+                "description": "The window. Default 1 minute.",
+                "x-channelstack-duration": true
+              }
+            },
+            "required": [
+              "limit"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "rate_limit",
+              "slow_down"
+            ],
+            "default": "rate_limit"
+          }
+        }
       },
       "Places": {
         "type": "array",
@@ -37185,6 +38252,1286 @@
         }
       }
     },
+    "/sessions/{session}/openai": {
+      "get": {
+        "summary": "The OpenAI fixture: where the agent reaches the fake model",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "Session",
+          "name": "openai"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIFixture"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/scripts": {
+      "post": {
+        "summary": "Script what the model answers: turns used in order, one per matching call, or a responder the test answers. Scripts are tried in the order they were added",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "OpenAIFixture",
+          "name": "respond",
+          "args": [
+            "turns"
+          ],
+          "options": [
+            "when",
+            "times",
+            "timing",
+            "responder"
+          ],
+          "responder": {
+            "flag": "responder",
+            "held": "heldCalls",
+            "answer": "answerHeld",
+            "request": "OpenAIRequest"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenAIRespondBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIScript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/scripts/{script}": {
+      "get": {
+        "summary": "Re-read a script: how many calls it answered, and its problems",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIScript",
+          "name": "refresh"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "script",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIScript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove a script. Closing the session does it too",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIScript",
+          "name": "undo",
+          "dispose": true
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "script",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/scripts/{script}/resume": {
+      "post": {
+        "summary": "Let the streams this script holds at `pauseAfter` go on",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIScript",
+          "name": "resume"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "script",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/scripts/{script}/calls": {
+      "get": {
+        "summary": "The calls this script answered",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIScript",
+          "name": "calls"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForCall",
+            "mode": "next",
+            "what": "a model call this script answers"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "script",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAICalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/scripts/{script}/paused": {
+      "get": {
+        "summary": "The calls whose streams this script holds at `pauseAfter`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIScript",
+          "name": "pausedCalls"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForPause",
+            "mode": "next",
+            "what": "a stream held at pauseAfter"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "script",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIPausedCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/scripts/{script}/tool-calls": {
+      "get": {
+        "summary": "The tool calls this script made, each with the result the agent sent back",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIScript",
+          "name": "toolCalls",
+          "options": [
+            "name"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "script",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "name",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIToolCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/scripts/{script}/requests": {
+      "get": {
+        "summary": "For a responder's SDK: the calls held for it since `since`, waiting up to `waitMs` for one",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIScript",
+          "name": "heldCalls",
+          "options": [
+            "since",
+            "waitMs"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "script",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "since",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 25000
+            },
+            "required": false,
+            "name": "waitMs",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIHeldPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/scripts/{script}/answers": {
+      "post": {
+        "summary": "For a responder's SDK: answer a held call with a turn, or report that the test's function threw",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIScript",
+          "name": "answerHeld",
+          "args": [
+            "held"
+          ],
+          "options": [
+            "turn",
+            "error"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "script",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenAIAnswerBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/calls": {
+      "get": {
+        "summary": "Every model call attributed to this session, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIFixture",
+          "name": "calls",
+          "options": [
+            "endpoint",
+            "error"
+          ]
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForCall",
+            "mode": "next",
+            "filter": true,
+            "what": "a model call from the agent"
+          },
+          {
+            "name": "latestCall",
+            "mode": "latest",
+            "filter": true,
+            "what": "a model call from the agent"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "chat.completions",
+                "responses"
+              ]
+            },
+            "required": false,
+            "name": "endpoint",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "`true` for any error, or one error code"
+            },
+            "required": false,
+            "description": "`true` for any error, or one error code",
+            "name": "error",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAISessionCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/calls/{call}": {
+      "get": {
+        "summary": "Re-read a model call: whether it is done, how it ended",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAICall",
+          "name": "refresh"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "call",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAICall"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/tool-calls": {
+      "get": {
+        "summary": "Every tool call the model made in this session, each with the result the agent sent back",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIFixture",
+          "name": "toolCalls",
+          "options": [
+            "name"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "name",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAISessionToolCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/problems": {
+      "get": {
+        "summary": "What went wrong with the model in this session: a call no script answered, a script that ran out or did what the real API can't, a responder that threw. Matchers fail at once on these",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIFixture",
+          "name": "problems"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIProblems"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/sent-secrets": {
+      "get": {
+        "summary": "The calls that sent a secret channelstack knows to the model, and the kinds they sent (`slack.botToken`): never the values",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIFixture",
+          "name": "sentSecrets"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAISentSecrets"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/unattributed": {
+      "get": {
+        "summary": "Model calls no session could be given (the agent calling the model at startup, for example), oldest first: what a failing matcher names",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIFixture",
+          "name": "unattributed",
+          "options": [
+            "withinMs"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "description": "Only the calls that arrived this recently."
+            },
+            "required": false,
+            "description": "Only the calls that arrived this recently.",
+            "name": "withinMs",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIUnattributedCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/rate-limits": {
+      "post": {
+        "summary": "Limit this session's model calls: requests and tokens per window, with truthful x-ratelimit-* headers",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "OpenAIFixture",
+          "name": "rateLimit",
+          "options": [
+            "requests",
+            "tokens",
+            "error"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenAIRateLimitBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIRateLimit"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/rate-limits/{limit}": {
+      "get": {
+        "summary": "What the rate limit's headers would say now",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIRateLimit",
+          "name": "remaining"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "limit",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIRateLimit"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove the rate limit",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIRateLimit",
+          "name": "undo",
+          "dispose": true
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "limit",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session}/places": {
       "get": {
         "summary": "Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread, a Discord channel), the most recently active last",
@@ -37441,6 +39788,29 @@
     {
       "name": "discord",
       "title": "Discord"
+    },
+    {
+      "name": "openai",
+      "title": "OpenAI",
+      "provider": true
     }
-  ]
+  ],
+  "x-channelstack-text-normalisation": {
+    "rules": [
+      {
+        "pattern": "<[@#!][^>]*>",
+        "replacement": " "
+      },
+      {
+        "pattern": "<(https?:[^>|]+)(\\|[^>]*)?>",
+        "replacement": " $1 "
+      },
+      {
+        "pattern": "(^|\\s)@[A-Za-z0-9_.-]+",
+        "replacement": " "
+      }
+    ],
+    "collapseWhitespace": true,
+    "lowercase": true
+  }
 }

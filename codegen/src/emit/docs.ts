@@ -17,7 +17,8 @@ const ROUTE = "/docs/reference/api";
 
 /**
  * The pages, in sidebar order. The client's and the errors page sit in "Test API"; the platforms'
- * in "Platform APIs", each linked to its guide under /docs/platforms.
+ * in "Platform APIs", each linked to its guide under /docs/platforms, the fake model's (decision
+ * 0029) too.
  */
 const pagesOf = (ir: Ir): Page[] => [
   { slug: "client", title: "Client and sessions", order: 2 },
@@ -28,6 +29,7 @@ const pagesOf = (ir: Ir): Page[] => [
       title: `${channel.title} API`,
       prefix: channel.title,
       fixture: channel.name,
+      ...(channel.provider ? { provider: true as const } : {}),
       order: at + 1,
     })),
 ];
@@ -41,6 +43,8 @@ interface Page {
   /** A platform's type prefix (`GitHub`); none for the client's page. */
   prefix?: string;
   fixture?: string;
+  /** The fake model (decision 0029): scripted, with no people or places. */
+  provider?: true;
   order: number;
 }
 
@@ -462,7 +466,9 @@ export function emitDocs(ir: Ir): Map<string, string> {
     const intro =
       page.prefix === undefined
         ? "The client you connect with, and the session each test runs in. Every handle on the platform pages is reached from here."
-        : `Every handle of the ${page.prefix} fake: the \`${page.fixture}\` fixture, the people and objects a test creates on it, and what they read and wait for. How to test a ${page.prefix} app or agent, step by step, is in the [${page.prefix} guide](/docs/platforms/${page.slug}).`;
+        : page.provider
+          ? `Every handle of the ${page.prefix} fake: the \`${page.fixture}\` fixture, the scripts a test answers the model's calls with, and the calls it reads and waits for. How to script the model, step by step, is in the [${page.prefix} guide](/docs/platforms/${page.slug}).`
+          : `Every handle of the ${page.prefix} fake: the \`${page.fixture}\` fixture, the people and objects a test creates on it, and what they read and wait for. How to test a ${page.prefix} app or agent, step by step, is in the [${page.prefix} guide](/docs/platforms/${page.slug}).`;
     const body = [
       ...resources.flatMap((resource) => {
         anchor(page, `resource:${resource.name}`, resource.name);

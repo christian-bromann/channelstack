@@ -7,6 +7,7 @@ export type {
   LiveContext,
   LiveCheck,
   LiveMaintenance,
+  MessagePlace,
   SweepReport,
   SocketPeer,
   SocketSession,

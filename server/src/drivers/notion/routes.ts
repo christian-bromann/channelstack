@@ -13,6 +13,7 @@ import {
   DeliveryStatus,
   duration,
   principalSchema,
+  textPattern,
   transcriptSchema,
 } from "../../core/router/inspect.ts";
 import type { NotionWorld } from "./backend.ts";
@@ -146,9 +147,7 @@ const Content = z.union([z.string(), z.array(z.unknown())]).openapi({
   "x-channelstack-files": "document",
 });
 /** Text to find in a page: a string, or a pattern (SDKs send a `RegExp` as its source and flags). */
-const TextPattern = z
-  .union([z.string().min(1), z.object({ source: z.string().min(1), flags: z.string().regex(/^[dgimsuvy]*$/) })])
-  .openapi({ "x-channelstack-pattern": true });
+const TextPattern = textPattern();
 
 const UserParams = z.object({ user: pathParam("user") });
 const AppParams = z.object({ app: pathParam("app") });

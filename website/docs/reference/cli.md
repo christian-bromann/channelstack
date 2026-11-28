@@ -1,7 +1,7 @@
 ---
 title: "CLI"
 order: 1
-description: "Every channelstack command and flag: start, env, the attach commands, mcp, and the live-mode commands, with their output and exit codes."
+description: "Every channelstack command and flag: start, env, the attach commands, the fake model's commands, mcp, and the live-mode commands, with their output and exit codes."
 section: "Tools"
 ---
 
@@ -32,6 +32,9 @@ npx channelstack show
 | [`channelstack tail`](#channelstack-tail) | Print deliveries and API calls as they happen |
 | [`channelstack deliveries`](#channelstack-deliveries) | List what was delivered to the app |
 | [`channelstack redeliver`](#channelstack-redeliver) | Deliver something again |
+| [`channelstack openai respond`](#channelstack-openai-respond) | Script what the fake OpenAI answers the app's model calls |
+| [`channelstack openai calls`](#channelstack-openai-calls) | List the app's model calls and what the model answered |
+| [`channelstack openai undo`](#channelstack-openai-undo) | Remove a model script |
 | [`channelstack ui`](#channelstack-ui) | Print a one-time link to the UI |
 | [`channelstack mcp`](#channelstack-mcp) | Serve the attach commands as MCP tools |
 | [`channelstack doctor`](#channelstack-doctor) | Check live credentials, allowlists and browser sessions |
@@ -53,7 +56,7 @@ npx channelstack show
 
 ## Attaching to the running server
 
-`env`, `<channel> …`, `show`, `tail`, `deliveries`, `redeliver`, `ui` and `mcp` talk to a running server through its control API.
+`env`, `<channel> …`, `show`, `tail`, `deliveries`, `redeliver`, `openai …`, `ui` and `mcp` talk to a running server through its control API.
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -94,7 +97,7 @@ channelstack [start] [--no-portless] [--port <n>] [--server-file <path>] [--log-
 | `--port <n>` | `0` with portless (a free port), `4500` without | The loopback port. `0` picks a free one |
 | `--server-file <path>` | `CHANNELSTACK_SERVER_FILE`, else `<home>/server.json` | Where to write the control API's URL and token (0600) |
 | `--log-level <level>` | `CHANNELSTACK_LOG_LEVEL`, else `info` | `debug`, `info`, `warn`, `error` or `silent`. Logs go to stderr |
-| `--proxy` | off | Also run an HTTP proxy for apps with hard-coded hosts: `slack.com`, `api.github.com`, `api.linear.app`, `api.notion.com`, `api.resend.com`, `gmail.googleapis.com`, `oauth2.googleapis.com`, `www.googleapis.com`, `discord.com` and `gateway.discord.gg` go to the fakes, every other host passes through. See [Proxy mode](/docs/guide/proxy-mode) |
+| `--proxy` | off | Also run an HTTP proxy for apps with hard-coded hosts: `slack.com`, `api.github.com`, `api.linear.app`, `api.notion.com`, `api.resend.com`, `gmail.googleapis.com`, `oauth2.googleapis.com`, `www.googleapis.com`, `discord.com`, `gateway.discord.gg` and `api.openai.com` go to the fakes, every other host passes through. See [Proxy mode](/docs/guide/proxy-mode) |
 | `--proxy-port <n>` | `7464` | The proxy's loopback port. `0` picks a free one. Needs `--proxy` |
 | `--record <dir>` | none | Write the shape of every exchange with those hosts, and of every webhook, to `<dir>/shapes.jsonl`: structure only, never a value. Needs `--proxy` |
 
@@ -113,12 +116,14 @@ channelstack <version> · in-memory
   notion   https://notion.localhost
   resend   https://resend.localhost
   google   https://google.localhost
+  discord  https://discord.localhost
+  openai   https://openai.localhost
   UI       https://channelstack.localhost/?login=…
 
   `channelstack env` prints tokens and URLs as .env lines
 ```
 
-With `--proxy`, a `Proxy` line adds the proxy's URL and the CA file, and the last line points at `channelstack env --proxy`. The UI link signs one browser in, once; `channelstack ui` prints a fresh one. `echo` is channelstack's own minimal test platform.
+With `--proxy`, a `Proxy` line adds the proxy's URL and the CA file, and the last line points at `channelstack env --proxy`. The UI link signs one browser in, once; `channelstack ui` prints a fresh one. `echo` is channelstack's own minimal test platform. `openai` is the fake OpenAI; the app's base URL is that address with `/v1`, as `channelstack env` prints it.
 
 | Error | Cause |
 |---|---|
@@ -264,6 +269,47 @@ Delivers it again, the way the platform does: on Slack it is a retry (with `X-Sl
 
 It fails with `nothing was delivered to the agent yet.` (or `… on <channel> yet.`) when there is nothing to send, and with ``no delivery <id>. `channelstack deliveries` lists them.`` (or `no delivery <id> on <channel>. …`) for an id it can't find.
 
+## `channelstack openai respond`
+
+```bash
+channelstack openai respond "<text>" [--when <text>] [--times <n>] [--tool <name> --args <json>]
+```
+
+Scripts what the [fake OpenAI](/docs/platforms/openai) answers the app's next model calls in the `dev` session. A model call no script answers gets a 400 (`channelstack_no_script`), so an app on the fake model needs one before it can answer. Scripts are tried in the order they were added. The text may use `{lastUserText}` (the newest user message of the call) and `{toolResult}` (what the app sent back from a tool).
+
+| Flag | Meaning |
+|---|---|
+| `--when <text>` | Answer only calls whose newest user message has this text |
+| `--times <n>` | How many calls it answers. Default: one per turn. `-1` answers every matching call |
+| `--tool <name>` | The model first calls this tool, and the text answers the call that carries its result. Without a text, the script is the tool call alone |
+| `--args <json>` | With `--tool`: the tool call's arguments, as JSON. Default `{}` |
+
+Prints the script's id and what it answers: `ms_…: the model answers 1 call`, `… every matching call`, `… 2 calls about "deploy"`.
+
+It fails with ``say what the model answers: `channelstack openai respond "…"` `` without a text or a tool, ``--args is the tool's arguments as JSON, not "…"`` and `--times is a whole number, not "…"`.
+
+## `channelstack openai calls`
+
+```bash
+channelstack openai calls
+```
+
+Prints the `dev` session's model calls, oldest first, one a line: the call's id, the endpoint (`chat.completions` or `responses`), the model, the newest user message, the status and what the model answered or the error, and the script that answered it:
+
+```
+<id>  chat.completions gpt-5 "what broke?" → 200 "You asked: what broke?" (ms_…)
+```
+
+Prints `No model calls yet.` when there are none.
+
+## `channelstack openai undo`
+
+```bash
+channelstack openai undo <script>
+```
+
+Removes a script by the id `openai respond` printed, and prints `Removed <script>.`. It fails with ``say which script: `channelstack openai undo ms_…` `` without one.
+
 ## `channelstack ui`
 
 ```bash
@@ -290,6 +336,8 @@ Serves the attach commands as MCP tools over stdio, for a coding agent that is b
 | `tail` | none | `tail --once`, from where the last call stopped (`Nothing new.` when nothing happened) |
 | `list_deliveries` | `channel?` | `deliveries` |
 | `redeliver` | `channel?`, `delivery?` (`last`, the default, or an id) | `redeliver` |
+| `openai_respond` | `text?`, `when?`, `times?`, `tool?`, `args?` | `openai respond` |
+| `openai_calls` | none | `openai calls` |
 
 `to`, `on` and `thread` take `last` (the default), `<place>:<entry>`, or a place by name.
 

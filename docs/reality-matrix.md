@@ -280,6 +280,23 @@ Discord has no API that acts as a person, and a user token or a scripted account
 
 ---
 
+## OpenAI (the fake model)
+
+Built in phase 13 ([decision 0029](decisions/0029-fake-openai.md)). The fake OpenAI is the agent's model, not a channel: it has no people and no deliveries, and it is fake in every run. In a live run the channels are real and the model is still the fake, so a nightly run against a sandbox workspace is as deterministic as the fake run, once each call finds its test: live there are no deliveries for attribution to read, so a call is attributed by a minted id or a tag naming the session ([live-mode.md, section 1.1](live-mode.md#11-the-fake-model-in-a-live-run)). There is no live OpenAI backend: an agent that should use the real model is given no `OPENAI_BASE_URL` (base-URL mode only; proxy mode routes `api.openai.com` to the fake).
+
+| Feature | Fake | Live | How (live) | Notes |
+|---|---|---|---|---|
+| `openai.respond(turns, { when, times, timing })` | Done | Done | — (the fake model) | Text, chunks, function and custom tool calls, reasoning, a refusal, `finish`, `usage`, every documented error; templates (`{lastUserText}`, `{toolResult.<name>}`) |
+| `openai.respond(fn)` (a responder) | Done | Done | — | In TypeScript, Python and Rust (`respond_with`): the server holds the call, the test's SDK answers it |
+| `openai.calls()`, `waitForCall`, `latestCall`, `toolCalls()`, `call.refresh()` | Done | Done | — | A call's request normalised for both endpoints, with its channel context; what it sent scrubbed of every secret channelstack knows |
+| `openai.rateLimit(…)`, `x-ratelimit-*` | Done | Done | — | Counted per session, on the server's clock |
+| `openai.problems()`, `unattributed()`, `sentSecrets()` | Done | Done | — | An unscripted call is a 400 `channelstack_no_script`, and the test fails |
+| Chat Completions, streamed or not | Done | Done | — | Every answer and chunk holds to OpenAI's pinned description (exit check 13.2). Dialects: OpenRouter's `reasoning`, DeepSeek's `reasoning_content`, Azure's deployment paths |
+| Responses, stored responses, `previous_response_id`, Conversations | Done | Done | — | Every event of a stream numbered, `response.failed` and `error` when a stream breaks with an error |
+| Built-in tools, images, audio, files | Yes | Yes | — | Phase 14 |
+
+Not in the fake at all: background responses and `n > 1` (refused with `unsupported_in_fake`), and embeddings, vector stores, Realtime and batches (OpenAI's 404).
+
 ## What this means for test authors
 
 1. **Most of a test runs live with plain tokens.** Commenting, reviewing, delegating and every read work on all four platforms through a person's token, including Notion, now that it has personal access tokens. Slack is the exception for messages: one posted through the API carries the posting app's bot, so a person's `say` and `reply` are typed in the client by the browser actor.

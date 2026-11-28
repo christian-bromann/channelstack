@@ -9,6 +9,7 @@ import { runDeliveries, runRedeliver } from "./cli/deliveries.ts";
 import { runShow } from "./cli/dev.ts";
 import { runDoctor, runLogin, runSweep } from "./cli/live.ts";
 import { runMcp } from "./cli/mcp.ts";
+import { runOpenAI } from "./cli/openai.ts";
 import { runTail } from "./cli/watch.ts";
 import { appWebhookVariable } from "./core/apps/index.ts";
 import { rotateCa } from "./core/ca/index.ts";
@@ -52,6 +53,11 @@ Usage:
   channelstack show [--thread last] [--json]    The most recently active place on any channel
   channelstack tail [--once]                    Events to the agent and its API calls, as they happen
   channelstack deliveries [<channel>]           What was delivered to the agent: ids, events, outcomes, attempts
+  channelstack openai respond "<text>"          Script the fake OpenAI's answer in the dev session (templates:
+      [--when <text>] [--times <n>]             {lastUserText}, {toolResult}); --tool <name> --args <json> calls a
+      [--tool <name> --args <json>]             tool first, and the text answers its result
+  channelstack openai calls                     The dev session's model calls, one a line
+  channelstack openai undo <script>             Remove a script
   channelstack redeliver [<channel>] [last|<id>]   Deliver it again, the way the platform does (Slack retries it)
   channelstack mcp                              These commands as MCP tools over stdio, for a coding agent
   channelstack ui                               A one-time link that opens the UI in a browser
@@ -236,6 +242,10 @@ async function main() {
       check: { type: "boolean" },
       user: { type: "string" },
       save: { type: "string" },
+      when: { type: "string" },
+      times: { type: "string" },
+      tool: { type: "string" },
+      args: { type: "string" },
     },
   });
   if (values.version) return void process.stdout.write(`${pkg.version}\n`);
@@ -294,6 +304,10 @@ async function main() {
     return print(await runRedeliver(attach(values), [action, ...rest].filter(Boolean) as string[]));
   // Attaches on its first tool call, so a coding agent can start it before the server.
   if (command === "mcp") return runMcp(values, pkg.version);
+  if (command === "openai") {
+    const { when, times, tool, args } = values;
+    return print(await runOpenAI(attach(values), action, rest, { when, times, tool, args }));
+  }
   fail(`unknown command "${command}". Run \`channelstack --help\`.`);
 }
 

@@ -1,4 +1,5 @@
 import { BUILT_IN_APP } from "../src/core/apps/index.ts";
+import { Attributor } from "../src/core/attribution/index.ts";
 import { BrowserActors } from "../src/core/browser/index.ts";
 import { systemClock, systemTimers } from "../src/core/clock/index.ts";
 import { DeliveryQueue } from "../src/core/delivery/index.ts";
@@ -37,6 +38,10 @@ export function driverContext(overrides: Partial<DriverContext> = {}): DriverCon
     secret: (name) => `secret-for-${name}`,
     apiUrl: () => "http://127.0.0.1:4500/fake",
     webhookUrl: undefined,
+    attribution: new Attributor({ sessions: () => [], known: () => [] }),
+    place: () => ({}),
+    findSecrets: () => [],
+    scrub: (value) => value,
     // Another app's secrets are `secret-for-<app>-<name>`; its events go where `webhookUrl` says, with `?app=<name>`.
     apps: {
       webhookUrl: (app) => (app === BUILT_IN_APP || webhookUrl === undefined ? webhookUrl : `${webhookUrl}?app=${app}`),

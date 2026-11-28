@@ -18,8 +18,8 @@ export interface RestShape {
   readonly driver: string;
   /** A refusal the handlers throw, as the platform answers it; undefined for anything else, which is a bug. */
   refusal(error: unknown): RestAnswer | undefined;
-  /** What the platform adds to every answer (a request id). */
-  decorate?(answer: RestAnswer): RestAnswer;
+  /** What the platform adds to every answer (a request id); `wrapRest` passes the request's context too. */
+  decorate?(answer: RestAnswer, c?: Context): RestAnswer;
   /** A call about nothing in a session: on record for every session (`world`, the default), or for none. */
   readonly unattributed?: "world" | "drop";
 }
@@ -74,12 +74,37 @@ export async function bodyOf(
   return { body: parsed as Record<string, unknown> };
 }
 
+/** What a stream's call puts on record once it ends: what went on the wire, and how it failed. */
+export interface StreamOutcome {
+  readonly status: number;
+  readonly response: unknown;
+  readonly error?: string;
+}
+
+/**
+ * What a route of `wrapRest` tells the kit about its call: the operation's name (in place of its
+ * method and path), and for an answer that is streamed or never sent, how it ended. The kit reads
+ * a whole answer back to record it; a stream it leaves alone and records when `ended` resolves.
+ */
+export interface RecordedAs {
+  readonly operation?: string;
+  readonly ended?: Promise<StreamOutcome>;
+}
+
+/** Where `recordAs` keeps what a route said about its call. */
+const RECORDED_AS = "channelstackRecordedAs";
+
+/** Name this call's operation, or have it recorded when its stream ends (`wrapRest` only). */
+export function recordAs(c: Context, as: RecordedAs): void {
+  c.set(RECORDED_AS as never, as as never);
+}
+
 /** The call on record: its operation and the platform's own path, what was asked and answered. */
 function recordRest(
   context: DriverContext,
   platform: RestShape,
   c: Context,
-  call: { operation?: string; request: unknown; status: number; response: unknown; startedAt: number },
+  call: { operation?: string; request: unknown; status: number; response: unknown; error?: string; startedAt: number },
   sessions: Iterable<string | undefined>,
   mounts: readonly string[] = [],
 ): void {
@@ -103,9 +128,10 @@ function recordRest(
       responseStatus: call.status,
       response: call.response,
       error:
-        call.status >= 400
+        call.error ??
+        (call.status >= 400
           ? String(failed?.name ?? failed?.code ?? failed?.error ?? failed?.message ?? call.status)
-          : undefined,
+          : undefined),
       durationMs: context.clock() - call.startedAt,
     },
     { unattributed: platform.unattributed ?? "world" },
@@ -189,9 +215,11 @@ export function restApi(context: DriverContext, platform: RestPlatform) {
 /**
  * `restApi` for a platform whose routes answer Hono responses themselves, check their own
  * credentials and parse their own bodies (with `bodyOf`), as GitHub's do (the App's JWT, the
- * installation token, a permission per endpoint): `router` served at `/` and at each of `mounts`,
- * every answer decorated, a thrown refusal answered in the platform's shape (and anything else as
- * its `internal` answer, logged), and each call `recorded` for the `sessions` it touched.
+ * installation token, a permission per endpoint) and OpenAI's (a model call streamed or held):
+ * `router` served at `/` and at each of `mounts`, every answer decorated, a thrown refusal
+ * answered in the platform's shape with its headers (and anything else as its `internal` answer,
+ * logged), and each call `recorded` for the `sessions` it touched; a streamed one when its stream
+ * ends (`recordAs`).
  */
 export function wrapRest(
   context: DriverContext,
@@ -214,28 +242,42 @@ export function wrapRest(
     const startedAt = clock();
     await next();
     const status = c.res.status;
-    const raw = status === 204 ? "" : await c.res.clone().text();
+    const as = c.get(RECORDED_AS as never) as RecordedAs | undefined;
+    // A stream is the client's to read: its call goes on record when it ends, with what it sent.
+    const raw = as?.ended || status === 204 ? "" : await c.res.clone().text();
     let response: unknown = raw;
     try {
       response = raw === "" ? undefined : JSON.parse(raw);
     } catch {
       response = raw;
     }
-    const decorated = platform.decorate?.({ body: response, sessions: [], status });
+    const decorated = platform.decorate?.({ body: response, sessions: [], status }, c);
     for (const [name, value] of Object.entries(decorated?.headers ?? {})) c.header(name, value);
-    if (options.recorded && !options.recorded(c)) return;
-    recordRest(
-      context,
-      platform,
-      c,
-      { request: c.get(PARSED_BODY as never), status, response, startedAt },
-      options.sessions(c),
-      options.mounts,
-    );
+    const record = (outcome: StreamOutcome) => {
+      if (options.recorded && !options.recorded(c)) return;
+      recordRest(
+        context,
+        platform,
+        c,
+        {
+          ...outcome,
+          ...(as?.operation === undefined ? {} : { operation: as.operation }),
+          request: c.get(PARSED_BODY as never),
+          startedAt,
+        },
+        options.sessions(c),
+        options.mounts,
+      );
+    };
+    if (as?.ended) void as.ended.then(record);
+    else record({ status, response });
   });
   outer.onError((error, c) => {
     const refusal = platform.refusal(error);
-    if (refusal) return c.json(refusal.body, (refusal.status ?? 400) as 400);
+    if (refusal) {
+      for (const [name, value] of Object.entries(refusal.headers ?? {})) c.header(name, value);
+      return c.json(refusal.body, (refusal.status ?? 400) as 400);
+    }
     context.log.error(`${platform.driver} api`, { error: error instanceof Error ? error.message : String(error) });
     const internal = platform.internal();
     return c.json(internal.body, (internal.status ?? 500) as 500);

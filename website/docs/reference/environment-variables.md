@@ -84,7 +84,9 @@ Allowlists are comma-separated. Live mode acts only where its allowlist names th
 | `CHANNELSTACK_NOTION_UNSEEN_PAGE` | none | A page the people can write in and the integration isn't connected to, for tests that create a page the integration can't see |
 | `CHANNELSTACK_RESEND_ADDRESS` | `my-agent@` the team's first verified domain | Where people email the agent live: an address on its team's receiving domain |
 
-channelstack's own nightly live run also reads `CHANNELSTACK_DISCORD_PUBLIC_KEY` (the real application's public key, which its reference agent checks interactions with) and `CHANNELSTACK_DISCORD_RELAY_URL` (the smee.io channel the application's interactions endpoint points at, relayed to the reference agent). The server doesn't read them: your own agent has its own configuration live.
+channelstack's own nightly run also checks the fake OpenAI against the real API with `CHANNELSTACK_OPENAI_LIVE_KEY` (an OpenAI API key, maintainers only) and `CHANNELSTACK_OPENAI_LIVE_MODEL` (the cheap model it asks, default `gpt-5-nano`). Without the key that lane runs the fake side only. The server doesn't read them, and the fake model has no live mode: an agent pointed at it gets the fake in every run.
+
+It also reads `CHANNELSTACK_DISCORD_PUBLIC_KEY` (the real application's public key, which its reference agent checks interactions with) and `CHANNELSTACK_DISCORD_RELAY_URL` (the smee.io channel the application's interactions endpoint points at, relayed to the reference agent). The server doesn't read them: your own agent has its own configuration live.
 
 Live credentials stay in the server's memory. They are never logged, never returned by the control API, and `channelstack env` prints nothing for a live channel.
 
@@ -134,6 +136,8 @@ Read by the **app**. `channelstack env` (and the `channelstack.env()` fixture) p
 | `DISCORD_APPLICATION_ID` | Discord | The application's id, the bot's too: for registering commands |
 | `DISCORD_PUBLIC_KEY` | Discord | The application's Ed25519 public key (hex), which interactions over HTTP are checked against with `verifyKey` |
 | `DISCORD_GUILD_ID` | Discord | The guild the bot is in: for registering guild commands |
+| `OPENAI_BASE_URL` | The model | The fake OpenAI's base URL with its `/v1`, e.g. `https://openai.localhost/v1`. The official `openai` SDKs and the AI SDK's OpenAI provider read it themselves; give it to anything else that takes an OpenAI base URL. See [OpenAI](/docs/platforms/openai) |
+| `OPENAI_API_KEY` | The model | The fake's key (`sk-proj-…`), random per install. The fake refuses calls without it, as OpenAI does |
 | `ECHO_API_URL`, `ECHO_APP_TOKEN`, `ECHO_SIGNING_SECRET` | Echo | channelstack's own test platform. Ignore them |
 
 The names are the ones the platforms' SDKs and examples use; map them to your app's own if they differ. `channelstack secrets rotate` changes every secret; run `channelstack env` again after a restart.
@@ -146,7 +150,7 @@ The names are the ones the platforms' SDKs and examples use; map them to your ap
 
 ### `channelstack env --proxy`
 
-For an app that hard-codes the platforms' hosts. The server must run with `--proxy`. It prints the same lines without the API URLs (the app keeps `slack.com` and the others), plus:
+For an app that hard-codes the platforms' hosts. The server must run with `--proxy`. It prints the same lines without the API URLs (the app keeps `slack.com` and the others, and `OPENAI_BASE_URL` is left out: the proxy sends `api.openai.com` to the fake, and `OPENAI_API_KEY` stays), plus:
 
 | Variable | Value |
 |---|---|

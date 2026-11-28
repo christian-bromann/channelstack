@@ -18,6 +18,25 @@ export function pythonName(name: string): string {
 const snakeCase = pythonName;
 
 const OUT = "sdks/python/channelstack/generated/__init__.py";
+const NORMALISATION_OUT = "sdks/python/channelstack/generated/normalisation.py";
+
+/** How the server compares text (`x-channelstack-text-normalisation`), for the runtime's `normalised_text`. */
+function normalisationFile(ir: Ir): string {
+  const { rules, collapseWhitespace, lowercase } = ir.textNormalisation;
+  return [
+    `# ${BANNER}`,
+    '"""Text as the server compares it for attribution: each rule replaces every match of its pattern',
+    "(`$1` is its first group), in order; then, as its flags say, whitespace collapsed and trimmed and case lowered.",
+    '"""',
+    "",
+    "RULES: tuple[tuple[str, str], ...] = (",
+    ...rules.map((rule) => `    (${JSON.stringify(rule.pattern)}, ${JSON.stringify(rule.replacement)}),`),
+    ")",
+    `COLLAPSE_WHITESPACE = ${pythonLiteral(collapseWhitespace)}`,
+    `LOWERCASE = ${pythonLiteral(lowercase)}`,
+    "",
+  ].join("\n");
+}
 
 /** A string, number or boolean as Python writes it: `True`, `3`, `"open"`. */
 function pythonLiteral(value: string | number | boolean): string {
@@ -31,15 +50,22 @@ export function emitPython(ir: Ir): Map<string, string> {
   const namedTypes = new Map(ir.types.map((type) => [type.name, type.type]));
   const isDataclass = (name: string) => namedTypes.get(name)?.kind === "object";
 
-  /** Named types that methods take as arguments: these also need a wire form. */
-  const inputTypes = new Set(
-    ir.resources
-      .flatMap((resource) => resource.methods)
-      .flatMap((m) => [...m.args, ...m.options])
-      .map((param) => param.type)
-      .filter((type) => type.kind === "named")
-      .map((type) => type.name),
-  );
+  /** Named types that methods take as arguments, and those they hold (a turn inside a union): these also need a wire form. */
+  const inputTypes = new Set<string>();
+  const collect = (type: IrType): void => {
+    if (type.kind === "named") {
+      if (inputTypes.has(type.name)) return;
+      inputTypes.add(type.name);
+      const named = namedTypes.get(type.name);
+      if (named) collect(named);
+    } else if (type.kind === "array") collect(type.items);
+    else if (type.kind === "union") for (const member of type.types) collect(member);
+    else if (type.kind === "nullable") collect(type.type);
+    else if (type.kind === "object") for (const field of type.fields) collect(field.type);
+  };
+  for (const param of ir.resources.flatMap((resource) => resource.methods).flatMap((m) => [...m.args, ...m.options])) {
+    collect(param.type);
+  }
 
   const typeOf = (type: IrType): string => {
     switch (type.kind) {
@@ -154,6 +180,8 @@ export function emitPython(ir: Ir): Map<string, string> {
 
   /** Does a value of this type have to be converted before it goes on the wire? */
   const holdsRefs = (type: IrType): boolean =>
+    (type.kind === "union" && type.types.some((member) => holdsRefs(member))) ||
+    (type.kind === "named" && !isDataclass(type.name) && holdsRefs(namedTypes.get(type.name) ?? { kind: "unknown" })) ||
     type.kind === "ref" ||
     type.kind === "duration" ||
     type.kind === "files" ||
@@ -181,8 +209,9 @@ export function emitPython(ir: Ir): Map<string, string> {
       const item = encodeValue(type.items, "item");
       return item === "item" ? list : `[${item} for item in ${list}]`;
     }
-    // A named input type is a dataclass that knows its own wire form.
-    if (type.kind === "named") return `${expr}._to_wire()`;
+    // A named input type is a dataclass that knows its own wire form; a named union is one of its members.
+    if (type.kind === "named") return isDataclass(type.name) ? `${expr}._to_wire()` : `to_wire(${expr})`;
+    if (type.kind === "union") return `to_wire(${expr})`;
     if (type.kind === "object") {
       // An object argument is a dict with the API's own key names; what it holds is converted, and absent keys stay absent.
       const converted = type.fields
@@ -226,11 +255,21 @@ export function emitPython(ir: Ir): Map<string, string> {
     `${param.shorthand === undefined ? "" : "str | "}${typeOf(param.type)}`;
 
   const method = (m: IrMethod): string[] => {
+    const { responder } = m;
+    // A responder's flag is the SDK's to set: the caller passes a function instead.
+    const shown = responder ? m.options.filter((option) => option.name !== responder.flag) : m.options;
+    const [first] = m.args;
+    const itemType =
+      first && first.type.kind === "array" ? typeOf(first.type.items) : first ? typeOf(first.type) : "Any";
+    const responderType = responder ? ` | Callable[[${responder.request}], ${itemType} | Awaitable[${itemType}]]` : "";
     const parameters = [
       "self",
-      ...m.args.map((arg) => `${snakeCase(arg.name)}: ${parameterType(arg)}${arg.optional ? " | None = None" : ""}`),
-      ...(m.options.length > 0 ? ["*"] : []),
-      ...m.options.map(
+      ...m.args.map(
+        (arg) =>
+          `${snakeCase(arg.name)}: ${parameterType(arg)}${arg === first ? responderType : ""}${arg.optional ? " | None = None" : ""}`,
+      ),
+      ...(shown.length > 0 ? ["*"] : []),
+      ...shown.map(
         (option) =>
           `${snakeCase(option.name)}: ${option.shorthand === undefined ? "" : "str | "}${annotation(option)}${option.optional ? " = None" : ""}`,
       ),
@@ -244,10 +283,19 @@ export function emitPython(ir: Ir): Map<string, string> {
       })
       .join("");
     const params = [...m.args, ...m.options];
+    const sentAs = (param: IrParam): string => {
+      if (responder && param.name === responder.flag) return "answer is not None";
+      // A list of turns, or one; never the function, which went as the flag.
+      if (responder && param === first) {
+        const name = snakeCase(param.name);
+        return `None if answer is not None or ${name} is None else to_wire(cast(Any, ${name}) if isinstance(${name}, list) else [${name}])`;
+      }
+      return encode(param);
+    };
     const dict = (where: "body" | "query") => {
       const entries = params
         .filter((param) => param.in === where)
-        .map((param) => `${JSON.stringify(param.name)}: ${encode(param)}`);
+        .map((param) => `${JSON.stringify(param.name)}: ${sentAs(param)}`);
       return entries.length > 0 ? [`${where}={${entries.join(", ")}}`] : [];
     };
     const sent = `ctx.transport.request(${[JSON.stringify(m.http.verb), `f"${path}"`, ...dict("body"), ...dict("query")].join(", ")})`;
@@ -259,8 +307,22 @@ export function emitPython(ir: Ir): Map<string, string> {
       `    async def ${snakeCase(m.name)}(${parameters.join(", ")}) -> ${m.returns ? typeOf(m.returns) : "None"}:`,
       `        """${m.summary}.${m.stability === "experimental" ? " Experimental." : ""}"""`,
       "        ctx = self._ctx",
+      ...(responder && first
+        ? [`        answer = ${snakeCase(first.name)} if callable(${snakeCase(first.name)}) else None`]
+        : []),
       ...(m.onceQuiet ? ["        await until_quiet(lambda: quiet_of(ctx))"] : []),
-      ...(m.returns ? [`        data = ${call}`, `        return ${decode(m.returns, "data")}`] : [`        ${call}`]),
+      ...(m.returns && responder
+        ? [
+            `        data = ${call}`,
+            `        handle = ${decode(m.returns, "data")}`,
+            "        if answer is not None:",
+            // The test answers each call the server holds for this script, in the background.
+            `            respond_with(lambda since, wait_ms: handle.${snakeCase(responder.held)}(since=since, wait_ms=wait_ms), lambda held, turn, error: handle.${snakeCase(responder.answer)}(held, turn=turn, error=error), answer)`,
+            "        return handle",
+          ]
+        : m.returns
+          ? [`        data = ${call}`, `        return ${decode(m.returns, "data")}`]
+          : [`        ${call}`]),
     ];
   };
 
@@ -428,17 +490,28 @@ export function emitPython(ir: Ir): Map<string, string> {
         ? [
             "",
             "    def _to_wire(self) -> dict[str, Any]:",
-            `        wire = {${ordered.map((field) => `${JSON.stringify(field.name)}: self.${snakeCase(field.name)}`).join(", ")}}`,
-            "        return {key: value for key, value in wire.items() if value is not None}",
+            // Each field as it goes on the wire: what it holds converted (a dataclass, a duration), absent ones left out.
+            `        wire = {${ordered
+              .map((field) => {
+                const value = `self.${snakeCase(field.name)}`;
+                const encoded = encodeValue(field.type, value);
+                return `${JSON.stringify(field.name)}: ${field.optional && encoded !== value ? `None if ${value} is None else ${encoded}` : encoded}`;
+              })
+              .join(", ")}}`,
+            ordered.some((field) => field.optional)
+              ? "        return {key: value for key, value in wire.items() if value is not None}"
+              : "        return wire",
           ]
         : []),
     ];
   };
 
   const channelNames = glue.channels.map((channel) => JSON.stringify(channel.name));
+  const providerNames = glue.providers.map((provider) => JSON.stringify(provider.name));
   const exported = [
     "VERSION",
     "CHANNEL_NAMES",
+    "PROVIDER_NAMES",
     "ChannelstackError",
     "connect",
     ...ir.errors.map(errorClassName),
@@ -469,10 +542,10 @@ export function emitPython(ir: Ir): Map<string, string> {
     ...(JSON.stringify(ir).includes('"kind":"pattern"') ? ["import re"] : []),
     "from collections.abc import Awaitable, Callable",
     "from dataclasses import dataclass",
-    "from typing import Any, Literal, Self",
+    `from typing import Any, Literal, Self${spec.includes('"responder":{') ? ", cast" : ""}`,
     "from urllib.parse import quote",
     "",
-    `from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly${allWaits.some((w) => w.mode === "latest") || allMethods.some((m) => m.onceQuiet) ? ", quiet_of" : ""}, session_of`,
+    `from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly${allWaits.some((w) => w.mode === "latest") || allMethods.some((m) => m.onceQuiet) ? ", quiet_of" : ""}, session_of${spec.includes('"kind":"union"') ? ", to_wire" : ""}`,
     ...(spec.includes('"credential":') ? ["from ..runtime.credentials import credential"] : []),
     ...(usesDurations || allWaits.length > 0
       ? [`from ..runtime.duration import Duration${usesDurations ? ", parse_duration" : ""}`]
@@ -489,6 +562,7 @@ export function emitPython(ir: Ir): Map<string, string> {
           ].join(", ")}`,
         ]
       : []),
+    ...(spec.includes('"responder":{') ? ["from ..runtime.responder import respond_with"] : []),
     "from ..runtime.transport import ChannelstackError, Transport",
     ...(waitImports.length > 0 ? [`from ..runtime.wait import ${waitImports.join(", ")}`] : []),
     "",
@@ -508,6 +582,9 @@ export function emitPython(ir: Ir): Map<string, string> {
     `CHANNEL_NAMES: tuple[str, ...] = (${channelNames.join(", ")}${channelNames.length === 1 ? "," : ""})`,
     '"""Every channel, by name, in the server\'s order: what pytest-channelstack makes a fixture of."""',
     "",
+    `PROVIDER_NAMES: tuple[str, ...] = (${providerNames.join(", ")}${providerNames.length === 1 ? "," : ""})`,
+    '"""The fakes the agent calls that aren\'t channels (the fake OpenAI): pytest-channelstack makes a fixture of each too."""',
+    "",
     "",
     `async def connect(*, mode: Literal["auto", "attach", "start"] = "auto", server: str | None = None, token: str | None = None) -> ${ir.root}:`,
     '    """Attach to a running channelstack server, or start one, and return the client."""',
@@ -515,5 +592,8 @@ export function emitPython(ir: Ir): Map<string, string> {
     `    return await connect_with(${ir.root}, protocol, mode=mode, server=server, token=token)`,
     "",
   ];
-  return new Map([[OUT, lines.join("\n")]]);
+  return new Map([
+    [OUT, lines.join("\n")],
+    [NORMALISATION_OUT, normalisationFile(ir)],
+  ]);
 }

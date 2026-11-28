@@ -553,6 +553,35 @@
           "dispose": false
         },
         {
+          "name": "openai",
+          "kind": "factory",
+          "summary": "The OpenAI fixture: where the agent reaches the fake model",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "OpenAIFixture"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
           "name": "places",
           "kind": "method",
           "summary": "Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread, a Discord channel), the most recently active last",
@@ -23991,6 +24020,1112 @@
       ]
     },
     {
+      "name": "OpenAIFixture",
+      "fields": [
+        {
+          "name": "baseUrl",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "respond",
+          "kind": "factory",
+          "summary": "Script what the model answers: turns used in order, one per matching call, or a responder the test answers. Scripts are tried in the order they were added",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/openai/scripts",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "turns",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "named",
+                  "name": "OpenAITurnInput"
+                },
+                "oneOrMany": true
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "when",
+              "type": {
+                "kind": "named",
+                "name": "OpenAIMatch"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "times",
+              "type": {
+                "kind": "integer"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "timing",
+              "type": {
+                "kind": "named",
+                "name": "OpenAITiming"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "responder",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "OpenAIScript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "responder": {
+            "flag": "responder",
+            "held": "heldCalls",
+            "answer": "answerHeld",
+            "request": "OpenAIRequest"
+          }
+        },
+        {
+          "name": "calls",
+          "kind": "method",
+          "summary": "Every model call attributed to this session, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "endpoint",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "chat.completions",
+                  "responses"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  {
+                    "kind": "string"
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "OpenAISessionCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "toolCalls",
+          "kind": "method",
+          "summary": "Every tool call the model made in this session, each with the result the agent sent back",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/tool-calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "OpenAISessionToolCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "problems",
+          "kind": "method",
+          "summary": "What went wrong with the model in this session: a call no script answered, a script that ran out or did what the real API can't, a responder that threw. Matchers fail at once on these",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/problems",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "OpenAIProblems"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "sentSecrets",
+          "kind": "method",
+          "summary": "The calls that sent a secret channelstack knows to the model, and the kinds they sent (`slack.botToken`): never the values",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/sent-secrets",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "OpenAISentSecrets"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "unattributed",
+          "kind": "method",
+          "summary": "Model calls no session could be given (the agent calling the model at startup, for example), oldest first: what a failing matcher names",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/unattributed",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "withinMs",
+              "type": {
+                "kind": "nullable",
+                "type": {
+                  "kind": "integer"
+                }
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "OpenAIUnattributedCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "rateLimit",
+          "kind": "factory",
+          "summary": "Limit this session's model calls: requests and tokens per window, with truthful x-ratelimit-* headers",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/openai/rate-limits",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "requests",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "limit",
+                    "type": {
+                      "kind": "integer"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "per",
+                    "type": {
+                      "kind": "duration"
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "tokens",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "limit",
+                    "type": {
+                      "kind": "integer"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "per",
+                    "type": {
+                      "kind": "duration"
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "rate_limit",
+                  "slow_down"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "OpenAIRateLimit"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForCall",
+          "mode": "next",
+          "read": "calls",
+          "item": {
+            "kind": "resource",
+            "name": "OpenAICall"
+          },
+          "filter": true,
+          "what": "a model call from the agent"
+        },
+        {
+          "name": "latestCall",
+          "mode": "latest",
+          "read": "calls",
+          "item": {
+            "kind": "resource",
+            "name": "OpenAICall"
+          },
+          "filter": true,
+          "what": "a model call from the agent"
+        }
+      ]
+    },
+    {
+      "name": "OpenAIScript",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "responder",
+          "type": {
+            "kind": "boolean"
+          },
+          "optional": false
+        },
+        {
+          "name": "times",
+          "type": {
+            "kind": "number"
+          },
+          "optional": false
+        },
+        {
+          "name": "used",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
+        },
+        {
+          "name": "problems",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a script: how many calls it answered, and its problems",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/scripts/{script}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "script",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "OpenAIScript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "undo",
+          "kind": "method",
+          "summary": "Remove a script. Closing the session does it too",
+          "stability": "experimental",
+          "http": {
+            "verb": "DELETE",
+            "path": "/sessions/{session}/openai/scripts/{script}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "script",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": true
+        },
+        {
+          "name": "resume",
+          "kind": "method",
+          "summary": "Let the streams this script holds at `pauseAfter` go on",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/openai/scripts/{script}/resume",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "script",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "calls",
+          "kind": "method",
+          "summary": "The calls this script answered",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/scripts/{script}/calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "script",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "OpenAICalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "pausedCalls",
+          "kind": "method",
+          "summary": "The calls whose streams this script holds at `pauseAfter`",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/scripts/{script}/paused",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "script",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "OpenAIPausedCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "toolCalls",
+          "kind": "method",
+          "summary": "The tool calls this script made, each with the result the agent sent back",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/scripts/{script}/tool-calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "script",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "OpenAIToolCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "heldCalls",
+          "kind": "method",
+          "summary": "For a responder's SDK: the calls held for it since `since`, waiting up to `waitMs` for one",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/scripts/{script}/requests",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "script",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "since",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "waitMs",
+              "type": {
+                "kind": "nullable",
+                "type": {
+                  "kind": "integer"
+                }
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "OpenAIHeldPage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "answerHeld",
+          "kind": "method",
+          "summary": "For a responder's SDK: answer a held call with a turn, or report that the test's function threw",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/openai/scripts/{script}/answers",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "script",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "held",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "turn",
+              "type": {
+                "kind": "named",
+                "name": "OpenAITurnInput"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForCall",
+          "mode": "next",
+          "read": "calls",
+          "item": {
+            "kind": "resource",
+            "name": "OpenAICall"
+          },
+          "what": "a model call this script answers"
+        },
+        {
+          "name": "waitForPause",
+          "mode": "next",
+          "read": "pausedCalls",
+          "item": {
+            "kind": "resource",
+            "name": "OpenAICall"
+          },
+          "what": "a stream held at pauseAfter"
+        }
+      ]
+    },
+    {
+      "name": "OpenAICall",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "endpoint",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "chat.completions",
+              "responses"
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "model",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "stream",
+          "type": {
+            "kind": "boolean"
+          },
+          "optional": false
+        },
+        {
+          "name": "at",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "durationMs",
+          "type": {
+            "kind": "number"
+          },
+          "optional": false
+        },
+        {
+          "name": "attempt",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
+        },
+        {
+          "name": "done",
+          "type": {
+            "kind": "boolean"
+          },
+          "optional": false
+        },
+        {
+          "name": "request",
+          "type": {
+            "kind": "named",
+            "name": "OpenAIRequest"
+          },
+          "optional": false
+        },
+        {
+          "name": "response",
+          "type": {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "status",
+                "type": {
+                  "kind": "integer"
+                },
+                "optional": false
+              },
+              {
+                "name": "text",
+                "type": {
+                  "kind": "string"
+                },
+                "optional": true
+              },
+              {
+                "name": "finish",
+                "type": {
+                  "kind": "string"
+                },
+                "optional": true
+              },
+              {
+                "name": "error",
+                "type": {
+                  "kind": "string"
+                },
+                "optional": true
+              },
+              {
+                "name": "aborted",
+                "type": {
+                  "kind": "boolean"
+                },
+                "optional": false
+              },
+              {
+                "name": "chunksSent",
+                "type": {
+                  "kind": "integer"
+                },
+                "optional": true
+              },
+              {
+                "name": "end",
+                "type": {
+                  "kind": "enum",
+                  "values": [
+                    "completed",
+                    "errored",
+                    "dropped",
+                    "stalled",
+                    "aborted"
+                  ]
+                },
+                "optional": true
+              }
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "toolCalls",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "named",
+              "name": "OpenAIToolCall"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "script",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a model call: whether it is done, how it ended",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/calls/{call}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "call",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "OpenAICall"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "OpenAIRateLimit",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "requests",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": true
+        },
+        {
+          "name": "tokens",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": true
+        },
+        {
+          "name": "resetsInMs",
+          "type": {
+            "kind": "number"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "remaining",
+          "kind": "method",
+          "summary": "What the rate limit's headers would say now",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/openai/rate-limits/{limit}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "limit",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "OpenAIRateLimit"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "undo",
+          "kind": "method",
+          "summary": "Remove the rate limit",
+          "stability": "experimental",
+          "http": {
+            "verb": "DELETE",
+            "path": "/sessions/{session}/openai/rate-limits/{limit}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "limit",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": true
+        }
+      ]
+    },
+    {
       "name": "Place",
       "idFields": [
         "channel",
@@ -24600,6 +25735,16 @@
           },
           {
             "name": "open",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "problems",
             "type": {
               "kind": "array",
               "items": {
@@ -28143,6 +29288,1132 @@
       }
     },
     {
+      "name": "OpenAITurnInput",
+      "type": {
+        "kind": "union",
+        "types": [
+          {
+            "kind": "string"
+          },
+          {
+            "kind": "named",
+            "name": "OpenAITurn"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAITurn",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "text",
+            "type": {
+              "kind": "union",
+              "types": [
+                {
+                  "kind": "string"
+                },
+                {
+                  "kind": "array",
+                  "items": {
+                    "kind": "string"
+                  }
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "toolCalls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "OpenAIToolCallSpec"
+              }
+            },
+            "optional": true
+          },
+          {
+            "name": "reasoning",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "summary",
+                  "type": {
+                    "kind": "union",
+                    "types": [
+                      {
+                        "kind": "string"
+                      },
+                      {
+                        "kind": "array",
+                        "items": {
+                          "kind": "string"
+                        }
+                      }
+                    ]
+                  },
+                  "optional": true
+                },
+                {
+                  "name": "tokens",
+                  "type": {
+                    "kind": "integer"
+                  },
+                  "optional": true
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "refusal",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "finish",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "stop",
+                "length",
+                "content_filter"
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "usage",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "input",
+                  "type": {
+                    "kind": "integer"
+                  },
+                  "optional": true
+                },
+                {
+                  "name": "output",
+                  "type": {
+                    "kind": "integer"
+                  },
+                  "optional": true
+                },
+                {
+                  "name": "reasoning",
+                  "type": {
+                    "kind": "integer"
+                  },
+                  "optional": true
+                },
+                {
+                  "name": "cached",
+                  "type": {
+                    "kind": "integer"
+                  },
+                  "optional": true
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "timing",
+            "type": {
+              "kind": "named",
+              "name": "OpenAITiming"
+            },
+            "optional": true
+          },
+          {
+            "name": "failAfter",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "chunks",
+                  "type": {
+                    "kind": "integer"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "how",
+                  "type": {
+                    "kind": "enum",
+                    "values": [
+                      "error",
+                      "drop",
+                      "stall"
+                    ]
+                  },
+                  "optional": true
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "pauseAfter",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": true
+          },
+          {
+            "name": "error",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "rate_limit",
+                "slow_down",
+                "insufficient_quota",
+                "credit_balance_exhausted",
+                "organization_spend_limit_exceeded",
+                "project_spend_limit_exceeded",
+                "organization_usage_limit_exceeded",
+                "server_error",
+                "overloaded",
+                "timeout",
+                "context_length_exceeded",
+                "content_policy",
+                "invalid_api_key",
+                "not_in_organization",
+                "ip_not_authorized",
+                "unsupported_region"
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "retryAfter",
+            "type": {
+              "kind": "union",
+              "types": [
+                {
+                  "kind": "integer"
+                },
+                {
+                  "kind": "string"
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "shouldRetry",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": true
+          },
+          {
+            "name": "message",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAIToolCallSpec",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "arguments",
+            "type": {
+              "kind": "union",
+              "types": [
+                {
+                  "kind": "record",
+                  "values": {
+                    "kind": "unknown"
+                  }
+                },
+                {
+                  "kind": "string"
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "input",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAITiming",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "firstToken",
+            "type": {
+              "kind": "union",
+              "types": [
+                {
+                  "kind": "integer"
+                },
+                {
+                  "kind": "string"
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "betweenChunks",
+            "type": {
+              "kind": "union",
+              "types": [
+                {
+                  "kind": "integer"
+                },
+                {
+                  "kind": "string"
+                }
+              ]
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAIMatch",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "text",
+            "type": {
+              "kind": "pattern"
+            },
+            "optional": true
+          },
+          {
+            "name": "prompt",
+            "type": {
+              "kind": "pattern"
+            },
+            "optional": true
+          },
+          {
+            "name": "tools",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": true
+          },
+          {
+            "name": "toolResult",
+            "type": {
+              "kind": "union",
+              "types": [
+                {
+                  "kind": "boolean"
+                },
+                {
+                  "kind": "string"
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "endpoint",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "chat.completions",
+                "responses"
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "model",
+            "type": {
+              "kind": "pattern"
+            },
+            "optional": true
+          },
+          {
+            "name": "stream",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": true
+          },
+          {
+            "name": "from",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "SlackUser",
+                "GitHubUser",
+                "LinearUser",
+                "NotionUser",
+                "ResendUser",
+                "GoogleUser",
+                "DiscordUser"
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "in",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "SlackConversation",
+                "GitHubRepo",
+                "LinearTeam",
+                "NotionPage",
+                "NotionDatabase",
+                "ResendThread",
+                "GoogleThread",
+                "DiscordChannel"
+              ]
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAICalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "OpenAICall"
+        }
+      }
+    },
+    {
+      "name": "OpenAIRequest",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "endpoint",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "chat.completions",
+                "responses"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "stream",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "instructions",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "messages",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "OpenAIMessage"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "tools",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "OpenAITool"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "toolChoice",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "responseFormat",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "lastUserText",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "lastToolResults",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "callId",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "name",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "text",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  }
+                ]
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "context",
+            "type": {
+              "kind": "named",
+              "name": "OpenAIContext"
+            },
+            "optional": false
+          },
+          {
+            "name": "body",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "headers",
+            "type": {
+              "kind": "record",
+              "values": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAIMessage",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "role",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "system",
+                "developer",
+                "user",
+                "assistant",
+                "tool"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "toolCalls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "id",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "name",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "arguments",
+                    "type": {
+                      "kind": "unknown"
+                    },
+                    "optional": true
+                  }
+                ]
+              }
+            },
+            "optional": true
+          },
+          {
+            "name": "callId",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "parts",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": {
+                      "kind": "enum",
+                      "values": [
+                        "image",
+                        "file",
+                        "audio"
+                      ]
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "from",
+                    "type": {
+                      "kind": "enum",
+                      "values": [
+                        "data",
+                        "file_id",
+                        "url"
+                      ]
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "url",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  }
+                ]
+              }
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAITool",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "type",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "description",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "parameters",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "strict",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAIContext",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "channel",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "from",
+            "type": {
+              "kind": "named",
+              "name": "OpenAIRef"
+            },
+            "optional": true
+          },
+          {
+            "name": "conversation",
+            "type": {
+              "kind": "named",
+              "name": "OpenAIRef"
+            },
+            "optional": true
+          },
+          {
+            "name": "thread",
+            "type": {
+              "kind": "named",
+              "name": "OpenAIRef"
+            },
+            "optional": true
+          },
+          {
+            "name": "message",
+            "type": {
+              "kind": "named",
+              "name": "OpenAIRef"
+            },
+            "optional": true
+          },
+          {
+            "name": "attributedBy",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "minted_id",
+                "tag",
+                "owned_id",
+                "text",
+                "order"
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "matched",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "tiedWith",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAIRef",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAIToolCall",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "type",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "function",
+                "custom"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "hosted",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "arguments",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "madeIn",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "result",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "text",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "sentIn",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": false
+                }
+              ]
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAIPausedCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "OpenAICall"
+        }
+      }
+    },
+    {
+      "name": "OpenAIToolCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "OpenAIToolCall"
+        }
+      }
+    },
+    {
+      "name": "OpenAIHeldPage",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "held",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "OpenAIHeldCall"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "cursor",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAIHeldCall",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "request",
+            "type": {
+              "kind": "named",
+              "name": "OpenAIRequest"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAISessionCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "OpenAICall"
+        }
+      }
+    },
+    {
+      "name": "OpenAISessionToolCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "OpenAIToolCall"
+        }
+      }
+    },
+    {
+      "name": "OpenAIProblems",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "string"
+        }
+      }
+    },
+    {
+      "name": "OpenAISentSecrets",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "OpenAISentSecret"
+        }
+      }
+    },
+    {
+      "name": "OpenAISentSecret",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "call",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "kinds",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAIUnattributedCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "OpenAIUnattributedCall"
+        }
+      }
+    },
+    {
+      "name": "OpenAIUnattributedCall",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "endpoint",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "chat.completions",
+                "responses"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "lastUserText",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "tools",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "sinceMs",
+            "type": {
+              "kind": "number"
+            },
+            "optional": false
+          },
+          {
+            "name": "message",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
       "name": "Places",
       "type": {
         "kind": "array",
@@ -28436,6 +30707,29 @@
     {
       "name": "discord",
       "title": "Discord"
+    },
+    {
+      "name": "openai",
+      "title": "OpenAI",
+      "provider": true
     }
-  ]
+  ],
+  "textNormalisation": {
+    "rules": [
+      {
+        "pattern": "<[@#!][^>]*>",
+        "replacement": " "
+      },
+      {
+        "pattern": "<(https?:[^>|]+)(\\|[^>]*)?>",
+        "replacement": " $1 "
+      },
+      {
+        "pattern": "(^|\\s)@[A-Za-z0-9_.-]+",
+        "replacement": " "
+      }
+    ],
+    "collapseWhitespace": true,
+    "lowercase": true
+  }
 }

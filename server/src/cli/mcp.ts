@@ -7,6 +7,7 @@ import { actionsOf, describeAction, runAct } from "./act.ts";
 import { attach, type Attached, type AttachFlags, CliError, ServerGoneError } from "./attach.ts";
 import { DELIVERY_CHANNELS, runDeliveries, runRedeliver } from "./deliveries.ts";
 import { devChannel, runReact, runReply, runSay, runShow } from "./dev.ts";
+import { runOpenAI } from "./openai.ts";
 import { readEvents } from "./watch.ts";
 
 /** What a reference is, in every tool that takes one. */
@@ -164,6 +165,38 @@ function mcpServer(flags: AttachFlags, version: string): McpServer {
           [channel, delivery].filter((arg) => arg !== undefined),
         ),
       ),
+  );
+
+  mcp.registerTool(
+    "openai_respond",
+    {
+      description:
+        "Script what the fake OpenAI answers the bot's next model calls in the dev session (decision 0029). The text may use {lastUserText} and {toolResult}. With `tool`, the model calls that tool first, with `args`, and the text answers its result.",
+      inputSchema: {
+        text: z.string().optional(),
+        when: z.string().min(1).optional().describe("Only calls whose newest user message has this text"),
+        times: z.number().int().optional().describe("How many calls it answers; -1 for all"),
+        tool: z.string().min(1).optional(),
+        args: z.string().optional().describe("The tool's arguments, as JSON"),
+      },
+    },
+    ({ text, when, times, tool: toolName, args }) =>
+      tool((attached) =>
+        runOpenAI(attached, "respond", text === undefined ? [] : [text], {
+          when,
+          times: times === undefined ? undefined : String(times),
+          tool: toolName,
+          args,
+        }),
+      ),
+  );
+  mcp.registerTool(
+    "openai_calls",
+    {
+      description: "The bot's model calls in the dev session: what it asked, and what the fake OpenAI answered.",
+      inputSchema: {},
+    },
+    () => tool((attached) => runOpenAI(attached, "calls", [], {})),
   );
 
   // `tail` remembers where it got to on each attachment: each call returns what happened since the

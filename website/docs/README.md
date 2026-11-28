@@ -31,19 +31,20 @@ The folder is the section and the frontmatter's `order` is the position in it. T
 
 **Quickstarts** (`docs/quickstarts/`)
 
-One per agent framework, in the order people use them with channelstack. Each is a short tutorial: the framework's own agent, pointed at the fakes, and a first passing test. Each was followed step by step against a local channelstack, so the steps are known to work. The Chat SDK and AI SDK ones also match a reference agent in `examples/agents/` that CI runs; Pi has no reference agent.
+One per agent framework, in the order people use them with channelstack. Each is a short tutorial: the framework's own agent, pointed at the fakes, and a first passing test. Each was followed step by step against a local channelstack, so the steps are known to work. The Chat SDK and AI SDK ones also match a reference agent in `examples/agents/` that CI runs; Pi and LangChain have no reference agent.
 
 | Page | Kind | What it covers |
 |---|---|---|
 | Chat SDK | Tutorial | A Chat SDK bot (`chat` with `@chat-adapter/slack`, and the GitHub and Linear adapters) |
-| AI SDK | Tutorial | A Bolt app that streams an AI SDK answer, with the AI SDK's mock model |
+| AI SDK | Tutorial | A Bolt app that streams an AI SDK answer, on `@ai-sdk/openai` pointed at the fake OpenAI, with tests that script the model |
 | Pi | Tutorial | A Pi agent in Slack |
+| LangChain | Tutorial | A Bolt app that streams a LangChain answer and runs its tool calls, on `ChatOpenAI` pointed at the fake OpenAI, with tests that script the model |
 
 **Guide** (`docs/guide/`)
 
 | Page | Kind | What it covers |
 |---|---|---|
-| How it works | Explanation | One server, six fakes, the control API; sessions in one shared world; the transcript the matchers and UI read. Animated: the architecture, and parallel sessions |
+| How it works | Explanation | One server, eight fakes (the seven platforms and the model), the control API; sessions in one shared world; the transcript the matchers and UI read. Animated: the architecture, and parallel sessions |
 | Connecting your app | How-to | `channelstack env`, each SDK's base-URL option, where the server delivers (`CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`), Socket Mode, TLS trust per runtime, `--no-portless` |
 | Writing tests | How-to | The Vitest plugin, fixtures, actor-first calls, giving the app access explicitly, shared people with `test.extend`, files and fixtures paths, cleanup |
 | Waiting and quiet | Explanation | Why matchers wait, positive vs negative and exact-count checks, the quiet window, "Still open:" messages, timeouts. Animated: the quiet window |
@@ -70,6 +71,8 @@ One page per platform, the same shape on each: what the fake covers, connecting 
 | Notion | How-to |
 | Resend | How-to |
 | Google | How-to |
+| Discord | How-to |
+| OpenAI | How-to: the fake model, not a platform your app lives in. `openai.respond(…)`, answers computed from the request, timing and failures, what the agent sent, how a call finds its test |
 
 **Reference** (`docs/reference/`)
 

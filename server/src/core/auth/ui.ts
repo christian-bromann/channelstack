@@ -5,12 +5,13 @@ import { constantTimeEqual } from "../signing/hmac.ts";
 export const UI_COOKIE = "channelstack_ui";
 
 /**
- * What a browser session may do: read what the UI shows (the status, the event log, and every
- * channel's places and their transcripts through `/places`), and nothing else. It never reaches
+ * What a browser session may do: read what the UI shows (the status, the event log, every
+ * channel's places and their transcripts through `/places`, and the model calls the fake OpenAI
+ * answered, scrubbed like every other read), and nothing else. It never reaches
  * `/env` or a fixture (they return the agent's tokens), and it can't change anything, so a
  * page that tricks the browser into a request gains nothing.
  */
-const UI_READS = /^\/(status|sessions\/[^/]+\/(events|quiet|places(\/[a-z]+\/[^/]+\/transcript)?))$/;
+const UI_READS = /^\/(status|sessions\/[^/]+\/(events|quiet|openai\/calls|places(\/[a-z]+\/[^/]+\/transcript)?))$/;
 
 /**
  * Browser access to the UI. The server prints a one-time login link; opening it trades the code

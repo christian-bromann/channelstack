@@ -53,9 +53,10 @@ Every test gets these fixtures from its context:
 | `resend`       | The fake Resend team: `createUser` (a mailbox outside it), the built-in team's address as `app`                                                  |
 | `google`       | The fake Gmail mailbox: `createUser` (a mailbox outside it), the agent's own mailbox as `app`                                                    |
 | `discord`      | The fake guild: `createUser`, `createChannel`, the agent's bot as `app`, faults and `verifyEndpoint`                                             |
+| `openai`       | The fake OpenAI, your agent's model: `respond` (what the model answers), `calls`, `latestCall`, `waitForCall`, `toolCalls`, `rateLimit`. Not a platform: no people or `app`. See [OpenAI](/docs/platforms/openai) |
 | `channelstack` | The server itself: `url`, `env()` (what `channelstack env` prints), `quiet()` (resolves when the app is quiet in this test's session), `reset()` |
 
-The fixtures are scoped to the test's own [session](/docs/guide/how-it-works#sessions-scopes-in-one-shared-world), which opens before the test's hooks and closes after them, whether the test names a fixture or not. Two tests that run at the same moment never see each other's people, channels or deliveries.
+The fixtures are scoped to the test's own [session](/docs/guide/how-it-works#sessions-scopes-in-one-shared-world), which opens before the test's hooks and closes after them, whether the test names a fixture or not. Two tests that run at the same moment never see each other's people, channels, deliveries or model scripts.
 
 Each fixture's `app` is the built-in app your code acts as on that platform, named `my-agent`. Matchers take it, or its name as a string, wherever they take an author: `toHaveReplyFrom(slack.app)` and `toHaveReplyFrom("my-agent")` mean the same. Every fixture also has `createApp({ name })` and `apps()`, for a test that needs another app beside `my-agent`: a second agent, or a bot to talk to. A name in a matcher then means that app too (`toHaveReplyFrom("coder")`). See [several apps](/docs/guide/several-apps).
 

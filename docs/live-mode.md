@@ -22,6 +22,15 @@ What follows from that:
 - **The exception is GitHub.** Its delivery log is readable through the API, so tests can still read what GitHub delivered to the agent and how the agent answered. channelstack stays out of the path.
 - **Fake mode is unchanged.** There, channelstack is the platform and delivers to the agent itself (implementation plan 6.3).
 
+### 1.1 The fake model in a live run
+
+The fake OpenAI ([decision 0029](decisions/0029-fake-openai.md)) is the agent's model, not a channel, and it works the same whether the channels are fake or live. A live run changes the channels only:
+
+- **The model stays whatever the agent is configured with.** An agent whose `OPENAI_BASE_URL` points at the fake keeps the fake model against the real platforms, and the test scripts it with `openai.respond(…)` as in a fake run: a real sandbox workspace with a deterministic model. An agent without that variable uses its own model, real or its framework's fake, and the `openai` fixture sees none of its calls.
+- **A call still has to find its test.** In a fake run, a model call is given to its session from what the session's deliveries and API answers held ([architecture.md, section 3.4](architecture.md#34-providers-the-agents-model)). Live, channelstack delivers nothing to the agent and doesn't see its platform calls, so that evidence isn't there: a call is attributed by an id the fake minted for an earlier answer, or by a tag naming the session (`user`, metadata, the `x-channelstack-session` header). See section 9.
+- **There is no live OpenAI backend.** channelstack never sends the agent's model calls on to OpenAI, never relays OpenAI's answers, and has no credentials for it: the fake OpenAI is fake in every run ([reality-matrix.md, "OpenAI"](reality-matrix.md#openai-the-fake-model)). In proxy mode, `api.openai.com` always goes to the fake.
+- **The real API checks the fake.** The nightly shape lane (`pnpm openai:shapes`, exit check 13.13) sends the same requests to the fake and to the real API with a cheap model, and diffs their shapes like the other channels' differential run (section 6). It is channelstack's own CI, with the maintainers' `CHANNELSTACK_OPENAI_LIVE_KEY` (and `CHANNELSTACK_OPENAI_LIVE_MODEL`, default `gpt-5-nano`); without the key it runs the fake side only.
+
 ## 2. How each live action is done
 
 Every live action is one of three mechanisms. Observing is a fourth.
@@ -148,4 +157,4 @@ Before writing this spec, probes drove each platform's official receiver with th
 
 ## 9. Open questions
 
-None right now. New ones go here.
+- **The fake model's calls in a live run** (section 1.1). Without deliveries, the first model call of a live conversation carries none of the evidence attribution reads in a fake run, unless the agent tags it with the session. How a live session gives attribution what its people wrote is open.

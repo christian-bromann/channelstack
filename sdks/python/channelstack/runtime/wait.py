@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+from ..generated import normalisation
 from .duration import Duration, parse_duration
 
 
@@ -99,8 +100,19 @@ class QuietState:
     quiet_for_ms: float
     open: Sequence[str] = ()
     """What is still open, in words: a delivery in flight or about to be retried, a stream the agent never stopped."""
+    problems: Sequence[str] = ()
+    """What should fail a test at once: a model call no script answered (decision 0029)."""
     loops: Sequence[str] = ()
     """The bot loops the fake stopped in the session (decision 0027), in words."""
+
+
+class ModelProblemError(Exception):
+    """A wait stopped because the session's model calls went wrong: no script answered one, a script ran out."""
+
+    def __init__(self, problems: Sequence[str]) -> None:
+        lines = "\n".join(f"  {problem}" for problem in problems)
+        super().__init__(f"The model calls of this test went wrong:\n{lines}")
+        self.problems = tuple(problems)
 
 
 class Author(Protocol):
@@ -131,6 +143,23 @@ def from_matches(author: Author, from_: Author | str | None) -> bool:
     if isinstance(from_, str):
         return from_ in (author.name, author.id)
     return author.id == from_.id
+
+
+_NORMALISATION_RULES = tuple(
+    # `$1` in a rule's replacement is its pattern's first group, as Python writes it.
+    (re.compile(pattern), re.sub(r"\$(\d)", r"\\g<\1>", replacement))
+    for pattern, replacement in normalisation.RULES
+)
+
+
+def normalised_text(text: str) -> str:
+    """Text as the server compares it for attribution, by the rules the spec publishes
+    (`generated/normalisation.py`): what `to_have_sent` compares."""
+    for pattern, replacement in _NORMALISATION_RULES:
+        text = pattern.sub(replacement, text)
+    if normalisation.COLLAPSE_WHITESPACE:
+        text = re.sub(r"\s+", " ", text).strip()
+    return text.lower() if normalisation.LOWERCASE else text
 
 
 def pattern_on_wire(pattern: str | re.Pattern[str]) -> str | dict[str, str]:
@@ -201,6 +230,8 @@ async def until_quiet(
         nonlocal still_open
         state = await quiet()
         still_open = state.open
+        if state.problems:
+            raise ModelProblemError(state.problems)
         if watching and (time.monotonic() - started) * 1000 < quiet_for_ms:
             return None
         return True if not state.busy and state.quiet_for_ms >= quiet_for_ms else None

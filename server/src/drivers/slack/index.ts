@@ -7,6 +7,7 @@ import { removeSlackEntry } from "./live/cleanup.ts";
 import { SlackWebClient } from "./live/client.ts";
 import { slackMaintenance } from "./live/maintenance.ts";
 import { createLiveWorld } from "./live/world.ts";
+import { slackPlace } from "./place.ts";
 import { registerSlackRoutes } from "./routes.ts";
 import { SLACK_SECRETS } from "./secrets.ts";
 
@@ -25,6 +26,7 @@ export const slack: DriverDefinition = {
   tokenPatterns: [/xox[abeoprs]-[A-Za-z0-9-]{10,}/g, /xapp-\d-[A-Za-z0-9-]{10,}/g],
   liveTokens: [SLACK_SECRETS.userToken],
   redeliver: "retry",
+  place: slackPlace,
   hosts: ["slack.com"],
   secrets: {
     botToken: SLACK_SECRETS.botToken,

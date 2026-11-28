@@ -2,7 +2,7 @@
 <!--
   The channelstack UI, v0: the dev session's places on every channel (Slack channels, GitHub and
   Linear issues, Notion pages, email threads, Discord channels) as a person would read them, and an inspector for what
-  went to the agent and what the agent called. One page, no build step. It only reads; everything it
+  went to the agent and what the agent called, and the calls the agent made to the fake model. One page, no build step. It only reads; everything it
   shows comes from the control API, the same data the matchers read: the places as the dev tools
   name them (`/places`, each channel's dev adapter in `core/dev`, as the CLI and MCP read them).
   The server fills in __NONCE__ (this response's CSP nonce) and __SESSION__ (the dev session).
@@ -40,6 +40,7 @@
       summary { cursor: pointer; font-family: ui-monospace, monospace; font-size: 0.8rem; overflow-wrap: anywhere; }
       summary .failed { color: #c0392b; }
       pre { margin: 0.4rem 0; font-size: 0.75rem; overflow: auto; }
+      h2.below { margin-top: 1.2rem; }
     </style>
   </head>
   <body data-session="__SESSION__">
@@ -58,6 +59,8 @@
       <section aria-label="Inspector">
         <h2>Inspector</h2>
         <div id="inspector" data-testid="inspector"></div>
+        <h2 class="below">Model calls</h2>
+        <div id="models" data-testid="models"></div>
       </section>
     </main>
     <script type="module" nonce="__NONCE__">
@@ -79,6 +82,7 @@
       let chosen; // The place the person picked (`<channel>/<id>`); the most recently active one until they do.
       let shown = ""; // What the transcript pane last rendered, to leave it alone while nothing changes.
       let cursor; // How far into the event log the inspector has read.
+      let modelsShown = ""; // What the model calls pane last rendered.
 
       // The server lists every channel's places, the most recently active last.
       const keyOf = (place) => `${place.channel}/${place.id}`;
@@ -167,10 +171,41 @@
         }
       }
 
+      // The calls the agent made to the fake OpenAI in this session, the oldest first: what it asked,
+      // which script answered, and how the answer ended.
+      async function models() {
+        const calls = await api("/openai/calls");
+        const signature = JSON.stringify(calls);
+        if (signature === modelsShown) return;
+        modelsShown = signature;
+        if (calls.length === 0) {
+          $("models").replaceChildren(element("p", "No model calls yet.", "empty"));
+          return;
+        }
+        $("models").replaceChildren(
+          ...calls.map((call) => {
+            const { response } = call;
+            const ok = response.status < 400 && !response.aborted && (response.end ?? "completed") === "completed";
+            const outcome = response.error ?? response.end ?? response.finish ?? String(response.status);
+            const details = element("details");
+            const summary = element("summary");
+            summary.append(
+              element("time", `${call.at.slice(11, 23)} `),
+              element("span", `${call.endpoint} ${call.model}${call.stream ? " (stream)" : ""}${call.script ? ` ← ${call.script}` : ""}  `),
+              element("span", call.done ? outcome : "answering…", ok ? "" : "failed"),
+            );
+            const said = response.text ? element("div", response.text, "entry") : undefined;
+            details.append(summary, ...(said ? [said] : []), element("pre", JSON.stringify(call, null, 2)));
+            return details;
+          }),
+        );
+      }
+
       async function refresh() {
         try {
           await transcript(await conversations());
           await inspector();
+          await models();
           $("status").textContent = `session ${document.body.dataset.session}`;
         } catch (error) {
           $("status").textContent = `not connected (${error.message})`;

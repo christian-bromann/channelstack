@@ -7,6 +7,7 @@ import { removeLinearEntry } from "./live/cleanup.ts";
 import { LinearGraphqlClient } from "./live/client.ts";
 import { linearMaintenance } from "./live/maintenance.ts";
 import { createLiveLinearWorld } from "./live/world.ts";
+import { linearPlace } from "./place.ts";
 import { registerLinearRoutes } from "./routes.ts";
 import { LINEAR_SECRETS } from "./secrets.ts";
 
@@ -14,6 +15,7 @@ import { LINEAR_SECRETS } from "./secrets.ts";
 export const linear: DriverDefinition = {
   name: "linear",
   title: "Linear",
+  place: linearPlace,
   dev: linearDev,
   ids: LINEAR_IDS,
   tokenPatterns: [/lin_(?:api|oauth|wh)_[A-Za-z0-9]{16,}/g],

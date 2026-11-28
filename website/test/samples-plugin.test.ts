@@ -51,6 +51,8 @@ describe("parseSample", () => {
       ["../samples/notion.test.ts", "../samples/python/test_comments.py", "../examples/rust/src/home_notion.rs"],
       ["../samples/resend.test.ts", "../samples/python/test_refund.py", "../examples/rust/src/home_resend.rs"],
       ["../samples/gmail.test.ts", "../samples/python/test_invoice.py", "../examples/rust/src/home_gmail.rs"],
+      ["../samples/discord.test.ts", "../samples/python/test_build.py", "../examples/rust/src/home_discord.rs"],
+      ["../samples/openai.test.ts", "../samples/python/test_incidents.py", "../examples/rust/src/home_openai.rs"],
     ];
     for (const files of scenes) {
       const stepSets = await Promise.all(

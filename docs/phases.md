@@ -21,6 +21,7 @@
 | 10 | deferred | Twilio isn't shipping for now: [#102](https://github.com/christian-bromann/channelstack/pull/102) is closed without merging, and its branch `phase-10-twilio` is kept, to reopen if users ask for it |
 | 11 | done | 2026-11-27, [#103](https://github.com/christian-bromann/channelstack/pull/103) (built in parallel with phase 10; Discord verified live with the agent's bot and two people's bots; conformance without a difference) |
 | 12 | done | 2026-11-28, [#107](https://github.com/christian-bromann/channelstack/pull/107) (any number of apps on every channel; live apps, 12.11 and 12.13, tracked in #111) |
+| 13 | done | 2026-11-28, [#116](https://github.com/christian-bromann/channelstack/pull/116) (built before phase 12 merged; 13.9 narrowed to Slack, the other channels tracked in #120; 13.13's live side waits for the maintainer's key; R3.2 to R3.4 tracked in #126) |
 
 ## When a phase is done
 
@@ -440,7 +441,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 - **Attribution** (`core/attribution/`): the four kinds of evidence, attribution by order, `request.context`, `when: { from, in }`, and `unattributed()` (design §8).
 - **No script, no answer:** `channelstack_no_script`, matchers that fail at once on a session's model problems, and the session's close failing the test in Vitest, pytest and Rust (design §8.4).
 - **Reading:** `calls()`, `waitForCall()`, `latestCall()`, `toolCalls()`, and the matchers in matchers-core, pytest and the Rust crate: `toHaveReceivedCall`, `toHaveSent`, `toHaveSentSecrets`, `toHaveOfferedTool`, `toHaveSentToolResult`, `toBeAborted`, `toHaveAnswered`. Model calls in `channelstack tail`, the UI's Models inspector, `channelstack openai respond` and `calls`, and the MCP tools.
-- **The checks:** `model: "openai"` on every `<channel>Checks()`, with `<channel>.slow-model`, `.model-error`, `.model-retry`, `.no-secrets-to-model`, `slack.stream-breaks` and `slack.stop-cancels-model`, and a broken variant per new check.
+- **The checks:** `model: "openai"` on every `<channel>Checks()` (a plain scripted answer for each check that scripts nothing itself), with Slack's `slack.slow-model`, `.model-error`, `.model-retry`, `.no-secrets-to-model`, `slack.stream-breaks` and `slack.stop-cancels-model`, and a broken variant per new check. The other channels' model checks are [#120](https://github.com/christian-bromann/channelstack/issues/120).
 - **Reference agents:** a Slack agent on the official `openai` SDK (Chat Completions, sending `user`), and one on the AI SDK's `@ai-sdk/openai` (Responses), both answering from the fake.
 - **The examples:** `test/acceptance/examples/openai.test.ts` (design §13), with Python and Rust ports of the tool-loop and responder tests.
 - **Conformance:** OpenAI's OpenAPI description pinned like Resend's (`pnpm openai:schema`), and a nightly shape lane against the real API with a cheap model. The lane needs a key from the maintainer; until then it is listed as waiting.
@@ -457,7 +458,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 | 13.6 | Responders in every SDK | TypeScript, Python and Rust tests: a responder answers from the request and its context; one that throws or never answers fails the test with its reason; `firstToken` holds with a slow responder |
 | 13.7 | Timing and breaks | Tests on the injected clock: `firstToken` and `betweenChunks`; `failAfter` with `error`, `drop` and `stall`, each as the official SDK sees it; `pauseAfter` and `resume`; a call the agent abandons is `aborted` |
 | 13.8 | Rate limits | Tests: every response carries the `x-ratelimit-*` headers; `rateLimit` counts one session's calls and tokens, refuses the one over the limit with `retry-after`, and frees up on the clock; another session's calls don't count |
-| 13.9 | The checks | Every `<channel>Checks({ model: "openai" })` passes against the reference agents, and each new model check fails against its broken variant |
+| 13.9 | The checks | `slackChecks({ model: "openai" })` passes against both Slack reference agents on the fake model, and each new model check fails against its broken variant. Narrowed to Slack in phase 13, approved by the maintainer on PR #116: the other channels' model checks and model-backed agents are [#120](https://github.com/christian-bromann/channelstack/issues/120) |
 | 13.10 | No secrets | Tests: `toHaveSentSecrets` finds every kind of secret channelstack knows when one is planted in a prompt, and reports only its kind; `pnpm test:redaction` knows the `sk-proj-` prefix |
 | 13.11 | Conversations, stored responses, dialects | Tests with the official SDK: a conversation's items grow with each response; `previous_response_id` chains; an unknown id is refused as OpenAI refuses it. OpenRouter's `reasoning`, DeepSeek's `reasoning_content` and `AzureOpenAI` on a deployment path each answer a scripted turn |
 | 13.12 | Proxy mode | An agent with a hard-coded `api.openai.com` passes the tool-loop example in proxy mode, unmodified |

@@ -16,6 +16,7 @@ export type {
   App,
   ChannelKind,
   DeliveryFilter,
+  ProviderKind,
   Inspectable,
   Resource,
   Transcript,

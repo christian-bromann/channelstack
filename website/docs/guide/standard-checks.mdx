@@ -56,11 +56,12 @@ Call only the functions for the platforms your app is on. The checks are written
 | `approval`     | none                   | `{ prompt, button }`: text that makes the app ask for an approval, and the label of the button it shows. Only a workspace admin may press it. Without it, the two click checks are left out |
 | `command`      | none                   | Discord: a slash command the app answers, as a person types it (`/deploy web`). Without it, the two interaction checks are left out |
 | `longPrompt`   | none                   | Discord: text that makes the app answer with more than one message may hold (2000 characters). Without it, the long-answer check is left out |
+| `model`        | none                   | `"openai"`: the app's model is the [fake OpenAI](/docs/platforms/openai). Every check that scripts nothing itself answers each model call with a plain answer, the stream and Stop checks script a long stream and need no `streamPrompt`, and the Slack model checks are added (below) |
 | `skip`         | `[]`                   | Check ids to leave out, for example `["slack.stream-stop"]`. An id that no check has throws, with the list of ids                                                                           |
 | `timeout`      | the plugin's `timeout` | How long each check waits for the app                                                                                                                                                       |
 | `loopTurns`    | `3`                    | How many times the app may answer another app that answers everything, with no person between them, before `<platform>.no-reply-loop` fails. An app built to hand off to another sets it higher, or skips the check |
 
-Pick prompts your app answers quickly and in a single message. With a real model, a short, plain prompt keeps the checks fast. With a fake model, use one your script already handles.
+Pick prompts your app answers quickly and in a single message. With a real model, a short, plain prompt keeps the checks fast. With a framework's fake model, use one your script already handles. On the fake OpenAI, pass `model: "openai"` and the checks script the model themselves.
 
 ## Slack checks
 
@@ -84,6 +85,25 @@ Pick prompts your app answers quickly and in a single message. With a real model
 `slack.double-click` counts messages: the app should answer one approval with exactly one new message in the thread. Replacing the question as well is fine, and so is removing the button once it has acted. An app that answers only by editing the question, or with several messages, should skip this check.
 
 `slack.msg-too-long` injects a [fault](/docs/guide/delivery-and-failures#faults), which applies to the whole workspace while it lasts. Run the Slack checks where no other test posts at the same moment, or skip that check in a parallel suite.
+
+### On the fake OpenAI
+
+With `model: "openai"`, `slackChecks` adds one check for each bug a model's timing and failures cause. Each scripts the model itself:
+
+```ts title="test/checks.test.ts"
+slackChecks({ app: "my-agent", model: "openai" });
+```
+
+| Id                          | What the test does                                                                                          | What it catches                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `slack.slow-model`          | The model's first token takes 5 seconds, and Slack retries the DM's event after 3; expects exactly one reply | A slow model that makes the app answer Slack's retry too                |
+| `slack.model-error`         | Every model call fails with `overloaded`; expects a reply, no stream left open, and the thread `idle`        | An app that says nothing, or leaves "Thinking…" up, when the model fails |
+| `slack.model-retry`         | The first two calls fail with `overloaded`, the third answers; expects that answer, once                    | A retried model call that posts twice, or not at all                    |
+| `slack.stream-breaks`       | The model's stream is cut after three chunks; expects a reply, no stream left open, and the thread `idle`   | A stream that breaks halfway and is never stopped                       |
+| `slack.stop-cancels-model`  | The model's stream is held after three chunks and Ana presses Stop; expects the thread `stopped` and the model call aborted | An app that stops posting but leaves the model running         |
+| `slack.no-secrets-to-model` | A DM; expects no token, signing secret or key in anything the app sent the model                            | A token, signing secret or key in the prompt                            |
+
+The ids are exported as `SLACK_MODEL_CHECKS`. Only Slack has model checks so far; the other platforms' are [#120](https://github.com/christian-bromann/channelstack/issues/120). With `model: "openai"`, their checks still answer each model call, so an agent on the fake OpenAI passes them.
 
 ## GitHub checks
 
@@ -185,7 +205,7 @@ To run a single check while you work on its bug, filter by its id, which is part
 npx vitest run test/checks.test.ts -t "slack.retry"
 ```
 
-The id lists are exported too, as `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECKS`, `NOTION_CHECKS`, `RESEND_CHECKS`, `GOOGLE_CHECKS` and `DISCORD_CHECKS`, for a script that builds `skip` from them.
+The id lists are exported too, as `SLACK_CHECKS`, `SLACK_MODEL_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECKS`, `NOTION_CHECKS`, `RESEND_CHECKS`, `GOOGLE_CHECKS` and `DISCORD_CHECKS`, for a script that builds `skip` from them.
 
 ## In live mode
 
@@ -193,7 +213,7 @@ Most checks are about delivery: retries, redeliveries, forged signatures, acknow
 
 | Checks | Live |
 | --- | --- |
-| `slack.retry`, `slack.redelivery`, `slack.bad-signature`, `slack.ack`; `github.redelivery`, `github.bad-signature`; `linear.redelivery`, `linear.stale`, `linear.bad-signature`; `notion.redelivery`, `notion.bad-signature`; `resend.redelivery`, `resend.bad-signature`, `resend.stale`; `google.redelivery`, `google.bad-signature`, `google.wrong-audience`, `google.stale` | Skip, with the delivery reason |
+| `slack.retry`, `slack.redelivery`, `slack.bad-signature`, `slack.ack`, `slack.slow-model`; `github.redelivery`, `github.bad-signature`; `linear.redelivery`, `linear.stale`, `linear.bad-signature`; `notion.redelivery`, `notion.bad-signature`; `resend.redelivery`, `resend.bad-signature`, `resend.stale`; `google.redelivery`, `google.bad-signature`, `google.wrong-audience`, `google.stale` | Skip, with the delivery reason |
 | `google.history` | Skips at its exact count, because waiting for quiet needs proxy mode live ([Live mode](/docs/guide/live-mode#what-skips-and-what-fails)) |
 | `slack.msg-too-long`, `slack.stop` and the others that use a fault, Stop or an exact count | Skip, with the reason |
 | `slack.in-thread`, `slack.ignores-bots`, `slack.stream-stop` | Skip, with the reason: they wait for quiet, read the status line or create a bot user, which live mode can't do yet |

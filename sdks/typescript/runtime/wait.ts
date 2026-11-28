@@ -1,3 +1,4 @@
+import { TEXT_NORMALISATION } from "../generated/normalisation.ts";
 import { type Duration, parseDuration } from "./duration.ts";
 
 export interface WaitOptions {
@@ -104,8 +105,20 @@ export interface QuietState {
   quietForMs: number;
   /** What is still open, in words: a delivery in flight or about to be retried, a stream the agent never stopped. */
   open: string[];
+  /** What should fail a test at once: a model call no script answered (decision 0029). */
+  problems?: string[];
   /** The bot loops the fake stopped in the session (decision 0027), when there are any. */
   loops?: string[];
+}
+
+/** A wait that stopped because the session's model calls went wrong: no script answered one, a script ran out. */
+export class ModelProblemError extends Error {
+  readonly problems: readonly string[];
+  constructor(problems: readonly string[]) {
+    super(`The model calls of this test went wrong:\n${problems.map((problem) => `  ${problem}`).join("\n")}`);
+    this.name = "ModelProblemError";
+    this.problems = problems;
+  }
 }
 
 /** Anyone who can author something: a handle with an id and a name. */
@@ -127,6 +140,23 @@ export function textMatches(text: string, expected: string | RegExp | undefined)
   // A pattern with the `g` or `y` flag remembers where it stopped; every test starts afresh.
   expected.lastIndex = 0;
   return expected.test(text);
+}
+
+const NORMALISATION_RULES = TEXT_NORMALISATION.rules.map(
+  ({ pattern, replacement }) => [new RegExp(pattern, "g"), replacement] as const,
+);
+
+/**
+ * Text as the server compares it for attribution, by the rules the spec publishes
+ * (`TEXT_NORMALISATION`, generated): what `toHaveSent` compares.
+ */
+export function normalisedText(text: string): string {
+  let normalised = NORMALISATION_RULES.reduce(
+    (current, [pattern, replacement]) => current.replace(pattern, replacement),
+    text,
+  );
+  if (TEXT_NORMALISATION.collapseWhitespace) normalised = normalised.replace(/\s+/g, " ").trim();
+  return TEXT_NORMALISATION.lowercase ? normalised.toLowerCase() : normalised;
 }
 
 /** Text to find as it goes to the server: a string as it is, a `RegExp` as its source and flags. */
@@ -188,6 +218,7 @@ export async function untilQuiet(
     async () => {
       const state = await quiet();
       open = state.open;
+      if (state.problems !== undefined && state.problems.length > 0) throw new ModelProblemError(state.problems);
       if (options.watching && Date.now() - started < quietFor) return undefined;
       return !state.busy && state.quietForMs >= quietFor ? true : undefined;
     },

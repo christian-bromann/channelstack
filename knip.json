@@ -13,6 +13,7 @@
         "test/acceptance/*.ts",
         "test/acceptance/examples/*.ts",
         "test/acceptance/stand-ins/*.ts",
+        "test/acceptance/stand-ins/*/*.ts",
         "test/acceptance/default-timeout/*.ts",
         "test/acceptance/wait-defaults/*.ts",
         "test/acceptance/bot-loop/*.ts",

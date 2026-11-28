@@ -7,17 +7,18 @@ from __future__ import annotations
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Literal, Self
+from typing import Any, Literal, Self, cast
 from urllib.parse import quote
 
-from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of
+from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of, to_wire
 from ..runtime.credentials import credential
 from ..runtime.duration import Duration, parse_duration
 from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes, read_document, read_tree
+from ..runtime.responder import respond_with
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CannotEditOthersMessageError", "CannotMessageUserError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DiscordApiCall", "DiscordApiCalls", "DiscordApp", "DiscordApps", "DiscordButtonRef", "DiscordChannel", "DiscordChannels", "DiscordDeliveries", "DiscordDelivery", "DiscordEndpointCheck", "DiscordEphemeralMessages", "DiscordFault", "DiscordFixture", "DiscordGuild", "DiscordMembers", "DiscordMessage", "DiscordMessageDeliveries", "DiscordMessageInput", "DiscordMessages", "DiscordPrincipal", "DiscordReaction", "DiscordReactions", "DiscordReplies", "DiscordThreads", "DiscordTranscript", "DiscordTranscriptEntry", "DiscordUser", "DiscordUsers", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "EmptyMessageError", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleApps", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "InvalidFormBodyError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MethodNotSupportedForChannelTypeError", "MissingAccessError", "MissingPermissionsError", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "ObjectNotFoundError", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendApps", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "ThreadAlreadyCreatedError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CannotEditOthersMessageError", "CannotMessageUserError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DiscordApiCall", "DiscordApiCalls", "DiscordApp", "DiscordApps", "DiscordButtonRef", "DiscordChannel", "DiscordChannels", "DiscordDeliveries", "DiscordDelivery", "DiscordEndpointCheck", "DiscordEphemeralMessages", "DiscordFault", "DiscordFixture", "DiscordGuild", "DiscordMembers", "DiscordMessage", "DiscordMessageDeliveries", "DiscordMessageInput", "DiscordMessages", "DiscordPrincipal", "DiscordReaction", "DiscordReactions", "DiscordReplies", "DiscordThreads", "DiscordTranscript", "DiscordTranscriptEntry", "DiscordUser", "DiscordUsers", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "EmptyMessageError", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleApps", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "InvalidFormBodyError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MethodNotSupportedForChannelTypeError", "MissingAccessError", "MissingPermissionsError", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "ObjectNotFoundError", "OpenAICall", "OpenAICalls", "OpenAIContext", "OpenAIFixture", "OpenAIHeldCall", "OpenAIHeldPage", "OpenAIMatch", "OpenAIMessage", "OpenAIPausedCalls", "OpenAIProblems", "OpenAIRateLimit", "OpenAIRef", "OpenAIRequest", "OpenAIScript", "OpenAISentSecret", "OpenAISentSecrets", "OpenAISessionCalls", "OpenAISessionToolCalls", "OpenAITiming", "OpenAITool", "OpenAIToolCall", "OpenAIToolCallSpec", "OpenAIToolCalls", "OpenAITurn", "OpenAITurnInput", "OpenAIUnattributedCall", "OpenAIUnattributedCalls", "PROVIDER_NAMES", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendApps", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "ThreadAlreadyCreatedError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
 
 VERSION = "0.1.1"
 
@@ -288,6 +289,7 @@ class Quiet:
     busy: bool
     quiet_for_ms: float
     open: list[str]
+    problems: list[str]
     loops: list[str] | None = None
 
     @classmethod
@@ -296,6 +298,7 @@ class Quiet:
             busy=data["busy"],
             quiet_for_ms=data["quietForMs"],
             open=data["open"],
+            problems=data["problems"],
             loops=data.get("loops"),
         )
 
@@ -467,7 +470,7 @@ class SlackMessageInput:
         )
 
     def _to_wire(self) -> dict[str, Any]:
-        wire = {"text": self.text, "blocks": self.blocks, "metadata": self.metadata}
+        wire = {"text": self.text, "blocks": self.blocks, "metadata": None if self.metadata is None else self.metadata._to_wire()}
         return {key: value for key, value in wire.items() if value is not None}
 
 
@@ -482,6 +485,10 @@ class SlackMessageMetadata:
             event_type=data["event_type"],
             event_payload=data["event_payload"],
         )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"event_type": self.event_type, "event_payload": self.event_payload}
+        return wire
 
 
 type SlackUsers = list[SlackUser]
@@ -1568,6 +1575,339 @@ class DiscordApiCall:
         )
 
 
+type OpenAITurnInput = str | OpenAITurn
+
+
+@dataclass(frozen=True)
+class OpenAITurn:
+    text: str | list[str] | None = None
+    tool_calls: list[OpenAIToolCallSpec] | None = None
+    reasoning: dict[str, Any] | None = None
+    refusal: str | None = None
+    finish: Literal["stop", "length", "content_filter"] | None = None
+    usage: dict[str, Any] | None = None
+    timing: OpenAITiming | None = None
+    fail_after: dict[str, Any] | None = None
+    pause_after: int | None = None
+    error: Literal["rate_limit", "slow_down", "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded", "project_spend_limit_exceeded", "organization_usage_limit_exceeded", "server_error", "overloaded", "timeout", "context_length_exceeded", "content_policy", "invalid_api_key", "not_in_organization", "ip_not_authorized", "unsupported_region"] | None = None
+    retry_after: int | str | None = None
+    should_retry: bool | None = None
+    message: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAITurn:
+        return cls(
+            text=data.get("text"),
+            tool_calls=None if data.get("toolCalls") is None else [OpenAIToolCallSpec._from_wire(ctx, item) for item in data["toolCalls"]],
+            reasoning=data.get("reasoning"),
+            refusal=data.get("refusal"),
+            finish=data.get("finish"),
+            usage=data.get("usage"),
+            timing=None if data.get("timing") is None else OpenAITiming._from_wire(ctx, data["timing"]),
+            fail_after=data.get("failAfter"),
+            pause_after=data.get("pauseAfter"),
+            error=data.get("error"),
+            retry_after=data.get("retryAfter"),
+            should_retry=data.get("shouldRetry"),
+            message=data.get("message"),
+        )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"text": self.text, "toolCalls": None if self.tool_calls is None else [item._to_wire() for item in self.tool_calls], "reasoning": self.reasoning, "refusal": self.refusal, "finish": self.finish, "usage": self.usage, "timing": None if self.timing is None else self.timing._to_wire(), "failAfter": self.fail_after, "pauseAfter": self.pause_after, "error": self.error, "retryAfter": self.retry_after, "shouldRetry": self.should_retry, "message": self.message}
+        return {key: value for key, value in wire.items() if value is not None}
+
+
+@dataclass(frozen=True)
+class OpenAIToolCallSpec:
+    name: str
+    arguments: dict[str, Any] | str | None = None
+    input: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIToolCallSpec:
+        return cls(
+            name=data["name"],
+            arguments=data.get("arguments"),
+            input=data.get("input"),
+        )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"name": self.name, "arguments": self.arguments, "input": self.input}
+        return {key: value for key, value in wire.items() if value is not None}
+
+
+@dataclass(frozen=True)
+class OpenAITiming:
+    first_token: int | str | None = None
+    between_chunks: int | str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAITiming:
+        return cls(
+            first_token=data.get("firstToken"),
+            between_chunks=data.get("betweenChunks"),
+        )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"firstToken": self.first_token, "betweenChunks": self.between_chunks}
+        return {key: value for key, value in wire.items() if value is not None}
+
+
+@dataclass(frozen=True)
+class OpenAIMatch:
+    text: str | re.Pattern[str] | None = None
+    prompt: str | re.Pattern[str] | None = None
+    tools: list[str] | None = None
+    tool_result: bool | str | None = None
+    endpoint: Literal["chat.completions", "responses"] | None = None
+    model: str | re.Pattern[str] | None = None
+    stream: bool | None = None
+    from_: SlackUser | GitHubUser | LinearUser | NotionUser | ResendUser | GoogleUser | DiscordUser | None = None
+    in_: SlackConversation | GitHubRepo | LinearTeam | NotionPage | NotionDatabase | ResendThread | GoogleThread | DiscordChannel | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIMatch:
+        return cls(
+            text=data.get("text"),
+            prompt=data.get("prompt"),
+            tools=data.get("tools"),
+            tool_result=data.get("toolResult"),
+            endpoint=data.get("endpoint"),
+            model=data.get("model"),
+            stream=data.get("stream"),
+            from_=data.get("from"),
+            in_=data.get("in"),
+        )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"text": None if self.text is None else pattern_on_wire(self.text), "prompt": None if self.prompt is None else pattern_on_wire(self.prompt), "tools": self.tools, "toolResult": self.tool_result, "endpoint": self.endpoint, "model": None if self.model is None else pattern_on_wire(self.model), "stream": self.stream, "from": None if self.from_ is None else self.from_.id, "in": None if self.in_ is None else self.in_.id}
+        return {key: value for key, value in wire.items() if value is not None}
+
+
+type OpenAICalls = list[OpenAICall]
+
+
+@dataclass(frozen=True)
+class OpenAIRequest:
+    endpoint: Literal["chat.completions", "responses"]
+    model: str
+    stream: bool
+    messages: list[OpenAIMessage]
+    tools: list[OpenAITool]
+    last_tool_results: list[dict[str, Any]]
+    text: str
+    context: OpenAIContext
+    headers: dict[str, str]
+    instructions: str | None = None
+    tool_choice: Any | None = None
+    response_format: Any | None = None
+    last_user_text: str | None = None
+    body: Any | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIRequest:
+        return cls(
+            endpoint=data["endpoint"],
+            model=data["model"],
+            stream=data["stream"],
+            messages=[OpenAIMessage._from_wire(ctx, item) for item in data["messages"]],
+            tools=[OpenAITool._from_wire(ctx, item) for item in data["tools"]],
+            last_tool_results=data["lastToolResults"],
+            text=data["text"],
+            context=OpenAIContext._from_wire(ctx, data["context"]),
+            headers=data["headers"],
+            instructions=data.get("instructions"),
+            tool_choice=data.get("toolChoice"),
+            response_format=data.get("responseFormat"),
+            last_user_text=data.get("lastUserText"),
+            body=data.get("body"),
+        )
+
+
+@dataclass(frozen=True)
+class OpenAIMessage:
+    role: Literal["system", "developer", "user", "assistant", "tool"]
+    text: str
+    tool_calls: list[dict[str, Any]] | None = None
+    call_id: str | None = None
+    name: str | None = None
+    parts: list[dict[str, Any]] | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIMessage:
+        return cls(
+            role=data["role"],
+            text=data["text"],
+            tool_calls=data.get("toolCalls"),
+            call_id=data.get("callId"),
+            name=data.get("name"),
+            parts=data.get("parts"),
+        )
+
+
+@dataclass(frozen=True)
+class OpenAITool:
+    type: str
+    name: str | None = None
+    description: str | None = None
+    parameters: Any | None = None
+    strict: bool | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAITool:
+        return cls(
+            type=data["type"],
+            name=data.get("name"),
+            description=data.get("description"),
+            parameters=data.get("parameters"),
+            strict=data.get("strict"),
+        )
+
+
+@dataclass(frozen=True)
+class OpenAIContext:
+    channel: str | None = None
+    from_: OpenAIRef | None = None
+    conversation: OpenAIRef | None = None
+    thread: OpenAIRef | None = None
+    message: OpenAIRef | None = None
+    attributed_by: Literal["minted_id", "tag", "owned_id", "text", "order"] | None = None
+    matched: str | None = None
+    tied_with: list[str] | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIContext:
+        return cls(
+            channel=data.get("channel"),
+            from_=None if data.get("from") is None else OpenAIRef._from_wire(ctx, data["from"]),
+            conversation=None if data.get("conversation") is None else OpenAIRef._from_wire(ctx, data["conversation"]),
+            thread=None if data.get("thread") is None else OpenAIRef._from_wire(ctx, data["thread"]),
+            message=None if data.get("message") is None else OpenAIRef._from_wire(ctx, data["message"]),
+            attributed_by=data.get("attributedBy"),
+            matched=data.get("matched"),
+            tied_with=data.get("tiedWith"),
+        )
+
+
+@dataclass(frozen=True)
+class OpenAIRef:
+    id: str
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIRef:
+        return cls(
+            id=data["id"],
+        )
+
+
+@dataclass(frozen=True)
+class OpenAIToolCall:
+    id: str
+    type: Literal["function", "custom"]
+    hosted: bool
+    name: str
+    made_in: str
+    arguments: Any | None = None
+    result: dict[str, Any] | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIToolCall:
+        return cls(
+            id=data["id"],
+            type=data["type"],
+            hosted=data["hosted"],
+            name=data["name"],
+            made_in=data["madeIn"],
+            arguments=data.get("arguments"),
+            result=data.get("result"),
+        )
+
+
+type OpenAIPausedCalls = list[OpenAICall]
+
+
+type OpenAIToolCalls = list[OpenAIToolCall]
+
+
+@dataclass(frozen=True)
+class OpenAIHeldPage:
+    held: list[OpenAIHeldCall]
+    cursor: str
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIHeldPage:
+        return cls(
+            held=[OpenAIHeldCall._from_wire(ctx, item) for item in data["held"]],
+            cursor=data["cursor"],
+        )
+
+
+@dataclass(frozen=True)
+class OpenAIHeldCall:
+    id: str
+    request: OpenAIRequest
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIHeldCall:
+        return cls(
+            id=data["id"],
+            request=OpenAIRequest._from_wire(ctx, data["request"]),
+        )
+
+
+type OpenAISessionCalls = list[OpenAICall]
+
+
+type OpenAISessionToolCalls = list[OpenAIToolCall]
+
+
+type OpenAIProblems = list[str]
+
+
+type OpenAISentSecrets = list[OpenAISentSecret]
+
+
+@dataclass(frozen=True)
+class OpenAISentSecret:
+    call: str
+    kinds: list[str]
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAISentSecret:
+        return cls(
+            call=data["call"],
+            kinds=data["kinds"],
+        )
+
+
+type OpenAIUnattributedCalls = list[OpenAIUnattributedCall]
+
+
+@dataclass(frozen=True)
+class OpenAIUnattributedCall:
+    id: str
+    endpoint: Literal["chat.completions", "responses"]
+    model: str
+    at: str
+    tools: list[str]
+    since_ms: float
+    message: str
+    last_user_text: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIUnattributedCall:
+        return cls(
+            id=data["id"],
+            endpoint=data["endpoint"],
+            model=data["model"],
+            at=data["at"],
+            tools=data["tools"],
+            since_ms=data["sinceMs"],
+            message=data["message"],
+            last_user_text=data.get("lastUserText"),
+        )
+
+
 type Places = list[Place]
 
 
@@ -1745,6 +2085,12 @@ class Session:
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord")
         return DiscordFixture(ctx, data)
+
+    async def openai(self) -> OpenAIFixture:
+        """The OpenAI fixture: where the agent reaches the fake model. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai")
+        return OpenAIFixture(ctx, data)
 
     async def places(self) -> Places:
         """Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread, a Discord channel), the most recently active last. Experimental."""
@@ -4549,6 +4895,186 @@ class DiscordFault:
         await dispose_quietly(self.undo)
 
 
+class OpenAIFixture:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.base_url: str = data["baseUrl"]
+
+    async def respond(self, turns: OpenAITurnInput | list[OpenAITurnInput] | Callable[[OpenAIRequest], OpenAITurnInput | Awaitable[OpenAITurnInput]] | None = None, *, when: OpenAIMatch | None = None, times: int | None = None, timing: OpenAITiming | None = None) -> OpenAIScript:
+        """Script what the model answers: turns used in order, one per matching call, or a responder the test answers. Scripts are tried in the order they were added. Experimental."""
+        ctx = self._ctx
+        answer = turns if callable(turns) else None
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts", body={"turns": None if answer is not None or turns is None else to_wire(cast(Any, turns) if isinstance(turns, list) else [turns]), "when": None if when is None else when._to_wire(), "times": times, "timing": None if timing is None else timing._to_wire(), "responder": answer is not None})
+        handle = OpenAIScript(ctx, data)
+        if answer is not None:
+            respond_with(lambda since, wait_ms: handle.held_calls(since=since, wait_ms=wait_ms), lambda held, turn, error: handle.answer_held(held, turn=turn, error=error), answer)
+        return handle
+
+    async def calls(self, *, endpoint: Literal["chat.completions", "responses"] | None = None, error: Literal[True] | str | None = None) -> OpenAISessionCalls:
+        """Every model call attributed to this session, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/calls", query={"endpoint": endpoint, "error": error})
+        return [OpenAICall(ctx, item) for item in data]
+
+    async def tool_calls(self, *, name: str | None = None) -> OpenAISessionToolCalls:
+        """Every tool call the model made in this session, each with the result the agent sent back. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/tool-calls", query={"name": name})
+        return [OpenAIToolCall._from_wire(ctx, item) for item in data]
+
+    async def problems(self) -> OpenAIProblems:
+        """What went wrong with the model in this session: a call no script answered, a script that ran out or did what the real API can't, a responder that threw. Matchers fail at once on these. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/problems")
+        return data
+
+    async def sent_secrets(self) -> OpenAISentSecrets:
+        """The calls that sent a secret channelstack knows to the model, and the kinds they sent (`slack.botToken`): never the values. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/sent-secrets")
+        return [OpenAISentSecret._from_wire(ctx, item) for item in data]
+
+    async def unattributed(self, *, within_ms: int | None | None = None) -> OpenAIUnattributedCalls:
+        """Model calls no session could be given (the agent calling the model at startup, for example), oldest first: what a failing matcher names. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/unattributed", query={"withinMs": within_ms})
+        return [OpenAIUnattributedCall._from_wire(ctx, item) for item in data]
+
+    async def rate_limit(self, *, requests: dict[str, Any] | None = None, tokens: dict[str, Any] | None = None, error: Literal["rate_limit", "slow_down"] | None = None) -> OpenAIRateLimit:
+        """Limit this session's model calls: requests and tokens per window, with truthful x-ratelimit-* headers. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/openai/rate-limits", body={"requests": None if requests is None else {key: value for key, value in {**requests, "per": None if requests.get("per") is None else parse_duration(requests["per"])}.items() if value is not None}, "tokens": None if tokens is None else {key: value for key, value in {**tokens, "per": None if tokens.get("per") is None else parse_duration(tokens["per"])}.items() if value is not None}, "error": error})
+        return OpenAIRateLimit(ctx, data)
+
+    async def wait_for_call(self, *, endpoint: Literal["chat.completions", "responses"] | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> OpenAICall:
+        """Wait for the next new model call from the agent, after the last one this handle saw."""
+        return await wait_for_next(self._seen, f"waitForCall:{endpoint!r}:{error!r}", lambda: self.calls(endpoint=endpoint, error=error), lambda item: True, "a model call from the agent", timeout=timeout)
+
+    async def latest_call(self, *, endpoint: Literal["chat.completions", "responses"] | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> OpenAICall:
+        """The latest model call from the agent, once the agent is quiet. Waits for at least one."""
+        return await latest_once_quiet(lambda: self.calls(endpoint=endpoint, error=error), lambda item: True, lambda: quiet_of(self._ctx), "a model call from the agent", timeout=timeout, quiet_for=quiet_for)
+
+
+class OpenAIScript:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.responder: bool = data["responder"]
+        self.times: float = data["times"]
+        self.used: int = data["used"]
+        self.problems: list[str] = data["problems"]
+
+    async def refresh(self) -> OpenAIScript:
+        """Re-read a script: how many calls it answered, and its problems. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts/{quote(str(self.id), safe='')}")
+        return OpenAIScript(ctx, data)
+
+    async def undo(self) -> None:
+        """Remove a script. Closing the session does it too. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("DELETE", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts/{quote(str(self.id), safe='')}")
+
+    async def resume(self) -> None:
+        """Let the streams this script holds at `pauseAfter` go on. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts/{quote(str(self.id), safe='')}/resume")
+
+    async def calls(self) -> OpenAICalls:
+        """The calls this script answered. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts/{quote(str(self.id), safe='')}/calls")
+        return [OpenAICall(ctx, item) for item in data]
+
+    async def paused_calls(self) -> OpenAIPausedCalls:
+        """The calls whose streams this script holds at `pauseAfter`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts/{quote(str(self.id), safe='')}/paused")
+        return [OpenAICall(ctx, item) for item in data]
+
+    async def tool_calls(self, *, name: str | None = None) -> OpenAIToolCalls:
+        """The tool calls this script made, each with the result the agent sent back. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts/{quote(str(self.id), safe='')}/tool-calls", query={"name": name})
+        return [OpenAIToolCall._from_wire(ctx, item) for item in data]
+
+    async def held_calls(self, *, since: str | None = None, wait_ms: int | None | None = None) -> OpenAIHeldPage:
+        """For a responder's SDK: the calls held for it since `since`, waiting up to `waitMs` for one. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts/{quote(str(self.id), safe='')}/requests", query={"since": since, "waitMs": wait_ms})
+        return OpenAIHeldPage._from_wire(ctx, data)
+
+    async def answer_held(self, held: str, *, turn: OpenAITurnInput | None = None, error: str | None = None) -> None:
+        """For a responder's SDK: answer a held call with a turn, or report that the test's function threw. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts/{quote(str(self.id), safe='')}/answers", body={"held": held, "turn": None if turn is None else to_wire(turn), "error": error})
+
+    async def wait_for_call(self, *, timeout: Duration | None = None) -> OpenAICall:
+        """Wait for the next new model call this script answers, after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForCall", self.calls, lambda item: True, "a model call this script answers", timeout=timeout)
+
+    async def wait_for_pause(self, *, timeout: Duration | None = None) -> OpenAICall:
+        """Wait for the next new stream held at pauseAfter, after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForPause", self.paused_calls, lambda item: True, "a stream held at pauseAfter", timeout=timeout)
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        await dispose_quietly(self.undo)
+
+
+class OpenAICall:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.endpoint: Literal["chat.completions", "responses"] = data["endpoint"]
+        self.model: str = data["model"]
+        self.stream: bool = data["stream"]
+        self.at: str = data["at"]
+        self.duration_ms: float = data["durationMs"]
+        self.attempt: int = data["attempt"]
+        self.done: bool = data["done"]
+        self.request: OpenAIRequest = OpenAIRequest._from_wire(ctx, data["request"])
+        self.response: dict[str, Any] = data["response"]
+        self.tool_calls: list[OpenAIToolCall] = [OpenAIToolCall._from_wire(ctx, item) for item in data["toolCalls"]]
+        self.script: str | None = data.get("script")
+
+    async def refresh(self) -> OpenAICall:
+        """Re-read a model call: whether it is done, how it ended. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/calls/{quote(str(self.id), safe='')}")
+        return OpenAICall(ctx, data)
+
+
+class OpenAIRateLimit:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.requests: int | None = data.get("requests")
+        self.tokens: int | None = data.get("tokens")
+        self.resets_in_ms: float = data["resetsInMs"]
+
+    async def remaining(self) -> OpenAIRateLimit:
+        """What the rate limit's headers would say now. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/rate-limits/{quote(str(self.id), safe='')}")
+        return OpenAIRateLimit(ctx, data)
+
+    async def undo(self) -> None:
+        """Remove the rate limit. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("DELETE", f"/sessions/{quote(session_of(ctx), safe='')}/openai/rate-limits/{quote(str(self.id), safe='')}")
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        await dispose_quietly(self.undo)
+
+
 class Place:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
@@ -4611,6 +5137,9 @@ class GitHubPullRequest(GitHubIssue):
 
 CHANNEL_NAMES: tuple[str, ...] = ("slack", "github", "linear", "notion", "resend", "google", "discord")
 """Every channel, by name, in the server's order: what pytest-channelstack makes a fixture of."""
+
+PROVIDER_NAMES: tuple[str, ...] = ("openai",)
+"""The fakes the agent calls that aren't channels (the fake OpenAI): pytest-channelstack makes a fixture of each too."""
 
 
 async def connect(*, mode: Literal["auto", "attach", "start"] = "auto", server: str | None = None, token: str | None = None) -> Channelstack:
