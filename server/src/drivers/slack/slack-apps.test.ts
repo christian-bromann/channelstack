@@ -321,7 +321,9 @@ describe("R1.12: deliveries, faults and the event log by app", () => {
       "my-agent",
       "coder",
     ]);
-    expect(events.filter((event) => event.kind === "delivery_attempt").map((event) => event.summary?.text)).toEqual([
+    // Attempts are logged as each agent answers, so in no fixed order.
+    const attempts = events.filter((event) => event.kind === "delivery_attempt").map((event) => event.summary?.text);
+    expect(attempts.toSorted()).toEqual([
       "→ slack app_mention to coder",
       "→ slack message",
       "→ slack message to coder",
