@@ -240,6 +240,15 @@ export function buildIr(openapi: Json): Ir {
       if (!(named in schemas)) throw new SpecError(where, `unknown schema "${named}"`);
       return resourceNames.has(named) ? { kind: "resource", name: named } : { kind: "named", name: named };
     }
+    // A handle of any channel's people, apps or places, by their role: what a provider takes (decision 0029).
+    const roles: unknown = schema["x-channelstack-ref-role"];
+    if (Array.isArray(roles)) {
+      const byRole = Object.keys(schemas).filter((name) =>
+        roles.includes(schemas[name]["x-channelstack-resource"]?.role),
+      );
+      if (byRole.length === 0) throw new SpecError(where, `x-channelstack-ref-role names no resource's role (${roles.join(", ")})`);
+      return { kind: "ref", resources: byRole };
+    }
     const refs: unknown = schema["x-channelstack-ref"];
     if (Array.isArray(refs)) {
       for (const name of refs)

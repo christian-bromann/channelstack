@@ -24818,14 +24818,33 @@
           {
             "name": "from",
             "type": {
-              "kind": "string"
+              "kind": "ref",
+              "resources": [
+                "SlackUser",
+                "GitHubUser",
+                "LinearUser",
+                "NotionUser",
+                "ResendUser",
+                "GoogleUser",
+                "DiscordUser"
+              ]
             },
             "optional": true
           },
           {
             "name": "in",
             "type": {
-              "kind": "string"
+              "kind": "ref",
+              "resources": [
+                "SlackConversation",
+                "GitHubRepo",
+                "LinearTeam",
+                "NotionPage",
+                "NotionDatabase",
+                "ResendThread",
+                "GoogleThread",
+                "DiscordChannel"
+              ]
             },
             "optional": true
           }

@@ -213,6 +213,7 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
       request.includes.includes("reasoning.encrypted_content") && answer.reasoning
         ? `gAAAAA${ids.next(OPENAI_IDS.held).slice(5)}${answer.reasoning.itemId.slice(3)}`
         : undefined;
+    if (encrypted !== undefined) world.store.issued.add(encrypted);
     const responseMeta: ResponseMeta = {
       id: call.id,
       created,
@@ -366,6 +367,17 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
             param: "conversation",
           });
         history = conversation.items;
+      }
+      // Reasoning sent back must be what the fake gave out, as OpenAI only decrypts its own.
+      for (const item of inputItems(body.input)) {
+        const blob = item.type === "reasoning" ? item.encrypted_content : undefined;
+        if (typeof blob === "string" && !world.store.issued.has(blob)) {
+          throw invalidRequest(
+            "The encrypted content for item could not be verified.",
+            "input",
+            "invalid_encrypted_content",
+          );
+        }
       }
       return {
         request: responsesRequest(body, c.req.raw.headers, history),

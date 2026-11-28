@@ -6,6 +6,7 @@ import { RESEND_IDS } from "./ids.ts";
 import { ResendRestClient } from "./live/client.ts";
 import { resendMaintenance } from "./live/maintenance.ts";
 import { createLiveResendWorld } from "./live/world.ts";
+import { resendPlace } from "./place.ts";
 import { registerResendRoutes } from "./routes.ts";
 import { RESEND_SECRETS } from "./secrets.ts";
 
@@ -13,6 +14,7 @@ import { RESEND_SECRETS } from "./secrets.ts";
 export const resend: DriverDefinition = {
   name: "resend",
   title: "Resend",
+  place: resendPlace,
   dev: emailDev("Resend"),
   ids: RESEND_IDS,
   tokenPatterns: [/re_[A-Za-z0-9]{8}_[A-Za-z0-9]{24}/g, /whsec_[A-Za-z0-9+/=]{20,}/g],

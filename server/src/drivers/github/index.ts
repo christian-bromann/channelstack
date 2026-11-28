@@ -6,6 +6,7 @@ import { removeGitHubEntry } from "./live/cleanup.ts";
 import { GitHubLiveClient } from "./live/client.ts";
 import { githubMaintenance } from "./live/maintenance.ts";
 import { createLiveGitHubWorld } from "./live/world.ts";
+import { githubPlace } from "./place.ts";
 import { registerGitHubRoutes } from "./routes.ts";
 import { GITHUB_SECRETS } from "./secrets.ts";
 
@@ -13,6 +14,7 @@ import { GITHUB_SECRETS } from "./secrets.ts";
 export const github: DriverDefinition = {
   name: "github",
   title: "GitHub",
+  place: githubPlace,
   dev: githubDev,
   ids: GITHUB_IDS,
   tokenPatterns: [/gh[opsur]_[A-Za-z0-9]{20,}/g, /github_pat_[A-Za-z0-9_]{20,}/g],

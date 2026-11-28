@@ -3,7 +3,7 @@
 //! The test plays the agent itself, calling the fake as the official SDKs do. `pnpm test:rust`
 //! sets the binary; without it, the test says so and passes.
 
-use channelstack::{Mode, connect, expect};
+use channelstack::{Error, Mode, connect, expect};
 use serde_json::{Value, json};
 
 /// A Chat Completions call as an agent makes it, tagged with the session (`user`) so it is the test's.
@@ -73,5 +73,10 @@ async fn a_responder_answers_from_the_request() -> channelstack::Result<()> {
             .contains("panicked"),
         "{refused}"
     );
+    // The session's model problems fail its close, as the other SDKs fail the test.
+    match session.close().await {
+        Err(Error::Expectation(message)) => assert!(message.contains("went wrong"), "{message}"),
+        other => panic!("expected the close to fail with the model problems, got {other:?}"),
+    }
     Ok(())
 }

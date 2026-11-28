@@ -1605,8 +1605,8 @@ class OpenAIMatch:
     endpoint: Literal["chat.completions", "responses"] | None = None
     model: str | re.Pattern[str] | None = None
     stream: bool | None = None
-    from_: str | None = None
-    in_: str | None = None
+    from_: SlackUser | GitHubUser | LinearUser | NotionUser | ResendUser | GoogleUser | DiscordUser | None = None
+    in_: SlackConversation | GitHubRepo | LinearTeam | NotionPage | NotionDatabase | ResendThread | GoogleThread | DiscordChannel | None = None
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIMatch:
@@ -1623,7 +1623,7 @@ class OpenAIMatch:
         )
 
     def _to_wire(self) -> dict[str, Any]:
-        wire = {"text": None if self.text is None else pattern_on_wire(self.text), "prompt": None if self.prompt is None else pattern_on_wire(self.prompt), "tools": self.tools, "toolResult": self.tool_result, "endpoint": self.endpoint, "model": None if self.model is None else pattern_on_wire(self.model), "stream": self.stream, "from": self.from_, "in": self.in_}
+        wire = {"text": None if self.text is None else pattern_on_wire(self.text), "prompt": None if self.prompt is None else pattern_on_wire(self.prompt), "tools": self.tools, "toolResult": self.tool_result, "endpoint": self.endpoint, "model": None if self.model is None else pattern_on_wire(self.model), "stream": self.stream, "from": None if self.from_ is None else self.from_.id, "in": None if self.in_ is None else self.in_.id}
         return {key: value for key, value in wire.items() if value is not None}
 
 

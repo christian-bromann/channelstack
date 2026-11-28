@@ -25,6 +25,8 @@ const LIMIT = 5000;
 export class OpenAIStore {
   readonly responses = new Map<string, StoredResponse>();
   readonly conversations = new Map<string, Conversation>();
+  /** The reasoning blobs (`encrypted_content`) the fake gave out: only these come back valid. */
+  readonly issued = new Set<string>();
 
   keep(response: StoredResponse): void {
     this.responses.set(response.id, response);
@@ -53,5 +55,6 @@ export class OpenAIStore {
   clear(): void {
     this.responses.clear();
     this.conversations.clear();
+    this.issued.clear();
   }
 }

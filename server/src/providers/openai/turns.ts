@@ -146,11 +146,21 @@ export const MatchSchema = z
     endpoint: z.enum(ENDPOINTS).optional(),
     model: textPattern().optional(),
     stream: z.boolean().optional(),
-    from: z.string().optional().openapi({ description: "The call answers this person's message (their id)." }),
+    from: z
+      .string()
+      .optional()
+      .openapi({
+        description: "The call answers this person's message: a person of any channel.",
+        "x-channelstack-ref-role": ["user"],
+      }),
     in: z
       .string()
       .optional()
-      .openapi({ description: "The call answers a message in this conversation or thread (its id)." }),
+      .openapi({
+        description:
+          "The call answers a message in this place (a channel, an issue, a thread of email), or the thread with this id.",
+        "x-channelstack-ref-role": ["resource"],
+      }),
   })
   .openapi("OpenAIMatch");
 

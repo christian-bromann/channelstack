@@ -448,3 +448,39 @@ describe("gateway dialects", () => {
     expect(call.model).toBe("my-gpt-5");
   });
 });
+
+describe("reasoning sent back", () => {
+  test("the fake's own encrypted reasoning comes back valid; any other blob is refused", async () => {
+    const { client, respond, prompt } = await setup();
+    await respond({ turns: [{ reasoning: { summary: "Thinking." }, text: "First." }, "Second."] });
+
+    const first = await client.responses.create({
+      model: "gpt-5",
+      input: prompt,
+      store: false,
+      include: ["reasoning.encrypted_content"],
+    });
+    const reasoning = first.output.find((item) => item.type === "reasoning");
+    expect(reasoning?.type === "reasoning" && reasoning.encrypted_content).toMatch(/^gAAAAA/);
+
+    const second = await client.responses.create({
+      model: "gpt-5",
+      store: false,
+      input: [...first.output, { role: "user", content: "and the API?" }] as never,
+    });
+    expect(second.output_text).toBe("Second.");
+
+    const forged = (await client.responses
+      .create({
+        model: "gpt-5",
+        store: false,
+        input: [
+          { type: "reasoning", id: "rs_x", summary: [], encrypted_content: "gAAAAAforged" },
+          { role: "user", content: prompt },
+        ] as never,
+      })
+      .catch((caught: unknown) => caught)) as APIError;
+    expect(forged.status).toBe(400);
+    expect(forged.code).toBe("invalid_encrypted_content");
+  });
+});

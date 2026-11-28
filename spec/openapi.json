@@ -8752,11 +8752,17 @@
           },
           "from": {
             "type": "string",
-            "description": "The call answers this person's message (their id)."
+            "description": "The call answers this person's message: a person of any channel.",
+            "x-channelstack-ref-role": [
+              "user"
+            ]
           },
           "in": {
             "type": "string",
-            "description": "The call answers a message in this conversation or thread (its id)."
+            "description": "The call answers a message in this place (a channel, an issue, a thread of email), or the thread with this id.",
+            "x-channelstack-ref-role": [
+              "resource"
+            ]
           }
         }
       },

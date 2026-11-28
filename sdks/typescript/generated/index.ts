@@ -1246,8 +1246,8 @@ export interface OpenAIMatch {
   endpoint?: "chat.completions" | "responses";
   model?: string | RegExp;
   stream?: boolean;
-  from?: string;
-  in?: string;
+  from?: SlackUser | GitHubUser | LinearUser | NotionUser | ResendUser | GoogleUser | DiscordUser;
+  in?: SlackConversation | GitHubRepo | LinearTeam | NotionPage | NotionDatabase | ResendThread | GoogleThread | DiscordChannel;
 }
 
 export type OpenAICalls = OpenAICall[];
@@ -1896,21 +1896,21 @@ export class SlackUser {
   /** Post a top-level message in a conversation, or in a DM with the people in `to`. Experimental. */
   async say(message: string | SlackMessageInput, options: { channel?: SlackConversation; to?: SlackUser | SlackApp | Array<SlackUser | SlackApp>; files?: string | FileInput[] } = {}): Promise<SlackMessage> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/say`, { body: { message: typeof message === "string" ? { text: message } : message, channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : [options.to].flat().map((item) => item.id), files: options.files === undefined ? undefined : readTree(options.files) } })) as SlackMessageData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/say`, { body: { message: typeof message === "string" ? { text: message } : (typeof message === "string" ? { text: message } : message), channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : [options.to].flat().map((item) => item.id), files: options.files === undefined ? undefined : readTree(options.files) } })) as SlackMessageData;
     return new SlackMessage(ctx, data);
   }
 
   /** Reply in a thread: pass the message that starts it, or any reply in it. Experimental. */
   async reply(message: string | SlackMessageInput, options: { thread: SlackThread | SlackMessage; alsoSendToChannel?: boolean; files?: string | FileInput[] }): Promise<SlackMessage> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/reply`, { body: { message: typeof message === "string" ? { text: message } : message, thread: { channel: options.thread.channel, ts: options.thread.ts }, alsoSendToChannel: options.alsoSendToChannel, files: options.files === undefined ? undefined : readTree(options.files) } })) as SlackMessageData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/reply`, { body: { message: typeof message === "string" ? { text: message } : (typeof message === "string" ? { text: message } : message), thread: { channel: options.thread.channel, ts: options.thread.ts }, alsoSendToChannel: options.alsoSendToChannel, files: options.files === undefined ? undefined : readTree(options.files) } })) as SlackMessageData;
     return new SlackMessage(ctx, data);
   }
 
   /** Edit one of this person's own messages. Experimental. */
   async edit(text: string | SlackMessageInput, options: { message: SlackMessage }): Promise<SlackMessage> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/edit`, { body: { text: typeof text === "string" ? { text: text } : text, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackMessageData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/edit`, { body: { text: typeof text === "string" ? { text: text } : (typeof text === "string" ? { text: text } : text), message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackMessageData;
     return new SlackMessage(ctx, data);
   }
 
@@ -1923,14 +1923,14 @@ export class SlackUser {
   /** Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation. Experimental. */
   async click(button: string | SlackButtonRef, options: { message?: SlackMessage; thread?: SlackThread | SlackMessage; channel?: SlackConversation } = {}): Promise<SlackDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/click`, { body: { button: typeof button === "string" ? { label: button } : button, message: options.message === undefined ? undefined : { channel: options.message.channel, ts: options.message.ts }, thread: options.thread === undefined ? undefined : { channel: options.thread.channel, ts: options.thread.ts }, channel: options.channel === undefined ? undefined : options.channel.id } }))) as SlackDeliveryData | null;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/click`, { body: { button: typeof button === "string" ? { label: button } : (typeof button === "string" ? { label: button } : button), message: options.message === undefined ? undefined : { channel: options.message.channel, ts: options.message.ts }, thread: options.thread === undefined ? undefined : { channel: options.thread.channel, ts: options.thread.ts }, channel: options.channel === undefined ? undefined : options.channel.id } }))) as SlackDeliveryData | null;
     return (data === null ? undefined : new SlackDelivery(ctx, data));
   }
 
   /** Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id. Experimental. */
   async select(option: string | string[], options: { menu: string | SlackMenuRef; message: SlackMessage }): Promise<SlackDelivery> {
     const ctx = this.#ctx;
-    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/select`, { body: { option: [option].flat(), menu: typeof options.menu === "string" ? { label: options.menu } : options.menu, message: { channel: options.message.channel, ts: options.message.ts } } }))) as SlackDeliveryData;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/select`, { body: { option: [option].flat(), menu: typeof options.menu === "string" ? { label: options.menu } : (typeof options.menu === "string" ? { label: options.menu } : options.menu), message: { channel: options.message.channel, ts: options.message.ts } } }))) as SlackDeliveryData;
     return new SlackDelivery(ctx, data);
   }
 
@@ -5352,21 +5352,21 @@ export class DiscordUser {
   /** Write a message in a channel or thread, or in a DM with the person or app in `to`. Experimental. */
   async say(text: string | DiscordMessageInput, options: { channel?: DiscordChannel; to?: DiscordUser | DiscordApp | Array<DiscordUser | DiscordApp> } = {}): Promise<DiscordMessage> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/say`, { body: { text: typeof text === "string" ? { content: text } : text, channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : [options.to].flat().map((item) => item.id) } })) as DiscordMessageData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/say`, { body: { text: typeof text === "string" ? { content: text } : (typeof text === "string" ? { content: text } : text), channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : [options.to].flat().map((item) => item.id) } })) as DiscordMessageData;
     return new DiscordMessage(ctx, data);
   }
 
   /** Reply to a message: Discord's reply, in the message's channel, which quotes it. Experimental. */
   async reply(text: string | DiscordMessageInput, options: { message: DiscordMessage }): Promise<DiscordMessage> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/reply`, { body: { text: typeof text === "string" ? { content: text } : text, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordMessageData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/reply`, { body: { text: typeof text === "string" ? { content: text } : (typeof text === "string" ? { content: text } : text), message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordMessageData;
     return new DiscordMessage(ctx, data);
   }
 
   /** Edit one of this person's own messages. Experimental. */
   async edit(text: string | DiscordMessageInput, options: { message: DiscordMessage }): Promise<DiscordMessage> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/edit`, { body: { text: typeof text === "string" ? { content: text } : text, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordMessageData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/edit`, { body: { text: typeof text === "string" ? { content: text } : (typeof text === "string" ? { content: text } : text), message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordMessageData;
     return new DiscordMessage(ctx, data);
   }
 
@@ -5420,7 +5420,7 @@ export class DiscordUser {
   /** Press a button, found by its label or custom_id: on a message, or on the app's newest message in a channel or thread that has it. Experimental. */
   async click(button: string | DiscordButtonRef, options: { message?: DiscordMessage; channel?: DiscordChannel } = {}): Promise<DiscordDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/click`, { body: { button: typeof button === "string" ? { label: button } : button, message: options.message === undefined ? undefined : { channelId: options.message.channelId, id: options.message.id }, channel: options.channel === undefined ? undefined : options.channel.id } }))) as DiscordDeliveryData | null;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/click`, { body: { button: typeof button === "string" ? { label: button } : (typeof button === "string" ? { label: button } : button), message: options.message === undefined ? undefined : { channelId: options.message.channelId, id: options.message.id }, channel: options.channel === undefined ? undefined : options.channel.id } }))) as DiscordDeliveryData | null;
     return (data === null ? undefined : new DiscordDelivery(ctx, data));
   }
 
@@ -5730,7 +5730,7 @@ export class OpenAIFixture {
   async respond(turns?: OpenAITurnInput | OpenAITurnInput[] | Responder<OpenAIRequest, OpenAITurnInput>, options: { when?: OpenAIMatch; times?: number; timing?: OpenAITiming } = {}): Promise<OpenAIScript> {
     const ctx = this.#ctx;
     const answer = typeof turns === "function" ? turns : undefined;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts`, { body: { turns: (answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined) === undefined ? undefined : [(answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined)].flat(), when: options.when, times: options.times, timing: options.timing, responder: answer !== undefined } })) as OpenAIScriptData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts`, { body: { turns: (answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined) === undefined ? undefined : [(answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined)].flat(), when: options.when === undefined ? undefined : { ...options.when, text: options.when.text === undefined ? undefined : patternOnWire(options.when.text), prompt: options.when.prompt === undefined ? undefined : patternOnWire(options.when.prompt), model: options.when.model === undefined ? undefined : patternOnWire(options.when.model), from: options.when.from === undefined ? undefined : options.when.from.id, in: options.when.in === undefined ? undefined : options.when.in.id }, times: options.times, timing: options.timing, responder: answer !== undefined } })) as OpenAIScriptData;
     const handle = new OpenAIScript(ctx, data);
     if (answer !== undefined) respondWith({ held: (o) => handle.heldCalls(o), answer: (id, o) => handle.answerHeld(id, o) }, answer);
     return handle;

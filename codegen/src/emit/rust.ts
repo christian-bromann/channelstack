@@ -181,7 +181,17 @@ export function emitRust(ir: Ir): Map<string, string> {
           ]
         : []),
       `        let path = format!(${str(path)}${pathArgs.map((arg) => `, ${arg}`).join("")});`,
-      `        send(ctx, ${str(m.http.verb)}, path, ${map("body")}, ${map("query")}, ${m.onceQuiet === true}, &[${(m.retryWhile ?? []).map(str).join(", ")}]).await`,
+      ...(resource.scope === "session" && m.dispose
+        ? [
+            // Closing a session whose model calls went wrong fails, as the other SDKs' fixtures fail the
+            // test (decision 0029): the problems are read first, the session closes all the same.
+            "        let problems = ctx.quiet().await.map(|state| state.problems).unwrap_or_default();",
+            `        let closed = send(ctx, ${str(m.http.verb)}, path, ${map("body")}, ${map("query")}, ${m.onceQuiet === true}, &[]).await?;`,
+            "        if problems.is_empty() { Ok(closed) } else { Err(crate::runtime::wait::model_problems(&problems)) }",
+          ]
+        : [
+            `        send(ctx, ${str(m.http.verb)}, path, ${map("body")}, ${map("query")}, ${m.onceQuiet === true}, &[${(m.retryWhile ?? []).map(str).join(", ")}]).await`,
+          ]),
       "    })",
       "}",
     ];

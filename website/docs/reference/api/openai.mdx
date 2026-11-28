@@ -662,8 +662,8 @@ type OpenAITurnInput = string | OpenAITurn;
 | `endpoint` | `endpoint` | `"chat.completions" \| "responses" \| undefined` |
 | `model` | `model` | `string \| RegExp \| undefined` |
 | `stream` | `stream` | `boolean \| undefined` |
-| `from` | `from_` · `from` | `string \| undefined` |
-| `in` | `in_` · `r#in` | `string \| undefined` |
+| `from` | `from_` · `from` | `SlackUser \| GitHubUser \| LinearUser \| NotionUser \| ResendUser \| GoogleUser \| DiscordUser \| undefined` |
+| `in` | `in_` · `r#in` | `SlackConversation \| GitHubRepo \| LinearTeam \| NotionPage \| NotionDatabase \| ResendThread \| GoogleThread \| DiscordChannel \| undefined` |
 
 ### OpenAICalls
 

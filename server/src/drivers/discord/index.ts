@@ -6,6 +6,7 @@ import { removeDiscordEntry } from "./live/cleanup.ts";
 import { DiscordRestClient } from "./live/client.ts";
 import { discordMaintenance } from "./live/maintenance.ts";
 import { createLiveDiscordWorld } from "./live/world.ts";
+import { discordPlace } from "./place.ts";
 import { registerDiscordRoutes } from "./routes.ts";
 import { DISCORD_SECRETS } from "./secrets.ts";
 import { publicKeyOf } from "./signing.ts";
@@ -14,6 +15,7 @@ import { publicKeyOf } from "./signing.ts";
 export const discord: DriverDefinition = {
   name: "discord",
   title: "Discord",
+  place: discordPlace,
   dev: discordDev,
   ids: DISCORD_IDS,
   // A bot token (`<id in base 64>.<6>.<38>`) and an interaction's token, wherever they turn up.

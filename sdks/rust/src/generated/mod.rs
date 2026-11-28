@@ -179,7 +179,17 @@ fn run_session_close<'a>(
         let _ = (&me, &options);
         let mut args = args.into_iter();
         let path = format!("/sessions/{}", encode_segment(ctx.session()?));
-        send(ctx, "DELETE", path, None, None, false, &[]).await
+        let problems = ctx
+            .quiet()
+            .await
+            .map(|state| state.problems)
+            .unwrap_or_default();
+        let closed = send(ctx, "DELETE", path, None, None, false, &[]).await?;
+        if problems.is_empty() {
+            Ok(closed)
+        } else {
+            Err(crate::runtime::wait::model_problems(&problems))
+        }
     })
 }
 

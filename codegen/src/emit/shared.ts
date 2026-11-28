@@ -32,6 +32,13 @@ export class IrIndex {
     this.#types = new Map(ir.types.map((type) => [type.name, type.type]));
   }
 
+  /** A named data type's own type. */
+  named(name: string): IrType {
+    const type = this.#types.get(name);
+    if (!type) throw new Error(`The IR has no type "${name}"`);
+    return type;
+  }
+
   resource(name: string): IrResource {
     const resource = this.#resources.get(name);
     if (!resource) throw new Error(`The IR has no resource "${name}"`);
