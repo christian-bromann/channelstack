@@ -111,11 +111,12 @@ export function registerEchoRoutes(
   router.route({
     method: "get",
     path: "/apps",
-    summary: "The apps, the built-in one first",
+    summary:
+      "The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
     response: z.array(EchoApp).openapi("EchoApps"),
     sdkMethod: { on: "EchoFixture", name: "apps" },
     stability,
-    handler: () => world.apps(),
+    handler: ({ session }) => world.apps(session.id),
   });
 
   router.route({

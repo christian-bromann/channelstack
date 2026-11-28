@@ -55,7 +55,7 @@ let app = resend.create_app().name("…").await?;
 
 ### apps()
 
-The channel's apps: the agent's team first, then the others in the order they were made.
+The teams this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here.
 
 <CodeGroup>
 

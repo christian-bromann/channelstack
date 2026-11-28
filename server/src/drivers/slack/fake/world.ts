@@ -127,8 +127,8 @@ export interface FakeSlackWorld extends Immediate<SlackWorld> {
    * did it closes (decision 0006).
    */
   uninstallApp(session: string, app?: string): string[];
-  /** The apps of the workspace, the built-in one first. */
-  apps(): SlackAppRecord[];
+  /** The apps a session used (decision 0027): the built-in one first, then each it got from `createApp`. */
+  apps(session: string): SlackAppRecord[];
   /** Make an app by name, or return the one made with the same settings (decision 0027). */
   createApp(
     session: string | undefined,
@@ -294,8 +294,9 @@ export function createFakeWorld(
     return user;
   };
 
+  /** A person of the session, or one of the apps it used (core's `lookup`): their user id. */
   const participant = (session: string, id: string): string => {
-    const app = store.appOf(id);
+    const app = store.apps.lookup(session, id);
     if (app) return app.botUserId;
     return store.users.get(session, id).id;
   };
@@ -497,7 +498,7 @@ export function createFakeWorld(
   > = {
     team: () => store.team,
     app: () => store.app,
-    apps: () => store.apps.all(),
+    apps: (session) => store.apps.of(session),
     appOf: (id) => store.appOf(id),
     roster: store.apps,
     emit,

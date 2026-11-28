@@ -1516,7 +1516,7 @@ export class EchoFixture {
     return new EchoApp(ctx, data);
   }
 
-  /** The apps, the built-in one first. Experimental. */
+  /** The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
   async apps(): Promise<EchoApps> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/echo/apps`)) as EchoAppsWire;
@@ -1698,7 +1698,7 @@ export class SlackFixture {
     return new SlackApp(ctx, data);
   }
 
-  /** The workspace's apps: the built-in one first, then the others in the order they were made. Experimental. */
+  /** The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
   async apps(): Promise<SlackApps> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/apps`)) as SlackAppsWire;
@@ -2521,7 +2521,7 @@ export class GitHubFixture {
     return new GitHubApp(ctx, data);
   }
 
-  /** The org's Apps: the built-in one first, then the others in the order they were made. Experimental. */
+  /** The Apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
   async apps(): Promise<GitHubApps> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/apps`)) as GitHubAppsWire;
@@ -3481,7 +3481,7 @@ export class LinearFixture {
     return new LinearApp(ctx, data);
   }
 
-  /** The workspace's apps: the built-in one first, then the others in the order they were made. Experimental. */
+  /** The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
   async apps(): Promise<LinearApps> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/apps`)) as LinearAppsWire;
@@ -4184,7 +4184,7 @@ export class NotionFixture {
     return new NotionIntegration(ctx, data);
   }
 
-  /** The workspace's integrations: the built-in one first, then the others in the order they were made. Experimental. */
+  /** The integrations this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
   async apps(): Promise<NotionIntegrations> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/apps`)) as NotionIntegrationsWire;
@@ -4762,7 +4762,7 @@ export class ResendFixture {
     return new ResendApp(ctx, data);
   }
 
-  /** The channel's apps: the agent's team first, then the others in the order they were made. Experimental. */
+  /** The teams this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
   async apps(): Promise<ResendApps> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/apps`)) as ResendAppsWire;
@@ -5161,7 +5161,7 @@ export class GoogleFixture {
     return new GoogleApp(ctx, data);
   }
 
-  /** The channel's apps: the agent's mailbox first, then the others in the order they were made. Experimental. */
+  /** The mailboxs this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
   async apps(): Promise<GoogleApps> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/apps`)) as GoogleAppsWire;
@@ -5586,7 +5586,7 @@ export class DiscordFixture {
     return new DiscordApp(ctx, data);
   }
 
-  /** The guild's apps: the built-in one first, then the others in the order they were made. Experimental. */
+  /** The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental. */
   async apps(): Promise<DiscordApps> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/apps`)) as DiscordAppsWire;

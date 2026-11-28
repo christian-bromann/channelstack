@@ -7,8 +7,8 @@ import { describe, expect, test } from "vitest";
 
 import { harness, refusal } from "./app-harness.ts";
 
-/** Two sessions of one server: `mine` made the app `reviewer`, `theirs` didn't. */
-async function twoSessions(channel: string) {
+/** Two sessions of one server: `mine` made the app (`reviewer` unless named), `theirs` didn't. */
+async function twoSessions(channel: string, app = "reviewer") {
   const h = harness();
   const session = async () => {
     const { sessionId } = (await h.call("POST", "/sessions")).body;
@@ -23,7 +23,7 @@ async function twoSessions(channel: string) {
   };
   const mine = await session();
   const theirs = await session();
-  const reviewer = await mine.post("/apps", { name: "reviewer" });
+  const reviewer = await mine.post("/apps", { name: app });
   return { h, mine, theirs, reviewer };
 }
 
@@ -108,4 +108,177 @@ describe("exit check 12.12: another session's apps never change what a name mean
     const person = await theirs.post("/users", REVIEWER.notion);
     expect(await mentioned(theirs)).toBe(person.id);
   });
+});
+
+type Side = Awaited<ReturnType<typeof twoSessions>>["theirs"];
+
+/** A name or a login no other try has used: some channels keep a person's name unique in a session. */
+let made = 0;
+const fresh = (prefix: string) => `${prefix}${++made}`;
+
+/**
+ * Each place a test gives an app's handle beside people's (a participant, a member, an installed
+ * App, a delegate, a connection, a recipient), per channel. Each try makes what it needs itself.
+ */
+const HANDED: Record<string, Array<[what: string, hand: (side: Side, app: string) => Promise<unknown>]>> = {
+  slack: [
+    [
+      "a channel's participant",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        return side.post("/channels", { participants: [ana.id, app] });
+      },
+    ],
+    [
+      "invited to a channel",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        const channel = await side.post("/channels", { participants: [ana.id] });
+        return side.post(`/users/${ana.id}/invite`, { participants: [app], channel: channel.id });
+      },
+    ],
+    [
+      "a DM's other end",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        return side.post(`/users/${ana.id}/open-dm`, { participants: [app] });
+      },
+    ],
+  ],
+  discord: [
+    [
+      "a channel's participant",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        return side.post("/channels", { participants: [ana.id, app] });
+      },
+    ],
+    [
+      "invited to a channel",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana"), admin: true });
+        const channel = await side.post("/channels", { participants: [ana.id] });
+        return side.post(`/users/${ana.id}/invite`, { participants: [app], channel: channel.id });
+      },
+    ],
+    [
+      "a DM's other end",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        return side.post(`/users/${ana.id}/open-dm`, { participant: app });
+      },
+    ],
+  ],
+  github: [
+    ["installed on a new repository", (side, app) => side.post("/repos", { apps: [app] })],
+    [
+      "installed on a repository",
+      async (side, app) => {
+        const repo = await side.post("/repos", {});
+        return side.post(`/repos/${repo.id}/install`, { app });
+      },
+    ],
+    [
+      "an assignee",
+      async (side, app) => {
+        const ana = await side.post("/users", { login: fresh("ana") });
+        const repo = await side.post("/repos", { collaborators: [{ user: ana.id }], apps: [app] });
+        const issue = await side.post(`/users/${ana.id}/issues`, { issue: { title: "Login fails" }, repo: repo.id });
+        return side.post(`/users/${ana.id}/assign`, {
+          assignees: [app],
+          issue: { repoId: repo.id, number: issue.number },
+        });
+      },
+    ],
+  ],
+  linear: [
+    [
+      "a new issue's delegate",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        const team = await side.post("/teams", { members: [ana.id] });
+        return side.post(`/users/${ana.id}/issues`, {
+          issue: { title: "Checkout fails", delegate: app },
+          team: team.id,
+        });
+      },
+    ],
+    [
+      "delegated an issue",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        const team = await side.post("/teams", { members: [ana.id] });
+        const issue = await side.post(`/users/${ana.id}/issues`, { issue: { title: "Checkout fails" }, team: team.id });
+        return side.post(`/users/${ana.id}/delegate`, { app, issue: issue.id });
+      },
+    ],
+  ],
+  notion: [
+    ["a new page's connection", (side, app) => side.post("/pages", { title: "Plan", connections: [app] })],
+    [
+      "connected to a page",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        const page = await side.post("/pages", { title: "Plan" });
+        return side.post(`/users/${ana.id}/connect`, { integration: app, page: page.id });
+      },
+    ],
+  ],
+  resend: [
+    [
+      "a recipient",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        return side.post(`/users/${ana.id}/send`, { to: [app], subject: "Hi", text: "Hi" });
+      },
+    ],
+  ],
+  google: [
+    [
+      "a recipient",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        return side.post(`/users/${ana.id}/send`, { to: [app], subject: "Hi", text: "Hi" });
+      },
+    ],
+  ],
+  echo: [
+    [
+      "a room's participant",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        return side.post("/rooms", { participants: [ana.id, app] });
+      },
+    ],
+  ],
+};
+
+describe("R2.2: a session sees and takes only the apps it used", () => {
+  test.each(Object.keys(HANDED))(
+    "%s: another session's app isn't in apps(), and its handle is not_found until the session makes it too",
+    async (channel) => {
+      const { mine, theirs, reviewer: coder } = await twoSessions(channel, "coder");
+      const ids = async (side: Side) => ((await side.get("/apps")) as Array<{ id: string }>).map(({ id }) => id);
+
+      // The session that made coder lists it and hands it everywhere.
+      expect(await ids(mine)).toContain(coder.id);
+      for (const [what, hand] of HANDED[channel] ?? []) {
+        expect(await refusal(hand(mine, coder.id)), what).toBe("no error");
+      }
+
+      // Another session sees only its built-in app, and coder's handle is nobody there.
+      const builtIn = (await theirs.get("")).app.id;
+      expect(await ids(theirs)).toEqual([builtIn]);
+      for (const [what, hand] of HANDED[channel] ?? []) {
+        expect(await refusal(hand(theirs, coder.id)), what).toBe("not_found");
+      }
+
+      // Once it asks for coder itself, it gets the same app, which belongs to the world, and may hand it.
+      expect((await theirs.post("/apps", { name: "coder" })).id).toBe(coder.id);
+      expect(await ids(theirs)).toEqual([builtIn, coder.id]);
+      for (const [what, hand] of HANDED[channel] ?? []) {
+        expect(await refusal(hand(theirs, coder.id)), what).toBe("no error");
+      }
+    },
+  );
 });

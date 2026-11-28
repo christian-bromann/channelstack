@@ -118,7 +118,14 @@ describe("exit check 12.12: names and limits", () => {
 
     // A handle's id names its app anywhere; a name only among the apps its session used.
     expect(apps.byId("U1")).toBe(coder);
-    expect(apps.find("coder")).toBe(coder);
+    // R2.2: where a person's handle may stand too, an id that is no app's is nobody's here, and
+    // another session's app is as unknown as another session's person.
+    expect(apps.lookup("s1", "U1")).toBe(coder);
+    expect(apps.lookup("s1", "coder")).toBe(coder);
+    expect(apps.lookup("s2", "A0")).toBe(builtIn);
+    expect(apps.lookup("s2", "U7")).toBeUndefined();
+    expect(apps.lookup("s2", "coder")).toBeUndefined();
+    expect(refusal(() => apps.lookup("s2", "U1"))).toBe("not_found");
     expect(apps.get("s1", "A1")).toBe(coder);
     expect(apps.get("s1", "coder")).toBe(coder);
     expect(apps.get("s2", "my-agent")).toBe(builtIn);

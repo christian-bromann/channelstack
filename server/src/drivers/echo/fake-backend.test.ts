@@ -76,7 +76,7 @@ describe("R1.23: echo's built-in app keeps its name", () => {
     expect(code(() => fake.world.createApp("ses_a", { name: "echo-agent" }))).toBe("invalid_argument");
     expect(code(() => fake.world.createApp(undefined, { name: "echo-agent" }))).toBe("invalid_argument");
     expect(code(() => fake.world.createUser("ses_a", { name: "echo-agent" }))).toBe("invalid_argument");
-    expect(fake.world.apps()).toEqual([builtIn]);
+    expect(fake.store.apps.all()).toEqual([builtIn]);
     // `env --app echo-agent` prints the built-in app's lines: core knows it as my-agent.
     const { apps } = fake.store;
     const found = apps.forEnv("echo-agent", (name) => fake.world.createApp(undefined, { name }));

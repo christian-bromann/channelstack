@@ -1778,7 +1778,7 @@ class EchoFixture:
         return EchoApp(ctx, data)
 
     async def apps(self) -> EchoApps:
-        """The apps, the built-in one first. Experimental."""
+        """The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/echo/apps")
         return [EchoApp(ctx, item) for item in data]
@@ -1872,7 +1872,7 @@ class SlackFixture:
         return SlackApp(ctx, data)
 
     async def apps(self) -> SlackApps:
-        """The workspace's apps: the built-in one first, then the others in the order they were made. Experimental."""
+        """The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps")
         return [SlackApp(ctx, item) for item in data]
@@ -2383,7 +2383,7 @@ class GitHubFixture:
         return GitHubApp(ctx, data)
 
     async def apps(self) -> GitHubApps:
-        """The org's Apps: the built-in one first, then the others in the order they were made. Experimental."""
+        """The Apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps")
         return [GitHubApp(ctx, item) for item in data]
@@ -2993,7 +2993,7 @@ class LinearFixture:
         return LinearApp(ctx, data)
 
     async def apps(self) -> LinearApps:
-        """The workspace's apps: the built-in one first, then the others in the order they were made. Experimental."""
+        """The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/apps")
         return [LinearApp(ctx, item) for item in data]
@@ -3419,7 +3419,7 @@ class NotionFixture:
         return NotionIntegration(ctx, data)
 
     async def apps(self) -> NotionIntegrations:
-        """The workspace's integrations: the built-in one first, then the others in the order they were made. Experimental."""
+        """The integrations this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps")
         return [NotionIntegration(ctx, item) for item in data]
@@ -3771,7 +3771,7 @@ class ResendFixture:
         return ResendApp(ctx, data)
 
     async def apps(self) -> ResendApps:
-        """The channel's apps: the agent's team first, then the others in the order they were made. Experimental."""
+        """The teams this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/apps")
         return [ResendApp(ctx, item) for item in data]
@@ -3989,7 +3989,7 @@ class GoogleFixture:
         return GoogleApp(ctx, data)
 
     async def apps(self) -> GoogleApps:
-        """The channel's apps: the agent's mailbox first, then the others in the order they were made. Experimental."""
+        """The mailboxs this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/apps")
         return [GoogleApp(ctx, item) for item in data]
@@ -4223,7 +4223,7 @@ class DiscordFixture:
         return DiscordApp(ctx, data)
 
     async def apps(self) -> DiscordApps:
-        """The guild's apps: the built-in one first, then the others in the order they were made. Experimental."""
+        """The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps")
         return [DiscordApp(ctx, item) for item in data]

@@ -87,7 +87,7 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
       return user;
     },
 
-    apps: () => store.apps.all(),
+    apps: (session) => store.apps.of(session),
 
     createApp(session, input) {
       const by =
@@ -121,9 +121,8 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
     },
 
     createRoom(session, input) {
-      const apps = new Set(store.apps.all().map((app) => app.id));
       for (const participant of input.participants) {
-        if (!apps.has(participant)) store.users.get(session, participant);
+        if (!store.apps.lookup(session, participant)) store.users.get(session, participant);
       }
       const id = ids.next(ECHO_IDS.room);
       const room: EchoRoom = {

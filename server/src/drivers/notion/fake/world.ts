@@ -845,9 +845,6 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   // --- Integrations (decision 0027) -----------------------------------------------------------
 
   const integrations = {
-    /** The workspace's integrations, the built-in one first. */
-    apps: () => store.apps.all(),
-
     /**
      * Make an internal integration by name, with its own bot user, token and webhook subscription,
      * or return the one made with the same settings. Its capabilities and events default to the

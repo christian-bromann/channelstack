@@ -36,8 +36,8 @@ export interface EchoMessage {
 export interface EchoWorld {
   app(): EchoApp;
   createUser(session: string, input: { name: string }): EchoUser;
-  /** The apps, the built-in one first (decision 0027). */
-  apps(): EchoApp[];
+  /** The apps a session used (decision 0027): the built-in one first, then each it got from `createApp`. */
+  apps(session: string): EchoApp[];
   /** Make an app by name, or return the one of that name. */
   createApp(session: string | undefined, input: { name: string }): EchoApp;
   /** An app a test made writes in a room it is a member of. */

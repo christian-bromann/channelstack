@@ -728,8 +728,6 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       } satisfies LinearUserRecord);
     },
 
-    /** The workspace's apps, the built-in one first. */
-    apps: () => store.apps.all(),
     /** The app an access token is the token of: each app's answers as that app (decision 0027). */
     appWithToken: (token: string) => store.apps.withSecret(token, (app) => context.apps.secret(app, "oauthToken")),
 

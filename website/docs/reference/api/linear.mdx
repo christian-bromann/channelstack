@@ -109,7 +109,7 @@ let app = linear.create_app().name("…").await?;
 
 ### apps()
 
-The workspace's apps: the built-in one first, then the others in the order they were made.
+The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here.
 
 <CodeGroup>
 

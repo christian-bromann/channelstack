@@ -451,7 +451,7 @@ export function registerGitHubRoutes(
    */
   const people = (session: string, ids: readonly string[], operation: string) =>
     ids.map((id) => {
-      const app = store.apps.all().find((candidate) => String(candidate.id) === id);
+      const app = store.apps.lookup(session, id);
       if (!app) return person(session, id);
       // Unverified live, and likely refused: GitHub's docs don't cover an App's bot as an assignee or reviewer.
       if (isLive) throw unsupportedInLive(operation, "GitHub doesn't take an App's bot here (docs/reality-matrix.md)");
@@ -730,11 +730,12 @@ export function registerGitHubRoutes(
   router.route({
     method: "get",
     path: "/apps",
-    summary: "The org's Apps: the built-in one first, then the others in the order they were made",
+    summary:
+      "The Apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
     response: z.array(GitHubApp).openapi("GitHubApps"),
     sdkMethod: { on: "GitHubFixture", name: "apps" },
     stability,
-    handler: () => (isLive ? [appHandle(store.app)] : fake.apps().map(appHandle)),
+    handler: ({ session }) => (isLive ? [appHandle(store.app)] : fake.apps(session.id).map(appHandle)),
   });
 
   // --- Repositories -----------------------------------------------------------------------------

@@ -306,12 +306,6 @@ export function registerLinearRoutes(
   const commentOf = (session: string, id: string) => store.comments.get(session, id);
   const sessionOf = (session: string, id: string) => store.sessions.get(session, id);
   const activityOf = (session: string, id: string) => store.activities.get(session, id);
-  /** An app by its handle (its app user's id) or its name. */
-  const appOf = (ref: string): LinearAppRecord => {
-    const app = store.appOf(ref);
-    if (!app) throw new ProtocolError("not_found", `There is no Linear app "${ref}"`, { app: ref });
-    return app;
-  };
   /** A person may act in a team they are a member of; anyone but a guest may act in any team of the workspace. */
   const mayAct = (user: LinearUserRecord, team: LinearTeamRecord) => {
     if (user.guest && !team.members.includes(user.id)) {
@@ -401,11 +395,12 @@ export function registerLinearRoutes(
   router.route({
     method: "get",
     path: "/apps",
-    summary: "The workspace's apps: the built-in one first, then the others in the order they were made",
+    summary:
+      "The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
     response: z.array(LinearApp).openapi("LinearApps"),
     sdkMethod: { on: "LinearFixture", name: "apps" },
     stability,
-    handler: () => store.apps.all().map(appHandle),
+    handler: ({ session }) => store.apps.of(session.id).map(appHandle),
   });
 
   router.route({
@@ -579,7 +574,7 @@ export function registerLinearRoutes(
           world.createIssue(team, user.id, {
             ...issue,
             description: issue.description === undefined ? undefined : world.markdown(session.id, issue.description),
-            delegate: issue.delegate === undefined ? undefined : appOf(issue.delegate).userId,
+            delegate: issue.delegate === undefined ? undefined : store.apps.get(session.id, issue.delegate).userId,
           }),
         ),
       );

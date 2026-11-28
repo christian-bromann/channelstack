@@ -311,12 +311,8 @@ export function registerNotionRoutes(
   const databaseOf = (session: string, id: string) => store.databases.get(session, id);
   const discussionOf = (session: string, id: string) => store.discussions.get(session, id);
   const commentOf = (session: string, id: string) => store.comments.get(session, id);
-  /** An integration of the workspace by its handle: the built-in one, or one a test made. */
-  const integration = (id: string): NotionBotRecord => {
-    const app = store.integration(id);
-    if (!app) throw new ProtocolError("not_found", `No Notion integration "${id}"`);
-    return app;
-  };
+  /** An integration by a session's handle: the built-in one, or one the session got from `createApp`. */
+  const integration = (session: string, id: string): NotionBotRecord => store.apps.get(session, id);
   /** A person may only write in a page they could open: the fake's workspace has no private pages for people. */
   const live = (page: NotionPageRecord) => {
     if (page.inTrash) throw new ProtocolError("not_found", `"${world.titleOf(page)}" is in the trash`);
@@ -404,11 +400,12 @@ export function registerNotionRoutes(
   router.route({
     method: "get",
     path: "/apps",
-    summary: "The workspace's integrations: the built-in one first, then the others in the order they were made",
+    summary:
+      "The integrations this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
     response: z.array(NotionIntegration).openapi("NotionIntegrations"),
     sdkMethod: { on: "NotionFixture", name: "apps" },
     stability,
-    handler: () => store.apps.all().map(integrationHandle),
+    handler: ({ session }) => store.apps.of(session.id).map(integrationHandle),
   });
 
   router.route({
@@ -544,7 +541,7 @@ export function registerNotionRoutes(
     handler: async ({ session, body }) => {
       if (body.parent) pageOf(session.id, body.parent);
       if (body.createdBy) person(session.id, body.createdBy);
-      for (const id of body.connections ?? []) integration(id);
+      for (const id of body.connections ?? []) integration(session.id, id);
       return pageWire((await asProtocol(() => world.createPage(session.id, body, { announce: false }))).page);
     },
   });
@@ -573,7 +570,7 @@ export function registerNotionRoutes(
     stability,
     handler: ({ session, body }) => {
       if (body.parent) pageOf(session.id, body.parent);
-      for (const id of body.connections ?? []) integration(id);
+      for (const id of body.connections ?? []) integration(session.id, id);
       for (const schema of Object.values(body.properties))
         if (typeof schema === "object" && "relation" in schema) databaseOf(session.id, schema.relation);
       return databaseWire(asProtocol(() => fake.createDatabase(session.id, body as never)));
@@ -608,7 +605,7 @@ export function registerNotionRoutes(
     live: FAKE_VERIFICATION,
     stability,
     handler: ({ session, body }) => {
-      const app = body?.app === undefined ? store.bot : integration(body.app);
+      const app = body?.app === undefined ? store.bot : integration(session.id, body.app);
       return caused(session.id, fake.verify(session.id, app)) ?? null;
     },
   });
@@ -742,7 +739,7 @@ export function registerNotionRoutes(
     handler: async ({ session, params, body }) => {
       const user = person(session.id, params.user);
       if (body.page.parent) live(pageOf(session.id, body.page.parent));
-      for (const id of body.page.connections ?? []) integration(id);
+      for (const id of body.page.connections ?? []) integration(session.id, id);
       const created = await asProtocol(() =>
         world.createPage(session.id, { ...body.page, createdBy: user.id }, { announce: true }),
       );
@@ -806,7 +803,7 @@ export function registerNotionRoutes(
     stability,
     handler: async ({ session, params, body }) => {
       const user = person(session.id, params.user);
-      integration(body.integration);
+      integration(session.id, body.integration);
       const page = live(pageOf(session.id, body.page));
       if (body.inBlock !== undefined) await world.refresh(session.id, { page: page.id });
       await world.mention(session.id, page, body.inBlock, user.id, body.integration);
@@ -874,7 +871,7 @@ export function registerNotionRoutes(
       stability,
       handler: ({ session, params, body }) => {
         person(session.id, params.user);
-        const app = integration(body.integration);
+        const app = integration(session.id, body.integration);
         const page = pageOf(session.id, body.page);
         if (connected) fake.connect(page, app.id);
         else fake.disconnect(page, app.id);

@@ -409,12 +409,13 @@ export function registerDiscordRoutes(
   router.route({
     method: "get",
     path: "/apps",
-    summary: "The guild's apps: the built-in one first, then the others in the order they were made",
+    summary:
+      "The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
     response: z.array(DiscordApp).openapi("DiscordApps"),
     sdkMethod: { on: "DiscordFixture", name: "apps" },
     live: APPS_NOT_YET,
     stability,
-    handler: () => fake.apps().map(appHandle),
+    handler: ({ session }) => fake.apps(session.id).map(appHandle),
   });
 
   router.route({

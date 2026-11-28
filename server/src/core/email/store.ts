@@ -91,11 +91,6 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
     return this.apps.all().find((app) => app.address === wanted);
   }
 
-  /** The app with this id, or this name. */
-  appOf(handle: string): App | undefined {
-    return this.apps.find(handle);
-  }
-
   /** The apps among these mailboxes, each once, in the order the channel's apps are. */
   appsAmong(mailboxes: readonly Mailbox[]): App[] {
     return this.apps.all().filter((app) => mailboxes.some((mailbox) => mailbox.address === app.address));

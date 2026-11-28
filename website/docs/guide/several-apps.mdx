@@ -39,7 +39,7 @@ Each app is a real app of its platform, with its own ids, credentials and endpoi
 | [Google](/docs/platforms/google#several-apps) | A mailbox of its own, `<name>@acme.example`, with its OAuth client, refresh token and Pub/Sub topic | An email to its address |
 | [Discord](/docs/platforms/discord#several-apps) | An application with its own bot user, bot token, Ed25519 key and interactions endpoint, on its own Gateway connection | `participants`, `invite` |
 
-`apps()` lists a channel's apps, `my-agent` first. Matchers take an app's handle or its name as the author: `toHaveReplyFrom(coder)` and `toHaveReplyFrom("coder")` mean the same.
+`apps()` lists the apps your test used, `my-agent` first, then each it got from `createApp`. An app another test made isn't among them, and its handle is `not_found` in yours until your test asks for it with `createApp` too, which returns the same app. Matchers take an app's handle or its name as the author: `toHaveReplyFrom(coder)` and `toHaveReplyFrom("coder")` mean the same.
 
 ## Names, and what an app keeps
 

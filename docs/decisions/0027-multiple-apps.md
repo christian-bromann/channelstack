@@ -29,7 +29,7 @@ The public API is the generated SDKs ([decision 0025](0025-no-hand-written-contr
 
 ```text
 POST /sessions/{session}/<channel>/apps        { name, …the channel's settings }   → the channel's app (role "app")
-GET  /sessions/{session}/<channel>/apps                                            → my-agent first, then the others in the order they were made
+GET  /sessions/{session}/<channel>/apps                                            → the apps this session used: my-agent first, then each it got from createApp
 ```
 
 ```ts
@@ -73,7 +73,11 @@ test("the triage agent hands off to the coder", async ({ slack }) => {
 Rules that hold on every channel:
 
 - **An app is found by its name.** `createApp({ name: "coder" })` makes the app the first time any session asks for it, and returns the same app afterwards, so parallel tests share it as they share `my-agent`. The same name with other settings is refused with `invalid_argument`. A name is 1 to 32 lower-case letters, digits and hyphens, starting with a letter (`coder`, `code-reviewer`), unique per channel; `my-agent` is reserved. With no `_` in names, each name has one variable name (`code-reviewer` is `CODE_REVIEWER`), and an app's variables always end in a credential after the name, so none reads as an existing variable such as `CHANNELSTACK_SLACK_APP_ID`.
-- **A name in a matcher** (`toHaveReplyFrom("coder")`) is looked up among the session's people and the apps the session has used (`my-agent`, and each app it got from `createApp`), so what another test does can't change its meaning. A name that is both a person's and an app's in that session is refused with `invalid_argument`, asking for the handle.
+- **A session sees only the apps it used:** `my-agent`, and each app it got from `createApp`. So what another test does can't change what a session's names and handles mean.
+  - `apps()` lists those apps, `my-agent` first, then the others in the order the session first asked for them.
+  - A name in a matcher (`toHaveReplyFrom("coder")`) or a mention is looked up among the session's people and those apps. A name that is both a person's and an app's in that session is refused with `invalid_argument`, asking for the handle.
+  - Every place a test hands over an app (a participant or a member, an assignee or a reviewer, an installed App, a delegate, a connection, a recipient, the app a test acts as or reads deliveries for) takes one of those apps. Another session's app is `not_found` there, as another session's person is, until the session asks for it with `createApp` too, which returns the same app. Core's `AppRoster` holds the rule (`of`, `lookup`, `get`, `namedIn`); drivers call it and keep no check of their own.
+  - The agent's own calls are unchanged: there an app is known by its token, and the platform's ids are the whole world's.
 - **A limit of 10 apps per channel** keeps a run from making apps without end, since they live as long as the server (open question 3).
 - **Its ids** come from the seeded id generator, derived from `CHANNELSTACK_SEED` and the app's name, so they don't depend on the order tests make apps in.
 - **Its secrets** are made once per install from the CSPRNG when the app is first made, and kept in `secrets.json` (0600) beside the driver's own, under `apps.<name>`, each checked against the driver's format for it as the driver's own are. Today `Secrets.load` keeps only what the drivers declare, so it learns to keep the apps' too: they stay across restarts, and the app's agent's `.env` stays valid. `channelstack secrets rotate` rotates them with the rest. The redactor's token shapes cover them, since they have the shapes `my-agent`'s have.

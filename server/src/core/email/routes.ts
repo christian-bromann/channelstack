@@ -235,9 +235,9 @@ export function registerEmailRoutes<Email extends EmailRecord, App extends Email
     }
     return email;
   };
-  /** A recipient: a person or an app by their handle. */
+  /** A recipient: a person of the session or one of the apps it used, by their handle. */
   const mailboxOf = (session: string, id: string): Mailbox => {
-    const app = store.appOf(id);
+    const app = store.apps.lookup(session, id);
     if (app) return { address: app.address, name: app.name };
     const user = person(session, id);
     return { address: user.address, name: user.name };
@@ -310,11 +310,11 @@ export function registerEmailRoutes<Email extends EmailRecord, App extends Email
   router.route({
     method: "get",
     path: "/apps",
-    summary: `The channel's apps: the agent's ${spec.words.app} first, then the others in the order they were made`,
+    summary: `The ${spec.words.app}s this session used: the agent's first, then each it got from \`createApp\`, in the order it first did. Another session's are \`not_found\` here`,
     response: z.array(App).openapi(`${title}Apps`),
     sdkMethod: { on: `${title}Fixture`, name: "apps" },
     stability,
-    handler: () => store.apps.all().map(appWire),
+    handler: ({ session }) => store.apps.of(session.id).map(appWire),
   });
 
   router.route({

@@ -177,23 +177,36 @@ export class AppRoster<App extends Named> {
     for (const name of names) checkNameFree(name, apps, "person");
   }
 
-  /** The app one of whose ids (`refs`) this is, in the whole world: ids are the platform's, and name one app. */
+  /**
+   * The app one of whose ids (`refs`) this is, in the whole world: ids are the platform's, and name
+   * one app. For what the platform's side knows (an author, a token's app); a test's handle goes
+   * through `lookup` or `get`.
+   */
   byId(id: string): App | undefined {
     return this.all().find((app) => this.#refs(app).includes(id));
   }
 
-  /** The app a handle's id or a name stands for. */
-  find(ref: string): App | undefined {
-    return this.byId(ref) ?? this.named(ref);
+  /**
+   * The app a test's handle (its id) or a name stands for, where a person's handle may stand too
+   * (a participant, a member, an assignee, a recipient): one of the apps the session used, or
+   * undefined when it is no app's. An app only other sessions used is `not_found`, as a person of
+   * another session is, so every handle `apps()` returns is one the session's other routes take.
+   */
+  lookup(session: string, ref: string): App | undefined {
+    const app = this.byId(ref);
+    if (app !== undefined && !this.of(session).includes(app)) throw this.#notFound(ref);
+    return app ?? this.namedIn(session, ref);
   }
 
   /** The app a session's handle (its id) or a name stands for: one of the apps that session used, or `not_found`. */
   get(session: string, ref: string): App {
-    const app = this.byId(ref) ?? this.namedIn(session, ref);
-    if (!app || !this.of(session).includes(app)) {
-      throw new ProtocolError("not_found", `There is no ${this.#channel} ${this.#noun} "${ref}"`, { app: ref });
-    }
+    const app = this.lookup(session, ref);
+    if (!app) throw this.#notFound(ref);
     return app;
+  }
+
+  #notFound(ref: string): ProtocolError {
+    return new ProtocolError("not_found", `There is no ${this.#channel} ${this.#noun} "${ref}"`, { app: ref });
   }
 
   /**

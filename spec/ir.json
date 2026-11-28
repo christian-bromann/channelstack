@@ -682,7 +682,7 @@
         {
           "name": "apps",
           "kind": "method",
-          "summary": "The apps, the built-in one first",
+          "summary": "The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -1371,7 +1371,7 @@
         {
           "name": "apps",
           "kind": "method",
-          "summary": "The workspace's apps: the built-in one first, then the others in the order they were made",
+          "summary": "The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -5727,7 +5727,7 @@
         {
           "name": "apps",
           "kind": "method",
-          "summary": "The org's Apps: the built-in one first, then the others in the order they were made",
+          "summary": "The Apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -11707,7 +11707,7 @@
         {
           "name": "apps",
           "kind": "method",
-          "summary": "The workspace's apps: the built-in one first, then the others in the order they were made",
+          "summary": "The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -15045,7 +15045,7 @@
         {
           "name": "apps",
           "kind": "method",
-          "summary": "The workspace's integrations: the built-in one first, then the others in the order they were made",
+          "summary": "The integrations this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -18013,7 +18013,7 @@
         {
           "name": "apps",
           "kind": "method",
-          "summary": "The channel's apps: the agent's team first, then the others in the order they were made",
+          "summary": "The teams this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -19586,7 +19586,7 @@
         {
           "name": "apps",
           "kind": "method",
-          "summary": "The channel's apps: the agent's mailbox first, then the others in the order they were made",
+          "summary": "The mailboxs this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -21328,7 +21328,7 @@
         {
           "name": "apps",
           "kind": "method",
-          "summary": "The guild's apps: the built-in one first, then the others in the order they were made",
+          "summary": "The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
           "stability": "experimental",
           "http": {
             "verb": "GET",

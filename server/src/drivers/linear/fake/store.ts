@@ -81,11 +81,6 @@ export class LinearStore {
     return this.apps.byId(id);
   }
 
-  /** The app a handle names: its user's id, or its name. */
-  appOf(ref: string): LinearAppRecord | undefined {
-    return this.apps.find(ref);
-  }
-
   /** Keep a new object for its session. */
   add<T extends Keyed>(collection: Collection<T>, session: string, record: T): T {
     return collection.add(record.id, record, session);

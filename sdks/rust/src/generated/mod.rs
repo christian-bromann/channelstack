@@ -10828,7 +10828,7 @@ impl EchoFixture {
         ))
     }
 
-    /// The apps, the built-in one first. Experimental.
+    /// The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
     pub fn apps(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -11360,7 +11360,7 @@ impl SlackFixture {
         ))
     }
 
-    /// The workspace's apps: the built-in one first, then the others in the order they were made. Experimental.
+    /// The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
     pub fn apps(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -14299,7 +14299,7 @@ impl GitHubFixture {
         ))
     }
 
-    /// The org's Apps: the built-in one first, then the others in the order they were made. Experimental.
+    /// The Apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
     pub fn apps(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -17714,7 +17714,7 @@ impl LinearFixture {
         ))
     }
 
-    /// The workspace's apps: the built-in one first, then the others in the order they were made. Experimental.
+    /// The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
     pub fn apps(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -20091,7 +20091,7 @@ impl NotionFixture {
         ))
     }
 
-    /// The workspace's integrations: the built-in one first, then the others in the order they were made. Experimental.
+    /// The integrations this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
     pub fn apps(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -22153,7 +22153,7 @@ impl ResendFixture {
         ))
     }
 
-    /// The channel's apps: the agent's team first, then the others in the order they were made. Experimental.
+    /// The teams this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
     pub fn apps(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -23601,7 +23601,7 @@ impl GoogleFixture {
         ))
     }
 
-    /// The channel's apps: the agent's mailbox first, then the others in the order they were made. Experimental.
+    /// The mailboxs this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
     pub fn apps(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -25093,7 +25093,7 @@ impl DiscordFixture {
         ))
     }
 
-    /// The guild's apps: the built-in one first, then the others in the order they were made. Experimental.
+    /// The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
     pub fn apps(&self) -> Call<Value> {
         Call::new(
             &self.ctx,

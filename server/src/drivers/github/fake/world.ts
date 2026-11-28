@@ -89,8 +89,8 @@ export function createFakeWorld(
     pulls,
     checks,
 
-    /** The org's Apps, the built-in one first. */
-    apps: (): GitHubAppRecord[] => store.apps.all(),
+    /** The Apps a session used (decision 0027): the built-in one first, then each it got from `createApp`. */
+    apps: (session: string): GitHubAppRecord[] => store.apps.of(session),
 
     /**
      * Make a GitHub App by name, installed on the org with selected repositories (none yet), or

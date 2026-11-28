@@ -115,8 +115,8 @@ export interface FakeDiscordWorld extends DiscordWorld {
    * and shows nothing: a transcript is what was written.
    */
   typing(channel: DiscordChannelRecord): void;
-  /** The guild's apps, the built-in one first. */
-  apps(): DiscordAppRecord[];
+  /** The apps a session used (decision 0027): the built-in one first, then each it got from `createApp`. */
+  apps(session: string): DiscordAppRecord[];
   /** The app whose application or bot user this is. */
   appOf(id: string): DiscordAppRecord | undefined;
   /** The channel's apps (decision 0027): a session's handle of one is looked up here. */
@@ -687,7 +687,7 @@ export function createFakeWorld(
     typing,
     sessionOf,
     mentionText,
-    apps: () => store.apps.all(),
+    apps: (session) => store.apps.of(session),
     appOf: (id) => store.appOf(id),
     roster: store.apps,
 
@@ -723,7 +723,7 @@ export function createFakeWorld(
         throw new ProtocolError("invalid_argument", "A DM is with one other: a person");
       }
       // Discord lets no bot open a DM with another bot: an app's, or a person's kind of bot.
-      if (store.appOf(other) || store.users.find(other)?.bot) throw new DiscordRefusal(50007);
+      if (store.apps.lookup(session, other) || store.users.find(other)?.bot) throw new DiscordRefusal(50007);
       return botWrites(session, by, dmWith(personIn(session, other).id, by), input);
     },
 
@@ -766,7 +766,7 @@ export function createFakeWorld(
 
     createChannel(session, options: DiscordChannelOptions) {
       for (const participant of options.participants) {
-        if (!store.appOf(participant)) personIn(session, participant);
+        if (!store.apps.lookup(session, participant)) personIn(session, participant);
       }
       const id = discordSnowflake(ids);
       const channel = store.addChannel(
@@ -845,7 +845,7 @@ export function createFakeWorld(
 
     openDM(session, user, other) {
       personIn(session, user);
-      const bot = store.appOf(other);
+      const bot = store.apps.lookup(session, other);
       if (bot) return dmWith(user, bot);
       const person = personIn(session, other);
       const key = [user, person.id].sort().join(":");
@@ -880,7 +880,7 @@ export function createFakeWorld(
       }
       const before = new Set(store.apps.all().filter((bot) => botSees(channel, bot)));
       for (const participant of participants) {
-        if (!store.appOf(participant)) personIn(session, participant);
+        if (!store.apps.lookup(session, participant)) personIn(session, participant);
         channel.members.add(participant);
       }
       // The channel's overwrites changed: whoever sees it hears CHANNEL_UPDATE, a bot too once it may.
