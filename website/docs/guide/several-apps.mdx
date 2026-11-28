@@ -102,7 +102,7 @@ await expect(msg.thread).toGoQuiet({ within: "10s", maxReplies: 4 });
 
 In pytest it is `await expect(msg.thread).to_go_quiet(max_replies=4, within="10s")`; in Rust, `expect(&thread).to_go_quiet(4).within("10s").await?`.
 
-A test that forgets to check still can't spin until its timeout. The fake counts the app messages in each conversation since a person last wrote there, and after 50 it stops delivering what apps cause in that conversation, records a `bot_loop` event (in `channelstack tail` and the UI's inspector), and fails the test at teardown, naming the loop. That stop is the fake's, not the platform's: real platforms throttle and never stop, and in live mode nothing stands between the agents.
+A test that forgets to check still can't spin until its timeout. The fake counts the app messages in each conversation since a person last wrote there, and after 50 it stops delivering the events of the app messages it counts there, records a `bot_loop` event (in `channelstack tail` and the UI's inspector), and fails the test at teardown, naming the loop. That stop is the fake's, not the platform's: real platforms throttle and never stop, and in live mode nothing stands between the agents.
 
 The [standard checks](/docs/guide/standard-checks) cover it for every platform: `<platform>.no-reply-loop` scripts a peer app that answers everything your agent says, and expects the agent to stop within `loopTurns` turns (default 3). On email, the peer marks its mail `Auto-Submitted`, and the agent should leave such mail unanswered. Pass `app: "coder"` to run every check against the agent driving `coder` instead of `my-agent`.
 
