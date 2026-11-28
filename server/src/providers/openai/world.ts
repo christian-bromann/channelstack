@@ -8,10 +8,13 @@ import type { Answer } from "./codecs/answer.ts";
 import { textChunks, usageOf } from "./codecs/answer.ts";
 import { OpenAIError, scriptedError } from "./errors.ts";
 import { OPENAI_IDS } from "./ids.ts";
+import { answerMedia, type Media, MediaStore } from "./media.ts";
 import { type RateLimits, SessionRateLimit } from "./rate-limit.ts";
 import { type ModelRequest, requestText } from "./request.ts";
 import { type CallContext, fillTemplate, type ScriptRecord, Scripts } from "./scripts.ts";
 import { OpenAIStore } from "./store.ts";
+import { annotationsOf } from "./tools/citations.ts";
+import { buildBuiltIns, builtInKindOf } from "./tools/index.ts";
 import type { Turn } from "./turns.ts";
 
 /** Where a call belongs in the channels, from the evidence it was attributed by. */
@@ -93,6 +96,7 @@ export interface OpenAIWorldDeps {
 export class OpenAIWorld {
   readonly scripts = new Scripts();
   readonly store = new OpenAIStore();
+  readonly media = new MediaStore();
   readonly #deps: OpenAIWorldDeps;
   readonly #calls = new Map<string, CallRecord[]>();
   readonly #problems = new Map<string, string[]>();
@@ -118,10 +122,16 @@ export class OpenAIWorld {
     const key = createHash("sha256")
       .update(JSON.stringify(body ?? null))
       .digest("hex");
+    // A file's name is evidence too: a person's shared file is something only their session was told of.
+    const names = request.messages.flatMap((message) =>
+      message.role === "user"
+        ? message.parts.flatMap((part) => (part.filename === undefined ? [] : [part.filename]))
+        : [],
+    );
     const attribution = this.#deps.attribution.attribute({
       minted: request.refs,
       tags: request.tags,
-      text,
+      text: [text, ...names].join("\n"),
       attempt: { key, retry: attempt > 0 },
     });
     const kept: Record<string, string> = {};
@@ -216,6 +226,7 @@ export class OpenAIWorld {
 
   reset(): void {
     this.store.clear();
+    this.media.clear();
     this.#unattributed.length = 0;
   }
 
@@ -290,12 +301,69 @@ export class OpenAIWorld {
       for (const problem of problems) if (!script.problems.includes(problem)) script.problems.push(problem);
       return { kind: "error", error: noScript(problems.join("; ")), firstTokenMs: 0 };
     }
-    return {
-      kind: "answer",
-      answer: this.#answer(turn, request, call, script.used),
-      turn: { ...turn, timing },
-      script,
-    };
+    const answer = this.#answer(turn, request, call, script);
+    if ("problems" in answer) {
+      for (const problem of answer.problems) if (!script.problems.includes(problem)) script.problems.push(problem);
+      return { kind: "error", error: noScript(answer.problems.join("; ")), firstTokenMs: 0 };
+    }
+    return { kind: "answer", answer, turn: { ...turn, timing }, script };
+  }
+
+  /**
+   * A turn's media for this request, or why the real API couldn't answer with it: an image only
+   * from the Images API, audio only from speech or a Chat Completion that asked for audio, each
+   * in the format the request asks for.
+   */
+  #media(turn: Turn, request: ModelRequest, id: string): { media?: NonNullable<Answer["media"]>; problems: string[] } {
+    const problems: string[] = [];
+    const images: Media[] = [];
+    let audio: (Media & { id: string }) | undefined;
+    const images_ = request.endpoint === "images.generations" || request.endpoint === "images.edits";
+    const speaks = request.endpoint === "audio.speech" || request.audioOutput !== undefined;
+    if (turn.image !== undefined && !images_)
+      problems.push(
+        `${id} answered with an image, but only the Images API answers with one (the request is ${request.endpoint})`,
+      );
+    if (turn.audio !== undefined && !speaks) {
+      problems.push(
+        `${id} answered with audio, but the request (${request.endpoint}) didn't ask for audio: speech, or Chat Completions with \`modalities: ["text", "audio"]\``,
+      );
+    }
+    if (images_) {
+      const given = turn.image ?? [];
+      const n = request.media?.n ?? 1;
+      if (given.length === 0) problems.push(`${id} answered the Images API without an image`);
+      else if (given.length !== 1 && given.length !== n)
+        problems.push(`${id} answered ${given.length} images, but the request asked for ${n}`);
+      const format = /^dall-e/.test(request.model) ? "png" : (request.media?.outputFormat ?? "png");
+      for (const source of given.length === 1 ? Array.from({ length: n }, () => given[0]) : given) {
+        if (source === undefined) continue;
+        const made = answerMedia(source, format, `${id}'s image`);
+        if ("problem" in made) problems.push(made.problem);
+        else images.push(made);
+      }
+    }
+    if (speaks) {
+      const format =
+        request.endpoint === "audio.speech"
+          ? (request.media?.responseFormat ?? "mp3")
+          : (request.audioOutput?.format ?? "wav");
+      if (turn.audio === undefined)
+        problems.push(`${id} answered without audio, but the request asked for ${format} audio`);
+      else {
+        const made = answerMedia(turn.audio, format, `${id}'s audio`);
+        if ("problem" in made) problems.push(made.problem);
+        else audio = { ...made, id: this.#deps.ids.next(OPENAI_IDS.audio) };
+      }
+    }
+    if (
+      request.endpoint !== "chat.completions" &&
+      request.endpoint !== "responses" &&
+      (turn.toolCalls ?? []).length > 0
+    )
+      problems.push(`${id} called tools, but the request (${request.endpoint}) offers none`);
+    if (images.length === 0 && audio === undefined) return { problems };
+    return { media: { images, ...(audio === undefined ? {} : { audio }) }, problems };
   }
 
   /** A responder's turn: the call is held, the test's SDK reads it and answers. */
@@ -339,37 +407,53 @@ export class OpenAIWorld {
     });
   }
 
-  /** A turn as an answer: its templates filled, its ids minted, its usage counted. */
-  #answer(turn: Turn, request: ModelRequest, call: CallRecord, number: number): Answer {
+  /** A turn as an answer: its templates filled, its ids minted, its usage counted; or why the real API couldn't send it. */
+  #answer(turn: Turn, request: ModelRequest, call: CallRecord, script: ScriptRecord): Answer | { problems: string[] } {
+    const number = script.used;
     const fill = (text: string) => fillTemplate(text, request, number);
     // In JSON text, a filled value is escaped as a JSON string's content, so the arguments stay JSON.
     const fillJson = (json: string) =>
       fillTemplate(json, request, number, (value) => JSON.stringify(value).slice(1, -1));
     const chunks = Array.isArray(turn.text) ? turn.text.map(fill) : textChunks(fill(turn.text ?? ""));
     const text = chunks.join("");
-    const { ids } = this.#deps;
-    const toolCalls = (turn.toolCalls ?? []).map((spec) => {
-      const custom = spec.input !== undefined;
-      const args = custom
-        ? (spec.input as string)
-        : typeof spec.arguments === "string"
-          ? fillJson(spec.arguments)
-          : JSON.stringify(fillValues(spec.arguments ?? {}, fill));
-      return {
-        id: ids.next(OPENAI_IDS.call),
-        itemId: ids.next(custom ? OPENAI_IDS.customCall : OPENAI_IDS.functionCall),
-        name: spec.name,
-        kind: custom ? ("custom" as const) : ("function" as const),
-        arguments: args,
-      };
+    const { ids, clock } = this.#deps;
+    const specs = turn.toolCalls ?? [];
+    const built = buildBuiltIns(specs, { ids, clock, request, media: this.media }, script.id);
+    const media = this.#media(turn, request, script.id);
+    const cited = annotationsOf(text, turn.citations ?? [], {
+      endpoint: request.endpoint === "chat.completions" ? "chat.completions" : "responses",
+      ids,
+      media: this.media,
+      written: built.calls.flatMap((tool) => tool.files ?? []),
+      script: script.id,
     });
+    const problems = [...built.problems, ...media.problems, ...cited.problems];
+    if (problems.length > 0) return { problems };
+    for (const file of built.calls.flatMap((tool) => tool.files ?? [])) this.media.keepContainerFile(file);
+    const toolCalls = specs
+      .filter((spec) => builtInKindOf(spec) === undefined)
+      .map((spec) => {
+        const custom = spec.input !== undefined;
+        const args = custom
+          ? (spec.input as string)
+          : typeof spec.arguments === "string"
+            ? fillJson(spec.arguments)
+            : JSON.stringify(fillValues(spec.arguments ?? {}, fill));
+        return {
+          id: ids.next(OPENAI_IDS.call),
+          itemId: ids.next(custom ? OPENAI_IDS.customCall : OPENAI_IDS.functionCall),
+          name: spec.name ?? "",
+          kind: custom ? ("custom" as const) : ("function" as const),
+          arguments: args,
+        };
+      });
     const summary = turn.reasoning?.summary;
     const reasoningTokens = turn.reasoning ? (turn.reasoning.tokens ?? 64) : 0;
     const finish =
       turn.finish ??
       (request.maxOutputTokens !== undefined && Math.ceil(text.length / 4) > request.maxOutputTokens
         ? "length"
-        : toolCalls.length > 0
+        : toolCalls.length > 0 || built.calls.some((tool) => !tool.hosted)
           ? "tool_calls"
           : "stop");
     const base = {
@@ -378,6 +462,7 @@ export class OpenAIWorld {
           ? text.slice(0, request.maxOutputTokens * 4)
           : text,
       toolCalls,
+      builtIns: built.calls,
       ...(turn.refusal === undefined ? {} : { refusal: fill(turn.refusal) }),
     };
     const answer: Answer = {
@@ -393,6 +478,8 @@ export class OpenAIWorld {
           }
         : {}),
       finish,
+      annotations: cited.annotations,
+      ...(media.media === undefined ? {} : { media: media.media }),
       usage: usageOf(call.text, base, reasoningTokens, turn.usage),
       messageId: ids.next(OPENAI_IDS.message),
     };
@@ -402,6 +489,7 @@ export class OpenAIWorld {
         call.id,
         answer.messageId,
         ...answer.toolCalls.flatMap((tool) => [tool.id, tool.itemId]),
+        ...answer.builtIns.flatMap((tool) => tool.ids),
         ...(answer.reasoning ? [answer.reasoning.itemId] : []),
       ]);
     }

@@ -797,6 +797,13 @@
             "type": "array",
             "items": {}
           },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names of the files shared with the message."
+          },
           "postedAt": {
             "type": "string"
           },
@@ -826,6 +833,7 @@
           "author",
           "text",
           "blocks",
+          "files",
           "postedAt",
           "edited",
           "thread"
@@ -9442,6 +9450,45 @@
             },
             "description": "Tool calls, in order: more than one is parallel."
           },
+          "citations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "quote": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The text the citation marks: its first occurrence."
+                },
+                "url": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "file": {
+                  "type": "string",
+                  "description": "A file's id (`file-…`), or a container file's name."
+                }
+              },
+              "required": [
+                "quote"
+              ]
+            },
+            "description": "Citations on the text, after a web or file search."
+          },
+          "image": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAIMediaSource"
+            },
+            "minItems": 1,
+            "x-channelstack-one-or-many": true,
+            "description": "The Images API's answer: one image, or one per `n`."
+          },
+          "audio": {
+            "$ref": "#/components/schemas/OpenAIMediaSource"
+          },
           "reasoning": {
             "type": "object",
             "properties": {
@@ -9596,10 +9643,298 @@
           "input": {
             "type": "string",
             "description": "A custom tool's free-form input."
+          },
+          "webSearch": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "search",
+                  "open_page",
+                  "find_in_page"
+                ],
+                "default": "search"
+              },
+              "url": {
+                "type": "string",
+                "description": "For `open_page` and `find_in_page`."
+              },
+              "pattern": {
+                "type": "string",
+                "description": "For `find_in_page`."
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "description": "`web_search`, run by OpenAI: its query and what it found."
+          },
+          "fileSearch": {
+            "type": "object",
+            "properties": {
+              "queries": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "file": {
+                      "type": "string",
+                      "description": "The file's id (`file-…`) or name."
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "score": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "file",
+                    "text"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "queries"
+            ],
+            "description": "`file_search`, run by OpenAI: its queries and what it found."
+          },
+          "codeInterpreter": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "logs": {
+                "type": "string"
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/OpenAIMediaSource"
+                },
+                "description": "Files the code wrote: downloadable from the container."
+              }
+            },
+            "required": [
+              "code"
+            ],
+            "description": "`code_interpreter`, run by OpenAI in a container."
+          },
+          "imageGeneration": {
+            "type": "object",
+            "properties": {
+              "image": {
+                "$ref": "#/components/schemas/OpenAIMediaSource"
+              },
+              "revisedPrompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "image"
+            ],
+            "description": "`image_generation`, run by OpenAI."
+          },
+          "mcp": {
+            "type": "object",
+            "properties": {
+              "server": {
+                "type": "string",
+                "description": "The request's `server_label`."
+              },
+              "tool": {
+                "type": "string"
+              },
+              "arguments": {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              "output": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "approval": {
+                "type": "boolean",
+                "description": "Ask for approval first: an `mcp_approval_request` instead of the call."
+              }
+            },
+            "required": [
+              "server",
+              "tool"
+            ],
+            "description": "A remote MCP server's tool, called by OpenAI."
+          },
+          "shell": {
+            "type": "object",
+            "properties": {
+              "commands": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              },
+              "output": {
+                "type": "string",
+                "description": "What it printed, when the request's shell is hosted."
+              }
+            },
+            "required": [
+              "commands"
+            ],
+            "description": "`shell`: run by OpenAI in a container, or by the agent (`local`)."
+          },
+          "computer": {
+            "type": "object",
+            "properties": {
+              "actions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/OpenAIComputerAction"
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "actions"
+            ],
+            "description": "`computer`, run by the agent, which sends back a screenshot."
+          },
+          "applyPatch": {
+            "type": "object",
+            "properties": {
+              "operations": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/OpenAIPatchOperation"
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "operations"
+            ],
+            "description": "`apply_patch`, run by the agent."
+          }
+        }
+      },
+      "OpenAIMediaSource": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string",
+                "description": "The bytes, in base64."
+              },
+              "name": {
+                "type": "string",
+                "description": "The file's name, when it was read from a path."
+              }
+            },
+            "required": [
+              "content"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "placeholder": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4096
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4096
+                  },
+                  "seconds": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  }
+                }
+              }
+            },
+            "required": [
+              "placeholder"
+            ]
+          }
+        ],
+        "x-channelstack-files": "media",
+        "description": "A path (read in the test process), bytes, or `{ placeholder: { width, height } }` (a PNG) or `{ placeholder: { seconds } }` (WAV or PCM silence)."
+      },
+      "OpenAIComputerAction": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": [
-          "name"
+          "type"
+        ],
+        "additionalProperties": {}
+      },
+      "OpenAIPatchOperation": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "create_file",
+              "update_file",
+              "delete_file"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "diff": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "path"
         ]
       },
       "OpenAITiming": {
@@ -9712,7 +10047,12 @@
             "type": "string",
             "enum": [
               "chat.completions",
-              "responses"
+              "responses",
+              "images.generations",
+              "images.edits",
+              "audio.speech",
+              "audio.transcriptions",
+              "audio.translations"
             ]
           },
           "model": {
@@ -9757,6 +10097,10 @@
             "x-channelstack-ref-role": [
               "resource"
             ]
+          },
+          "approval": {
+            "type": "boolean",
+            "description": "The newest input is an MCP approval response: approving (true) or not (false)."
           }
         }
       },
@@ -9774,11 +10118,7 @@
             "description": "The response's own id: `chatcmpl-…` or `resp_…`."
           },
           "endpoint": {
-            "type": "string",
-            "enum": [
-              "chat.completions",
-              "responses"
-            ]
+            "$ref": "#/components/schemas/OpenAIEndpoint"
           },
           "model": {
             "type": "string"
@@ -9868,21 +10208,36 @@
           "id": "id"
         }
       },
+      "OpenAIEndpoint": {
+        "type": "string",
+        "enum": [
+          "chat.completions",
+          "responses",
+          "images.generations",
+          "images.edits",
+          "audio.speech",
+          "audio.transcriptions",
+          "audio.translations"
+        ]
+      },
       "OpenAIRequest": {
         "type": "object",
         "properties": {
           "endpoint": {
-            "type": "string",
-            "enum": [
-              "chat.completions",
-              "responses"
-            ]
+            "$ref": "#/components/schemas/OpenAIEndpoint"
           },
           "model": {
             "type": "string"
           },
           "stream": {
             "type": "boolean"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The Images API's prompt, or the text speech is made from."
+          },
+          "file": {
+            "$ref": "#/components/schemas/OpenAIPart"
           },
           "instructions": {
             "type": "string"
@@ -9955,6 +10310,53 @@
           "headers"
         ]
       },
+      "OpenAIPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "file",
+              "audio"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "enum": [
+              "data",
+              "file_id",
+              "url"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "fileId": {
+            "type": "string",
+            "description": "For `file_id`: the file in `/v1/files`."
+          },
+          "mediaType": {
+            "type": "string",
+            "description": "None for a URL the fake didn't fetch."
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "sha256": {
+            "type": "string",
+            "description": "What `toHaveSentFile` compares."
+          },
+          "filename": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "from"
+        ],
+        "description": "The audio to transcribe, or the image to edit."
+      },
       "OpenAIMessage": {
         "type": "object",
         "properties": {
@@ -10001,32 +10403,7 @@
           "parts": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "image",
-                    "file",
-                    "audio"
-                  ]
-                },
-                "from": {
-                  "type": "string",
-                  "enum": [
-                    "data",
-                    "file_id",
-                    "url"
-                  ]
-                },
-                "url": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "from"
-              ]
+              "$ref": "#/components/schemas/OpenAIPart"
             }
           }
         },
@@ -10050,6 +10427,11 @@
           "parameters": {},
           "strict": {
             "type": "boolean"
+          },
+          "settings": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "A built-in tool's settings, as the request gave them."
           }
         },
         "required": [
@@ -10121,11 +10503,20 @@
             "type": "string",
             "enum": [
               "function",
-              "custom"
+              "custom",
+              "web_search",
+              "file_search",
+              "code_interpreter",
+              "image_generation",
+              "mcp",
+              "shell",
+              "computer",
+              "apply_patch"
             ]
           },
           "hosted": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "OpenAI ran it, so `result` is what the script said."
           },
           "name": {
             "type": "string"
@@ -10277,11 +10668,7 @@
             "type": "string"
           },
           "endpoint": {
-            "type": "string",
-            "enum": [
-              "chat.completions",
-              "responses"
-            ]
+            "$ref": "#/components/schemas/OpenAIEndpoint"
           },
           "model": {
             "type": "string"
@@ -38984,11 +39371,7 @@
           },
           {
             "schema": {
-              "type": "string",
-              "enum": [
-                "chat.completions",
-                "responses"
-              ]
+              "$ref": "#/components/schemas/OpenAIEndpoint"
             },
             "required": false,
             "name": "endpoint",

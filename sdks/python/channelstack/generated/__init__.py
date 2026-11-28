@@ -13,12 +13,12 @@ from urllib.parse import quote
 from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of, to_wire
 from ..runtime.credentials import credential
 from ..runtime.duration import Duration, parse_duration
-from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes, read_document, read_tree
+from ..runtime.files import ChangesInput, DocumentInput, MediaSource, TreeInput, read_changes, read_document, read_media, read_tree
 from ..runtime.responder import respond_with
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CannotEditOthersMessageError", "CannotMessageUserError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DiscordApiCall", "DiscordApiCalls", "DiscordApp", "DiscordApps", "DiscordButtonRef", "DiscordChannel", "DiscordChannels", "DiscordDeliveries", "DiscordDelivery", "DiscordEndpointCheck", "DiscordEphemeralMessages", "DiscordFault", "DiscordFixture", "DiscordGuild", "DiscordMembers", "DiscordMessage", "DiscordMessageDeliveries", "DiscordMessageInput", "DiscordMessages", "DiscordPrincipal", "DiscordReaction", "DiscordReactions", "DiscordReplies", "DiscordThreads", "DiscordTranscript", "DiscordTranscriptEntry", "DiscordUser", "DiscordUsers", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "EmptyMessageError", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleApps", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "InvalidFormBodyError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MethodNotSupportedForChannelTypeError", "MissingAccessError", "MissingPermissionsError", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "ObjectNotFoundError", "OpenAICall", "OpenAICalls", "OpenAIContext", "OpenAIFixture", "OpenAIHeldCall", "OpenAIHeldPage", "OpenAIMatch", "OpenAIMessage", "OpenAIPausedCalls", "OpenAIProblems", "OpenAIRateLimit", "OpenAIRef", "OpenAIRequest", "OpenAIScript", "OpenAISentSecret", "OpenAISentSecrets", "OpenAISessionCalls", "OpenAISessionToolCalls", "OpenAITiming", "OpenAITool", "OpenAIToolCall", "OpenAIToolCallSpec", "OpenAIToolCalls", "OpenAITurn", "OpenAITurnInput", "OpenAIUnattributedCall", "OpenAIUnattributedCalls", "PROVIDER_NAMES", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendApps", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "ThreadAlreadyCreatedError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CannotEditOthersMessageError", "CannotMessageUserError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DiscordApiCall", "DiscordApiCalls", "DiscordApp", "DiscordApps", "DiscordButtonRef", "DiscordChannel", "DiscordChannels", "DiscordDeliveries", "DiscordDelivery", "DiscordEndpointCheck", "DiscordEphemeralMessages", "DiscordFault", "DiscordFixture", "DiscordGuild", "DiscordMembers", "DiscordMessage", "DiscordMessageDeliveries", "DiscordMessageInput", "DiscordMessages", "DiscordPrincipal", "DiscordReaction", "DiscordReactions", "DiscordReplies", "DiscordThreads", "DiscordTranscript", "DiscordTranscriptEntry", "DiscordUser", "DiscordUsers", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "EmptyMessageError", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleApps", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "InvalidFormBodyError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MethodNotSupportedForChannelTypeError", "MissingAccessError", "MissingPermissionsError", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "ObjectNotFoundError", "OpenAICall", "OpenAICalls", "OpenAIComputerAction", "OpenAIContext", "OpenAIEndpoint", "OpenAIFixture", "OpenAIHeldCall", "OpenAIHeldPage", "OpenAIMatch", "OpenAIMediaSource", "OpenAIMessage", "OpenAIPart", "OpenAIPatchOperation", "OpenAIPausedCalls", "OpenAIProblems", "OpenAIRateLimit", "OpenAIRef", "OpenAIRequest", "OpenAIScript", "OpenAISentSecret", "OpenAISentSecrets", "OpenAISessionCalls", "OpenAISessionToolCalls", "OpenAITiming", "OpenAITool", "OpenAIToolCall", "OpenAIToolCallSpec", "OpenAIToolCalls", "OpenAITurn", "OpenAITurnInput", "OpenAIUnattributedCall", "OpenAIUnattributedCalls", "PROVIDER_NAMES", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendApps", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "ThreadAlreadyCreatedError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
 
 VERSION = "0.1.1"
 
@@ -1582,6 +1582,9 @@ type OpenAITurnInput = str | OpenAITurn
 class OpenAITurn:
     text: str | list[str] | None = None
     tool_calls: list[OpenAIToolCallSpec] | None = None
+    citations: list[dict[str, Any]] | None = None
+    image: OpenAIMediaSource | list[OpenAIMediaSource] | None = None
+    audio: OpenAIMediaSource | None = None
     reasoning: dict[str, Any] | None = None
     refusal: str | None = None
     finish: Literal["stop", "length", "content_filter"] | None = None
@@ -1599,6 +1602,9 @@ class OpenAITurn:
         return cls(
             text=data.get("text"),
             tool_calls=None if data.get("toolCalls") is None else [OpenAIToolCallSpec._from_wire(ctx, item) for item in data["toolCalls"]],
+            citations=data.get("citations"),
+            image=data.get("image"),
+            audio=data.get("audio"),
             reasoning=data.get("reasoning"),
             refusal=data.get("refusal"),
             finish=data.get("finish"),
@@ -1613,26 +1619,79 @@ class OpenAITurn:
         )
 
     def _to_wire(self) -> dict[str, Any]:
-        wire = {"text": self.text, "toolCalls": None if self.tool_calls is None else [item._to_wire() for item in self.tool_calls], "reasoning": self.reasoning, "refusal": self.refusal, "finish": self.finish, "usage": self.usage, "timing": None if self.timing is None else self.timing._to_wire(), "failAfter": self.fail_after, "pauseAfter": self.pause_after, "error": self.error, "retryAfter": self.retry_after, "shouldRetry": self.should_retry, "message": self.message}
+        wire = {"text": self.text, "toolCalls": None if self.tool_calls is None else [item._to_wire() for item in self.tool_calls], "citations": self.citations, "image": None if self.image is None else [read_media(item) for item in (self.image if isinstance(self.image, list) else [self.image])], "audio": None if self.audio is None else read_media(self.audio), "reasoning": self.reasoning, "refusal": self.refusal, "finish": self.finish, "usage": self.usage, "timing": None if self.timing is None else self.timing._to_wire(), "failAfter": self.fail_after, "pauseAfter": self.pause_after, "error": self.error, "retryAfter": self.retry_after, "shouldRetry": self.should_retry, "message": self.message}
         return {key: value for key, value in wire.items() if value is not None}
 
 
 @dataclass(frozen=True)
 class OpenAIToolCallSpec:
-    name: str
+    name: str | None = None
     arguments: dict[str, Any] | str | None = None
     input: str | None = None
+    web_search: dict[str, Any] | None = None
+    file_search: dict[str, Any] | None = None
+    code_interpreter: dict[str, Any] | None = None
+    image_generation: dict[str, Any] | None = None
+    mcp: dict[str, Any] | None = None
+    shell: dict[str, Any] | None = None
+    computer: dict[str, Any] | None = None
+    apply_patch: dict[str, Any] | None = None
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIToolCallSpec:
         return cls(
-            name=data["name"],
+            name=data.get("name"),
             arguments=data.get("arguments"),
             input=data.get("input"),
+            web_search=data.get("webSearch"),
+            file_search=data.get("fileSearch"),
+            code_interpreter=data.get("codeInterpreter"),
+            image_generation=data.get("imageGeneration"),
+            mcp=data.get("mcp"),
+            shell=data.get("shell"),
+            computer=data.get("computer"),
+            apply_patch=data.get("applyPatch"),
         )
 
     def _to_wire(self) -> dict[str, Any]:
-        wire = {"name": self.name, "arguments": self.arguments, "input": self.input}
+        wire = {"name": self.name, "arguments": self.arguments, "input": self.input, "webSearch": self.web_search, "fileSearch": self.file_search, "codeInterpreter": None if self.code_interpreter is None else {key: value for key, value in {**self.code_interpreter, "files": None if self.code_interpreter.get("files") is None else [read_media(item) for item in self.code_interpreter["files"]]}.items() if value is not None}, "imageGeneration": None if self.image_generation is None else {key: value for key, value in {**self.image_generation, "image": None if self.image_generation.get("image") is None else read_media(self.image_generation["image"])}.items() if value is not None}, "mcp": self.mcp, "shell": self.shell, "computer": None if self.computer is None else {key: value for key, value in {**self.computer, "actions": None if self.computer.get("actions") is None else [item._to_wire() for item in self.computer["actions"]]}.items() if value is not None}, "applyPatch": None if self.apply_patch is None else {key: value for key, value in {**self.apply_patch, "operations": None if self.apply_patch.get("operations") is None else [item._to_wire() for item in self.apply_patch["operations"]]}.items() if value is not None}}
+        return {key: value for key, value in wire.items() if value is not None}
+
+
+type OpenAIMediaSource = MediaSource
+
+
+@dataclass(frozen=True)
+class OpenAIComputerAction:
+    type: str
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIComputerAction:
+        return cls(
+            type=data["type"],
+        )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"type": self.type}
+        return wire
+
+
+@dataclass(frozen=True)
+class OpenAIPatchOperation:
+    type: Literal["create_file", "update_file", "delete_file"]
+    path: str
+    diff: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIPatchOperation:
+        return cls(
+            type=data["type"],
+            path=data["path"],
+            diff=data.get("diff"),
+        )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"type": self.type, "path": self.path, "diff": self.diff}
         return {key: value for key, value in wire.items() if value is not None}
 
 
@@ -1659,11 +1718,12 @@ class OpenAIMatch:
     prompt: str | re.Pattern[str] | None = None
     tools: list[str] | None = None
     tool_result: bool | str | None = None
-    endpoint: Literal["chat.completions", "responses"] | None = None
+    endpoint: Literal["chat.completions", "responses", "images.generations", "images.edits", "audio.speech", "audio.transcriptions", "audio.translations"] | None = None
     model: str | re.Pattern[str] | None = None
     stream: bool | None = None
     from_: SlackUser | GitHubUser | LinearUser | NotionUser | ResendUser | GoogleUser | DiscordUser | None = None
     in_: SlackConversation | GitHubRepo | LinearTeam | NotionPage | NotionDatabase | ResendThread | GoogleThread | DiscordChannel | None = None
+    approval: bool | None = None
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIMatch:
@@ -1677,19 +1737,23 @@ class OpenAIMatch:
             stream=data.get("stream"),
             from_=data.get("from"),
             in_=data.get("in"),
+            approval=data.get("approval"),
         )
 
     def _to_wire(self) -> dict[str, Any]:
-        wire = {"text": None if self.text is None else pattern_on_wire(self.text), "prompt": None if self.prompt is None else pattern_on_wire(self.prompt), "tools": self.tools, "toolResult": self.tool_result, "endpoint": self.endpoint, "model": None if self.model is None else pattern_on_wire(self.model), "stream": self.stream, "from": None if self.from_ is None else self.from_.id, "in": None if self.in_ is None else self.in_.id}
+        wire = {"text": None if self.text is None else pattern_on_wire(self.text), "prompt": None if self.prompt is None else pattern_on_wire(self.prompt), "tools": self.tools, "toolResult": self.tool_result, "endpoint": self.endpoint, "model": None if self.model is None else pattern_on_wire(self.model), "stream": self.stream, "from": None if self.from_ is None else self.from_.id, "in": None if self.in_ is None else self.in_.id, "approval": self.approval}
         return {key: value for key, value in wire.items() if value is not None}
 
 
 type OpenAICalls = list[OpenAICall]
 
 
+type OpenAIEndpoint = Literal["chat.completions", "responses", "images.generations", "images.edits", "audio.speech", "audio.transcriptions", "audio.translations"]
+
+
 @dataclass(frozen=True)
 class OpenAIRequest:
-    endpoint: Literal["chat.completions", "responses"]
+    endpoint: OpenAIEndpoint
     model: str
     stream: bool
     messages: list[OpenAIMessage]
@@ -1698,6 +1762,8 @@ class OpenAIRequest:
     text: str
     context: OpenAIContext
     headers: dict[str, str]
+    prompt: str | None = None
+    file: OpenAIPart | None = None
     instructions: str | None = None
     tool_choice: Any | None = None
     response_format: Any | None = None
@@ -1716,11 +1782,38 @@ class OpenAIRequest:
             text=data["text"],
             context=OpenAIContext._from_wire(ctx, data["context"]),
             headers=data["headers"],
+            prompt=data.get("prompt"),
+            file=None if data.get("file") is None else OpenAIPart._from_wire(ctx, data["file"]),
             instructions=data.get("instructions"),
             tool_choice=data.get("toolChoice"),
             response_format=data.get("responseFormat"),
             last_user_text=data.get("lastUserText"),
             body=data.get("body"),
+        )
+
+
+@dataclass(frozen=True)
+class OpenAIPart:
+    type: Literal["image", "file", "audio"]
+    from_: Literal["data", "file_id", "url"]
+    url: str | None = None
+    file_id: str | None = None
+    media_type: str | None = None
+    bytes: int | None = None
+    sha256: str | None = None
+    filename: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIPart:
+        return cls(
+            type=data["type"],
+            from_=data["from"],
+            url=data.get("url"),
+            file_id=data.get("fileId"),
+            media_type=data.get("mediaType"),
+            bytes=data.get("bytes"),
+            sha256=data.get("sha256"),
+            filename=data.get("filename"),
         )
 
 
@@ -1731,7 +1824,7 @@ class OpenAIMessage:
     tool_calls: list[dict[str, Any]] | None = None
     call_id: str | None = None
     name: str | None = None
-    parts: list[dict[str, Any]] | None = None
+    parts: list[OpenAIPart] | None = None
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIMessage:
@@ -1741,7 +1834,7 @@ class OpenAIMessage:
             tool_calls=data.get("toolCalls"),
             call_id=data.get("callId"),
             name=data.get("name"),
-            parts=data.get("parts"),
+            parts=None if data.get("parts") is None else [OpenAIPart._from_wire(ctx, item) for item in data["parts"]],
         )
 
 
@@ -1752,6 +1845,7 @@ class OpenAITool:
     description: str | None = None
     parameters: Any | None = None
     strict: bool | None = None
+    settings: dict[str, Any] | None = None
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAITool:
@@ -1761,6 +1855,7 @@ class OpenAITool:
             description=data.get("description"),
             parameters=data.get("parameters"),
             strict=data.get("strict"),
+            settings=data.get("settings"),
         )
 
 
@@ -1803,7 +1898,7 @@ class OpenAIRef:
 @dataclass(frozen=True)
 class OpenAIToolCall:
     id: str
-    type: Literal["function", "custom"]
+    type: Literal["function", "custom", "web_search", "file_search", "code_interpreter", "image_generation", "mcp", "shell", "computer", "apply_patch"]
     hosted: bool
     name: str
     made_in: str
@@ -1886,7 +1981,7 @@ type OpenAIUnattributedCalls = list[OpenAIUnattributedCall]
 @dataclass(frozen=True)
 class OpenAIUnattributedCall:
     id: str
-    endpoint: Literal["chat.completions", "responses"]
+    endpoint: OpenAIEndpoint
     model: str
     at: str
     tools: list[str]
@@ -2441,6 +2536,7 @@ class SlackMessage:
         self.author: SlackUser | SlackApp = SlackUser(ctx, data["author"]) if data["author"]["kind"] == "user" else SlackApp(ctx, data["author"])
         self.text: str = data["text"]
         self.blocks: list[Any] = data["blocks"]
+        self.files: list[str] = data["files"]
         self.posted_at: str = data["postedAt"]
         self.thread_ts: str | None = data.get("threadTs")
         self.edited: bool = data["edited"]
@@ -4911,7 +5007,7 @@ class OpenAIFixture:
             respond_with(lambda since, wait_ms: handle.held_calls(since=since, wait_ms=wait_ms), lambda held, turn, error: handle.answer_held(held, turn=turn, error=error), answer)
         return handle
 
-    async def calls(self, *, endpoint: Literal["chat.completions", "responses"] | None = None, error: Literal[True] | str | None = None) -> OpenAISessionCalls:
+    async def calls(self, *, endpoint: OpenAIEndpoint | None = None, error: Literal[True] | str | None = None) -> OpenAISessionCalls:
         """Every model call attributed to this session, oldest first. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/calls", query={"endpoint": endpoint, "error": error})
@@ -4947,11 +5043,11 @@ class OpenAIFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/openai/rate-limits", body={"requests": None if requests is None else {key: value for key, value in {**requests, "per": None if requests.get("per") is None else parse_duration(requests["per"])}.items() if value is not None}, "tokens": None if tokens is None else {key: value for key, value in {**tokens, "per": None if tokens.get("per") is None else parse_duration(tokens["per"])}.items() if value is not None}, "error": error})
         return OpenAIRateLimit(ctx, data)
 
-    async def wait_for_call(self, *, endpoint: Literal["chat.completions", "responses"] | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> OpenAICall:
+    async def wait_for_call(self, *, endpoint: OpenAIEndpoint | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> OpenAICall:
         """Wait for the next new model call from the agent, after the last one this handle saw."""
         return await wait_for_next(self._seen, f"waitForCall:{endpoint!r}:{error!r}", lambda: self.calls(endpoint=endpoint, error=error), lambda item: True, "a model call from the agent", timeout=timeout)
 
-    async def latest_call(self, *, endpoint: Literal["chat.completions", "responses"] | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> OpenAICall:
+    async def latest_call(self, *, endpoint: OpenAIEndpoint | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> OpenAICall:
         """The latest model call from the agent, once the agent is quiet. Waits for at least one."""
         return await latest_once_quiet(lambda: self.calls(endpoint=endpoint, error=error), lambda item: True, lambda: quiet_of(self._ctx), "a model call from the agent", timeout=timeout, quiet_for=quiet_for)
 
@@ -5030,7 +5126,7 @@ class OpenAICall:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
-        self.endpoint: Literal["chat.completions", "responses"] = data["endpoint"]
+        self.endpoint: OpenAIEndpoint = data["endpoint"]
         self.model: str = data["model"]
         self.stream: bool = data["stream"]
         self.at: str = data["at"]

@@ -75,7 +75,7 @@ let session_calls = openai.calls().endpoint(endpoint).await?;
 
 | Parameter | Type | Required |  |
 |---|---|---|---|
-| `endpoint` | `"chat.completions" \| "responses"` | no | option |
+| `endpoint` | `OpenAIEndpoint` | no | option |
 | `error` | `true \| string` | no | option |
 
 **Returns** [`OpenAISessionCalls`](/docs/reference/api/openai#openaisessioncalls).
@@ -226,7 +226,7 @@ let call = openai.wait_for_call().endpoint(endpoint).await?;
 
 | Parameter | Type | Required |  |
 |---|---|---|---|
-| `endpoint` | `"chat.completions" \| "responses"` | no | filter |
+| `endpoint` | `OpenAIEndpoint` | no | filter |
 | `error` | `true \| string` | no | filter |
 | `timeout` | `Duration` | no | default 10s |
 
@@ -254,7 +254,7 @@ let call = openai.latest_call().endpoint(endpoint).await?;
 
 | Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
-| `endpoint` | `endpoint` | `"chat.completions" \| "responses"` | no | filter |
+| `endpoint` | `endpoint` | `OpenAIEndpoint` | no | filter |
 | `error` | `error` | `true \| string` | no | filter |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
 | `quietFor` | `quiet_for` | `Duration` | no | default 750ms |
@@ -523,7 +523,7 @@ Returned by [`OpenAICall.refresh()`](/docs/reference/api/openai#refresh-1).
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
-| `endpoint` | `endpoint` | `"chat.completions" \| "responses"` |
+| `endpoint` | `endpoint` | `OpenAIEndpoint` |
 | `model` | `model` | `string` |
 | `stream` | `stream` | `boolean` |
 | `at` | `at` | `string` |
@@ -628,6 +628,9 @@ type OpenAITurnInput = string | OpenAITurn;
 |---|---|---|
 | `text` | `text` | `string \| string[] \| undefined` |
 | `toolCalls` | `tool_calls` | `OpenAIToolCallSpec[] \| undefined` |
+| `citations` | `citations` | `Array<{ quote: string; url?: string; title?: string; file?: string }> \| undefined` |
+| `image` | `image` | `OpenAIMediaSource \| OpenAIMediaSource[] \| undefined` |
+| `audio` | `audio` | `OpenAIMediaSource \| undefined` |
 | `reasoning` | `reasoning` | `{ summary?: string \| string[]; tokens?: number } \| undefined` |
 | `refusal` | `refusal` | `string \| undefined` |
 | `finish` | `finish` | `"stop" \| "length" \| "content_filter" \| undefined` |
@@ -642,11 +645,39 @@ type OpenAITurnInput = string | OpenAITurn;
 
 ### OpenAIToolCallSpec
 
-| Field | Type |
-|---|---|
-| `name` | `string` |
-| `arguments` | `Record<string, unknown> \| string \| undefined` |
-| `input` | `string \| undefined` |
+| Field | Python / Rust | Type |
+|---|---|---|
+| `name` | `name` | `string \| undefined` |
+| `arguments` | `arguments` | `Record<string, unknown> \| string \| undefined` |
+| `input` | `input` | `string \| undefined` |
+| `webSearch` | `web_search` | `{ query: string; action?: "search" \| "open_page" \| "find_in_page"; url?: string; pattern?: string; sources?: Array<{ url: string; title?: string }> } \| undefined` |
+| `fileSearch` | `file_search` | `{ queries: string[]; results?: Array<{ file: string; text: string; score?: number }> } \| undefined` |
+| `codeInterpreter` | `code_interpreter` | `{ code: string; logs?: string; files?: OpenAIMediaSource[] } \| undefined` |
+| `imageGeneration` | `image_generation` | `{ image: OpenAIMediaSource; revisedPrompt?: string } \| undefined` |
+| `mcp` | `mcp` | `{ server: string; tool: string; arguments?: Record<string, unknown>; output?: string; error?: string; approval?: boolean } \| undefined` |
+| `shell` | `shell` | `{ commands: string[]; output?: string } \| undefined` |
+| `computer` | `computer` | `{ actions: OpenAIComputerAction[] } \| undefined` |
+| `applyPatch` | `apply_patch` | `{ operations: OpenAIPatchOperation[] } \| undefined` |
+
+### OpenAIMediaSource
+
+```ts
+type OpenAIMediaSource = MediaSource;
+```
+
+### OpenAIComputerAction
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `type` | `type` · `r#type` | `string` |
+
+### OpenAIPatchOperation
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `type` | `type` · `r#type` | `"create_file" \| "update_file" \| "delete_file"` |
+| `path` | `path` | `string` |
+| `diff` | `diff` | `string \| undefined` |
 
 ### OpenAITiming
 
@@ -663,11 +694,12 @@ type OpenAITurnInput = string | OpenAITurn;
 | `prompt` | `prompt` | `string \| RegExp \| undefined` |
 | `tools` | `tools` | `string[] \| undefined` |
 | `toolResult` | `tool_result` | `boolean \| string \| undefined` |
-| `endpoint` | `endpoint` | `"chat.completions" \| "responses" \| undefined` |
+| `endpoint` | `endpoint` | `"chat.completions" \| "responses" \| "images.generations" \| "images.edits" \| "audio.speech" \| "audio.transcriptions" \| "audio.translations" \| undefined` |
 | `model` | `model` | `string \| RegExp \| undefined` |
 | `stream` | `stream` | `boolean \| undefined` |
 | `from` | `from_` · `from` | `SlackUser \| GitHubUser \| LinearUser \| NotionUser \| ResendUser \| GoogleUser \| DiscordUser \| undefined` |
 | `in` | `in_` · `r#in` | `SlackConversation \| GitHubRepo \| LinearTeam \| NotionPage \| NotionDatabase \| ResendThread \| GoogleThread \| DiscordChannel \| undefined` |
+| `approval` | `approval` | `boolean \| undefined` |
 
 ### OpenAICalls
 
@@ -675,13 +707,21 @@ type OpenAITurnInput = string | OpenAITurn;
 type OpenAICalls = OpenAICall[];
 ```
 
+### OpenAIEndpoint
+
+```ts
+type OpenAIEndpoint = "chat.completions" | "responses" | "images.generations" | "images.edits" | "audio.speech" | "audio.transcriptions" | "audio.translations";
+```
+
 ### OpenAIRequest
 
 | Field | Python / Rust | Type |
 |---|---|---|
-| `endpoint` | `endpoint` | `"chat.completions" \| "responses"` |
+| `endpoint` | `endpoint` | `OpenAIEndpoint` |
 | `model` | `model` | `string` |
 | `stream` | `stream` | `boolean` |
+| `prompt` | `prompt` | `string \| undefined` |
+| `file` | `file` | `OpenAIPart \| undefined` |
 | `instructions` | `instructions` | `string \| undefined` |
 | `messages` | `messages` | `OpenAIMessage[]` |
 | `tools` | `tools` | `OpenAITool[]` |
@@ -694,6 +734,19 @@ type OpenAICalls = OpenAICall[];
 | `body` | `body` | `unknown \| undefined` |
 | `headers` | `headers` | `Record<string, string>` |
 
+### OpenAIPart
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `type` | `type` · `r#type` | `"image" \| "file" \| "audio"` |
+| `from` | `from_` · `from` | `"data" \| "file_id" \| "url"` |
+| `url` | `url` | `string \| undefined` |
+| `fileId` | `file_id` | `string \| undefined` |
+| `mediaType` | `media_type` | `string \| undefined` |
+| `bytes` | `bytes` | `number \| undefined` |
+| `sha256` | `sha256` | `string \| undefined` |
+| `filename` | `filename` | `string \| undefined` |
+
 ### OpenAIMessage
 
 | Field | Python / Rust | Type |
@@ -703,7 +756,7 @@ type OpenAICalls = OpenAICall[];
 | `toolCalls` | `tool_calls` | `Array<{ id: string; name: string; arguments?: unknown }> \| undefined` |
 | `callId` | `call_id` | `string \| undefined` |
 | `name` | `name` | `string \| undefined` |
-| `parts` | `parts` | `Array<{ type: "image" \| "file" \| "audio"; from: "data" \| "file_id" \| "url"; url?: string }> \| undefined` |
+| `parts` | `parts` | `OpenAIPart[] \| undefined` |
 
 ### OpenAITool
 
@@ -714,6 +767,7 @@ type OpenAICalls = OpenAICall[];
 | `description` | `description` | `string \| undefined` |
 | `parameters` | `parameters` | `unknown \| undefined` |
 | `strict` | `strict` | `boolean \| undefined` |
+| `settings` | `settings` | `Record<string, unknown> \| undefined` |
 
 ### OpenAIContext
 
@@ -739,7 +793,7 @@ type OpenAICalls = OpenAICall[];
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
-| `type` | `type` · `r#type` | `"function" \| "custom"` |
+| `type` | `type` · `r#type` | `"function" \| "custom" \| "web_search" \| "file_search" \| "code_interpreter" \| "image_generation" \| "mcp" \| "shell" \| "computer" \| "apply_patch"` |
 | `hosted` | `hosted` | `boolean` |
 | `name` | `name` | `string` |
 | `arguments` | `arguments` | `unknown \| undefined` |
@@ -814,7 +868,7 @@ type OpenAIUnattributedCalls = OpenAIUnattributedCall[];
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
-| `endpoint` | `endpoint` | `"chat.completions" \| "responses"` |
+| `endpoint` | `endpoint` | `OpenAIEndpoint` |
 | `model` | `model` | `string` |
 | `at` | `at` | `string` |
 | `lastUserText` | `last_user_text` | `string \| undefined` |

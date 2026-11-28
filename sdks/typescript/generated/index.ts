@@ -2,7 +2,7 @@
 import { ClientBase, connectWith, CONTEXT, disposeQuietly, type HandleContext, printsAs, QUIET, quietOf, sessionOf } from "../runtime/client.ts";
 import { credential } from "../runtime/credentials.ts";
 import { type Duration, parseDuration } from "../runtime/duration.ts";
-import { type FileInput, readChanges, readDocument, readTree } from "../runtime/files.ts";
+import { type FileInput, type MediaSource, readChanges, readDocument, readMedia, readTree } from "../runtime/files.ts";
 import type { LaunchOptions } from "../runtime/launcher.ts";
 import { type Responder, respondWith } from "../runtime/responder.ts";
 import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";
@@ -1291,6 +1291,9 @@ export type OpenAITurnInput = string | OpenAITurn;
 export interface OpenAITurn {
   text?: string | string[];
   toolCalls?: OpenAIToolCallSpec[];
+  citations?: Array<{ quote: string; url?: string; title?: string; file?: string }>;
+  image?: OpenAIMediaSource | OpenAIMediaSource[];
+  audio?: OpenAIMediaSource;
   reasoning?: { summary?: string | string[]; tokens?: number };
   refusal?: string;
   finish?: "stop" | "length" | "content_filter";
@@ -1305,9 +1308,29 @@ export interface OpenAITurn {
 }
 
 export interface OpenAIToolCallSpec {
-  name: string;
+  name?: string;
   arguments?: Record<string, unknown> | string;
   input?: string;
+  webSearch?: { query: string; action?: "search" | "open_page" | "find_in_page"; url?: string; pattern?: string; sources?: Array<{ url: string; title?: string }> };
+  fileSearch?: { queries: string[]; results?: Array<{ file: string; text: string; score?: number }> };
+  codeInterpreter?: { code: string; logs?: string; files?: OpenAIMediaSource[] };
+  imageGeneration?: { image: OpenAIMediaSource; revisedPrompt?: string };
+  mcp?: { server: string; tool: string; arguments?: Record<string, unknown>; output?: string; error?: string; approval?: boolean };
+  shell?: { commands: string[]; output?: string };
+  computer?: { actions: OpenAIComputerAction[] };
+  applyPatch?: { operations: OpenAIPatchOperation[] };
+}
+
+export type OpenAIMediaSource = MediaSource;
+
+export interface OpenAIComputerAction {
+  type: string;
+}
+
+export interface OpenAIPatchOperation {
+  type: "create_file" | "update_file" | "delete_file";
+  path: string;
+  diff?: string;
 }
 
 export interface OpenAITiming {
@@ -1320,11 +1343,12 @@ export interface OpenAIMatch {
   prompt?: string | RegExp;
   tools?: string[];
   toolResult?: boolean | string;
-  endpoint?: "chat.completions" | "responses";
+  endpoint?: "chat.completions" | "responses" | "images.generations" | "images.edits" | "audio.speech" | "audio.transcriptions" | "audio.translations";
   model?: string | RegExp;
   stream?: boolean;
   from?: SlackUser | GitHubUser | LinearUser | NotionUser | ResendUser | GoogleUser | DiscordUser;
   in?: SlackConversation | GitHubRepo | LinearTeam | NotionPage | NotionDatabase | ResendThread | GoogleThread | DiscordChannel;
+  approval?: boolean;
 }
 
 export type OpenAICalls = OpenAICall[];
@@ -1335,10 +1359,14 @@ function decodeOpenAICalls(ctx: HandleContext, data: OpenAICallsWire): OpenAICal
   return data.map((item) => new OpenAICall(ctx, item));
 }
 
+export type OpenAIEndpoint = "chat.completions" | "responses" | "images.generations" | "images.edits" | "audio.speech" | "audio.transcriptions" | "audio.translations";
+
 export interface OpenAIRequest {
-  endpoint: "chat.completions" | "responses";
+  endpoint: OpenAIEndpoint;
   model: string;
   stream: boolean;
+  prompt?: string;
+  file?: OpenAIPart;
   instructions?: string;
   messages: OpenAIMessage[];
   tools: OpenAITool[];
@@ -1352,13 +1380,24 @@ export interface OpenAIRequest {
   headers: Record<string, string>;
 }
 
+export interface OpenAIPart {
+  type: "image" | "file" | "audio";
+  from: "data" | "file_id" | "url";
+  url?: string;
+  fileId?: string;
+  mediaType?: string;
+  bytes?: number;
+  sha256?: string;
+  filename?: string;
+}
+
 export interface OpenAIMessage {
   role: "system" | "developer" | "user" | "assistant" | "tool";
   text: string;
   toolCalls?: Array<{ id: string; name: string; arguments?: unknown }>;
   callId?: string;
   name?: string;
-  parts?: Array<{ type: "image" | "file" | "audio"; from: "data" | "file_id" | "url"; url?: string }>;
+  parts?: OpenAIPart[];
 }
 
 export interface OpenAITool {
@@ -1367,6 +1406,7 @@ export interface OpenAITool {
   description?: string;
   parameters?: unknown;
   strict?: boolean;
+  settings?: Record<string, unknown>;
 }
 
 export interface OpenAIContext {
@@ -1386,7 +1426,7 @@ export interface OpenAIRef {
 
 export interface OpenAIToolCall {
   id: string;
-  type: "function" | "custom";
+  type: "function" | "custom" | "web_search" | "file_search" | "code_interpreter" | "image_generation" | "mcp" | "shell" | "computer" | "apply_patch";
   hosted: boolean;
   name: string;
   arguments?: unknown;
@@ -1437,7 +1477,7 @@ export type OpenAIUnattributedCalls = OpenAIUnattributedCall[];
 
 export interface OpenAIUnattributedCall {
   id: string;
-  endpoint: "chat.completions" | "responses";
+  endpoint: OpenAIEndpoint;
   model: string;
   at: string;
   lastUserText?: string;
@@ -2227,6 +2267,7 @@ export interface SlackMessageData {
   author: SlackUserData | SlackAppData;
   text: string;
   blocks: unknown[];
+  files: string[];
   postedAt: string;
   threadTs?: string;
   edited: boolean;
@@ -2243,6 +2284,7 @@ export class SlackMessage {
   readonly author: SlackUser | SlackApp;
   readonly text: string;
   readonly blocks: unknown[];
+  readonly files: string[];
   readonly postedAt: string;
   readonly threadTs: string | undefined;
   readonly edited: boolean;
@@ -2261,6 +2303,7 @@ export class SlackMessage {
     this.author = data.author.kind === "user" ? new SlackUser(ctx, data.author) : new SlackApp(ctx, data.author);
     this.text = data.text;
     this.blocks = data.blocks;
+    this.files = data.files;
     this.postedAt = data.postedAt;
     this.threadTs = data.threadTs;
     this.edited = data.edited;
@@ -6614,14 +6657,14 @@ export class OpenAIFixture {
   async respond(turns?: OpenAITurnInput | OpenAITurnInput[] | Responder<OpenAIRequest, OpenAITurnInput>, options: { when?: OpenAIMatch; times?: number; timing?: OpenAITiming } = {}): Promise<OpenAIScript> {
     const ctx = this.#ctx;
     const answer = typeof turns === "function" ? turns : undefined;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts`, { body: { turns: (answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined) === undefined ? undefined : [(answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined)].flat(), when: options.when === undefined ? undefined : { ...options.when, text: options.when.text === undefined ? undefined : patternOnWire(options.when.text), prompt: options.when.prompt === undefined ? undefined : patternOnWire(options.when.prompt), model: options.when.model === undefined ? undefined : patternOnWire(options.when.model), from: options.when.from === undefined ? undefined : options.when.from.id, in: options.when.in === undefined ? undefined : options.when.in.id }, times: options.times, timing: options.timing, responder: answer !== undefined } })) as OpenAIScriptData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts`, { body: { turns: (answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined) === undefined ? undefined : [(answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined)].flat().map((item) => (typeof item === "object" && item !== null && !Array.isArray(item) ? { ...item, toolCalls: item.toolCalls === undefined ? undefined : item.toolCalls.map((item) => ({ ...item, codeInterpreter: item.codeInterpreter === undefined ? undefined : { ...item.codeInterpreter, files: item.codeInterpreter.files === undefined ? undefined : item.codeInterpreter.files.map((item) => readMedia(item)) }, imageGeneration: item.imageGeneration === undefined ? undefined : { ...item.imageGeneration, image: readMedia(item.imageGeneration.image) } })), image: item.image === undefined ? undefined : [item.image].flat().map((item) => readMedia(item)), audio: item.audio === undefined ? undefined : readMedia(item.audio) } : item)), when: options.when === undefined ? undefined : { ...options.when, text: options.when.text === undefined ? undefined : patternOnWire(options.when.text), prompt: options.when.prompt === undefined ? undefined : patternOnWire(options.when.prompt), model: options.when.model === undefined ? undefined : patternOnWire(options.when.model), from: options.when.from === undefined ? undefined : options.when.from.id, in: options.when.in === undefined ? undefined : options.when.in.id }, times: options.times, timing: options.timing, responder: answer !== undefined } })) as OpenAIScriptData;
     const handle = new OpenAIScript(ctx, data);
     if (answer !== undefined) respondWith({ held: (o) => handle.heldCalls(o), answer: (id, o) => handle.answerHeld(id, o) }, answer);
     return handle;
   }
 
   /** Every model call attributed to this session, oldest first. Experimental. */
-  async calls(options: { endpoint?: "chat.completions" | "responses"; error?: true | string } = {}): Promise<OpenAISessionCalls> {
+  async calls(options: { endpoint?: OpenAIEndpoint; error?: true | string } = {}): Promise<OpenAISessionCalls> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/calls`, { query: { endpoint: options.endpoint, error: options.error } })) as OpenAISessionCallsWire;
     return decodeOpenAISessionCalls(ctx, data);
@@ -6663,12 +6706,12 @@ export class OpenAIFixture {
   }
 
   /** Wait for the next new model call from the agent, after the last one this handle saw. */
-  async waitForCall(filter: { endpoint?: "chat.completions" | "responses"; error?: true | string } = {}, options: WaitOptions = {}): Promise<OpenAICall> {
+  async waitForCall(filter: { endpoint?: OpenAIEndpoint; error?: true | string } = {}, options: WaitOptions = {}): Promise<OpenAICall> {
     return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "a model call from the agent", options);
   }
 
   /** The latest model call from the agent, once the agent is quiet. Waits for at least one. */
-  async latestCall(filter: { endpoint?: "chat.completions" | "responses"; error?: true | string } = {}, options: QuietOptions = {}): Promise<OpenAICall> {
+  async latestCall(filter: { endpoint?: OpenAIEndpoint; error?: true | string } = {}, options: QuietOptions = {}): Promise<OpenAICall> {
     return latestOnceQuiet(() => this.calls(filter), () => true, () => quietOf(this.#ctx), "a model call from the agent", options);
   }
 
@@ -6765,7 +6808,7 @@ export class OpenAIScript implements AsyncDisposable {
   /** For a responder's SDK: answer a held call with a turn, or report that the test's function threw. Experimental. */
   async answerHeld(held: string, options: { turn?: OpenAITurnInput; error?: string } = {}): Promise<void> {
     const ctx = this.#ctx;
-    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/answers`, { body: { held, turn: options.turn, error: options.error } });
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/answers`, { body: { held, turn: options.turn === undefined ? undefined : (typeof options.turn === "object" && options.turn !== null && !Array.isArray(options.turn) ? { ...options.turn, toolCalls: options.turn.toolCalls === undefined ? undefined : options.turn.toolCalls.map((item) => ({ ...item, codeInterpreter: item.codeInterpreter === undefined ? undefined : { ...item.codeInterpreter, files: item.codeInterpreter.files === undefined ? undefined : item.codeInterpreter.files.map((item) => readMedia(item)) }, imageGeneration: item.imageGeneration === undefined ? undefined : { ...item.imageGeneration, image: readMedia(item.imageGeneration.image) } })), image: options.turn.image === undefined ? undefined : [options.turn.image].flat().map((item) => readMedia(item)), audio: options.turn.audio === undefined ? undefined : readMedia(options.turn.audio) } : options.turn), error: options.error } });
   }
 
   /** Wait for the next new model call this script answers, after the last one this handle saw. */
@@ -6792,7 +6835,7 @@ export class OpenAIScript implements AsyncDisposable {
 /** Wire data of a {@link OpenAICall}. */
 export interface OpenAICallData {
   id: string;
-  endpoint: "chat.completions" | "responses";
+  endpoint: OpenAIEndpoint;
   model: string;
   stream: boolean;
   at: string;
@@ -6807,7 +6850,7 @@ export interface OpenAICallData {
 
 export class OpenAICall {
   readonly id: string;
-  readonly endpoint: "chat.completions" | "responses";
+  readonly endpoint: OpenAIEndpoint;
   readonly model: string;
   readonly stream: boolean;
   readonly at: string;

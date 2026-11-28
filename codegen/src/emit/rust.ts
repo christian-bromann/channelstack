@@ -115,34 +115,68 @@ export function emitRust(ir: Ir): Map<string, string> {
   // --- How an argument goes on the wire ---------------------------------------------------------
 
   /** A closure (`&|v: &Value| …`) that encodes one value of this type, or `None` when it goes as it is. */
-  const encoder = (type: IrType): string | undefined => {
+  const encoder = (type: IrType, seen: ReadonlySet<string> = new Set()): string | undefined => {
+    const inner = (member: IrType) => encoder(member, seen);
     switch (type.kind) {
       case "ref":
         return `&|v: &Value| enc::ref_ids(v, &[${index.refIdFields(type.resources).map(str).join(", ")}])`;
       case "duration":
         return "&|v: &Value| enc::duration(v)";
       case "files":
-        return `&|v: &Value| files::${{ tree: "read_tree", changes: "read_changes", document: "read_document" }[type.mode]}(v)`;
+        return `&|v: &Value| files::${{ tree: "read_tree", changes: "read_changes", document: "read_document", media: "read_media" }[type.mode]}(v)`;
+      case "named": {
+        // A named type is encoded as what it names (`OpenAITurn`'s media, `OpenAIMediaSource`). An
+        // object whose fields all go as they are stays as it is: its text shorthand is the argument's.
+        const target = resolve(type);
+        const within = new Set([...seen, type.name]);
+        if (seen.has(type.name)) return undefined;
+        if (target.kind === "object" && target.fields.every((field) => encoder(field.type, within) === undefined))
+          return undefined;
+        return encoder(target, within);
+      }
       case "array": {
-        const item = encoder(type.items);
+        const items = resolve(type.items);
+        // Bytes are a list of numbers: one media source, not a list of them.
+        if (type.oneOrMany === true && items.kind === "files" && items.mode === "media")
+          return "&|v: &Value| files::read_media_one_or_many(v)";
+        const item = inner(type.items);
         return item === undefined && !type.oneOrMany
           ? undefined
           : `&|v: &Value| enc::array(v, ${type.oneOrMany === true}, ${item ?? "&|v: &Value| enc::plain(v)"})`;
       }
       case "object": {
         const fields = type.fields.flatMap((field) => {
-          const encode = encoder(field.type);
+          const encode = inner(field.type);
           return encode === undefined ? [] : [`(${str(field.name)}, ${encode})`];
         });
         const short = type.fields.find((field) => field.name === type.shorthand);
         if (fields.length === 0 && !short) return undefined;
         const shorthand = short
-          ? `Some((${str(short.name)}, ${encoder(short.type) ?? "&|v: &Value| enc::plain(v)"}))`
+          ? `Some((${str(short.name)}, ${inner(short.type) ?? "&|v: &Value| enc::plain(v)"}))`
           : "None";
         return `&|v: &Value| enc::object(v, ${shorthand}, &[${fields.join(", ")}])`;
       }
       case "nullable":
-        return encoder(type.type);
+        return inner(type.type);
+      case "union": {
+        // Told apart by the value's JSON kind: an object as the union's object member, a list as its list member.
+        const encoded = type.types.flatMap((member) => {
+          const encode = inner(member);
+          return encode === undefined ? [] : [{ kind: resolve(member).kind, encode }];
+        });
+        if (encoded.length === 0) return undefined;
+        const as = (kinds: readonly IrType["kind"][]) => {
+          const found = encoded.filter((member) => kinds.includes(member.kind));
+          if (found.length > 1)
+            throw new Error("A union whose members hold files or handles needs them of different JSON kinds");
+          return found[0] === undefined ? "None" : `Some(${found[0].encode})`;
+        };
+        const object = as(["object", "record"]);
+        const list = as(["array"]);
+        if (encoded.some((member) => !["object", "record", "array"].includes(member.kind)))
+          throw new Error("A union whose members hold files or handles takes them in objects or lists");
+        return `&|v: &Value| enc::union(v, ${object}, ${list})`;
+      }
       default:
         return undefined;
     }

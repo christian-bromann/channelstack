@@ -1100,6 +1100,70 @@ async fn api_calls_by_name_pattern_count_and_error() -> Result<()> {
         .await
 }
 
+/// A few bytes that aren't text, as a fixture image has.
+const PNG: [u8; 6] = [0x89, b'P', b'N', b'G', 0, 255];
+
+fn png_sha256() -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(PNG)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// The openai fixture: calls, the newest last, with the images, files and audio they carried.
+fn model() -> StandIn {
+    StandIn::with(json!({ "modelCalls": [
+        { "request": { "messages": [{ "role": "user", "parts": [{ "type": "image", "from": "url", "url": "https://example.com/a.png" }] }] } },
+        // A media endpoint's call: its file is its message's first part.
+        { "request": { "messages": [{ "role": "user", "parts": [{ "type": "audio", "from": "data", "mediaType": "audio/wav", "bytes": 44, "sha256": "ab".repeat(32) }] }] } },
+        { "request": { "messages": [
+            { "role": "system", "text": "be brief" },
+            { "role": "user", "parts": [{ "type": "image", "from": "data", "mediaType": "image/png", "bytes": 6, "sha256": png_sha256() }] },
+        ] } },
+    ] }))
+}
+
+#[tokio::test]
+async fn a_file_sent_holds_for_its_path_and_for_its_bytes() -> Result<()> {
+    let root = tempfile::tempdir().unwrap();
+    let chart = root.path().join("chart.png");
+    std::fs::write(&chart, PNG).unwrap();
+    let model = model();
+    expect(&model)
+        .to_have_sent_file(chart.display().to_string())
+        .timeout(FAST)
+        .await?;
+    expect(&model)
+        .to_have_sent_file(PNG.to_vec())
+        .timeout(FAST)
+        .await?;
+    let message = failure(
+        expect(&StandIn::with(
+            json!({ "modelCalls": [{ "request": { "messages": [{ "role": "user" }] } }] }),
+        ))
+        .to_have_sent_file(chart.display().to_string())
+        .timeout(FAST)
+        .await,
+    );
+    assert_eq!(
+        message,
+        format!(
+            "Expected the agent to send the model chart.png (6 bytes, sha256 {}). It sent no image, file or audio.",
+            &png_sha256()[..12]
+        )
+    );
+    // A path that isn't there is an error, not a failed check.
+    assert!(matches!(
+        expect(&model)
+            .to_have_sent_file(root.path().join("missing.png").display().to_string())
+            .timeout(FAST)
+            .await,
+        Err(Error::Files { .. })
+    ));
+    Ok(())
+}
+
 // --- The model ------------------------------------------------------------------------------------
 
 #[tokio::test]
@@ -1171,6 +1235,48 @@ async fn to_have_sent_compares_text_as_attribution_does_a_slack_link_is_its_url(
         .to_have_sent("<@U08B5K2M9QX> deploy <https://example.com/runs/7|the run> now")
         .timeout(FAST)
         .await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_file_not_sent_fails_with_what_was_sent_newest_first() {
+    let message = failure(
+        expect(&model())
+            .to_have_sent_file(vec![1u8, 2, 3])
+            .timeout(FAST)
+            .await,
+    );
+    assert_eq!(
+        message,
+        [
+            "Expected the agent to send the model these bytes (3 bytes, sha256 039058c6f2c0). What it sent, newest first:".to_owned(),
+            format!("  image, image/png, 6 bytes, sha256 {}", &png_sha256()[..12]),
+            "  audio, audio/wav, 44 bytes, sha256 abababababab".to_owned(),
+            "  image, https://example.com/a.png".to_owned(),
+        ]
+        .join("\n")
+    );
+}
+
+#[tokio::test]
+async fn a_file_not_to_be_sent_once_quiet() -> Result<()> {
+    let model = model();
+    expect(&model)
+        .not_to_have_sent_file(vec![1u8])
+        .timeout(FAST)
+        .quiet_for(QUIET)
+        .await?;
+    let message = failure(
+        expect(&model)
+            .not_to_have_sent_file(PNG.to_vec())
+            .timeout(FAST)
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert!(
+        message.starts_with("Expected the agent not to send the model these bytes (6 bytes"),
+        "{message}"
+    );
     Ok(())
 }
 

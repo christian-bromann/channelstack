@@ -81,7 +81,10 @@ export async function runProviderExamples(
   const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
   if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
   const { enabled, agents, suites } = PROVIDERS[provider];
-  for (const [name, { channel, path }] of Object.entries(agents)) {
+  for (const [name, where] of Object.entries(agents)) {
+    const { channel, path } = where;
+    // What every agent runs, and what only this one does.
+    const patterns = [...enabled, ...("also" in where ? where.also : [])];
     console.log(`\ntest/acceptance/examples/${provider}.test.ts against ${name}`);
     const agent = join(ROOT, "examples", "agents", name, "agent.ts");
     await withStack({ bin, agent, webhook: { driver: channel, path } }, ({ env }) => {
@@ -95,7 +98,7 @@ export async function runProviderExamples(
           "test/acceptance/vitest.config.ts",
           `test/acceptance/examples/${provider}.test.ts`,
           "-t",
-          `^(${enabled.join("|")})`,
+          `^(${patterns.join("|")})`,
         ],
         { cwd: ROOT, env },
       );

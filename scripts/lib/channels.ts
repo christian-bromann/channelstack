@@ -171,8 +171,13 @@ interface ProviderHarness {
   readonly suites: readonly string[];
   /** The agent with one fault per model check (`BROKEN=<check id>`), the channel it lives in, and where it takes webhooks. */
   readonly broken: { readonly agent: string; readonly channel: HarnessChannel; readonly path: string };
-  /** The reference agents, the channel each lives in, and where it takes that channel's webhooks. */
-  readonly agents: Readonly<Record<string, { readonly channel: HarnessChannel; readonly path: string }>>;
+  /**
+   * The reference agents, the channel each lives in, where it takes that channel's webhooks, and
+   * the examples only it runs (`also`): what only its API has, such as the Responses API's built-in tools.
+   */
+  readonly agents: Readonly<
+    Record<string, { readonly channel: HarnessChannel; readonly path: string; readonly also?: readonly string[] }>
+  >;
 }
 
 /** The fakes the agent calls that aren't channels (decision 0029): their examples run against agents of a channel. */
@@ -185,11 +190,16 @@ export const PROVIDERS = {
       "what the agent sends the model > ",
       "a missing script fails the test > ",
     ],
-    suites: ["test/acceptance/checks/openai-checks.test.ts", "test/acceptance/providers/openai-parallel.test.ts"],
+    suites: [
+      "test/acceptance/checks/openai-checks.test.ts",
+      "test/acceptance/providers/openai-parallel.test.ts",
+      "test/acceptance/providers/openai-media.test.ts",
+    ],
     broken: { agent: "broken-openai", channel: "slack", path: "/slack/events" },
     agents: {
       "openai-node": { channel: "slack", path: "/slack/events" },
-      "openai-ai-sdk": { channel: "slack", path: "/slack/events" },
+      // Images, files and OpenAI's built-in tools are on the Responses API (design §5.6).
+      "openai-ai-sdk": { channel: "slack", path: "/slack/events", also: ["images and built-in tools > "] },
     },
   },
 } as const satisfies Readonly<Record<string, ProviderHarness>>;

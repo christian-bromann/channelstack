@@ -1,5 +1,6 @@
 import type { SseFrame } from "../../../core/stream/index.ts";
 import type { OpenAIError } from "../errors.ts";
+import { base64Of } from "../media.ts";
 import { type Answer, type ChatDialect, jsonChunks, obfuscation } from "./answer.ts";
 
 /** What every chunk and completion of one answer shares. */
@@ -13,6 +14,9 @@ export interface ChatMeta {
   /** Every chunk padded with `obfuscation` (`stream_options.include_obfuscation`, on by default). */
   readonly obfuscation: boolean;
 }
+
+/** Audio output stays downloadable for an hour, as OpenAI says in `expires_at`. */
+const AUDIO_LIFETIME_S = 3600;
 
 const usageWire = (usage: Answer["usage"]) => ({
   prompt_tokens: usage.input,
@@ -39,6 +43,7 @@ const reasoningField = (dialect: ChatDialect, text: string): Record<string, stri
 /** A whole `chat.completion`. */
 export function chatCompletion(answer: Answer, meta: ChatMeta): Record<string, unknown> {
   const reasoning = answer.reasoning?.summary.join("") ?? "";
+  const audio = answer.media?.audio;
   return {
     id: meta.id,
     object: "chat.completion",
@@ -49,11 +54,24 @@ export function chatCompletion(answer: Answer, meta: ChatMeta): Record<string, u
         index: 0,
         message: {
           role: "assistant",
+          // With audio output, the text is the audio's transcript, not the content.
           content:
-            answer.refusal === undefined && (answer.text !== "" || answer.toolCalls.length === 0) ? answer.text : null,
+            audio === undefined && answer.refusal === undefined && (answer.text !== "" || answer.toolCalls.length === 0)
+              ? answer.text
+              : null,
           refusal: answer.refusal ?? null,
           ...(answer.toolCalls.length > 0 ? { tool_calls: answer.toolCalls.map(toolCallWire) } : {}),
-          annotations: [],
+          annotations: answer.annotations,
+          ...(audio === undefined
+            ? {}
+            : {
+                audio: {
+                  id: audio.id,
+                  expires_at: meta.created + AUDIO_LIFETIME_S,
+                  data: base64Of(audio.bytes),
+                  transcript: answer.text,
+                },
+              }),
           ...(reasoning === "" ? {} : reasoningField(meta.dialect, reasoning)),
         },
         logprobs: null,
@@ -99,9 +117,22 @@ export function chatFrames(answer: Answer, meta: ChatMeta, includeUsage: boolean
   for (const piece of answer.reasoning?.summary ?? []) {
     if (meta.dialect !== "openai") frames.push({ data: data(reasoningField(meta.dialect, piece)), content: true });
   }
+  const audio = answer.media?.audio;
   if (answer.refusal !== undefined) {
     for (const piece of answer.refusal.match(/[\s\S]{1,4}/g) ?? [])
       frames.push({ data: data({ refusal: piece }), content: true });
+  } else if (audio !== undefined) {
+    // Audio output: the transcript in pieces, then the audio in pieces, then when it expires.
+    answer.chunks.forEach((piece, at) => {
+      frames.push({
+        data: data({ audio: { ...(at === 0 ? { id: audio.id } : {}), transcript: piece } }),
+        content: true,
+      });
+    });
+    for (const piece of base64Of(audio.bytes).match(/[\s\S]{1,8192}/g) ?? []) {
+      frames.push({ data: data({ audio: { id: audio.id, data: piece } }), content: true });
+    }
+    frames.push({ data: data({ audio: { id: audio.id, expires_at: meta.created + AUDIO_LIFETIME_S } }) });
   } else {
     for (const piece of answer.chunks) frames.push({ data: data({ content: piece }), content: true });
   }

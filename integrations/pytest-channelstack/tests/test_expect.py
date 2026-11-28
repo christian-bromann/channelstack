@@ -1,9 +1,12 @@
 """`expect(...)` passes and fails the way the matchers do, on stand-in handles (no server)."""
 
+import hashlib
 import re
 import secrets
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import ANY
 
@@ -11,6 +14,7 @@ import httpx
 import pytest
 
 from channelstack.runtime.client import HandleContext, quiet_of
+from channelstack.runtime.files import set_files_root
 from channelstack.runtime.transport import Transport, on_refusal
 from channelstack.runtime.wait import QuietState, WaitTimeoutError, set_wait_defaults, wait_defaults, wait_for
 from pytest_channelstack import expect, matchers
@@ -749,6 +753,92 @@ async def test_not_a_property_value() -> None:
     await expect(row).not_to_have_property_value("Points", 5, timeout="300ms")
     with pytest.raises(AssertionError, match="Expected Points not to be 3, it is 3"):
         await expect(row).not_to_have_property_value("Points", 3, timeout="300ms")
+
+
+# The model: the file a call carried, by its hash.
+
+PNG = bytes([0x89, *b"PNG", 0, 255])
+PNG_SHA256 = hashlib.sha256(PNG).hexdigest()
+
+
+def part(type: str, **fields: Any) -> SimpleNamespace:
+    """An image, file or audio in a call, as the fake read it."""
+    return SimpleNamespace(
+        type=type, **{"url": None, "file_id": None, "media_type": None, "bytes": None, "sha256": None, **fields}
+    )
+
+
+def request(messages: list[SimpleNamespace] | None = None, file: SimpleNamespace | None = None) -> SimpleNamespace:
+    """A call as the fake reads it: a media endpoint's file is its message's first part, and its `file`."""
+    if file is not None:
+        messages = [SimpleNamespace(parts=[file]), *(messages or [])]
+    return SimpleNamespace(request=SimpleNamespace(text="", tools=[], messages=messages or [], file=file))
+
+
+@dataclass
+class Model:
+    """The openai fixture: its calls, the newest last."""
+
+    requests: list[SimpleNamespace]
+    _ctx: object = None
+
+    async def calls(self) -> list[SimpleNamespace]:
+        return list(self.requests)
+
+
+SENT = Model(
+    [
+        request([SimpleNamespace(parts=[part("image", url="https://example.com/a.png")])]),
+        request(file=part("audio", media_type="audio/wav", bytes=44, sha256="ab" * 32)),
+        request(
+            [
+                SimpleNamespace(parts=None),
+                SimpleNamespace(parts=[part("image", media_type="image/png", bytes=6, sha256=PNG_SHA256)]),
+            ]
+        ),
+    ]
+)
+
+
+@pytest.fixture
+def chart(tmp_path: Path) -> Iterator[Path]:
+    """`chart.png` in the files root. Leaves no root set."""
+    (tmp_path / "chart.png").write_bytes(PNG)
+    set_files_root(tmp_path)
+    yield tmp_path / "chart.png"
+    set_files_root(None)
+
+
+async def test_a_file_sent_holds_for_its_path_from_the_files_root_and_for_its_bytes(chart: Path) -> None:
+    await expect(SENT).to_have_sent_file("./chart.png", **FAST)
+    await expect(SENT).to_have_sent_file(chart, **FAST)
+    await expect(SENT).to_have_sent_file(PNG, **FAST)
+
+
+async def test_a_file_not_sent_fails_with_what_was_sent_newest_first(chart: Path) -> None:
+    listed = "\n".join(
+        [
+            r"Expected the agent to send the model these bytes \(3 bytes, sha256 039058c6f2c0\)\. "
+            "What it sent, newest first:",
+            rf"  image, image/png, 6 bytes, sha256 {PNG_SHA256[:12]}",
+            "  audio, audio/wav, 44 bytes, sha256 abababababab",
+            r"  image, https://example\.com/a\.png",
+        ]
+    )
+    with pytest.raises(AssertionError, match=f"^{listed}$"):
+        await expect(SENT).to_have_sent_file(b"\x01\x02\x03", **FAST)
+    with pytest.raises(
+        AssertionError, match=r"to send the model chart\.png \(6 bytes, .*It sent no image, file or audio\.$"
+    ):
+        await expect(Model([request([SimpleNamespace(parts=None)])])).to_have_sent_file("./chart.png", **FAST)
+    with pytest.raises(FileNotFoundError):
+        await expect(SENT).to_have_sent_file("./missing.png", **FAST)
+
+
+async def test_a_file_not_to_be_sent_once_quiet() -> None:
+    await expect(SENT).not_to_have_sent_file(b"\x01", **FAST)
+    with pytest.raises(AssertionError, match=r"^Expected the agent not to send the model these bytes \(6 bytes"):
+        await expect(SENT).not_to_have_sent_file(PNG, **FAST)
 
 
 # The model

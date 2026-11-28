@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 /** Files in a test: inline contents, or a path to a fixture file or directory. */
 export type FileInput =
@@ -44,9 +44,9 @@ function read(input: FileInput): WireFile[] {
   return [{ path: input.name ?? input.path.split(/[\\/]/).at(-1) ?? input.path, content: base64(readFileSync(path)) }];
 }
 
-/** A whole tree of files: a fixture directory, or a list of files. */
+/** A whole tree of files: a fixture directory, one fixture file, or a list of files. */
 export function readTree(input: string | FileInput[]): WireFile[] {
-  return typeof input === "string" ? walk(located(input)) : input.flatMap(read);
+  return typeof input === "string" ? read({ path: input }) : input.flatMap(read);
 }
 
 /** Changes to files: a list of files, or a map of path to its new contents, where `null` deletes the file. */
@@ -60,4 +60,19 @@ export function readChanges(
 /** One text a test hands over: inline, or the contents of a fixture file (`{ path }`). Structured content passes as it is. */
 export function readDocument(input: string | { path: string } | unknown[]): string | unknown[] {
   return typeof input === "string" || Array.isArray(input) ? input : readFileSync(located(input.path), "utf8");
+}
+
+/** A placeholder picture, recording or video the server makes: its size, or its length in seconds. */
+interface Placeholder {
+  placeholder: { width?: number; height?: number; seconds?: number };
+}
+
+/** A picture, a recording or a video a test hands over: a fixture file's path, its bytes, or a placeholder. */
+export type MediaSource = string | Uint8Array | Placeholder;
+
+/** One media source as it travels to the server: a file's bytes in base64 (and its name), or a placeholder as it is. */
+export function readMedia(input: MediaSource): { content: string; name?: string } | Placeholder {
+  if (input instanceof Uint8Array) return { content: base64(input) };
+  if (typeof input !== "string") return input;
+  return { content: base64(readFileSync(located(input))), name: basename(input) };
 }

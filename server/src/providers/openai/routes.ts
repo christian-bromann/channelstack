@@ -7,9 +7,10 @@ import type { IdGenerator } from "../../core/ids/index.ts";
 import { type DriverRouter, pathParam } from "../../core/router/index.ts";
 import { duration } from "../../core/router/inspect.ts";
 import { OPENAI_IDS } from "./ids.ts";
+import type { ModelPart } from "./media.ts";
 import type { ModelRequest } from "./request.ts";
 import { turnsOf } from "./scripts.ts";
-import { MatchSchema, TurnObject, TurnSchema } from "./turns.ts";
+import { ENDPOINTS, MatchSchema, TurnObject, TurnSchema } from "./turns.ts";
 import type { CallRecord, OpenAIWorld } from "./world.ts";
 
 /** The fake's calls aren't live: a model call is the agent's, and live mode never fakes what the agent calls. */
@@ -38,6 +39,20 @@ const Context = z
   })
   .openapi("OpenAIContext");
 
+/** An image, file or audio part the agent sent, identified by its hash (design §5.5). */
+const Part = z
+  .object({
+    type: z.enum(["image", "file", "audio"]),
+    from: z.enum(["data", "file_id", "url"]),
+    url: z.string().optional(),
+    fileId: z.string().optional().openapi({ description: "For `file_id`: the file in `/v1/files`." }),
+    mediaType: z.string().optional().openapi({ description: "None for a URL the fake didn't fetch." }),
+    bytes: z.number().int().optional(),
+    sha256: z.string().optional().openapi({ description: "What `toHaveSentFile` compares." }),
+    filename: z.string().optional(),
+  })
+  .openapi("OpenAIPart");
+
 const Message = z
   .object({
     role: z.enum(["system", "developer", "user", "assistant", "tool"]),
@@ -45,23 +60,19 @@ const Message = z
     toolCalls: z.array(z.object({ id: z.string(), name: z.string(), arguments: z.unknown() })).optional(),
     callId: z.string().optional().openapi({ description: "A tool result: the call it answers." }),
     name: z.string().optional().openapi({ description: "A tool result: the tool's name." }),
-    parts: z
-      .array(
-        z.object({
-          type: z.enum(["image", "file", "audio"]),
-          from: z.enum(["data", "file_id", "url"]),
-          url: z.string().optional(),
-        }),
-      )
-      .optional(),
+    parts: z.array(Part).optional(),
   })
   .openapi("OpenAIMessage");
 
+const Endpoint = z.enum(ENDPOINTS).openapi("OpenAIEndpoint");
+
 const Request = z
   .object({
-    endpoint: z.enum(["chat.completions", "responses"]),
+    endpoint: Endpoint,
     model: z.string(),
     stream: z.boolean(),
+    prompt: z.string().optional().openapi({ description: "The Images API's prompt, or the text speech is made from." }),
+    file: Part.optional().openapi({ description: "The audio to transcribe, or the image to edit." }),
     instructions: z.string().optional(),
     messages: z.array(Message),
     tools: z.array(
@@ -72,6 +83,10 @@ const Request = z
           description: z.string().optional(),
           parameters: z.unknown().optional(),
           strict: z.boolean().optional(),
+          settings: z
+            .record(z.string(), z.unknown())
+            .optional()
+            .openapi({ description: "A built-in tool's settings, as the request gave them." }),
         })
         .openapi("OpenAITool"),
     ),
@@ -89,8 +104,19 @@ const Request = z
 const ToolCall = z
   .object({
     id: z.string(),
-    type: z.enum(["function", "custom"]),
-    hosted: z.boolean(),
+    type: z.enum([
+      "function",
+      "custom",
+      "web_search",
+      "file_search",
+      "code_interpreter",
+      "image_generation",
+      "mcp",
+      "shell",
+      "computer",
+      "apply_patch",
+    ]),
+    hosted: z.boolean().openapi({ description: "OpenAI ran it, so `result` is what the script said." }),
     name: z.string(),
     arguments: z.unknown(),
     madeIn: z.string().openapi({ description: "The call whose answer made it." }),
@@ -104,7 +130,7 @@ const ToolCall = z
 const Call = z
   .object({
     id: z.string().openapi({ description: "The response's own id: `chatcmpl-…` or `resp_…`." }),
-    endpoint: z.enum(["chat.completions", "responses"]),
+    endpoint: Endpoint,
     model: z.string(),
     stream: z.boolean(),
     at: z.string(),
@@ -155,7 +181,7 @@ const RateLimit = z
 const Unattributed = z
   .object({
     id: z.string(),
-    endpoint: z.enum(["chat.completions", "responses"]),
+    endpoint: Endpoint,
     model: z.string(),
     at: z.string(),
     lastUserText: z.string().optional(),
@@ -177,12 +203,17 @@ function requestWire(call: CallRecord, scrub: Scrub) {
   return scrub(rawRequestWire(call));
 }
 
+/** A part as a test reads it: what it is and its hash, never its bytes. */
+const partWire = ({ pending: _pending, ...part }: ModelPart) => part;
+
 function rawRequestWire(call: CallRecord) {
   const request: ModelRequest = call.request;
   return {
     endpoint: request.endpoint,
     model: request.model,
     stream: request.stream,
+    ...(request.prompt === undefined ? {} : { prompt: request.prompt }),
+    ...(request.file === undefined ? {} : { file: partWire(request.file) }),
     ...(request.instructions === undefined ? {} : { instructions: request.instructions }),
     messages: request.messages.map((message) => ({
       role: message.role,
@@ -191,7 +222,7 @@ function rawRequestWire(call: CallRecord) {
       ...(message.role === "tool"
         ? { callId: message.callId, ...(message.name === undefined ? {} : { name: message.name }) }
         : {}),
-      ...(message.role === "user" ? { parts: message.parts.map((part) => ({ ...part })) } : {}),
+      ...(message.role === "user" ? { parts: message.parts.map(partWire) } : {}),
     })),
     tools: request.tools.map((tool) => ({ ...tool })),
     ...(request.toolChoice === undefined ? {} : { toolChoice: request.toolChoice }),
@@ -223,8 +254,8 @@ function toolCallsOf(calls: readonly CallRecord[], made: readonly CallRecord[] =
         results.set(message.callId, { text: message.text, sentIn: call.id });
     }
   }
-  return made.flatMap((call) =>
-    (call.answer?.toolCalls ?? []).map((tool) => {
+  return made.flatMap((call) => [
+    ...(call.answer?.toolCalls ?? []).map((tool) => {
       const result = results.get(tool.id);
       let args: unknown = tool.arguments;
       if (tool.kind === "function") {
@@ -244,7 +275,21 @@ function toolCallsOf(calls: readonly CallRecord[], made: readonly CallRecord[] =
         ...(result === undefined ? {} : { result }),
       };
     }),
-  );
+    // OpenAI's built-in tools: a hosted one's result is the script's, in the same call; a client-run one's is the agent's.
+    ...(call.answer?.builtIns ?? []).map((tool) => {
+      const result =
+        tool.hosted && tool.result !== undefined ? { text: tool.result, sentIn: call.id } : results.get(tool.id);
+      return {
+        id: tool.id,
+        type: tool.type,
+        hosted: tool.hosted,
+        name: tool.name,
+        arguments: tool.arguments,
+        madeIn: call.id,
+        ...(result === undefined ? {} : { result }),
+      };
+    }),
+  ]);
 }
 
 /** A call as a test reads it: its request, answer and tool calls (with what the agent sent back), scrubbed. */
@@ -550,10 +595,7 @@ export function registerOpenAIRoutes(
     path: "/calls",
     summary: "Every model call attributed to this session, oldest first",
     query: z.object({
-      endpoint: z
-        .enum(["chat.completions", "responses"])
-        .optional()
-        .openapi({ param: { name: "endpoint", in: "query" } }),
+      endpoint: Endpoint.optional().openapi({ param: { name: "endpoint", in: "query" } }),
       error: z
         .union([z.literal(true), z.string()])
         .optional()

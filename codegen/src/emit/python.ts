@@ -94,7 +94,9 @@ export function emitPython(ir: Ir): Map<string, string> {
         return short ? `${typeOf(short.type)} | dict[str, Any]` : "dict[str, Any]";
       }
       case "files":
-        return { tree: "TreeInput", changes: "ChangesInput", document: "DocumentInput" }[type.mode];
+        return { tree: "TreeInput", changes: "ChangesInput", document: "DocumentInput", media: "MediaSource" }[
+          type.mode
+        ];
       case "pattern":
         return "str | re.Pattern[str]";
       case "named":
@@ -201,8 +203,11 @@ export function emitPython(ir: Ir): Map<string, string> {
         : `{${idFields.map((id) => `${JSON.stringify(id)}: ${expr}.${snakeCase(id)}`).join(", ")}}`;
     }
     if (type.kind === "duration") return `parse_duration(${expr})`;
+    // A named files type (`OpenAIMediaSource`) is read as the files it names.
+    const named = type.kind === "named" ? namedTypes.get(type.name) : undefined;
+    if (named?.kind === "files") return encodeValue(named, expr);
     if (type.kind === "files")
-      return `${{ tree: "read_tree", changes: "read_changes", document: "read_document" }[type.mode]}(${expr})`;
+      return `${{ tree: "read_tree", changes: "read_changes", document: "read_document", media: "read_media" }[type.mode]}(${expr})`;
     if (type.kind === "pattern") return `pattern_on_wire(${expr})`;
     if (type.kind === "array") {
       const list = type.oneOrMany ? `(${expr} if isinstance(${expr}, list) else [${expr}])` : expr;
@@ -555,9 +560,11 @@ export function emitPython(ir: Ir): Map<string, string> {
           `from ..runtime.files import ${[
             ...(spec.includes('"mode":"changes"') ? ["ChangesInput"] : []),
             ...(spec.includes('"mode":"document"') ? ["DocumentInput"] : []),
+            ...(spec.includes('"mode":"media"') ? ["MediaSource"] : []),
             ...(spec.includes('"mode":"tree"') ? ["TreeInput"] : []),
             ...(spec.includes('"mode":"changes"') ? ["read_changes"] : []),
             ...(spec.includes('"mode":"document"') ? ["read_document"] : []),
+            ...(spec.includes('"mode":"media"') ? ["read_media"] : []),
             ...(spec.includes('"mode":"tree"') ? ["read_tree"] : []),
           ].join(", ")}`,
         ]

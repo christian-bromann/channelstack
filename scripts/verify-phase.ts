@@ -134,6 +134,12 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
       group: "static",
     },
   ],
+  // 14.1 (the "images and built-in tools" examples against the Responses agent) and the
+  // acceptance half of 14.5 (TypeScript and pytest) run in the acceptance check's `openai` part;
+  // 14.2 to 14.4 in the unit tests (`server/src/providers/openai`, its `tools/`, and the matchers),
+  // with every answer and event held to the pinned description by 13.2's check; 14.5 in the SDKs'
+  // own tests and the Rust SDK's (7.1).
+  14: [],
 };
 
 const phase = Number(process.argv[2]);

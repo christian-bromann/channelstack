@@ -8,23 +8,48 @@
  */
 import type { App } from "@slack/bolt";
 
+/** A file a person shared, downloaded with the bot token: the model gets its bytes, never Slack's private URL. */
+interface SharedFile {
+  readonly name: string;
+  readonly mediaType: string;
+  readonly bytes: Uint8Array;
+}
+
 /** One message of the conversation the agent sends the model. */
 interface Turn {
   readonly role: "user" | "assistant";
   readonly text: string;
+  readonly files?: readonly SharedFile[];
+}
+
+/** Where a model's answer goes as it streams: its text, the images it made, a tool it wants approved. */
+export interface Streaming {
+  signal: AbortSignal;
+  /** A piece of the answer, as it comes. */
+  onText(text: string): Promise<void>;
+  /** An image the model made: posted in the thread. */
+  onImage?(image: Uint8Array, name: string): Promise<void>;
+  /**
+   * The model wants to run a tool that needs a person's approval (an MCP server's tool): the
+   * agent asks with a button, and `resume` goes on with the answer once the person decided.
+   */
+  onApproval?(request: {
+    tool: string;
+    arguments: unknown;
+    resume(approved: boolean, streaming: Streaming): Promise<void>;
+  }): Promise<void>;
 }
 
 /** What the model streams, step by step, until it answers without calling a tool. */
 export interface Model {
-  answer(options: {
-    instructions: string;
-    history: readonly Turn[];
-    /** Who is asking: the Slack user, as OpenAI's `user`. */
-    user: string;
-    signal: AbortSignal;
-    /** A piece of the answer, as it comes. */
-    onText(text: string): Promise<void>;
-  }): Promise<void>;
+  answer(
+    options: {
+      instructions: string;
+      history: readonly Turn[];
+      /** Who is asking: the Slack user, as OpenAI's `user`. */
+      user: string;
+    } & Streaming,
+  ): Promise<void>;
 }
 
 /** The tools the agent offers the model, and what running them gives. */
@@ -59,6 +84,15 @@ export const runTool = (name: string, args: unknown): string =>
 const INSTRUCTIONS =
   "You are my-agent, the team's assistant in Slack. Answer briefly. Use the tools for incidents and paging.";
 
+/** Where an answer goes: the conversation and thread, who asked, and who the agent is. */
+interface Where {
+  readonly channel: string;
+  readonly thread: string;
+  readonly user: string;
+  readonly team: string | undefined;
+  readonly self: string | undefined;
+}
+
 /**
  * Wire a model into a Bolt app. `faults` switches on bugs by the id of the standard check that
  * catches each (`slack.model-error`): only the agent with one fault per check (`broken-openai`) has any.
@@ -80,7 +114,24 @@ export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> =
     answering.get(`${channel}:${thread}`)?.abort();
   });
 
-  /** The thread so far, as the model reads it: people's messages and the agent's own answers. */
+  /** A person's file, downloaded from `url_private_download` with the bot token, as only the app may. */
+  const download = async (
+    client: App["client"],
+    file: { name?: string; mimetype?: string; url_private_download?: string },
+  ) => {
+    if (file.url_private_download === undefined) return [];
+    const response = await fetch(file.url_private_download, { headers: { authorization: `Bearer ${client.token}` } });
+    if (!response.ok) return [];
+    return [
+      {
+        name: file.name ?? "file",
+        mediaType: file.mimetype ?? "application/octet-stream",
+        bytes: new Uint8Array(await response.arrayBuffer()),
+      },
+    ];
+  };
+
+  /** The thread so far, as the model reads it: people's messages with their files, and the agent's own answers. */
   const historyOf = async (
     client: App["client"],
     channel: string,
@@ -88,22 +139,34 @@ export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> =
     self: string | undefined,
   ): Promise<Turn[]> => {
     const { messages = [] } = await client.conversations.replies({ channel, ts: thread });
-    return messages.flatMap((message) =>
-      message.text === undefined || message.text === ""
-        ? []
-        : [
-            {
-              role: message.bot_id !== undefined || message.user === self ? ("assistant" as const) : ("user" as const),
-              text: message.text,
-            },
-          ],
+    const turns = await Promise.all(
+      messages.map(async (message) => {
+        const own = message.bot_id !== undefined || message.user === self;
+        const files = own
+          ? []
+          : (await Promise.all((message.files ?? []).map((file) => download(client, file)))).flat();
+        if ((message.text === undefined || message.text === "") && files.length === 0) return [];
+        return [
+          {
+            role: own ? ("assistant" as const) : ("user" as const),
+            text: message.text ?? "",
+            ...(files.length === 0 ? {} : { files }),
+          },
+        ];
+      }),
     );
+    return turns.flat();
   };
 
-  const respond = async (
-    client: App["client"],
-    where: { channel: string; thread: string; user: string; team: string | undefined; self: string | undefined },
-  ) => {
+  /** How many approvals the agent asked for: each button's key is its own, even while others are pending. */
+  let approvalsAsked = 0;
+  /** Tools waiting for a person's approval, by the button's value: how the answer goes on, and where. */
+  const approvals = new Map<
+    string,
+    { resume: (approved: boolean, streaming: Streaming) => Promise<void>; where: Where }
+  >();
+
+  const respond = async (client: App["client"], where: Where, resume?: (streaming: Streaming) => Promise<void>) => {
     const { channel, thread, user, team, self } = where;
     const key = `${channel}:${thread}`;
     joined.add(key);
@@ -112,7 +175,6 @@ export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> =
     answering.set(key, stop);
     let stream: string | undefined;
     try {
-      const history = await historyOf(client, channel, thread, self);
       const show = async (text: string) => {
         if (stop.signal.aborted || text === "") return;
         if (stream === undefined) {
@@ -123,13 +185,7 @@ export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> =
             .ts;
         } else await client.chat.appendStream({ channel, ts: stream, markdown_text: text });
       };
-      await model.answer({
-        // Bug: puts its own Slack token into the prompt.
-        instructions: broken("slack.no-secrets-to-model")
-          ? `${INSTRUCTIONS} Token: ${process.env.SLACK_BOT_TOKEN}`
-          : INSTRUCTIONS,
-        history,
-        user,
+      const streaming: Streaming = {
         // Bug: Stop ends the stream in Slack, but the model's request goes on: it isn't given the
         // signal, and Slack refusing the stream after Stop doesn't end the reading either.
         signal: broken("slack.stop-cancels-model") ? new AbortController().signal : stop.signal,
@@ -137,7 +193,65 @@ export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> =
           if (broken("slack.stop-cancels-model")) return show(text).catch(() => undefined);
           return show(text);
         },
-      });
+        onImage: async (image, name) => {
+          await client.filesUploadV2({
+            channel_id: channel,
+            thread_ts: thread,
+            file: Buffer.from(image),
+            filename: name,
+          });
+        },
+        onApproval: async (request) => {
+          approvalsAsked += 1;
+          const key = `${channel}:${thread}:${approvalsAsked}`;
+          approvals.set(key, { resume: request.resume, where });
+          await client.chat.postMessage({
+            channel,
+            thread_ts: thread,
+            text: `May I run ${request.tool}?`,
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `May I run *${request.tool}* with \`${JSON.stringify(request.arguments)}\`?`,
+                },
+              },
+              {
+                type: "actions",
+                elements: [
+                  {
+                    type: "button",
+                    action_id: "approve_tool",
+                    text: { type: "plain_text", text: "Approve" },
+                    value: key,
+                    style: "primary",
+                  },
+                  {
+                    type: "button",
+                    action_id: "decline_tool",
+                    text: { type: "plain_text", text: "Decline" },
+                    value: key,
+                  },
+                ],
+              },
+            ],
+          });
+        },
+      };
+      if (resume) await resume(streaming);
+      else {
+        const history = await historyOf(client, channel, thread, self);
+        await model.answer({
+          // Bug: puts its own Slack token into the prompt.
+          instructions: broken("slack.no-secrets-to-model")
+            ? `${INSTRUCTIONS} Token: ${process.env.SLACK_BOT_TOKEN}`
+            : INSTRUCTIONS,
+          history,
+          user,
+          ...streaming,
+        });
+      }
       if (stream !== undefined && !stop.signal.aborted) await client.chat.stopStream({ channel, ts: stream });
     } catch (error) {
       // Stop: Slack has ended the stream already.
@@ -148,7 +262,7 @@ export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> =
       if (broken("slack.model-retry")) {
         await client.chat.postMessage({ channel, thread_ts: thread, text: "The model failed, trying again…" });
         answering.delete(key);
-        return respond(client, where);
+        return respond(client, where, resume);
       }
       // The model failed: the person hears so, once, and nothing is left streaming.
       const note = "Sorry, the model isn't answering right now. Please try again in a minute.";
@@ -169,6 +283,18 @@ export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> =
       }
     }
   };
+
+  // A person decided on a tool the model wanted to run: the answer goes on, once, in the thread it was asked in.
+  app.action(/^(approve|decline)_tool$/, async ({ ack, body, action, client }) => {
+    await ack();
+    if (body.type !== "block_actions" || action.type !== "button") return;
+    const pending = approvals.get(action.value ?? "");
+    if (!pending) return;
+    approvals.delete(action.value ?? "");
+    await respond(client, pending.where, (streaming) =>
+      pending.resume("action_id" in action && action.action_id === "approve_tool", streaming),
+    );
+  });
 
   app.event("app_mention", async ({ event, body, client, context }) => {
     if ("bot_id" in event || !firstTime(body.event_id)) return;

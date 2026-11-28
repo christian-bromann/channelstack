@@ -1,6 +1,11 @@
-import { describe, expect, test } from "vitest";
+import { createHash } from "node:crypto";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { ChannelstackError, QUIET } from "../../sdks/typescript/client.ts";
+import { afterEach, describe, expect, test } from "vitest";
+
+import { ChannelstackError, QUIET, setFilesRoot } from "../../sdks/typescript/client.ts";
 import { CONTEXT } from "../../sdks/typescript/runtime/client.ts";
 import { matchers, modelNotes } from "./index.ts";
 
@@ -184,6 +189,102 @@ describe("comments", () => {
     const discussion = { ...quiet, comments: async () => [{ author: agent, text: "Summary: all green" }] };
     expect((await matchers.toHaveCommentFrom(state, discussion, agent, { text: /green/ })).pass).toBe(true);
     expect((await matchers.toHaveCommentsFrom(state, discussion, agent, { count: 1 })).pass).toBe(true);
+  });
+});
+
+describe("toHaveSentFile", () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 255]);
+  const sha256 = createHash("sha256").update(png).digest("hex");
+  const root = mkdtempSync(join(tmpdir(), "cs-sent-file-"));
+  writeFileSync(join(root, "chart.png"), png);
+  afterEach(() => setFilesRoot(undefined));
+
+  /** The openai fixture: its calls, the newest last, with what they carried. */
+  const fixture = (...requests: object[]) => ({
+    ...quiet,
+    calls: async () => requests.map((request) => ({ request: { text: "", tools: [], ...request } })),
+  });
+  const sent = fixture(
+    {
+      messages: [
+        {
+          role: "user",
+          text: "what is this?",
+          parts: [{ type: "image", from: "url", url: "https://example.com/a.png" }],
+        },
+      ],
+    },
+    // A media endpoint's call: its file is its message's first part.
+    {
+      messages: [
+        {
+          role: "user",
+          text: "",
+          parts: [{ type: "audio", from: "data", mediaType: "audio/wav", bytes: 44, sha256: "ab".repeat(32) }],
+        },
+      ],
+    },
+    {
+      messages: [
+        { role: "system", text: "be brief" },
+        {
+          role: "user",
+          text: "and this?",
+          parts: [{ type: "image", from: "data", mediaType: "image/png", bytes: 6, sha256 }],
+        },
+      ],
+    },
+  );
+
+  test("holds for a fixture file's path, from the files root, and for its bytes", async () => {
+    setFilesRoot(root);
+    expect((await matchers.toHaveSentFile(state, sent, "./chart.png")).pass).toBe(true);
+    expect((await matchers.toHaveSentFile(state, sent, png)).pass).toBe(true);
+    // One call is a subject too: `refresh()` reads it again.
+    const call = {
+      request: { text: "", tools: [] },
+      refresh: async () => ({
+        request: {
+          text: "",
+          tools: [],
+          messages: [{ role: "user", text: "", parts: [{ type: "image", from: "data", sha256 }] }],
+        },
+      }),
+    };
+    expect((await matchers.toHaveSentFile(state, call, png)).pass).toBe(true);
+  });
+
+  test("fails with what was expected and what was sent, newest first", async () => {
+    const result = await matchers.toHaveSentFile(state, sent, new Uint8Array([1, 2, 3]));
+    expect(result.pass).toBe(false);
+    expect(result.message()).toBe(
+      [
+        "Expected the agent to send the model these bytes (3 bytes, sha256 039058c6f2c0). What it sent, newest first:",
+        `  image, image/png, 6 bytes, sha256 ${sha256.slice(0, 12)}`,
+        "  audio, audio/wav, 44 bytes, sha256 abababababab",
+        "  image, https://example.com/a.png",
+      ].join("\n"),
+    );
+    const none = await matchers.toHaveSentFile(
+      state,
+      fixture({ messages: [{ role: "user", text: "hi" }] }),
+      join(root, "chart.png"),
+    );
+    expect(none.message()).toBe(
+      `Expected the agent to send the model chart.png (6 bytes, sha256 ${sha256.slice(0, 12)}). It sent no image, file or audio.`,
+    );
+  });
+
+  test("`not.` waits for quiet and fails when the file was sent", async () => {
+    const result = await matchers.toHaveSentFile(negated, sent, png);
+    expect(result.pass).toBe(true);
+    expect(result.message()).toMatch(/^Expected the agent not to send the model these bytes \(6 bytes/);
+    expect((await matchers.toHaveSentFile(negated, sent, new Uint8Array([1]))).pass).toBe(false);
+  });
+
+  test("a path that isn't there is an error", async () => {
+    setFilesRoot(root);
+    await expect(async () => matchers.toHaveSentFile(state, sent, "./missing.png")).rejects.toThrow(/ENOENT/);
   });
 });
 

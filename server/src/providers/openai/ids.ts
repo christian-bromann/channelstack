@@ -22,6 +22,27 @@ export const OPENAI_IDS = idFormats("openai", {
   customCall: hex48("ctc"),
   reasoning: hex48("rs"),
   conversation: hex48("conv"),
+  // The built-in tools' items (design §5.6).
+  webSearch: hex48("ws"),
+  fileSearch: hex48("fs"),
+  codeInterpreter: hex48("ci"),
+  imageGeneration: hex48("ig"),
+  mcpCall: hex48("mcp"),
+  mcpApproval: hex48("mcpr"),
+  mcpList: hex48("mcpl"),
+  shellCall: hex48("sh"),
+  shellOutput: hex48("sho"),
+  localShell: hex48("lsh"),
+  computer: hex48("cu"),
+  applyPatch: hex48("apc"),
+  container: hex48("cntr"),
+  containerFile: hex48("cfile"),
+  // A file in `/v1/files`: `file-` and 22 base-62 characters.
+  file: { pattern: /^file-[0-9A-Za-z]{22}$/, generate: (draw) => `file-${draw.chars(22, BASE62)}` },
+  // Chat Completions' audio output: `audio_` and 32 hex characters.
+  audio: { pattern: /^audio_[0-9a-f]{32}$/, generate: (draw) => `audio_${draw.chars(32, HEX)}` },
+  // The name of an image the Images API answered with as a URL.
+  generated: { pattern: /^img-[0-9A-Za-z]{24}$/, generate: (draw) => `img-${draw.chars(24, BASE62)}` },
   // A tool call's id, as the model makes it: `call_` and 24 base-62 characters.
   call: { pattern: /^call_[0-9A-Za-z]{24}$/, generate: (draw) => `call_${draw.chars(24, BASE62)}` },
   // `x-request-id`: `req_` and 32 hex characters.

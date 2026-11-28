@@ -105,6 +105,10 @@ export function typeScriptTypes(index: IrIndex) {
         return short ? `${typeOf(short.type, side)} | ${whole}` : whole;
       }
       case "files":
+        if (type.mode === "media")
+          return side === "public"
+            ? "MediaSource"
+            : "{ content: string; name?: string } | { placeholder: { width?: number; height?: number; seconds?: number } }";
         if (type.mode === "document")
           return side === "public" ? "string | { path: string } | unknown[]" : "string | unknown[]";
         if (side === "public")
@@ -202,6 +206,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     (type.kind === "named" &&
       !seen.has(type.name) &&
       holdsRefs(index.named(type.name), new Set([...seen, type.name]))) ||
+    (type.kind === "union" && type.types.some((member) => holdsRefs(member, seen))) ||
     type.kind === "ref" ||
     type.kind === "duration" ||
     type.kind === "files" ||
@@ -221,8 +226,28 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     }
     if (type.kind === "duration") return `parseDuration(${expr})`;
     if (type.kind === "files")
-      return `${{ tree: "readTree", changes: "readChanges", document: "readDocument" }[type.mode]}(${expr})`;
+      return `${{ tree: "readTree", changes: "readChanges", document: "readDocument", media: "readMedia" }[type.mode]}(${expr})`;
     if (type.kind === "pattern") return `patternOnWire(${expr})`;
+    if (type.kind === "union") {
+      // Told apart by the value's JSON kind: an object as the union's object member, a list as its list member.
+      const resolved = (member: IrType): IrType =>
+        member.kind === "named" ? resolved(index.named(member.name)) : member;
+      const held = type.types.filter((member) => holdsRefs(member));
+      const as = (kind: "object" | "array") => {
+        const found = held.filter((member) => resolved(member).kind === kind);
+        if (found.length > 1)
+          throw new Error("A union whose members hold files or handles needs them of different JSON kinds");
+        return found[0];
+      };
+      const object = as("object");
+      const list = as("array");
+      if (held.some((member) => member !== object && member !== list))
+        throw new Error("A union whose members hold files or handles takes them in objects or lists");
+      const rest = list ? `(Array.isArray(${expr}) ? ${encodeValue(list, expr)} : ${expr})` : expr;
+      return object
+        ? `(typeof ${expr} === "object" && ${expr} !== null && !Array.isArray(${expr}) ? ${encodeValue(object, expr)} : ${rest})`
+        : rest;
+    }
     if (type.kind === "array") {
       const list = type.oneOrMany ? `[${expr}].flat()` : expr;
       const item = encodeValue(type.items, "item");
@@ -551,8 +576,10 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       ? [
           `import { ${[
             ...(spec.includes('"mode":"tree"') || spec.includes('"mode":"changes"') ? ["type FileInput"] : []),
+            ...(spec.includes('"mode":"media"') ? ["type MediaSource"] : []),
             ...(spec.includes('"mode":"changes"') ? ["readChanges"] : []),
             ...(spec.includes('"mode":"document"') ? ["readDocument"] : []),
+            ...(spec.includes('"mode":"media"') ? ["readMedia"] : []),
             ...(spec.includes('"mode":"tree"') ? ["readTree"] : []),
           ].join(", ")} } from "../runtime/files.ts";`,
         ]

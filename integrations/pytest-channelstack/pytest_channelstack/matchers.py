@@ -10,7 +10,10 @@ Each check reads plain SDK methods, the way the TypeScript matchers do (`integra
   for the whole quiet window, and check once.
 """
 
+import base64
+import hashlib
 import json
+import os
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, NoReturn, Protocol, cast
@@ -19,6 +22,7 @@ from urllib.parse import quote
 from channelstack import ChannelstackError
 from channelstack.runtime.client import quiet_of
 from channelstack.runtime.duration import Duration, parse_duration
+from channelstack.runtime.files import read_media
 from channelstack.runtime.transport import unreported_refusals
 from channelstack.runtime.wait import (
     ModelProblemError,
@@ -32,6 +36,8 @@ from channelstack.runtime.wait import (
 )
 
 Text = str | re.Pattern[str]
+# A file a check compares by hash: a fixture file's path, read as a `MediaSource` is, or its bytes.
+FileSource = str | os.PathLike[str] | bytes | bytearray
 
 
 class Author(Protocol):
@@ -135,6 +141,21 @@ def _result_text(result: Any) -> str:
     if isinstance(result, dict):
         return str(cast("dict[str, Any]", result).get("text", ""))
     return str(getattr(result, "text", ""))
+
+
+def _size(count: int) -> str:
+    return f"{count} {'byte' if count == 1 else 'bytes'}"
+
+
+def _part(part: Any) -> str:
+    """A part as a failure lists it: type, media type, size and hash, or where it is when the fake didn't read it."""
+    where = (
+        f"sha256 {part.sha256[:12]}"
+        if part.sha256 is not None
+        else part.url or (None if part.file_id is None else f"file {part.file_id}")
+    )
+    pieces = [part.type, part.media_type, None if part.bytes is None else _size(part.bytes), where]
+    return ", ".join(piece for piece in pieces if piece is not None)
 
 
 def _excerpt(text: str) -> str:
@@ -1468,6 +1489,48 @@ class Expectation:
     ) -> None:
         """Once the agent is quiet, it sent the model none of it: no text from a channel it shouldn't read."""
         await self._sent(expected, ordered, timeout, negate=True)
+
+    async def _sent_file(self, file: FileSource, timeout: Duration | None, negate: bool) -> None:
+        read_file = read_media(file)
+        content = base64.b64decode(read_file["content"])
+        sha256 = hashlib.sha256(content).hexdigest()
+        named = read_file.get("name", "these bytes")
+
+        async def read() -> list[Any]:
+            parts: list[Any] = []
+            for call in await _model_calls(self._subject):
+                # A media endpoint's file is its message's first part, so the parts are everything.
+                for message in call.request.messages:
+                    parts.extend(message.parts or [])
+            return parts
+
+        def described(parts: list[Any]) -> str:
+            sent = (
+                "It sent no image, file or audio."
+                if not parts
+                else f"What it sent, newest first:\n{_listing([_part(part) for part in reversed(parts)])}"
+            )
+            return (
+                f"Expected the agent {'not ' if negate else ''}to send the model {named} "
+                f"({_size(len(content))}, sha256 {sha256[:12]}). {sent}"
+            )
+
+        await self._settle(
+            read=read,
+            holds=lambda parts: any(part.sha256 == sha256 for part in parts),
+            describe=described,
+            negate=negate,
+            timeout=timeout,
+        )
+
+    async def to_have_sent_file(self, file: FileSource, *, timeout: Duration | None = None) -> None:
+        """Subject: the openai fixture, a script, or a call. The agent sent the model this image, file or audio,
+        compared by its SHA-256: a fixture file's path (read as a `MediaSource` is, from the files root) or bytes."""
+        await self._sent_file(file, timeout, negate=False)
+
+    async def not_to_have_sent_file(self, file: FileSource, *, timeout: Duration | None = None) -> None:
+        """Once the agent is quiet, it sent the model no part with this file's hash."""
+        await self._sent_file(file, timeout, negate=True)
 
     async def _secrets(self, timeout: Duration | None, negate: bool) -> None:
         def described(sent: list[Any]) -> str:

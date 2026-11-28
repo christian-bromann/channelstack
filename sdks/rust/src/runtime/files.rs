@@ -73,6 +73,11 @@ fn base64(content: &Value) -> Result<String> {
     }
 }
 
+/// The last part of a path as a test wrote it, with either kind of slash.
+fn file_name(given: &str) -> &str {
+    given.rsplit(['/', '\\']).next().unwrap_or(given)
+}
+
 fn wire(path: String, content: String) -> Value {
     json!({ "path": path, "content": content })
 }
@@ -129,9 +134,8 @@ fn read(input: &Value) -> Result<Vec<Value>> {
             })
             .collect());
     }
-    let base = given.rsplit(['/', '\\']).next().unwrap_or(given);
     Ok(vec![wire(
-        name.unwrap_or(base).to_owned(),
+        name.unwrap_or(file_name(given)).to_owned(),
         STANDARD.encode(read_bytes(&path)?),
     )])
 }
@@ -144,14 +148,14 @@ fn read_list(items: &[Value]) -> Result<Value> {
     Ok(Value::Array(files))
 }
 
-/// A whole tree of files: a fixture directory, or a list of files.
+/// A whole tree of files: a fixture directory, one fixture file (by its name), or a list of files.
 pub fn read_tree(input: &Value) -> Result<Value> {
     match input {
         Value::Null => Ok(Value::Null),
-        Value::String(directory) => Ok(Value::Array(walk(&located(directory)?)?)),
+        Value::String(path) => Ok(Value::Array(read(&json!({ "path": path }))?)),
         Value::Array(items) => read_list(items),
         other => Err(Error::Invalid(format!(
-            "Not a directory or a list of files: {other}"
+            "Not a directory, a file or a list of files: {other}"
         ))),
     }
 }
@@ -198,6 +202,37 @@ pub fn read_document(input: &Value) -> Result<Value> {
                 .map_err(unread(&path))
         }
         other => Err(Error::Invalid(format!("Not a document: {other}"))),
+    }
+}
+
+/// One picture, recording or video a test hands over, as it goes to the server: a fixture file's
+/// path (`{ "content", "name" }`, the file's bytes in base64), its bytes as a list of numbers
+/// (`{ "content" }`), or a placeholder the server makes (`{ "placeholder": { "width"?, "height"?,
+/// "seconds"? } }`), sent as it is.
+pub fn read_media(input: &Value) -> Result<Value> {
+    match input {
+        Value::Null => Ok(Value::Null),
+        Value::Array(_) => Ok(json!({ "content": base64(input)? })),
+        Value::Object(media) if media.contains_key("placeholder") => Ok(input.clone()),
+        Value::String(given) => {
+            let path = located(given)?;
+            Ok(json!({ "content": STANDARD.encode(read_bytes(&path)?), "name": file_name(given) }))
+        }
+        other => Err(Error::Invalid(format!(
+            "Not a path, bytes or a placeholder: {other}"
+        ))),
+    }
+}
+
+/// One media source or a list of them. Bytes are a list of numbers, so a list of numbers is one
+/// source, not a list of them.
+pub fn read_media_one_or_many(input: &Value) -> Result<Value> {
+    match input {
+        Value::Array(items) if items.is_empty() || !items.iter().all(Value::is_number) => Ok(
+            Value::Array(items.iter().map(read_media).collect::<Result<_>>()?),
+        ),
+        Value::Null => Ok(Value::Null),
+        one => Ok(Value::Array(vec![read_media(one)?])),
     }
 }
 
@@ -331,11 +366,10 @@ mod tests {
                 paths(&read_tree(&web).unwrap()),
                 ["README.md", "src/app.ts"]
             );
-            let file = json!(format!("{relative}/web/README.md"));
-            assert_eq!(
-                kind(read_tree(&file).unwrap_err()),
-                ErrorKind::NotADirectory
-            );
+            // A path to one file is that file, by its name.
+            let file = read_tree(&json!(format!("{relative}/web/README.md"))).unwrap();
+            assert_eq!(paths(&file), ["README.md"]);
+            assert_eq!(text(&file[0]["content"]).unwrap(), "# web\n");
         });
     }
 

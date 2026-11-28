@@ -111,6 +111,50 @@ describe("several calls at once", () => {
   });
 });
 
+describe("images and built-in tools", () => {
+  test("the screenshot Ana shares reaches the model", async ({ slack, openai }) => {
+    const ana = await slack.createUser({ name: "Ana" });
+    const channel = await slack.createChannel({ participants: [ana, slack.app] });
+    await openai.respond("The stack trace points at the migration.");
+
+    await ana.say("@my-agent what's wrong here?", { channel, files: "./fixtures/error.png" });
+
+    const call = await openai.waitForCall();
+    await expect(call).toHaveSentFile("./fixtures/error.png"); // downloaded with the bot token, sent as bytes
+  });
+
+  test("a generated chart is posted in the thread", async ({ slack, openai }) => {
+    const ana = await slack.createUser({ name: "Ana" });
+    const channel = await slack.createChannel({ participants: [ana, slack.app] });
+    await openai.respond({
+      toolCalls: [{ imageGeneration: { image: "./fixtures/chart.png" } }],
+      text: "Here's this week's deploys.",
+    });
+
+    const msg = await ana.say("@my-agent chart this week's deploys", { channel });
+
+    const reply = await msg.thread.waitForReply({ from: "my-agent" });
+    expect(reply.files).toHaveLength(1);
+  });
+
+  test("an MCP approval becomes a button, and only the click runs the tool", async ({ slack, openai }) => {
+    const ana = await slack.createUser({ name: "Ana", admin: true });
+    const deploy = { server: "deploys", tool: "deploy", arguments: { app: "web" } };
+    const ai = await openai.respond([
+      { toolCalls: [{ mcp: { ...deploy, approval: true } }] },
+      { toolCalls: [{ mcp: { ...deploy, output: "started" } }], text: "Deploying web." },
+    ]);
+
+    const msg = await ana.say("deploy web", { to: slack.app });
+    const ask = await msg.thread.waitForReply({ from: "my-agent" });
+    await expect(ai).toHaveAnswered({ times: 1 }); // nothing runs before the click
+    await ana.click("Approve", { message: ask });
+
+    await expect(msg.thread).toHaveReplyFrom("my-agent", { text: /Deploying web/ });
+    await expect(ai).toHaveAnswered({ times: 2 });
+  });
+});
+
 describe("a missing script fails the test", () => {
   // The agent calls the model, but the test scripted nothing for "status?". The agent gets a 400
   // (channelstack_no_script) and the matcher fails at once with the missing respond(…) in its message.

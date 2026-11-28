@@ -41,6 +41,7 @@ export function driverContext(overrides: Partial<DriverContext> = {}): DriverCon
     attribution: new Attributor({ sessions: () => [], known: () => [] }),
     place: () => ({}),
     findSecrets: () => [],
+    fetchFake: () => undefined,
     scrub: (value) => value,
     // Another app's secrets are `secret-for-<app>-<name>`; its events go where `webhookUrl` says, with `?app=<name>`.
     apps: {

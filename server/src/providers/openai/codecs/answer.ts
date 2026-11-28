@@ -1,5 +1,7 @@
 import { randomString } from "../../../core/secrets/index.ts";
+import type { Media } from "../media.ts";
 import type { ModelRequest } from "../request.ts";
+import type { BuiltInCall } from "../tools/shared.ts";
 
 /** Padding that makes every streamed piece's length uninformative, as OpenAI adds unless `include_obfuscation: false`. */
 export const obfuscation = () => randomString(16, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
@@ -21,6 +23,12 @@ export interface Answer {
   /** The text in the pieces a stream sends. */
   readonly chunks: readonly string[];
   readonly toolCalls: readonly AnswerToolCall[];
+  /** OpenAI's built-in tools' calls (Responses only): hosted ones with their results, client-run ones for the agent. */
+  readonly builtIns: readonly BuiltInCall[];
+  /** The citations on the text, in the endpoint's shape. */
+  readonly annotations: readonly Record<string, unknown>[];
+  /** The Images API's images, speech's audio, or Chat Completions' audio output (its id is `audio.id`). */
+  readonly media?: { readonly images: readonly Media[]; readonly audio?: Media & { readonly id: string } };
   readonly reasoning?: { readonly itemId: string; readonly summary: readonly string[]; readonly tokens: number };
   readonly refusal?: string;
   readonly finish: "stop" | "length" | "content_filter" | "tool_calls";
@@ -73,7 +81,7 @@ export function jsonChunks(json: string): string[] {
 /** The usage of an answer: counted from the request's text and the answer's, unless the turn gives it. */
 export function usageOf(
   requestText: string,
-  answer: Pick<Answer, "text" | "toolCalls" | "refusal">,
+  answer: Pick<Answer, "text" | "toolCalls" | "refusal"> & { readonly builtIns?: readonly BuiltInCall[] },
   reasoning: number,
   given: {
     input?: number | undefined;
@@ -83,7 +91,10 @@ export function usageOf(
   } = {},
 ): Answer["usage"] {
   const produced =
-    answer.text + (answer.refusal ?? "") + answer.toolCalls.map((call) => call.name + call.arguments).join("");
+    answer.text +
+    (answer.refusal ?? "") +
+    answer.toolCalls.map((call) => call.name + call.arguments).join("") +
+    (answer.builtIns ?? []).map((call) => call.text).join("");
   const reasoningTokens = given.reasoning ?? reasoning;
   return {
     input: given.input ?? tokens(requestText),

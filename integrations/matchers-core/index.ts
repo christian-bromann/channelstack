@@ -6,6 +6,8 @@
  * - A positive matcher polls until its condition holds, or fails after the timeout.
  * - A negated matcher, and one with an exact count, waits until the agent is quiet and checks once.
  */
+import { createHash } from "node:crypto";
+
 import {
   ChannelstackError,
   type DiscordChannel,
@@ -15,6 +17,7 @@ import {
   ModelProblemError,
   parseDuration,
   QUIET,
+  readMedia,
   type SlackConversation,
   textMatches,
   unreportedRefusals,
@@ -943,6 +946,30 @@ export const matchers = {
     });
   },
 
+  /**
+   * The agent sent the model this image, file or audio, compared by its SHA-256: a fixture file's
+   * path (read as a `MediaSource` is, from the files root) or its bytes. The subject is the
+   * `openai` fixture, a script or one call, as for `toHaveSent`.
+   */
+  toHaveSentFile(state: MatcherState, subject: unknown, file: string | Uint8Array, options?: Timing) {
+    const read = readMedia(file);
+    if (!("content" in read)) throw new TypeError("toHaveSentFile takes a path or bytes");
+    const bytes = Buffer.from(read.content, "base64");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const named = read.name ?? "these bytes";
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: async () =>
+        // A media endpoint's file is its message's first part, so the parts are everything.
+        (await modelCalls(subject)).flatMap((call) =>
+          (call.request.messages ?? []).flatMap((message) => message.parts ?? []),
+        ),
+      holds: (parts) => parts.some((part) => part.sha256 === sha256),
+      describe: (parts) =>
+        `Expected the agent ${state.isNot ? "not " : ""}to send the model ${named} (${sizeOf(bytes.length)}, sha256 ${sha256.slice(0, 12)}). ${parts.length === 0 ? "It sent no image, file or audio." : `What it sent, newest first:\n${listing(parts.toReversed().map(partOf))}`}`,
+    });
+  },
+
   /** A secret channelstack knows (a token, a signing secret, a key) was sent to the model. Use it as `not.`. */
   toHaveSentSecrets(state: MatcherState, subject: unknown, options?: Timing) {
     const fixture = subject as { sentSecrets(): Promise<ReadonlyArray<{ call: string; kinds: readonly string[] }>> };
@@ -1061,10 +1088,22 @@ interface ModelToolCall {
   readonly result?: { readonly text: string };
 }
 
+/** An image, file or audio in a model call, as the fake read it: no hash for a URL it didn't fetch. */
+interface ModelPart {
+  readonly type: string;
+  readonly from: string;
+  readonly url?: string;
+  readonly fileId?: string;
+  readonly mediaType?: string;
+  readonly bytes?: number;
+  readonly sha256?: string;
+}
+
 interface ModelCallData {
   readonly request: {
     readonly text: string;
     readonly tools: ReadonlyArray<{ readonly type: string; readonly name?: string; readonly parameters?: unknown }>;
+    readonly messages?: ReadonlyArray<{ readonly parts?: readonly ModelPart[] }>;
   };
 }
 
@@ -1103,6 +1142,21 @@ function sentIn(text: string, wanted: readonly (string | RegExp | Texted)[], ord
   }
   return true;
 }
+
+const sizeOf = (bytes: number) => `${bytes} ${bytes === 1 ? "byte" : "bytes"}`;
+
+/** One part as a failure lists it: its type, media type, size and hash, or where it is when the fake didn't read it. */
+const partOf = (part: ModelPart) =>
+  [
+    part.type,
+    part.mediaType,
+    part.bytes === undefined ? undefined : sizeOf(part.bytes),
+    part.sha256 === undefined
+      ? (part.url ?? (part.fileId === undefined ? undefined : `file ${part.fileId}`))
+      : `sha256 ${part.sha256.slice(0, 12)}`,
+  ]
+    .filter((piece) => piece !== undefined)
+    .join(", ");
 
 const excerptOf = (text: string) => {
   const line = text.replace(/\s+/g, " ").trim();

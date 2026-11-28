@@ -4,8 +4,9 @@ import { bodyOf, recordAs, type RestAnswer, type StreamOutcome, wrapRest } from 
 import type { DriverContext } from "../../core/router/index.ts";
 import { constantTimeEqual } from "../../core/signing/hmac.ts";
 import { type SseFrame, sseStream, type StreamBreak } from "../../core/stream/index.ts";
-import { chatDialect } from "./codecs/answer.ts";
+import { type Answer, chatDialect } from "./codecs/answer.ts";
 import { chatCompletion, chatErrorFrames, chatFrames, type ChatMeta } from "./codecs/chat.ts";
+import { imagesResponse, speechFrames, transcriptBody, transcriptFrames } from "./codecs/media.ts";
 import {
   finalStatus,
   outputItems,
@@ -16,8 +17,25 @@ import {
 } from "./codecs/responses.ts";
 import { invalidRequest, notFound, OpenAIError, scriptedError } from "./errors.ts";
 import { OPENAI_IDS } from "./ids.ts";
+import {
+  containerFileWire,
+  fileWire,
+  type Media,
+  mediaTypeOf,
+  type ModelPart,
+  partOf,
+  readPart,
+  sha256,
+} from "./media.ts";
 import { defaultRateHeaders } from "./rate-limit.ts";
-import { chatRequest, type InputItem, inputItems, type ModelRequest, responsesRequest } from "./request.ts";
+import {
+  chatRequest,
+  type InputItem,
+  inputItems,
+  mediaRequest,
+  type ModelRequest,
+  responsesRequest,
+} from "./request.ts";
 import type { Conversation } from "./store.ts";
 import type { CallRecord, OpenAIWorld } from "./world.ts";
 
@@ -107,6 +125,8 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
 
   api.use("*", async (c, next) => {
     c.set(STARTED as never, clock() as never);
+    // What the Images API answered with as a URL is served without a key, as OpenAI's own links are.
+    if (/^(?:\/openai)?\/generated\//.test(new URL(c.req.url).pathname)) return next();
     const refused = authorized(c);
     if (refused) throw refused;
     c.set(AUTHENTICATED as never, true as never);
@@ -123,22 +143,89 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     return parsed.body;
   };
 
+  /** Every part of a request with its bytes read: data URLs, `file_id`s, URLs on a fake host (design §5.5). */
+  const readParts = async (request: ModelRequest): Promise<ModelRequest> => {
+    const read = (part: ModelPart) => readPart(part, world.media, (url) => context.fetchFake(url));
+    const messages = await Promise.all(
+      request.messages.map(async (message) =>
+        message.role === "user" ? { ...message, parts: await Promise.all(message.parts.map(read)) } : message,
+      ),
+    );
+    // A media endpoint's file is its message's first part: read once, with the others.
+    const first = messages[0]?.role === "user" ? messages[0].parts[0] : undefined;
+    return { ...request, messages, ...(request.file === undefined || first === undefined ? {} : { file: first }) };
+  };
+
+  /** The files of a multipart body, by field: the body a call records names each by its hash instead. */
+  const uploads = new WeakMap<object, Record<string, Media[]>>();
+
   /**
-   * One model call, either endpoint: attributed, answered as its script says, streamed with its
+   * A multipart body (the media endpoints' uploads, `/v1/files`), or JSON: its fields, with each
+   * file as `{ filename, mediaType, bytes, sha256 }`, and the bytes kept in `uploads`.
+   */
+  const readForm = async (c: Context): Promise<Json> => {
+    if (!(c.req.header("content-type") ?? "").startsWith("multipart/form-data")) return parse(c);
+    let form: Record<string, unknown>;
+    try {
+      form = await c.req.parseBody({ all: true });
+    } catch {
+      throw invalidRequest("We could not parse the multipart form body of your request.");
+    }
+    const body: Json = {};
+    const files: Record<string, Media[]> = {};
+    for (const [key, value] of Object.entries(form)) {
+      const name = key.replace(/\[\]$/, "");
+      const described: unknown[] = [];
+      for (const entry of Array.isArray(value) ? value : [value]) {
+        if (!(entry instanceof File)) {
+          described.push(entry);
+          continue;
+        }
+        const bytes = new Uint8Array(await entry.arrayBuffer());
+        const mediaType = mediaTypeOf(bytes, entry.type === "" ? undefined : entry.type, entry.name);
+        const list = files[name] ?? [];
+        list.push({ bytes, mediaType, filename: entry.name });
+        files[name] = list;
+        described.push({ filename: entry.name, mediaType, bytes: bytes.length, sha256: sha256(bytes) });
+      }
+      body[name] = described.length === 1 && !key.endsWith("[]") ? described[0] : described;
+    }
+    uploads.set(body, files);
+    return body;
+  };
+
+  /** An uploaded file as a part of the request, its bytes already read. */
+  const uploaded =
+    (type: ModelPart["type"]) =>
+    (media: Media): ModelPart =>
+      partOf({ type, from: "data" }, media);
+
+  /** An image a JSON body names: `{ image_url }` (a URL or a data URL) or `{ file_id }`. */
+  const namedImage = (value: unknown): ModelPart | undefined => {
+    if (!isObject(value)) return undefined;
+    if (typeof value.file_id === "string") return { type: "image", from: "file_id", fileId: value.file_id };
+    if (typeof value.image_url !== "string") return undefined;
+    return value.image_url.startsWith("data:")
+      ? { type: "image", from: "data", pending: { data: value.image_url } }
+      : { type: "image", from: "url", url: value.image_url };
+  };
+
+  /**
+   * One model call, any endpoint: attributed, answered as its script says, streamed with its
    * timing. It goes on record when it ends: answered, refused, cut, or abandoned by the agent.
    */
   const answerCall = async (
     c: Context,
     endpoint: ModelRequest["endpoint"],
     normalise: (body: Json) => { request: ModelRequest; history?: { conversation?: Conversation; previous?: string } },
-    overrides: { model?: string } = {},
+    overrides: { model?: string; read?: (c: Context) => Promise<Json> } = {},
   ): Promise<Response> => {
     recordAs(c, { operation: endpoint });
     const startedAt = clock();
-    const parsed = await parse(c);
+    const parsed = await (overrides.read ?? parse)(c);
     const body = overrides.model === undefined ? parsed : { ...parsed, model: overrides.model };
     const normalised = normalise(body);
-    const { request } = normalised;
+    const request = await readParts(normalised.request);
     world.scripts.refuseInvalidSchemas(request);
     seen.add(request.model);
     const call = world.begin(request, body, c.req.raw.headers);
@@ -261,21 +348,23 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     };
 
     const timing = turn.timing ?? {};
+    // Speech streams when `stream_format: "sse"` asks; the other endpoints when `stream` does.
+    const streamed = request.stream || request.media?.streamFormat === "sse";
     if (await world.firstToken(call, timing.firstToken ?? 0, hangUp)) return abandoned();
-    if (!request.stream) {
+    if (!streamed) {
       keep();
       done({ status: 200 });
-      return c.json(
-        endpoint === "chat.completions"
-          ? chatCompletion(answer, chatMeta)
-          : responseObject(answer, responseMeta, finalStatus(answer)),
-      );
+      return whole(c, endpoint, answer, request, body, { chatMeta, responseMeta, created });
     }
 
     const frames: SseFrame[] =
       endpoint === "chat.completions"
         ? chatFrames(answer, chatMeta, request.includeUsage)
-        : responseFrames(answer, responseMeta);
+        : endpoint === "responses"
+          ? responseFrames(answer, responseMeta)
+          : endpoint === "audio.speech"
+            ? speechFrames(answer)
+            : transcriptFrames(answer);
     let breaking: StreamBreak | undefined;
     if (turn.failAfter !== undefined) {
       const { chunks, how } = turn.failAfter;
@@ -288,9 +377,9 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
         ...(how === "error"
           ? {
               errorFrames:
-                endpoint === "chat.completions"
-                  ? chatErrorFrames(failure)
-                  : responseErrorFrames(responseMeta, failure, cut === -1 ? frames.length : cut),
+                endpoint === "responses"
+                  ? responseErrorFrames(responseMeta, failure, cut === -1 ? frames.length : cut)
+                  : chatErrorFrames(failure),
             }
           : {}),
       };
@@ -326,6 +415,42 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
         connection: "keep-alive",
       },
     });
+  };
+
+  /** Where an image answered as a URL is served: on the fake's own address, without a key. */
+  const imageUrl = (media: Media) => {
+    const name = `${ids.next(OPENAI_IDS.generated)}.${media.mediaType.split("/")[1] ?? "png"}`;
+    world.media.keepGenerated(name, media);
+    return `${context.apiUrl()}/generated/${name}`;
+  };
+
+  /** A whole answer, in the endpoint's format: an object, the audio's bytes, or a transcript's text. */
+  const whole = (
+    c: Context,
+    endpoint: ModelRequest["endpoint"],
+    answer: Answer,
+    request: ModelRequest,
+    body: Json,
+    meta: { chatMeta: ChatMeta; responseMeta: ResponseMeta; created: number },
+  ): Response => {
+    switch (endpoint) {
+      case "chat.completions":
+        return c.json(chatCompletion(answer, meta.chatMeta));
+      case "responses":
+        return c.json(responseObject(answer, meta.responseMeta, finalStatus(answer)));
+      case "images.generations":
+      case "images.edits":
+        return c.json(imagesResponse(answer, request, { created: meta.created, imageUrl }));
+      case "audio.speech": {
+        const audio = answer.media?.audio;
+        c.header("content-type", audio?.mediaType ?? "audio/mpeg");
+        return c.body((audio?.bytes ?? new Uint8Array()) as Uint8Array<ArrayBuffer>);
+      }
+      default: {
+        const transcript = transcriptBody(answer, request, uploads.get(body)?.file?.[0]);
+        return "json" in transcript ? c.json(transcript.json) : c.text(transcript.text);
+      }
+    }
   };
 
   const chat = (c: Context, model?: string) =>
@@ -400,6 +525,137 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
   const v1 = new Hono();
   v1.post("/chat/completions", (c) => chat(c));
   v1.post("/responses", (c) => responses(c));
+
+  // The media endpoints (design §5.5): answered by scripts like any model call.
+  const headersOf = (c: Context) => c.req.raw.headers;
+  v1.post("/images/generations", (c) =>
+    answerCall(c, "images.generations", (body) => ({
+      request: mediaRequest("images.generations", body, {}, headersOf(c)),
+    })),
+  );
+  v1.post("/images/edits", (c) =>
+    answerCall(
+      c,
+      "images.edits",
+      (body) => {
+        const files = uploads.get(body) ?? {};
+        const named = (Array.isArray(body.images) ? body.images : []).map(namedImage);
+        const images = [
+          ...(files.image ?? []).map(uploaded("image")),
+          ...named.filter((part): part is ModelPart => part !== undefined),
+        ];
+        const mask = files.mask?.[0] === undefined ? namedImage(body.mask) : uploaded("image")(files.mask[0]);
+        return {
+          request: mediaRequest(
+            "images.edits",
+            body,
+            { images, ...(mask === undefined ? {} : { mask }) },
+            headersOf(c),
+          ),
+        };
+      },
+      { read: readForm },
+    ),
+  );
+  v1.post("/audio/speech", (c) =>
+    answerCall(c, "audio.speech", (body) => ({ request: mediaRequest("audio.speech", body, {}, headersOf(c)) })),
+  );
+  for (const [path, endpoint] of [
+    ["/audio/transcriptions", "audio.transcriptions"],
+    ["/audio/translations", "audio.translations"],
+  ] as const) {
+    v1.post(path, (c) =>
+      answerCall(
+        c,
+        endpoint,
+        (body) => {
+          const file = uploads.get(body)?.file?.[0];
+          return {
+            request: mediaRequest(
+              endpoint,
+              body,
+              file === undefined ? {} : { file: uploaded("audio")(file) },
+              headersOf(c),
+            ),
+          };
+        },
+        { read: readForm },
+      ),
+    );
+  }
+
+  // Files: what `file_id` parts name, and what file search cites.
+  const PURPOSES = ["assistants", "batch", "fine-tune", "vision", "user_data", "evals"];
+  const noFile = (id: string) =>
+    new OpenAIError(404, { message: `No such File object: ${id}`, type: "invalid_request_error", param: "id" });
+  const fileOf = (c: Context) => {
+    const id = c.req.param("id") ?? "";
+    const file = world.media.files.get(id);
+    if (!file) throw noFile(id);
+    return file;
+  };
+  v1.post("/files", async (c) => {
+    const parsed = await readForm(c);
+    const file = uploads.get(parsed)?.file?.[0];
+    const purpose = typeof parsed.purpose === "string" ? parsed.purpose : undefined;
+    if (file === undefined) throw invalidRequest("Missing required parameter: 'file'.", "file");
+    if (purpose === undefined) throw invalidRequest("Missing required parameter: 'purpose'.", "purpose");
+    if (!PURPOSES.includes(purpose)) {
+      throw invalidRequest(
+        `'${purpose}' is not one of ${PURPOSES.map((name) => `'${name}'`).join(", ")} - 'purpose'`,
+        "purpose",
+      );
+    }
+    const created = Math.floor(clock() / 1000);
+    const seconds = Number((parsed as { "expires_after[seconds]"?: unknown })["expires_after[seconds]"]);
+    const stored = world.media.keepFile({
+      ...file,
+      id: ids.next(OPENAI_IDS.file),
+      filename: file.filename ?? "file",
+      purpose,
+      createdAt: created,
+      ...(Number.isFinite(seconds) && seconds > 0 ? { expiresAt: created + seconds } : {}),
+    });
+    return c.json(fileWire(stored));
+  });
+  v1.get("/files", (c) => {
+    const purpose = c.req.query("purpose");
+    const files = [...world.media.files.values()].filter((file) => purpose === undefined || file.purpose === purpose);
+    const ordered = c.req.query("order") === "asc" ? files : files.reverse();
+    return c.json(listOf(ordered.map(fileWire)));
+  });
+  v1.get("/files/:id", (c) => c.json(fileWire(fileOf(c))));
+  v1.delete("/files/:id", (c) => {
+    const { id } = fileOf(c);
+    world.media.files.delete(id);
+    return c.json({ id, object: "file", deleted: true });
+  });
+  v1.get("/files/:id/content", (c) => {
+    const file = fileOf(c);
+    c.header("content-type", "application/octet-stream");
+    return c.body(file.bytes as Uint8Array<ArrayBuffer>);
+  });
+
+  // A code interpreter's container: the files its code wrote.
+  const notFoundIn = (what: string) =>
+    new OpenAIError(404, { message: `${what} not found.`, type: "invalid_request_error", param: null });
+  const containerOf = (c: Context) => {
+    const files = world.media.containers.get(c.req.param("container") ?? "");
+    if (!files) throw notFoundIn(`Container ${c.req.param("container") ?? ""}`);
+    return files;
+  };
+  const containerFileOf = (c: Context) => {
+    const file = containerOf(c).get(c.req.param("file") ?? "");
+    if (!file) throw notFoundIn(`File ${c.req.param("file") ?? ""}`);
+    return file;
+  };
+  v1.get("/containers/:container/files", (c) => c.json(listOf([...containerOf(c).values()].map(containerFileWire))));
+  v1.get("/containers/:container/files/:file", (c) => c.json(containerFileWire(containerFileOf(c))));
+  v1.get("/containers/:container/files/:file/content", (c) => {
+    const file = containerFileOf(c);
+    c.header("content-type", file.mediaType);
+    return c.body(file.bytes as Uint8Array<ArrayBuffer>);
+  });
 
   const missing = (message: string) => new OpenAIError(404, { message, type: "invalid_request_error", param: null });
   /** A stored response, its call on record for the session it belongs to. */
@@ -521,6 +777,12 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     metadata: conversation.metadata,
   });
 
+  api.get("/generated/:name", (c) => {
+    const media = world.media.generated.get(c.req.param("name"));
+    if (!media) return c.body(null, 404);
+    c.header("content-type", media.mediaType);
+    return c.body(media.bytes as Uint8Array<ArrayBuffer>);
+  });
   api.route("/v1", v1);
   // Azure OpenAI's v1 API, and its deployment paths: the deployment is the model, `api-version` is required.
   api.route("/openai/v1", v1);
@@ -567,7 +829,7 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
 }
 
 /** A list as OpenAI pages one: `object: "list"`, its first and last ids, and no more. */
-function listOf(items: readonly InputItem[]) {
+function listOf(items: readonly Record<string, unknown>[]) {
   return {
     object: "list",
     data: items,

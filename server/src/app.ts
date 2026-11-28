@@ -324,6 +324,26 @@ export function createApp(options: AppOptions): App {
     return kinds;
   };
 
+  /** Whether a URL is on one of the fakes' addresses: its `*.localhost` name, or its path prefix without portless. */
+  const onFake = (url: string): boolean => {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return false;
+    }
+    return DRIVERS.some((definition) => {
+      const base = options.urls().driver(definition.name);
+      // The parsed URL, as `fetch` will send it: never the text, which a fake's prefix could hide inside.
+      const { href } = parsed;
+      return parsed.hostname === `${definition.name}.localhost` || href === base || href.startsWith(`${base}/`);
+    });
+  };
+  /** The app as it serves requests, once it is built: what `fetchFake` sends a URL on a fake's address to. */
+  const served: { fetch(request: Request): Response | Promise<Response> } = {
+    fetch: () => new Response(null, { status: 503 }),
+  };
+
   const drivers: Driver[] = DRIVERS.map((definition) =>
     definition.create({
       ids,
@@ -341,6 +361,7 @@ export function createApp(options: AppOptions): App {
       attribution,
       place,
       findSecrets,
+      fetchFake: (url) => (onFake(url) ? Promise.resolve(served.fetch(new Request(url))) : undefined),
       scrub: (value) => redactor.tokens(value),
       apps: {
         webhookUrl: (app) =>
@@ -678,7 +699,7 @@ export function createApp(options: AppOptions): App {
     ]),
   );
 
-  return {
+  const app: App = {
     fetch(request) {
       // Behind portless every driver has its own name; without it, drivers are path prefixes on one port.
       const host = (request.headers.get("x-forwarded-host") ?? new URL(request.url).host).split(":")[0] ?? "";
@@ -722,4 +743,6 @@ export function createApp(options: AppOptions): App {
       return driver?.fake.socket?.(request);
     },
   };
+  served.fetch = (request) => app.fetch(request);
+  return app;
 }

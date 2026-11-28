@@ -293,9 +293,18 @@ Built in phase 13 ([decision 0029](decisions/0029-fake-openai.md)). The fake Ope
 | `openai.problems()`, `unattributed()`, `sentSecrets()` | Done | Done | — | An unscripted call is a 400 `channelstack_no_script`, and the test fails |
 | Chat Completions, streamed or not | Done | Done | — | Every answer and chunk holds to OpenAI's pinned description (exit check 13.2). Dialects: OpenRouter's `reasoning`, DeepSeek's `reasoning_content`, Azure's deployment paths |
 | Responses, stored responses, `previous_response_id`, Conversations | Done | Done | — | Every event of a stream numbered, `response.failed` and `error` when a stream breaks with an error |
-| Built-in tools, images, audio, files | Yes | Yes | — | Phase 14 |
+| Media in requests: image, file and audio parts | Done | Done | — | Phase 14. Data URLs, `file_id`s and URLs on both endpoints (`image_url`, `file`, `input_audio`; `input_image`, `input_file`), each recorded with its media type, size and SHA-256 (`toHaveSentFile`). A URL on a fake host is fetched without credentials, so Slack's `url_private` is refused with `invalid_image_url`; URLs elsewhere are recorded, not fetched |
+| The Images API: `images.generate`, `images.edit` | Done | Done | — | Phase 14. Base64, in `output_format` png, jpeg or webp; one image per `n`; an edit's images and mask are all parts of its request. A URL served without a key only for the retired DALL·E models' `response_format: "url"`: GPT image models refuse it, as the pinned description says |
+| `audio.speech` | Done | Done | — | Phase 14. mp3, opus, aac, flac, wav, pcm, and `stream_format: "sse"` (not for `tts-1` and `tts-1-hd`, as OpenAI's description says) |
+| `audio.transcriptions`, `audio.translations` | Done | Done | — | Phase 14. json, text, srt, vtt, verbose_json, diarized_json, each only for the models OpenAI's description allows it (the GPT-4o transcribe models JSON only; diarized JSON only the diarizing one); transcriptions streamed as transcript deltas (`whisper-1` ignores `stream` and answers whole, as OpenAI's does) |
+| Chat Completions' audio output (`modalities: ["text", "audio"]`) | Done | Done | — | Phase 14. `message.audio` and `delta.audio`, the text as its transcript |
+| A `MediaSource`: a path, bytes, or a placeholder | Done | Done | — | Phase 14. The SDK reads a path in the test process (TypeScript, Python, Rust). The fake makes a PNG of a size, or WAV or PCM silence; any other format needs a file, and a placeholder in one is a script problem |
+| `/v1/files`, container files | Done | Done | — | Phase 14. Upload, list, retrieve, content, delete; a code interpreter's files at `/v1/containers/{container}/files/{file}/content` |
+| Built-in tools, run by OpenAI: `web_search`, `file_search`, `code_interpreter`, `image_generation`, remote `mcp`, hosted `shell` | Done | Done | — | Phase 14. Scripted and never run: what the tool found is what the script says. Each item and event holds to the pinned description; MCP lists its tools once a conversation and asks for approval as the request's `require_approval` says |
+| Built-in tools, run by the agent: local `shell`, `local_shell`, `computer`, `apply_patch` | Done | Done | — | Phase 14. The agent's output is joined to its call in `toolCalls()` |
+| Citations on text | Done | Done | — | Phase 14. `url_citation`, `file_citation`, `container_file_citation` on Responses; URL citations on Chat Completions |
 
-Not in the fake at all: background responses and `n > 1` (refused with `unsupported_in_fake`), and embeddings, vector stores, Realtime and batches (OpenAI's 404).
+Not in the fake at all: background responses, `n > 1` on the model's endpoints and streamed images (refused with `unsupported_in_fake`), and embeddings, vector stores, Realtime, batches and the Videos API (OpenAI's 404). Built-in tools are on Responses only, as on the real API: offering one on Chat Completions is refused as OpenAI refuses it.
 
 ## What this means for test authors
 

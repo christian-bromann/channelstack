@@ -6,6 +6,7 @@ import { CursorList } from "../../core/events/index.ts";
 import { matchesText } from "../../core/router/inspect.ts";
 import { invalidRequest } from "./errors.ts";
 import type { ModelRequest } from "./request.ts";
+import { builtInKindOf } from "./tools/index.ts";
 import type { Match, Turn, TurnInput } from "./turns.ts";
 import { turnOf } from "./turns.ts";
 
@@ -66,6 +67,10 @@ function matches(when: Match | undefined, request: ModelRequest, text: string, c
   if (when.model !== undefined && !matchesText(when.model)(request.model)) return false;
   if (when.stream !== undefined && when.stream !== request.stream) return false;
   if (when.from !== undefined && context.from !== when.from) return false;
+  if (when.approval !== undefined) {
+    const newest = request.approvals.at(-1);
+    if (newest === undefined || newest.approve !== when.approval) return false;
+  }
   if (when.in !== undefined && !(context.in ?? []).includes(when.in)) return false;
   return true;
 }
@@ -243,7 +248,9 @@ export class Scripts {
     const offered = new Map(
       request.tools.filter((tool) => tool.name !== undefined).map((tool) => [tool.name as string, tool]),
     );
-    for (const call of turn.toolCalls ?? []) {
+    // Built-in tools are checked as they are built (`tools/`).
+    for (const call of (turn.toolCalls ?? []).filter((spec) => builtInKindOf(spec) === undefined)) {
+      if (call.name === undefined) continue;
       const tool = offered.get(call.name);
       if (!tool) {
         const names = [...offered.keys()];

@@ -4,7 +4,8 @@
  * and the SDK's retries, timing and breaks on the injected clock, rate limits, the secrets an
  * agent sends, scripts that run out, and the store behind `previous_response_id` and conversations.
  */
-import OpenAI, {
+import type OpenAI from "openai";
+import {
   APIError,
   APIUserAbortError,
   AuthenticationError,
@@ -15,116 +16,14 @@ import OpenAI, {
   PermissionDeniedError,
   RateLimitError,
 } from "openai";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { TOKEN } from "../../../test/app-harness.ts";
+import { useOpenAIWorkspace } from "../../../test/openai-workspace.ts";
 import { PREFIXED_TOKENS } from "../../../test/prefixed-tokens.ts";
-import { openaiResponseProblems, openaiStreamProblems } from "../../../test/schemas/openai.ts";
-import { slackWorkspace } from "../../../test/slack-workspace.ts";
 import { DRIVERS, secretSpecs } from "../../drivers/index.ts";
 
-type Workspace = Awaited<ReturnType<typeof slackWorkspace>>;
-let open: Workspace | undefined;
-/** What OpenAI's description says about the answers and stream events of this test (exit check 13.2). */
-let problems: string[] = [];
-/** Streams still being read for the check: one that stalled or was cut is read as far as it went. */
-let reading: Promise<void>[] = [];
-/** The check's readers of each stream, so a test can hang up on a stream the way an agent does. */
-let readers: Array<{ cancel(): Promise<void> }> = [];
-afterEach(async () => {
-  vi.useRealTimers();
-  await open?.agent.close();
-  open = undefined;
-  await Promise.race([Promise.allSettled(reading), new Promise((resolve) => setTimeout(resolve, 200))]);
-  for (const reader of readers) await reader.cancel().catch(() => {});
-  const found = problems;
-  problems = [];
-  reading = [];
-  readers = [];
-  expect(found).toEqual([]);
-});
-
-/** Hold an answer of the fake to OpenAI's description: its body, or each event of its stream that arrived whole. */
-function check(method: string, path: string, response: Response): Response {
-  const copy = response.clone();
-  if ((copy.headers.get("content-type") ?? "").startsWith("text/event-stream") && copy.body) {
-    const reader = copy.body.getReader();
-    readers.push(reader);
-    const decoder = new TextDecoder();
-    let text = "";
-    const events = async () => {
-      try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          text += decoder.decode(value, { stream: true });
-        }
-      } finally {
-        for (const event of text.split("\n\n").slice(0, -1)) {
-          const data = event.split("\n").find((line) => line.startsWith("data: "));
-          if (data === undefined || data === "data: [DONE]") continue;
-          problems.push(...openaiStreamProblems(path, JSON.parse(data.slice(6)) as Record<string, unknown>));
-        }
-      }
-    };
-    reading.push(events().catch(() => {}));
-  } else {
-    reading.push(
-      copy
-        .json()
-        .then((body: unknown) => {
-          problems.push(...openaiResponseProblems(method, path, response.status, body));
-        })
-        .catch(() => {}),
-    );
-  }
-  return response;
-}
-
-/** An OpenAI client on the fake in process, the way an agent has one; every answer it gets is kept in `answers`. */
-function clientOn(h: Workspace["h"], answers: Response[], options: ConstructorParameters<typeof OpenAI>[0] = {}) {
-  return new OpenAI({
-    apiKey: h.secrets.get("openai", "apiKey"),
-    baseURL: "http://127.0.0.1:4500/openai/v1",
-    fetch: async (input, init) => {
-      const request = new Request(input as string, init as RequestInit);
-      const response = check(request.method, new URL(request.url).pathname, await h.app.fetch(request));
-      answers.push(response);
-      return response;
-    },
-    ...options,
-  });
-}
-
-/** A Slack workspace where Ana said `prompt`, and an OpenAI client on the fake, the way an agent has one. */
-async function setup(
-  prompt = "what broke in the web deploy yesterday?",
-  options: ConstructorParameters<typeof OpenAI>[0] = {},
-) {
-  const workspace = await slackWorkspace();
-  open = workspace;
-  await workspace.say(prompt);
-  const { h, sessionId } = workspace;
-  const answers: Response[] = [];
-  const client = clientOn(h, answers, options);
-  const controlOf = (session: string) => async (method: string, path: string, body?: unknown) => {
-    const response = await h.call(method, `/sessions/${session}/openai${path}`, body);
-    if (response.status >= 400) throw Object.assign(new Error(response.body.message), response);
-    return response.body;
-  };
-  const control = controlOf(sessionId);
-  const respond = (body: Record<string, unknown>) => control("POST", "/scripts", body);
-  /** Another test's session in the same server, and a client whose calls it claims by their tag. */
-  const neighbour = async () => {
-    const { sessionId: id } = (await h.call("POST", "/sessions")).body;
-    return {
-      sessionId: id as string,
-      control: controlOf(id),
-      client: clientOn(h, answers, { defaultHeaders: { "x-channelstack-session": id } }),
-    };
-  };
-  return { ...workspace, client, control, respond, prompt, answers, neighbour };
-}
+const setup = useOpenAIWorkspace();
 
 /** Let the in-process server and the SDK run what is ready: promises, and the stream reads they wait on. */
 const settle = async (rounds = 20) => {
@@ -1056,7 +955,7 @@ describe("timing and breaks on the injected clock, as the SDK sees them", () => 
   test.each(ENDPOINTS)(
     "%s: failAfter stall sends nothing more, the SDK waits, and the agent hanging up ends it",
     async (endpoint) => {
-      const { client, respond, control, h, sessionId, prompt } = await setup();
+      const { client, respond, control, h, sessionId, prompt, hangUpChecks } = await setup();
       await respond({ turns: [{ text: ["one", " two", " three"], failAfter: { chunks: 2, how: "stall" } }] });
       const hangUp = new AbortController();
 
@@ -1075,7 +974,7 @@ describe("timing and breaks on the injected clock, as the SDK sees them", () => 
       const stalled = { text, ended };
       hangUp.abort();
       // The check's copy of the stream hangs up with the agent, so the stream is cancelled at its source.
-      for (const reader of readers) await reader.cancel().catch(() => {});
+      await hangUpChecks();
       const error = await read;
 
       expect(stalled).toEqual({ text: "one two", ended: false });

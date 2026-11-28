@@ -102,7 +102,7 @@ macro_rules! numbers {
         }
     })*};
 }
-numbers!(i32, i64, u32, u64, usize, f64);
+numbers!(u8, i32, i64, u32, u64, usize, f64);
 impl<T: IntoArg> IntoArg for Vec<T> {
     fn into_arg(self) -> Value {
         Value::Array(self.into_iter().map(IntoArg::into_arg).collect())
@@ -224,6 +224,17 @@ pub mod enc {
             }
             other => Ok(other.clone()),
         }
+    }
+
+    /// One of several types, told apart by the value's JSON kind: an object is encoded as the
+    /// union's object member, a list as its list member, anything else goes as it is.
+    pub fn union(value: &Value, object: Option<Encode>, list: Option<Encode>) -> Result<Value> {
+        let encode = match value {
+            Value::Object(_) => object,
+            Value::Array(_) => list,
+            _ => None,
+        };
+        encode.map_or_else(|| plain(value), |encode| encode(value))
     }
 
     /// An argument whose plain text stands for an object: `"hi"` for `{ "text": "hi" }`.

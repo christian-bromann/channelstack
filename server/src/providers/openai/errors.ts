@@ -1,5 +1,5 @@
 import { goDuration, type RateLimitRefusal, scriptedRefusal } from "./rate-limit.ts";
-import type { ErrorKind } from "./turns.ts";
+import type { Endpoint, ErrorKind } from "./turns.ts";
 
 /** An error as OpenAI answers it: `{ error: { message, type, param, code } }`, with its status and headers. */
 export class OpenAIError extends Error {
@@ -175,7 +175,7 @@ export function scriptedError(
     message?: string | undefined;
     retryAfterMs?: number | undefined;
     shouldRetry?: boolean | undefined;
-    endpoint: "chat.completions" | "responses";
+    endpoint: Endpoint;
     limit?: RateLimitRefusal | undefined;
     organization?: string | undefined;
   },
