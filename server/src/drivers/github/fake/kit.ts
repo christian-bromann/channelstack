@@ -111,7 +111,13 @@ export interface GitHubKit {
   identity(user: GitHubUserRecord): { name: string; email: string };
   /** Something about an issue or a pull request changed: GitHub moves its `updated_at`. */
   touch(issue: GitHubIssueRecord): void;
-  /** `issues` for an issue, `pull_request` for a pull request, with the object under the matching key. */
+  /**
+   * Someone wrote on issue or pull request `number`, for the loop guard (decision 0027): an App's
+   * comment, review, review comment, edit or change adds to its count, a person's starts it over.
+   * Answers whether the events the write causes are still delivered.
+   */
+  wrote(repo: GitHubRepoRecord, number: number, sender: number): boolean;
+  /** `issues` for an issue, `pull_request` for a pull request, with the object under the matching key; counted by the loop guard. */
   issueEvent(issue: GitHubIssueRecord, sender: number, action: string, extra?: Json): string | undefined;
 }
 
@@ -278,8 +284,19 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     touch(issue) {
       issue.updatedAt = clock();
     },
+    wrote(repo, number, sender) {
+      const session = store.sessionOf(repo);
+      if (session === undefined) return true;
+      const app = store.appOfBot(sender);
+      return context.loops.wrote(
+        session,
+        `${repo.id}#${number}`,
+        app ? { kind: "app", name: app.slug } : { kind: "person" },
+      );
+    },
     issueEvent(issue, sender, action, extra = {}) {
       const repo = store.repo(issue.repo);
+      if (!kit.wrote(repo, issue.number, sender)) return undefined;
       return issue.pull
         ? emit(repo, "pull_request", sender, {
             action,

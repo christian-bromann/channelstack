@@ -15,6 +15,7 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
 import { webhookProblems } from "../../../test/schemas/github.ts";
+import { LOOP_LIMIT } from "../../core/loops/index.ts";
 
 const agents: RecordingAgent[] = [];
 const checks: Array<() => void> = [];
@@ -104,7 +105,25 @@ async function twoApps() {
   const api = async (of: App, method: string, path: string, body?: unknown) =>
     h.provider(method, `github${path}`, body, await token(of));
   const path = `/repos/acme/${repo.name}`;
-  return { h, mine, theirs, base, post, get, app, reviewer, ana, repo, issueRef, jwt, asApp, token, api, path };
+  return {
+    h,
+    sessionId: sessionId as string,
+    mine,
+    theirs,
+    base,
+    post,
+    get,
+    app,
+    reviewer,
+    ana,
+    repo,
+    issueRef,
+    jwt,
+    asApp,
+    token,
+    api,
+    path,
+  };
 }
 
 describe("exit check 12.3: GitHub Apps", () => {
@@ -355,6 +374,44 @@ describe("exit check 12.3: GitHub Apps", () => {
     const reader = await post("/apps", { name: "reader", permissions: { issues: "read" } });
     await post(`/repos/${issueRef.repoId}/install`, { app: reader.id });
     expect(await refusal(post(`/apps/${reader.id}/comment`, { body: "hi", issue: issueRef }))).toBe("forbidden");
+  });
+
+  test("exit check 12.6: Apps reviewing a pull request at each other are stopped at the guard's limit, their edits too, and the session says so", async () => {
+    const { h, sessionId, mine, post, api, app, reviewer, ana, path, issueRef } = await twoApps();
+    const pr = await post(`/users/${ana.id}/pulls`, {
+      pr: { from: "fix", title: "Fix", changes: [{ path: "a.ts", content: Buffer.from("x\n").toString("base64") }] },
+      repo: issueRef.repoId,
+    });
+    for (let i = 0; i < LOOP_LIMIT + 5; i++) {
+      const reviewed = await api(i % 2 === 0 ? reviewer : app, "POST", `${path}/pulls/${pr.number}/reviews`, {
+        event: "COMMENT",
+        body: `turn ${i}`,
+      });
+      expect(reviewed.status).toBe(200);
+    }
+    await h.app.settled();
+    const reviews = () => webhooks(mine).filter((hook) => hook.event === "pull_request_review").length;
+
+    // my-agent heard each App's review up to the limit (its own too), and nothing after.
+    expect(reviews()).toBe(LOOP_LIMIT);
+    const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
+    expect(quiet.loops).toEqual([
+      expect.stringMatching(/^a bot loop in github \d+#\d+ was stopped after 50 app messages .*reviewer → my-agent/),
+    ]);
+    // On the stopped pull request, an App's comment and edit are kept, and cause nothing.
+    const before = webhooks(mine).length;
+    expect((await api(reviewer, "POST", `${path}/issues/${pr.number}/comments`, { body: "more" })).status).toBe(201);
+    expect((await api(reviewer, "PATCH", `${path}/issues/${pr.number}`, { title: "Fix, again" })).status).toBe(200);
+    await h.app.settled();
+    expect(webhooks(mine)).toHaveLength(before);
+
+    // A person writing again starts the pull request over; the issue beside it was never stopped.
+    await post(`/users/${ana.id}/comment`, { body: "again", issue: { repoId: issueRef.repoId, number: pr.number } });
+    await api(reviewer, "POST", `${path}/pulls/${pr.number}/reviews`, { event: "COMMENT", body: "back" });
+    await api(reviewer, "POST", `${path}/issues/${issueRef.number}/comments`, { body: "elsewhere" });
+    await h.app.settled();
+    expect(reviews()).toBe(LOOP_LIMIT + 1);
+    expect(webhooks(mine).at(-1)?.payload.comment.body).toBe("elsewhere");
   });
 
   test("a person and an App of one session can't share a name", async () => {

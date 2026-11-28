@@ -261,6 +261,46 @@ describe("exit check 12.3: Discord apps", () => {
     expect(inLoop()).toBe(3 + LOOP_LIMIT);
   });
 
+  test("exit check 12.6: once stopped, a channel's bot edits, reactions and threads cause nothing, a scripted bot doesn't start it over, and a thread is its own conversation", async () => {
+    const { h, identify, post, asCoder, sessionId, app, coder, ana } = await twoApps();
+    const mine = await identify();
+    closers.push(() => mine.disconnect());
+    const robot = await post("/users", { name: "Robot", bot: true });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id, robot.id] });
+    await post(`/users/${ana.id}/say`, { text: { content: "go" }, channel: channel.id });
+    // A scripted bot user and coder answer each other: the bot counts as a bot, by its name.
+    let last: { id: string } | undefined;
+    for (let i = 0; i <= LOOP_LIMIT; i++) {
+      if (i % 2 === 0)
+        last = await post(`/apps/${coder.id}/say`, { text: { content: `turn ${i}` }, channel: channel.id });
+      else await post(`/users/${robot.id}/say`, { text: { content: `turn ${i}` }, channel: channel.id });
+    }
+    await h.app.settled();
+    const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
+    expect(quiet.loops).toEqual([expect.stringMatching(/stopped after 50 app messages .*coder → Robot → coder/)]);
+    if (!last) throw new Error("coder said nothing");
+    const seen = mine.dispatches().length;
+
+    // coder's edit, reaction and thread in the stopped channel are kept, and dispatch nothing.
+    expect((await asCoder("PATCH", `/channels/${channel.id}/messages/${last.id}`, { content: "edited" })).status).toBe(
+      200,
+    );
+    expect(
+      (await asCoder("PUT", `/channels/${channel.id}/messages/${last.id}/reactions/%F0%9F%91%8D/@me`)).status,
+    ).toBe(204);
+    const thread = await asCoder("POST", `/channels/${channel.id}/messages/${last.id}/threads`, { name: "More" });
+    expect(thread.status).toBe(201);
+    await h.app.settled();
+    expect(mine.dispatches().length).toBe(seen);
+
+    // The thread is a conversation of its own: coder's message there is dispatched.
+    expect((await asCoder("POST", `/channels/${thread.body.id}/messages`, { content: "in the thread" })).status).toBe(
+      200,
+    );
+    await h.app.settled();
+    expect(created(mine).at(-1)?.d).toMatchObject({ channel_id: thread.body.id, content: "in the thread" });
+  });
+
   test("a person and an app of one session can't share a name", async () => {
     const { post } = await twoApps();
     expect(await refusal(post("/users", { name: "coder" }))).toBe("invalid_argument");

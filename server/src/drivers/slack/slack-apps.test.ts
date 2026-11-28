@@ -226,6 +226,49 @@ describe("exit check 12.3: Slack apps", () => {
     expect(mine.received.length).toBe(3 + LOOP_LIMIT);
   });
 
+  test("exit check 12.6: the guard counts per thread; once stopped, app edits and reactions cause nothing, and a scripted bot doesn't start it over", async () => {
+    const { h, mine, post, app, coder, web, sessionId } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const robot = await post("/users", { name: "Robot", bot: true });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id, robot.id] });
+    const loop = await post(`/users/${ana.id}/say`, { message: { text: "thread A" }, channel: channel.id });
+    const other = await post(`/users/${ana.id}/say`, { message: { text: "thread B" }, channel: channel.id });
+    const inThread = (ts: string) => () =>
+      events(mine).filter((one) => one.event.type === "message" && one.event.thread_ts === ts).length;
+    const inLoop = inThread(loop.ts);
+    // coder and a scripted bot user answer each other in thread A; Ana writing in thread B doesn't start A over.
+    let last: { ts: string } | undefined;
+    for (let i = 0; i <= LOOP_LIMIT; i++) {
+      const thread = { channel: channel.id, ts: loop.ts };
+      if (i % 2 === 0) last = await post(`/apps/${coder.id}/reply`, { message: { text: `turn ${i}` }, thread });
+      else await post(`/users/${robot.id}/reply`, { message: { text: `turn ${i}` }, thread });
+      if (i === 10) await post(`/users/${ana.id}/reply`, { message: { text: "elsewhere" }, thread: other });
+    }
+    await h.app.settled();
+    expect(inLoop()).toBe(LOOP_LIMIT);
+    const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
+    expect(quiet.loops).toEqual([
+      expect.stringMatching(
+        new RegExp(`^a bot loop in slack ${channel.id}/${loop.ts.replace(".", "\\.")} was stopped .*coder → Robot`),
+      ),
+    ]);
+    if (!last) throw new Error("coder said nothing");
+
+    // coder's edit and reaction in the stopped thread are kept, and cause nothing; the channel's top level goes on.
+    const before = mine.received.length;
+    expect(
+      await web("chat.update", { channel: channel.id, ts: last.ts, text: "edited" }, coder.botToken),
+    ).toMatchObject({ ok: true });
+    expect(
+      await web("reactions.add", { channel: channel.id, timestamp: last.ts, name: "eyes" }, coder.botToken),
+    ).toMatchObject({ ok: true });
+    await h.app.settled();
+    expect(mine.received.length).toBe(before);
+    await post(`/apps/${coder.id}/say`, { message: { text: "top level" }, channel: channel.id });
+    await h.app.settled();
+    expect(events(mine).at(-1)?.event).toMatchObject({ type: "message", text: "top level" });
+  });
+
   test("Stop goes to the app streaming in the thread", async () => {
     const { h, mine, theirs, post, coder, web } = await twoApps();
     const ana = await post("/users", { name: "Ana" });

@@ -197,7 +197,11 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
     return mailbox.historyId;
   };
 
-  /** Record a change to a message of a mailbox, and tell its app if it watches for it. */
+  /**
+   * Record a change to a message of a mailbox, and tell its app if it watches for it. A copy of an
+   * email the loop guard stopped (decision 0027) changes history, and pushes nothing: the sender's
+   * own SENT copy included, or an agent that answers its own answer would loop on alone.
+   */
   const record = (
     message: GmailMessageRecord,
     kind: GmailHistoryRecord["kind"],
@@ -221,6 +225,8 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
       },
       session,
     );
+    const email = store.emails.find(message.email);
+    if (email !== undefined && store.halted(email)) return;
     changed(app, session, message.email, [...labelsBefore, ...message.labels]);
   };
 

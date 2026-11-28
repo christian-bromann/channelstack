@@ -4,10 +4,11 @@ import type { EventLog } from "../events/index.ts";
  * The loop guard (decision 0027): apps that answer each other without end are stopped, in the
  * fake only, so a looping test fails at once instead of spinning until its timeout.
  *
- * Each driver says, from its one message path, who wrote in which conversation. The guard counts
- * the apps' messages in each conversation since a person last wrote there, and once they reach the
- * limit it stops the deliveries apps cause there, records a `bot_loop` event, and names the loop
- * to every check and to the test's fixture. The real platforms have no such stop: they throttle.
+ * Each driver says, from one helper every write goes through (a message, a comment, a review, an
+ * edit, a reaction, a page change), who wrote in which conversation. The guard counts the apps'
+ * writes in each conversation since a person last wrote there, and once they pass the limit it
+ * stops the events those writes cause, records a `bot_loop` event, and names the loop to every
+ * check and to the test's fixture. The real platforms have no such stop: they throttle.
  */
 
 /** App messages in one conversation, with no person between them, that are still delivered: the next one stops it. */
