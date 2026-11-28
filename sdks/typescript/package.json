@@ -1,6 +1,6 @@
 {
   "name": "channelstack",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord: fake platforms and a fake OpenAI on localhost, the TypeScript SDK, Vitest fixtures and matchers.",
   "keywords": [
     "testing",
@@ -67,11 +67,11 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "optionalDependencies": {
-    "@channelstack/server-darwin-arm64": "0.1.1",
-    "@channelstack/server-darwin-x64": "0.1.1",
-    "@channelstack/server-linux-arm64": "0.1.1",
-    "@channelstack/server-linux-x64": "0.1.1",
-    "@channelstack/server-win32-x64": "0.1.1"
+    "@channelstack/server-darwin-arm64": "0.2.0",
+    "@channelstack/server-darwin-x64": "0.2.0",
+    "@channelstack/server-linux-arm64": "0.2.0",
+    "@channelstack/server-linux-x64": "0.2.0",
+    "@channelstack/server-win32-x64": "0.2.0"
   },
   "peerDependencies": {
     "vitest": ">=5.0.0 <6"
