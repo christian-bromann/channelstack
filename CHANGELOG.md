@@ -4,6 +4,30 @@ All notable changes to channelstack. The format follows [Keep a Changelog](https
 
 ## Unreleased
 
+## [0.2.0] - 2026-11-28
+
+### The fakes
+
+- **Slack:**
+  - A DM can't gain or lose a person, as on Slack ([#119](https://github.com/christian-bromann/channelstack/pull/119))
+- **GitHub:**
+  - A transcript entry keeps its own time, so a label or a close doesn't make it newer ([#118](https://github.com/christian-bromann/channelstack/pull/118))
+
+### Tools
+
+- **The server:**
+  - **Breaking:** The dev tools act on every channel, with each channel's actions generated from its routes ([#106](https://github.com/christian-bromann/channelstack/pull/106))
+  - Phase 11, Discord: a bot in a guild, on the Gateway and HTTP interactions ([#103](https://github.com/christian-bromann/channelstack/pull/103))
+  - Phase 12, any number of agent apps per channel ([#107](https://github.com/christian-bromann/channelstack/pull/107))
+  - Phase 13, a fake OpenAI scripted per test ([#116](https://github.com/christian-bromann/channelstack/pull/116))
+  - Phase 14, the fake OpenAI's images, audio, files and built-in tools ([#121](https://github.com/christian-bromann/channelstack/pull/121))
+  - **Breaking:** Help for every command, and each command takes only its own flags ([#128](https://github.com/christian-bromann/channelstack/pull/128))
+
+### Packages
+
+- **The Python SDK:**
+  - Email waits take the channel's user and app handles as from_ ([#101](https://github.com/christian-bromann/channelstack/pull/101))
+
 ## [0.1.1] - 2026-11-26
 
 The first release on npm and crates.io, and of `pytest-channelstack` on PyPI. What channelstack does is under [0.1.0](https://github.com/christian-bromann/channelstack/blob/main/CHANGELOG.md#010---2026-11-26).

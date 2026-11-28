@@ -1,6 +1,6 @@
 [package]
 name = "channelstack"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "Test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord, and their OpenAI model: the channelstack Rust SDK"

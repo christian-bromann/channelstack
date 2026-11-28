@@ -35,7 +35,7 @@ wheels = [
 
 [[package]]
 name = "channelstack"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "../../sdks/python" }
 dependencies = [
     { name = "httpx" },
@@ -475,7 +475,7 @@ wheels = [
 
 [[package]]
 name = "pytest-channelstack"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "channelstack" },
