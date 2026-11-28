@@ -12,6 +12,7 @@ import type {
   GitHubUserRecord,
 } from "../world.ts";
 import { PRIVATE_BY_DEFAULT } from "../world.ts";
+import type { GitHubChecks } from "./checks.ts";
 import { type GitHubKit, GitHubRefusal } from "./kit.ts";
 
 /** The labels GitHub gives a new repository. */
@@ -52,7 +53,7 @@ export interface GitHubRepoInput {
 }
 
 /** People, repositories and their git history: creating them, pushing, and what a push sets off. */
-export function createRepos(kit: GitHubKit) {
+export function createRepos(kit: GitHubKit, checks: Pick<GitHubChecks, "requestSuites">) {
   const { context, store, git, objects } = kit;
   const { ids, clock } = context;
 
@@ -96,8 +97,9 @@ export function createRepos(kit: GitHubKit) {
   };
 
   /**
-   * A branch moved, by a push, an API call or a merge: GitHub sends `push`, and `pull_request`
-   * `synchronize` for every open pull request from that branch.
+   * A branch moved, by a push, an API call or a merge: GitHub sends `push`, asks each App with
+   * checks for a check suite of the new head, and sends `pull_request` `synchronize` for every open
+   * pull request from that branch.
    */
   const afterPush = async (
     repo: GitHubRepoRecord,
@@ -131,6 +133,16 @@ export function createRepos(kit: GitHubKit) {
       head_commit: listed.at(-1) ?? null,
       pusher: { name: pusher.login, email: kit.identity(pusher).email },
     });
+    const head = listed.at(-1);
+    if (after !== undefined && head) {
+      const { id, tree_id, message, timestamp, author, committer } = head;
+      checks.requestSuites(repo, actor, {
+        branch,
+        before: before ?? null,
+        after,
+        headCommit: { id, tree_id, message, timestamp, author, committer },
+      });
+    }
     for (const issue of store.issuesOf(repo)) {
       if (!issue.pull || issue.state !== "open") continue;
       await refreshPull(repo, issue);

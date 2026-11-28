@@ -15,6 +15,13 @@ export const BUILT_IN_APP = "my-agent";
 /** How many apps a channel holds beside the built-in one: they live as long as the server. */
 export const APP_LIMIT = 10;
 
+/**
+ * Where an app's credentials appear in the control API: on the handle a test asks for, never on
+ * an author, a member or a principal, and never live. Each credential's description ends with it.
+ */
+export const HANDLE_ONLY =
+  "On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live.";
+
 /** 1 to 32 lower-case letters, digits and hyphens, from a letter: one variable name per app name. */
 const APP_NAME = /^[a-z][a-z0-9-]{0,31}$/;
 
@@ -71,14 +78,14 @@ export class AppRoster<App extends Named> {
   readonly #channel: string;
   readonly #noun: string;
   readonly #refs: (app: App) => readonly string[];
-  /** The names of the apps each session used beside the built-in one, in the order it first did. */
-  readonly #used: Collection<string>;
+  /** The apps each session used beside the built-in one, by name, in the order it first did. */
+  readonly #used: Collection<{ readonly session: string; readonly name: string }>;
 
   constructor(channel: string, registry: Registry, options: RosterOptions<App> = {}) {
     this.#channel = channel;
     this.#noun = options.noun ?? "app";
     this.#refs = options.refs ?? (() => []);
-    this.#used = registry.collection<string>(channel, "app in use");
+    this.#used = registry.collection<{ session: string; name: string }>(channel, "app in use");
   }
 
   /** The built-in app, set when the fake is seeded (again after a reset). */
@@ -99,12 +106,18 @@ export class AppRoster<App extends Named> {
   make(name: string, settings: Readonly<Record<string, unknown>>, build: () => App, by?: Asker): App {
     if (by) checkNameFree(name, by.people, "app");
     const app = this.#make(name, settings, build);
-    if (by) this.#used.add(`${by.session}\u0000${app.name}`, app.name, by.session);
+    if (by) this.#used.add(`${by.session}\u0000${app.name}`, { session: by.session, name: app.name }, by.session);
     return app;
   }
 
   #make(name: string, settings: Readonly<Record<string, unknown>>, build: () => App): App {
     checkAppName(name);
+    // The built-in app's own name is reserved too, where a channel calls it otherwise (echo's `echo-agent`).
+    if (name === this.#builtIn?.name) {
+      throw new ProtocolError("invalid_argument", `"${name}" is the built-in ${this.#noun}: use the fixture's app`, {
+        app: name,
+      });
+    }
     const key = settingsKey(settings);
     const known = this.#apps.get(name);
     if (known) {
@@ -127,18 +140,29 @@ export class AppRoster<App extends Named> {
     return app;
   }
 
-  /** The app with this name, the built-in one included. */
+  /** The app with this name, the built-in one included, by `my-agent` or by the name its channel gives it. */
   named(name: string): App | undefined {
-    return name === BUILT_IN_APP ? this.#builtIn : this.#apps.get(name)?.app;
+    return name === BUILT_IN_APP || name === this.#builtIn?.name ? this.#builtIn : this.#apps.get(name)?.app;
   }
 
   /** The apps a session used: the built-in one first, then each it got from `createApp`, in the order it first did. */
   of(session: string): App[] {
-    const used = this.#used.list(session).flatMap((name) => {
+    const used = this.#used.list(session).flatMap(({ name }) => {
       const app = this.#apps.get(name)?.app;
       return app ? [app] : [];
     });
     return [this.builtIn, ...used];
+  }
+
+  /**
+   * The open sessions that used this app from `createApp`, in the order they first did. The
+   * built-in app is every session's, so it names none.
+   */
+  sessionsOf(app: App): string[] {
+    return this.#used
+      .values()
+      .filter((use) => use.name === app.name && app !== this.#builtIn)
+      .map((use) => use.session);
   }
 
   /** The app a name means in a session, in any case: one of the apps that session used. */

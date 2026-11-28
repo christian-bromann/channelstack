@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
-import { BUILT_IN_APP } from "../../core/apps/index.ts";
+import { BUILT_IN_APP, HANDLE_ONLY } from "../../core/apps/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { deliveryTo } from "../../core/delivery/kit.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
@@ -54,9 +54,7 @@ const DiscordApp = z
     kind: z.literal("app"),
     channel: z.literal("discord"),
     botUserId: z.string(),
-    botToken: z
-      .string()
-      .openapi({ description: "The bot token the agent logs in with. Empty live: it stays on the server." }),
+    botToken: z.string().openapi({ description: `The bot token the agent logs in with. ${HANDLE_ONLY}` }),
     publicKey: z
       .string()
       .openapi({ description: "The application's public key, which interactions are verified with." }),
@@ -199,16 +197,24 @@ export function registerDiscordRoutes(
     isAdmin: user.admin,
     isBot: user.bot,
   });
+  /**
+   * An app as an author or a member: who it is, without its bot token. Only the app a test asks
+   * for (the fixture's, `createApp`, `apps()`) carries it: `appHandle`.
+   */
   const appWire = (app: DiscordAppRecord) => ({
     id: app.id,
     name: app.name,
     kind: "app" as const,
     channel: "discord" as const,
     botUserId: app.botUserId,
-    // A live bot's token stays on the server: the control API never returns it.
-    botToken: isLive() ? "" : deps.secret("botToken", app.name),
+    botToken: "",
     publicKey: isLive() ? "" : deps.publicKey(app.name),
     guildId: world.guild().id,
+  });
+  // A live bot's token stays on the server: the control API never returns it.
+  const appHandle = (app: DiscordAppRecord) => ({
+    ...appWire(app),
+    botToken: isLive() ? "" : deps.secret("botToken", app.name),
   });
   /** The app whose bot this is: live, only the built-in one. */
   const appOf = (id: string) => (id === world.app().botUserId ? world.app() : isLive() ? undefined : fake.appOf(id));
@@ -335,7 +341,7 @@ export function registerDiscordRoutes(
     factory: { on: "Session", name: "discord" },
     stability,
     handler: () => ({
-      app: appWire(world.app()),
+      app: appHandle(world.app()),
       apiUrl: isLive() ? "https://discord.com/api" : `${deps.apiUrl()}/api`,
       guild: { id: world.guild().id, name: world.guild().name },
       gatewayConnections: world.gatewayConnections(),
@@ -397,7 +403,7 @@ export function registerDiscordRoutes(
     factory: { on: "DiscordFixture", name: "createApp", options: ["name", "privilegedIntents"] },
     live: APPS_NOT_YET,
     stability,
-    handler: ({ session, body }) => appWire(fake.createApp(session.id, body)),
+    handler: ({ session, body }) => appHandle(fake.createApp(session.id, body)),
   });
 
   router.route({
@@ -408,7 +414,7 @@ export function registerDiscordRoutes(
     sdkMethod: { on: "DiscordFixture", name: "apps" },
     live: APPS_NOT_YET,
     stability,
-    handler: () => fake.apps().map(appWire),
+    handler: () => fake.apps().map(appHandle),
   });
 
   router.route({

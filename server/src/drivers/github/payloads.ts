@@ -522,8 +522,8 @@ export function githubObjects(lookups: GitHubLookups) {
     };
   };
 
-  /** An App (the built-in one unless given), as `GET /app` answers and as check runs name it. */
-  const integration = (app: GitHubAppRecord = lookups.app()): Json => {
+  /** An App, as `GET /app` answers and as check runs name it. */
+  const integration = (app: GitHubAppRecord): Json => {
     return {
       id: app.id,
       client_id: app.clientId,
@@ -547,8 +547,8 @@ export function githubObjects(lookups: GitHubLookups) {
     return app ? integration(app) : null;
   };
 
-  /** An App's installation on the org (the built-in App's unless given): every App has its own. */
-  const installation = (app: GitHubAppRecord = lookups.app()): Json => {
+  /** An App's installation on the org: every App has its own. */
+  const installation = (app: GitHubAppRecord): Json => {
     const org = lookups.org();
     return {
       id: app.installationId,
@@ -575,7 +575,7 @@ export function githubObjects(lookups: GitHubLookups) {
   };
 
   /** The installation as every webhook of an App carries it: the receiving App's own. */
-  const installationLite = (app: GitHubAppRecord = lookups.app()): Json => {
+  const installationLite = (app: GitHubAppRecord): Json => {
     const { installationId } = app;
     return { id: installationId, node_id: githubLegacyNodeId("IntegrationInstallation", installationId) };
   };
@@ -594,6 +594,23 @@ export function githubObjects(lookups: GitHubLookups) {
     app: integration(app),
     created_at: githubTime(repo.createdAt),
     updated_at: githubTime(repo.updatedAt),
+  });
+
+  /** One App's check suite for a pushed commit, as `check_suite` webhooks carry it: no runs yet. */
+  const checkSuite = (
+    repo: GitHubRepoRecord,
+    id: number,
+    push: { branch: string; before: string | null; after: string; headCommit: Json },
+    app: GitHubAppRecord,
+  ): Json => ({
+    ...suite(repo, id, push.after, app),
+    head_branch: push.branch,
+    before: push.before,
+    latest_check_runs_count: 0,
+    check_runs_url: `${repoApi(repo)}/check-suites/${id}/check-runs`,
+    head_commit: push.headCommit,
+    rerequestable: true,
+    runs_rerequestable: true,
   });
 
   const checkRun = (record: GitHubCheckRunRecord): Json => {
@@ -770,6 +787,7 @@ export function githubObjects(lookups: GitHubLookups) {
     integration,
     installation,
     installationLite,
+    checkSuite,
     checkRun,
     status,
     gitCommit,

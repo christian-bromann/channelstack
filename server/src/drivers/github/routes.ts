@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
-import { BUILT_IN_APP } from "../../core/apps/index.ts";
+import { BUILT_IN_APP, HANDLE_ONLY } from "../../core/apps/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import { type EventLog, WORLD_SCOPE } from "../../core/events/index.ts";
 import { type LiveSupport, unsupportedInLive } from "../../core/reality/index.ts";
@@ -68,8 +68,8 @@ const GitHubApp = z
     botLogin: z.string(),
     botUserId: z.string(),
     appId: z.number().int(),
-    privateKey: z.string(),
-    webhookSecret: z.string(),
+    privateKey: z.string().openapi({ description: `Its private key (PEM). ${HANDLE_ONLY}` }),
+    webhookSecret: z.string().openapi({ description: `Its webhook secret. ${HANDLE_ONLY}` }),
   })
   .openapi("GitHubApp", { "x-channelstack-resource": { id: "id", role: "app" } });
 
@@ -305,7 +305,11 @@ export function registerGitHubRoutes(
     email: user.email,
     role: user.role,
   });
-  const appWire = (app: GitHubAppRecord = store.app) => {
+  /**
+   * An App as an author, an assignee or a reactor: who it is, without its credentials. Only the
+   * App a test asks for (the fixture's, `createApp`, `apps()`) carries them: `appHandle`.
+   */
+  const appWire = (app: GitHubAppRecord) => {
     const bot = store.botOf(app);
     return {
       id: String(app.id),
@@ -315,11 +319,16 @@ export function registerGitHubRoutes(
       botLogin: bot.login,
       botUserId: String(bot.id),
       appId: app.id,
-      // A live App's credentials stay on the server: the control API never returns them.
-      privateKey: isLive ? "" : deps.secret("privateKey", app.name),
-      webhookSecret: isLive ? "" : deps.secret("webhookSecret", app.name),
+      privateKey: "",
+      webhookSecret: "",
     };
   };
+  const appHandle = (app: GitHubAppRecord) => ({
+    ...appWire(app),
+    // A live App's credentials stay on the server: the control API never returns them.
+    privateKey: isLive ? "" : deps.secret("privateKey", app.name),
+    webhookSecret: isLive ? "" : deps.secret("webhookSecret", app.name),
+  });
   const authorWire = (id: number) => {
     const app = store.appOfBot(id);
     return app ? appWire(app) : userWire(store.actor(id));
@@ -508,7 +517,7 @@ export function registerGitHubRoutes(
     response: GitHubFixture,
     factory: { on: "Session", name: "github" },
     stability,
-    handler: () => ({ app: appWire(), apiUrl: isLive ? GITHUB_API : deps.apiUrl(), org: store.org.login }),
+    handler: () => ({ app: appHandle(store.app), apiUrl: isLive ? GITHUB_API : deps.apiUrl(), org: store.org.login }),
   });
 
   router.route({
@@ -660,10 +669,15 @@ export function registerGitHubRoutes(
     },
   });
 
+  // `github.app.installationId(repo)` is the one way the examples and docs ask, on the App's own
+  // path below. This path is the built-in App's from before several Apps: the tests of phase 5
+  // call it, and exit check 12.1 keeps every existing test as it was, so it stays. Every route has
+  // an SDK method, so it is the fixture's (decision 0027, GitHub).
   router.route({
     method: "post",
     path: "/installation-id",
-    summary: "The id of the built-in App's installation, for a repository it is installed on",
+    summary:
+      "The id of the built-in App's installation, for a repository it is installed on. The same as `github.app.installationId(repo)`",
     body: z.object({ repo: repoRef }).openapi("GitHubInstallationIdBody"),
     response: z.number().int(),
     errors: ["not_found"],
@@ -704,10 +718,10 @@ export function registerGitHubRoutes(
           .openapi({
             description: 'What its installation may do, e.g. `{ issues: "write" }`. Default: the built-in App\'s',
           }),
-        events: z
-          .array(z.string())
-          .optional()
-          .openapi({ description: "The webhook events it subscribes to. Default: the built-in App's" }),
+        events: z.array(z.string()).optional().openapi({
+          description:
+            "The webhook events it subscribes to, each one its permissions cover, as GitHub's App settings allow (`check_suite` among them). Default: the built-in App's that its permissions cover",
+        }),
       })
       .openapi("GitHubAppOptions"),
     response: GitHubApp,
@@ -715,7 +729,7 @@ export function registerGitHubRoutes(
     factory: { on: "GitHubFixture", name: "createApp", options: ["name", "permissions", "events"] },
     live: APPS_NOT_YET,
     stability,
-    handler: ({ session, body }) => appWire(fake.createApp(session.id, body)),
+    handler: ({ session, body }) => appHandle(fake.createApp(session.id, body)),
   });
 
   router.route({
@@ -725,7 +739,7 @@ export function registerGitHubRoutes(
     response: z.array(GitHubApp).openapi("GitHubApps"),
     sdkMethod: { on: "GitHubFixture", name: "apps" },
     stability,
-    handler: () => (isLive ? [appWire()] : fake.apps().map((app) => appWire(app))),
+    handler: () => (isLive ? [appHandle(store.app)] : fake.apps().map(appHandle)),
   });
 
   // --- Repositories -----------------------------------------------------------------------------

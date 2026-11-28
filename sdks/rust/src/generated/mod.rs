@@ -1392,6 +1392,7 @@ fn run_slack_user_shortcut<'a>(
         let mut args = args.into_iter();
         let p_callback_id = args.next().unwrap_or(Value::Null);
         let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/users/{}/shortcut",
             encode_segment(ctx.session()?),
@@ -1407,6 +1408,10 @@ fn run_slack_user_shortcut<'a>(
                 wire.insert(
                     "message".into(),
                     (&|v: &Value| enc::ref_ids(v, &["channel", "ts"]))(&p_message)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -1429,6 +1434,7 @@ fn run_slack_user_run_command<'a>(
         let mut args = args.into_iter();
         let p_command = args.next().unwrap_or(Value::Null);
         let p_channel = options.get("channel").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/users/{}/commands",
             encode_segment(ctx.session()?),
@@ -1444,6 +1450,10 @@ fn run_slack_user_run_command<'a>(
                 wire.insert(
                     "channel".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_channel)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -1500,6 +1510,7 @@ fn run_slack_user_open_agent_thread<'a>(
         let _ = (&me, &options);
         let mut args = args.into_iter();
         let p_from = options.get("from").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/users/{}/agent-threads",
             encode_segment(ctx.session()?),
@@ -1514,6 +1525,10 @@ fn run_slack_user_open_agent_thread<'a>(
                 wire.insert(
                     "from".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_from)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -12103,7 +12118,7 @@ impl SlackUser {
         ))
     }
 
-    /// Run a message shortcut on a message. Experimental.
+    /// Run an app's message shortcut on a message: it goes to that app alone. Experimental.
     pub fn shortcut(&self, callback_id: impl IntoArg) -> SlackUserShortcut {
         SlackUserShortcut(Call::new(
             &self.ctx,
@@ -12114,7 +12129,7 @@ impl SlackUser {
         ))
     }
 
-    /// Run a slash command in a conversation, e.g. `/deploy web staging`. Experimental.
+    /// Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone. Experimental.
     pub fn run_command(&self, command: impl IntoArg) -> SlackUserRunCommand {
         SlackUserRunCommand(Call::new(
             &self.ctx,
@@ -12136,7 +12151,7 @@ impl SlackUser {
         ))
     }
 
-    /// Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at. Experimental.
+    /// Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at. Experimental.
     pub fn open_agent_thread(&self) -> SlackUserOpenAgentThread {
         SlackUserOpenAgentThread(Call::new(
             &self.ctx,
@@ -12425,6 +12440,10 @@ impl SlackUserShortcut {
     pub fn message(self, value: impl IntoArg) -> Self {
         Self(self.0.option("message", value))
     }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
     /// Send the request.
     pub async fn send(self) -> Result<SlackDelivery> {
         self.0.send().await
@@ -12446,6 +12465,10 @@ impl SlackUserRunCommand {
     /// `channel`.
     pub fn channel(self, value: impl IntoArg) -> Self {
         Self(self.0.option("channel", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<SlackDelivery> {
@@ -12490,6 +12513,10 @@ impl SlackUserOpenAgentThread {
     /// `from`.
     pub fn from(self, value: impl IntoArg) -> Self {
         Self(self.0.option("from", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<SlackThread> {
@@ -14179,7 +14206,7 @@ impl GitHubFixture {
         )
     }
 
-    /// The id of the built-in App's installation, for a repository it is installed on. Experimental.
+    /// The id of the built-in App's installation, for a repository it is installed on. The same as `github.app.installationId(repo)`. Experimental.
     pub fn installation_id(&self, repo: impl IntoArg) -> Call<Value> {
         Call::new(
             &self.ctx,

@@ -291,8 +291,6 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
   const conversationOf = (message: { id: string; inReplyTo?: string | undefined; references: readonly string[] }) =>
     threadOf(message, (id) => store.byMessageId(id)?.thread) ?? message.id;
 
-  const isApp = (mailbox: Mailbox) => store.appAt(mailbox.address) !== undefined;
-
   /** Another app's mailbox (`createApp`): `<name>@acme.example`, its own OAuth client and history. */
   const createApp = (session: string | undefined, input: { name: string }): GoogleAppRecord => {
     let historyStart: string | undefined;
@@ -333,8 +331,8 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
       ...(parsed.messageId ? {} : { "Message-ID": ownId }),
     };
     const sent = Object.keys(stamped).length === 0 ? raw : withHeaders(raw, stamped);
-    // The email belongs to the session of the conversation it answers, or of a person it reaches.
-    const place = store.placeOf(parsed, to);
+    // The email belongs to the session of the conversation it answers, of a person it reaches, or of the apps it is between.
+    const place = store.placeOf(parsed, to, app);
     const session = acting ?? place.session;
     const email: GoogleEmailRecord = {
       id,
@@ -449,7 +447,6 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
       clientSecret: context.apps.secret(app.name, "clientSecret"),
       refreshToken: context.apps.secret(app.name, "refreshToken"),
     }),
-    isApp,
     principalOf: (email: GoogleEmailRecord) => emailAuthor(email, store.apps.all(), (id) => store.users.find(id)),
     /** The id of the key the certificates serve. */
     keyId,

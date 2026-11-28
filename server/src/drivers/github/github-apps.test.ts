@@ -1,3 +1,12 @@
+import { createPrivateKey } from "node:crypto";
+
+import { Webhooks } from "@octokit/webhooks";
+import { SignJWT } from "jose";
+import { Probot } from "probot";
+import { afterEach, describe, expect, test } from "vitest";
+
+import { harness, type RecordingAgent, recordingAgent, refusal, watchCredentials } from "../../../test/app-harness.ts";
+import { webhookProblems } from "../../../test/schemas/github.ts";
 /**
  * Exit check 12.3 for GitHub: several GitHub Apps on one org (decision 0027). Each has its own App
  * id, slug, `<slug>[bot]`, installation, private key and webhook secret, its own webhook URL, and
@@ -6,15 +15,6 @@
  * GitHub refuses one App's token, the fake refuses. Delivery cases A1 and A2 for GitHub use
  * `@octokit/webhooks` and Probot as the receivers.
  */
-import { createPrivateKey } from "node:crypto";
-
-import { Webhooks } from "@octokit/webhooks";
-import { SignJWT } from "jose";
-import { Probot } from "probot";
-import { afterEach, describe, expect, test } from "vitest";
-
-import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
-import { webhookProblems } from "../../../test/schemas/github.ts";
 import { LOOP_LIMIT } from "../../core/loops/index.ts";
 
 const agents: RecordingAgent[] = [];
@@ -376,6 +376,170 @@ describe("exit check 12.3: GitHub Apps", () => {
     expect(await refusal(post(`/apps/${reader.id}/comment`, { body: "hi", issue: issueRef }))).toBe("forbidden");
   });
 
+  test("only the App that made a check run may change it; two Apps' runs of one name are both the latest", async () => {
+    const { api, app, reviewer, path } = await twoApps();
+    const sha = (await api(reviewer, "GET", `${path}/commits/main`)).body.sha;
+    const made = await api(reviewer, "POST", `${path}/check-runs`, { name: "lint", head_sha: sha });
+    expect(made.status).toBe(201);
+
+    const taken = await api(app, "PATCH", `${path}/check-runs/${made.body.id}`, { conclusion: "success" });
+    expect(taken.status).toBe(403);
+    expect(taken.body.message).toBe(
+      `Invalid app_id \`${app.appId}\` - check run can only be modified by the GitHub App that created it.`,
+    );
+    expect((await api(app, "GET", `${path}/check-runs/${made.body.id}`)).body.status).toBe("queued");
+    const done = await api(reviewer, "PATCH", `${path}/check-runs/${made.body.id}`, { conclusion: "success" });
+    expect(done.body).toMatchObject({ status: "completed", conclusion: "success" });
+
+    // my-agent's own "lint" doesn't hide reviewer's: each App's newest run of a name is listed.
+    await api(app, "POST", `${path}/check-runs`, { name: "lint", head_sha: sha });
+    const listed = (await api(app, "GET", `${path}/commits/${sha}/check-runs`)).body;
+    expect(listed.check_runs.map((run: { app: { slug: string } }) => run.app.slug).sort()).toEqual([
+      "my-agent",
+      "reviewer",
+    ]);
+    expect(listed.total_count).toBe(2);
+  });
+
+  test("an App subscribes only to the events its permissions cover, and hears only those", async () => {
+    const { h, theirs, post, ana, issueRef, reviewer } = await twoApps();
+    const reader = await post("/apps", { name: "reader", permissions: { issues: "read" } });
+    expect(reader).toMatchObject({ name: "reader" });
+    expect(await refusal(post("/apps", { name: "pusher", permissions: { issues: "read" }, events: ["push"] }))).toBe(
+      "invalid_argument",
+    );
+    expect(await refusal(post("/apps", { name: "watcher", events: ["star"] }))).toBe("invalid_argument");
+    await post(`/repos/${issueRef.repoId}/install`, { app: reader.id });
+    await h.app.settled();
+    theirs.received.length = 0;
+
+    await post(`/users/${ana.id}/comment`, { body: "hi", issue: issueRef });
+    await post(`/users/${ana.id}/push`, {
+      changes: [{ path: "a.txt", content: Buffer.from("a\n").toString("base64") }],
+      repo: issueRef.repoId,
+      branch: "main",
+    });
+    await h.app.settled();
+    // reader and reviewer share an endpoint here: reader's are the ones for its App id.
+    const heard = (of: App) =>
+      webhooks(theirs)
+        .filter((hook) => hook.headers["x-github-hook-installation-target-id"] === String(of.appId))
+        .map((hook) => hook.event);
+    expect(heard(reader)).toEqual(["issue_comment"]);
+    expect(heard(reviewer)).toEqual(["issue_comment", "push"]);
+  });
+
+  test("check_suite requested goes to each App with checks write that subscribes to it, alone, for the pushed head", async () => {
+    const { h, mine, theirs, post, ana, issueRef, api, path } = await twoApps();
+    const ci = await post("/apps", {
+      name: "ci",
+      permissions: { checks: "write", contents: "read" },
+      events: ["check_suite", "check_run"],
+    });
+    const lint = await post("/apps", { name: "lint", permissions: { checks: "read" }, events: ["check_suite"] });
+    for (const one of [ci, lint]) await post(`/repos/${issueRef.repoId}/install`, { app: one.id });
+    await h.app.settled();
+    mine.received.length = 0;
+    theirs.received.length = 0;
+
+    const commit = await post(`/users/${ana.id}/push`, {
+      changes: [{ path: "a.txt", content: Buffer.from("a\n").toString("base64") }],
+      repo: issueRef.repoId,
+      branch: "main",
+      message: "Add a",
+    });
+    await h.app.settled();
+    const suites = webhooks(theirs).filter((hook) => hook.event === "check_suite");
+    // ci alone: lint may only read checks, and my-agent and reviewer don't subscribe to check_suite.
+    expect(suites.map((hook) => hook.headers["x-github-hook-installation-target-id"])).toEqual([String(ci.appId)]);
+    expect(suites[0]?.payload).toMatchObject({
+      action: "requested",
+      check_suite: {
+        head_sha: commit.sha,
+        head_branch: "main",
+        status: "queued",
+        app: { id: ci.appId, slug: "ci" },
+        head_commit: { id: commit.sha, message: "Add a" },
+      },
+      installation: { id: expect.any(Number) },
+      sender: { login: "ana" },
+    });
+    expect(webhooks(mine).some((hook) => hook.event === "check_suite")).toBe(false);
+
+    // The run ci makes for that commit is in the suite it was asked for.
+    const run = await api(ci, "POST", `${path}/check-runs`, { name: "build", head_sha: commit.sha });
+    expect(run.body.check_suite.id).toBe(suites[0]?.payload.check_suite.id);
+  });
+
+  test("an App's private key and webhook secret come with its handle only: no author or principal holds them", async () => {
+    const { h, base, post, get, app, reviewer, ana, issueRef, api, path } = await twoApps();
+    const watch = watchCredentials(h, "github");
+    const comment = await post(`/apps/${reviewer.id}/comment`, { body: "@my-agent over to you", issue: issueRef });
+    await post(`/apps/${reviewer.id}/issues`, { issue: { title: "Follow-up" }, repo: issueRef.repoId });
+    await post(`/apps/${reviewer.id}/react`, { content: "+1", comment: comment.id });
+    await post(`/users/${ana.id}/assign`, { assignees: [app.id], issue: issueRef });
+    const pr = await post(`/users/${ana.id}/pulls`, {
+      pr: { from: "fix", title: "Fix", changes: [{ path: "a.ts", content: Buffer.from("x\n").toString("base64") }] },
+      repo: issueRef.repoId,
+    });
+    const prRef = `/repos/${issueRef.repoId}/pulls/${pr.number}`;
+    await post(`/apps/${reviewer.id}/review`, {
+      review: { pr: { repoId: issueRef.repoId, number: pr.number }, event: "COMMENT", body: "Looks fine" },
+    });
+    const sha = (await api(reviewer, "GET", `${path}/commits/fix`)).body.sha;
+    await api(reviewer, "POST", `${path}/statuses/${sha}`, { state: "success", context: "review" });
+    await api(reviewer, "POST", `${path}/check-runs`, {
+      name: "review",
+      head_sha: sha,
+      status: "completed",
+      conclusion: "success",
+    });
+    await h.app.settled();
+    const issue = `/repos/${issueRef.repoId}/issues/${issueRef.number}`;
+    const reads = [
+      ...["", "/comments", "/assignees", "/transcript"].map((read) => `${issue}${read}`),
+      ...["", "/reviews", "/check-runs", "/review-comments"].map((read) => `${prRef}${read}`),
+      `/comments/${comment.id}/reactions`,
+      `/repos/${issueRef.repoId}/commits/${sha}/statuses`,
+      `/repos/${issueRef.repoId}/commits/${sha}/check-runs`,
+      "/deliveries",
+    ];
+    for (const read of reads) expect([read, (await h.call("GET", `${base}${read}`)).status]).toEqual([read, 200]);
+    // The handle routes still carry the credentials: an agent's tests read them there.
+    expect((await get("/apps")).map((one: App) => one.privateKey)).toEqual([app.privateKey, reviewer.privateKey]);
+
+    const secrets = [app, reviewer].flatMap((one) => [one.privateKey, one.webhookSecret]);
+    expect(secrets.every((secret) => secret.length > 0)).toBe(true);
+    expect(watch.leaks([...secrets, "PRIVATE KEY-----"])).toEqual([]);
+  });
+
+  test("a person and an App of one session can't share a name", async () => {
+    const { post } = await twoApps();
+    expect(await refusal(post("/users", { login: "reviewer" }))).toBe("invalid_argument");
+    await post("/users", { login: "ben" });
+    expect(await refusal(post("/apps", { name: "ben" }))).toBe("invalid_argument");
+  });
+
+  test("exit check 12.5: channelstack env --app prints the App's lines under my-agent's keys", async () => {
+    const { h, reviewer } = await twoApps();
+    const env = (await h.call("GET", "/env?app=reviewer&channel=github")).body;
+    expect(env).toMatchObject({
+      GITHUB_APP_ID: String(reviewer.appId),
+      GITHUB_APP_SLUG: "reviewer",
+      GITHUB_BOT_USER_ID: reviewer.botUserId,
+      GITHUB_PRIVATE_KEY: reviewer.privateKey.replaceAll("\n", "\\n"),
+      GITHUB_WEBHOOK_SECRET: reviewer.webhookSecret,
+    });
+    expect(env.GITHUB_INSTALLATION_ID).toMatch(/^[6-9]\d{7}$/);
+    expect((await h.call("GET", "/env?app=my-agent&channel=github")).body.GITHUB_WEBHOOK_SECRET).toBe(
+      h.secrets.get("github", "webhookSecret"),
+    );
+    // An App no test made yet is made by asking for its lines, so its agent can start first.
+    expect((await h.call("GET", "/env?app=linter&channel=github")).body.GITHUB_WEBHOOK_SECRET).toBe(
+      h.secrets.forApp("github", "linter", "webhookSecret"),
+    );
+  });
+
   test("exit check 12.6: Apps reviewing a pull request at each other are stopped at the guard's limit, their edits too, and the session says so", async () => {
     const { h, sessionId, mine, post, api, app, reviewer, ana, path, issueRef } = await twoApps();
     const pr = await post(`/users/${ana.id}/pulls`, {
@@ -412,32 +576,5 @@ describe("exit check 12.3: GitHub Apps", () => {
     await h.app.settled();
     expect(reviews()).toBe(LOOP_LIMIT + 1);
     expect(webhooks(mine).at(-1)?.payload.comment.body).toBe("elsewhere");
-  });
-
-  test("a person and an App of one session can't share a name", async () => {
-    const { post } = await twoApps();
-    expect(await refusal(post("/users", { login: "reviewer" }))).toBe("invalid_argument");
-    await post("/users", { login: "ben" });
-    expect(await refusal(post("/apps", { name: "ben" }))).toBe("invalid_argument");
-  });
-
-  test("exit check 12.5: channelstack env --app prints the App's lines under my-agent's keys", async () => {
-    const { h, reviewer } = await twoApps();
-    const env = (await h.call("GET", "/env?app=reviewer&channel=github")).body;
-    expect(env).toMatchObject({
-      GITHUB_APP_ID: String(reviewer.appId),
-      GITHUB_APP_SLUG: "reviewer",
-      GITHUB_BOT_USER_ID: reviewer.botUserId,
-      GITHUB_PRIVATE_KEY: reviewer.privateKey.replaceAll("\n", "\\n"),
-      GITHUB_WEBHOOK_SECRET: reviewer.webhookSecret,
-    });
-    expect(env.GITHUB_INSTALLATION_ID).toMatch(/^[6-9]\d{7}$/);
-    expect((await h.call("GET", "/env?app=my-agent&channel=github")).body.GITHUB_WEBHOOK_SECRET).toBe(
-      h.secrets.get("github", "webhookSecret"),
-    );
-    // An App no test made yet is made by asking for its lines, so its agent can start first.
-    expect((await h.call("GET", "/env?app=linter&channel=github")).body.GITHUB_WEBHOOK_SECRET).toBe(
-      h.secrets.forApp("github", "linter", "webhookSecret"),
-    );
   });
 });

@@ -193,6 +193,69 @@ describe("exit check 12.3: Resend apps", () => {
     expect(thread[2].headers["auto-submitted"]).toBe("auto-replied");
   });
 
+  test("a new email between two apps, with no person on it, is delivered in the session that used them", async () => {
+    const { h, mine, theirs, get, rest, app, coder, base } = await twoTeams();
+    // Another session uses only my-agent: an email between my-agent and coder isn't its.
+    const other = (await h.call("POST", "/sessions")).body.sessionId;
+    expect(other).not.toBe(base.split("/")[2]);
+
+    const fresh = await rest("POST", "/emails", app.apiKey, {
+      from: `my-agent <${app.address}>`,
+      to: coder.address,
+      subject: "Can you take the refunds queue?",
+      text: "It's yours from today.",
+    });
+    expect(fresh.status).toBe(200);
+    await h.app.settled();
+
+    const received = events(theirs).find((one) => one.type === "email.received");
+    expect(received?.data).toMatchObject({ email_id: fresh.body.id, from: app.address, to: [coder.address] });
+    expect(
+      events(mine)
+        .filter((one) => one.data.email_id === fresh.body.id)
+        .map((one) => one.type),
+    ).toEqual(["email.sent", "email.delivered"]);
+    // It is a conversation of the session that made coder, with the delivery to coder in it.
+    expect((await get("/deliveries?app=coder")).map((one: { type: string }) => one.type)).toContain("email.received");
+    expect((await h.call("GET", `/sessions/${other}/resend/deliveries`)).body).toEqual([]);
+
+    // coder answers it, and my-agent hears that in the same session.
+    const answer = await rest("POST", "/emails", coder.apiKey, {
+      from: coder.address,
+      to: app.address,
+      subject: "Fine",
+      text: "On it.",
+    });
+    await h.app.settled();
+    expect(events(mine).find((one) => one.data.email_id === answer.body.id)?.type).toBe("email.received");
+  });
+
+  test("idempotency keys and the rate limit are each team's own", async () => {
+    const { h, app, coder, ana } = await twoTeams();
+    const send = (team: { apiKey: string; address: string }, text: string, key?: string) =>
+      h.provider(
+        "POST",
+        "resend/emails",
+        { from: team.address, to: ana.address, subject: "Your refund", text },
+        team.apiKey,
+        key === undefined ? {} : { "idempotency-key": key },
+      );
+
+    // Two teams answering one email often key the send by its id: each key is its own team's.
+    const mine = await send(app, "Refunded.", "reply-1");
+    const theirs = await send(coder, "Ticket opened.", "reply-1");
+    expect([mine.status, theirs.status]).toEqual([200, 200]);
+    expect(theirs.body.id).not.toBe(mine.body.id);
+    expect((await send(app, "Refunded.", "reply-1")).body.id).toBe(mine.body.id);
+    expect((await send(app, "Something else.", "reply-1")).body.name).toBe("invalid_idempotent_request");
+    expect((await send(coder, "Ticket opened.", "reply-1")).body.id).toBe(theirs.body.id);
+
+    // 10 a second is my-agent's team's limit: coder's team still sends.
+    for (let i = 0; i < 10; i++) await send(app, `note ${i}`);
+    expect((await send(app, "one too many")).status).toBe(429);
+    expect((await send(coder, "still fine")).status).toBe(200);
+  });
+
   test("A1: an email two teams receive is two deliveries, each to its own URL and signed with its own secret, which webhooks.verify tells apart", async () => {
     const { h, mine, theirs, base, post, app, coder, ana } = await twoTeams();
     const email = await post(`/users/${encodeURIComponent(ana.id)}/send`, {

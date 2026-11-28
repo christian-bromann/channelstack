@@ -8,7 +8,7 @@
 import { LinearWebhookClient } from "@linear/sdk/webhooks";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
+import { harness, type RecordingAgent, recordingAgent, refusal, watchCredentials } from "../../../test/app-harness.ts";
 import { linearWebhookProblems } from "../../../test/schemas/linear.ts";
 import { LOOP_LIMIT } from "../../core/loops/index.ts";
 
@@ -284,6 +284,36 @@ describe("exit check 12.3: Linear apps", () => {
     expect(delegating.errors[0].extensions.code).toBe("INPUT_ERROR");
     await h.app.settled();
     expect(theirs.received.length + mine.received.length).toBe(before);
+  });
+
+  test("an app's token and secrets come with its handle only: no author, delegate or session's app holds them", async () => {
+    const { h, base, post, get, gql, app, coder, ana, issue } = await twoApps();
+    const watch = watchCredentials(h, "linear");
+    const created = await issue();
+    const session = await post(`/users/${ana.id}/delegate`, { app: coder.id, issue: created.id });
+    const said = await post(`/apps/${coder.id}/comment`, { body: "I'll take the backend", issue: created.id });
+    await post(`/apps/coder/reply`, { body: "PR is up", comment: said.id });
+    const thought = { agentSessionId: session.id, content: { type: "thought", body: "Looking" } };
+    await gql(coder.accessToken, ACTIVITY, { input: thought });
+    await h.app.settled();
+    const reads = [
+      ...["", "/comments", "/delegate", "/sessions", "/session", "/transcript"].map(
+        (read) => `/issues/${created.id}${read}`,
+      ),
+      `/comments/${said.id}/replies`,
+      `/comments/${said.id}/transcript`,
+      ...["/state", "/activities", "/transcript"].map((read) => `/agent-sessions/${session.id}${read}`),
+    ];
+    for (const read of reads) expect([read, (await h.call("GET", `${base}${read}`)).status]).toEqual([read, 200]);
+    expect((await get("/apps")).map((one: { accessToken: string }) => one.accessToken)).toEqual([
+      app.accessToken,
+      coder.accessToken,
+    ]);
+
+    // The client id isn't a secret: Linear puts it in every AgentSessionEvent (`oauthClientId`), and deliveries show it.
+    const secrets = [app, coder].flatMap((one) => [one.accessToken, one.webhookSecret, one.clientSecret]);
+    expect(secrets.every((secret) => secret.length > 0)).toBe(true);
+    expect(watch.leaks(secrets)).toEqual([]);
   });
 
   test("a scripted app comments and replies through the fake's own path, as itself; never as my-agent", async () => {

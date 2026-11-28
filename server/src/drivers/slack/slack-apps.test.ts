@@ -8,7 +8,7 @@ import { createHmac } from "node:crypto";
 
 import { afterEach, describe, expect, test } from "vitest";
 
-import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
+import { harness, type RecordingAgent, recordingAgent, refusal, watchCredentials } from "../../../test/app-harness.ts";
 import { LOOP_LIMIT } from "../../core/loops/index.ts";
 
 const agents: RecordingAgent[] = [];
@@ -199,6 +199,186 @@ describe("exit check 12.3: Slack apps", () => {
     expect(payload.token).toBe(h.secrets.forApp("slack", "coder", "verificationToken"));
   });
 
+  test("a modal another app opens is that app's: its trigger_id, updates, view_submission and view_closed are its alone", async () => {
+    const { h, mine, theirs, post, get, app, coder, web } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id] });
+    const blocks = [
+      {
+        type: "actions",
+        elements: [{ type: "button", action_id: "form", text: { type: "plain_text", text: "Open form" } }],
+      },
+    ];
+    await web("chat.postMessage", { channel: channel.id, text: "File a bug?", blocks }, coder.botToken);
+    await h.app.settled();
+    const view = {
+      type: "modal",
+      callback_id: "bug",
+      notify_on_close: true,
+      title: { type: "plain_text", text: "Bug" },
+      submit: { type: "plain_text", text: "File" },
+      blocks: [{ type: "section", text: { type: "mrkdwn", text: "File it?" } }],
+    };
+    /** Ana clicks coder's button: the trigger_id coder is handed. */
+    const click = async () => {
+      await post(`/users/${ana.id}/click`, { button: { label: "Open form" }, channel: channel.id });
+      await h.app.settled();
+      return JSON.parse(new URLSearchParams(theirs.received.at(-1)?.body).get("payload") ?? "{}").trigger_id as string;
+    };
+    const payloadOf = (agent: RecordingAgent) =>
+      JSON.parse(new URLSearchParams(agent.received.at(-1)?.body).get("payload") ?? "{}");
+    const signedFor = (agent: RecordingAgent, secret: string) => {
+      const delivery = agent.received.at(-1);
+      const timestamp = String(delivery?.headers["x-slack-request-timestamp"]);
+      const signature = createHmac("sha256", secret).update(`v0:${timestamp}:${delivery?.body}`).digest("hex");
+      return delivery?.headers["x-slack-signature"] === `v0=${signature}`;
+    };
+    const before = mine.received.length;
+
+    // my-agent can't open a modal on the trigger_id coder was handed; coder can.
+    const trigger = await click();
+    expect(await web("views.open", { trigger_id: trigger, view }, app.botToken)).toMatchObject({
+      ok: false,
+      error: "invalid_trigger_id",
+    });
+    const opened = await web("views.open", { trigger_id: trigger, view }, coder.botToken);
+    expect(opened).toMatchObject({ ok: true, view: { app_id: coder.id, bot_id: coder.botId } });
+
+    // Only coder may update it.
+    const update = { view_id: opened.view.id, view: { ...view, title: { type: "plain_text", text: "Bug!" } } };
+    expect(await web("views.update", update, app.botToken)).toMatchObject({ ok: false, error: "not_found" });
+    expect(await web("views.update", update, coder.botToken)).toMatchObject({ ok: true, view: { app_id: coder.id } });
+
+    // Its submission goes to coder, signed with coder's secret, with coder's verification token.
+    const submitted = await post(`/modals/${opened.view.id}/submit`);
+    await h.app.settled();
+    expect(submitted).toMatchObject({ type: "view_submission", app: "coder" });
+    expect(payloadOf(theirs)).toMatchObject({
+      type: "view_submission",
+      api_app_id: coder.id,
+      token: h.secrets.forApp("slack", "coder", "verificationToken"),
+      view: { id: opened.view.id, app_id: coder.id },
+    });
+    expect(signedFor(theirs, coder.signingSecret)).toBe(true);
+
+    // And its close.
+    const again = await web("views.open", { trigger_id: await click(), view }, coder.botToken);
+    const closed = await post(`/modals/${again.view.id}/close`);
+    await h.app.settled();
+    expect(closed).toMatchObject({ type: "view_closed", app: "coder" });
+    expect(payloadOf(theirs)).toMatchObject({ type: "view_closed", api_app_id: coder.id });
+    expect(signedFor(theirs, coder.signingSecret)).toBe(true);
+    expect(mine.received.length).toBe(before);
+    expect((await get(`/users/${ana.id}/modals`)).map((modal: { viewId: string }) => modal.viewId)).toEqual([
+      opened.view.id,
+      again.view.id,
+    ]);
+  });
+
+  test("a slash command, a message shortcut and a split view reach the app they are for, and it answers as itself", async () => {
+    const { h, mine, theirs, post, get, app, coder } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id] });
+    const said = await post(`/users/${ana.id}/say`, { message: { text: "the build broke" }, channel: channel.id });
+    await h.app.settled();
+    const before = mine.received.length;
+    theirs.received.length = 0;
+    const form = () => new URLSearchParams(theirs.received.at(-1)?.body);
+
+    // coder answers its command in the response itself.
+    theirs.respond = () => ({
+      status: 200,
+      body: JSON.stringify({ text: "Deploying web" }),
+      headers: { "content-type": "application/json" },
+    });
+    const command = await post(`/users/${ana.id}/commands`, {
+      command: "/deploy web",
+      channel: channel.id,
+      app: "coder",
+    });
+    await h.app.settled();
+    expect(command).toMatchObject({ type: "slash_command", app: "coder" });
+    expect(Object.fromEntries(form())).toMatchObject({
+      command: "/deploy",
+      text: "web",
+      api_app_id: coder.id,
+      token: h.secrets.forApp("slack", "coder", "verificationToken"),
+    });
+    const answer = (await get(`/users/${ana.id}/ephemeral`)).at(-1);
+    expect(answer).toMatchObject({ text: "Deploying web", author: { id: coder.id } });
+    theirs.respond = () => ({ status: 200, body: "" });
+
+    const shortcut = await post(`/users/${ana.id}/shortcut`, {
+      callbackId: "file_bug",
+      message: { channel: channel.id, ts: said.ts },
+      app: coder.id,
+    });
+    await h.app.settled();
+    expect(shortcut).toMatchObject({ type: "message_action", app: "coder" });
+    expect(JSON.parse(form().get("payload") ?? "{}")).toMatchObject({
+      type: "message_action",
+      callback_id: "file_bug",
+      api_app_id: coder.id,
+    });
+
+    const thread = await post(`/users/${ana.id}/agent-threads`, { from: channel.id, app: "coder" });
+    await h.app.settled();
+    expect(JSON.parse(theirs.received.at(-1)?.body ?? "{}").event).toMatchObject({
+      type: "assistant_thread_started",
+      assistant_thread: { user_id: ana.id, channel_id: thread.channel, context: { channel_id: channel.id } },
+    });
+    expect(await get(`/conversations/${thread.channel}/members`)).toEqual([
+      expect.objectContaining({ id: ana.id }),
+      expect.objectContaining({ id: coder.id }),
+    ]);
+    // None of it went to my-agent; without app, each is my-agent's as before.
+    expect(mine.received.length).toBe(before);
+    expect(await post(`/users/${ana.id}/commands`, { command: "/deploy", channel: channel.id })).toMatchObject({
+      app: "my-agent",
+    });
+    expect(
+      await refusal(post(`/users/${ana.id}/commands`, { command: "/x", channel: channel.id, app: "nobody" })),
+    ).toBe("not_found");
+  });
+
+  test("a file is read as the app whose token asks: where its bot is a member, never where only another's is", async () => {
+    const { h, theirs, post, app, coder, web } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const withCoder = await post("/channels", { participants: [ana.id, coder.id] });
+    const withMine = await post("/channels", { participants: [ana.id, app.id] });
+    const log = "Error: disk full\n";
+    const share = (channel: string, path: string) =>
+      post(`/users/${ana.id}/say`, {
+        message: { text: "why does it crash?" },
+        channel,
+        files: [{ path, content: Buffer.from(log).toString("base64") }],
+      });
+    await share(withCoder.id, "coder.log");
+    await share(withMine.id, "mine.log");
+    await h.app.settled();
+    const fileOf = (name: string) =>
+      events(theirs)
+        .flatMap((one) => (one.event.files as Array<{ id: string; name: string; url_private: string }>) ?? [])
+        .find((file) => file.name === name);
+    const theirsFile = fileOf("coder.log");
+    if (!theirsFile) throw new Error("coder was told of the file in its channel");
+    const download = async (url: string, token: string) =>
+      (await h.app.fetch(new Request(url, { headers: { authorization: `Bearer ${token}` } }))).status;
+
+    expect(await download(theirsFile.url_private, coder.botToken)).toBe(200);
+    expect(await download(theirsFile.url_private, app.botToken)).toBe(404);
+    expect(await web("files.info", { file: theirsFile.id }, coder.botToken)).toMatchObject({ ok: true });
+    expect(await web("files.info", { file: theirsFile.id }, app.botToken)).toMatchObject({
+      ok: false,
+      error: "file_not_found",
+    });
+
+    // my-agent's file, in a channel coder isn't in, is my-agent's to read alone.
+    const mine = (await web("conversations.history", { channel: withMine.id }, app.botToken)).messages[0].files[0];
+    expect(await download(mine.url_private, app.botToken)).toBe(200);
+    expect(await download(mine.url_private, coder.botToken)).toBe(404);
+  });
+
   test("exit check 12.6: two apps answering each other are stopped at the guard's limit, and the session says so", async () => {
     const { h, mine, post, app, coder, sessionId } = await twoApps();
     const reviewer = await post("/apps", { name: "reviewer" });
@@ -286,6 +466,36 @@ describe("exit check 12.3: Slack apps", () => {
 
     expect(mine.received.length).toBe(before);
     expect(events(theirs).at(-1)?.event).toMatchObject({ type: "agent_session_stopped", user: ana.id });
+  });
+
+  test("an app's tokens and signing secret come with its handle only: no author, member or reactor holds them", async () => {
+    const { h, base, post, get, app, coder, web } = await twoApps();
+    const watch = watchCredentials(h, "slack");
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id] });
+    const sent = await web("chat.postMessage", { channel: channel.id, text: "opened #12" }, coder.botToken);
+    await web("reactions.add", { channel: channel.id, timestamp: sent.ts, name: "eyes" }, coder.botToken);
+    await web("chat.postMessage", { channel: channel.id, thread_ts: sent.ts, text: "on it" }, app.botToken);
+    await h.app.settled();
+    const at = `/conversations/${channel.id}`;
+    const reads = [
+      `${at}/messages`,
+      `${at}/members`,
+      `${at}/latest`,
+      `${at}/messages/${sent.ts}`,
+      `${at}/threads/${sent.ts}/replies`,
+      `${at}/messages/${sent.ts}/reactions`,
+      `${at}/transcript`,
+    ];
+    for (const read of reads) expect([read, (await h.call("GET", `${base}${read}`)).status]).toEqual([read, 200]);
+    expect((await get("/apps")).map((one: { botToken: string }) => one.botToken)).toEqual([
+      app.botToken,
+      coder.botToken,
+    ]);
+
+    const secrets = [app, coder].flatMap((one) => [one.botToken, one.appToken, one.signingSecret]);
+    expect(secrets.every((secret) => secret.length > 0)).toBe(true);
+    expect(watch.leaks(secrets)).toEqual([]);
   });
 
   test("a person and an app of one session can't share a name", async () => {

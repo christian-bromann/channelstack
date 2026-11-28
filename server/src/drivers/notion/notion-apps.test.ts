@@ -1,3 +1,7 @@
+import notionClient from "@notionhq/client";
+import { afterEach, describe, expect, test } from "vitest";
+
+import { harness, type RecordingAgent, recordingAgent, refusal, watchCredentials } from "../../../test/app-harness.ts";
 /**
  * Exit check 12.3 for Notion: several integrations in one workspace (decision 0027). Each has its
  * own bot user, token and webhook subscription, sees only the pages connected to it, and hears
@@ -6,10 +10,6 @@
  * verification token. Whether Notion does send them, and how it refuses a mention of a bot, is
  * still to confirm (B7); the fake does what the decision says until then.
  */
-import notionClient from "@notionhq/client";
-import { afterEach, describe, expect, test } from "vitest";
-
-import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
 import { LOOP_LIMIT } from "../../core/loops/index.ts";
 
 // The package is CommonJS: Node gives it to an ES module as its default export.
@@ -306,6 +306,61 @@ describe("exit check 12.3: Notion integrations", () => {
     );
   });
 
+  test("an integration's token and verification token come with its handle only: no author or connection holds them", async () => {
+    const { h, base, post, get, app, writer, ana } = await twoIntegrations();
+    const watch = watchCredentials(h, "notion");
+    const page = await post("/pages", { title: "Plan", content: "## Goals", connections: [app.id, writer.id] });
+    const comment = await post(`/apps/${writer.id}/comment`, { text: "Drafted it", page: page.id });
+    await post(`/users/${ana.id}/reply`, { text: "Thanks", discussion: comment.discussion.id });
+    h.timers.advance(1000);
+    await h.app.settled();
+    const reads = [
+      ...["/discussions", "/connections", "/transcript"].map((read) => `/pages/${page.id}${read}`),
+      ...["/comments", "/transcript"].map((read) => `/discussions/${comment.discussion.id}${read}`),
+    ];
+    for (const read of reads) expect([read, (await h.call("GET", `${base}${read}`)).status]).toEqual([read, 200]);
+    expect((await get("/apps")).map((one: { token: string }) => one.token)).toEqual([app.token, writer.token]);
+
+    const secrets = [app, writer].flatMap((one) => [one.token, one.webhookSecret]);
+    expect(secrets.every((secret) => secret.length > 0)).toBe(true);
+    expect(watch.leaks(secrets)).toEqual([]);
+  });
+
+  test("a person and an integration of one session can't share a name", async () => {
+    const { post } = await twoIntegrations();
+    expect(await refusal(post("/users", { name: "writer" }))).toBe("invalid_argument");
+    await post("/users", { name: "editor" });
+    expect(await refusal(post("/apps", { name: "editor" }))).toBe("invalid_argument");
+  });
+
+  test("exit check 12.5: channelstack env --app prints the integration's lines under my-agent's keys", async () => {
+    const { h, app, writer } = await twoIntegrations();
+    expect((await h.call("GET", "/env?app=writer&channel=notion")).body).toMatchObject({
+      NOTION_TOKEN: writer.token,
+      NOTION_VERIFICATION_TOKEN: writer.webhookSecret,
+    });
+    expect((await h.call("GET", "/env?app=my-agent&channel=notion")).body.NOTION_TOKEN).toBe(app.token);
+    // An integration no test made yet is made by asking for its lines, so its agent can start first.
+    expect((await h.call("GET", "/env?app=summarizer&channel=notion")).body.NOTION_TOKEN).toBe(
+      h.secrets.forApp("notion", "summarizer", "token"),
+    );
+  });
+});
+
+describe("R1.12: deliveries by integration", () => {
+  test("deliveries({ app }) lists one integration's, beside the type and resource filters", async () => {
+    const { h, post, get, app, writer, ana } = await twoIntegrations();
+    const shared = await post("/pages", { title: "Shared", connections: [app.id, writer.id] });
+    await post(`/users/${ana.id}/comment`, { text: "please draft", page: shared.id });
+    await h.app.settled();
+
+    const apps = (query: string) =>
+      get(`/deliveries?${query}`).then((list: { app: string; type: string }[]) => list.map((one) => one.app));
+    expect(await apps(`app=${writer.id}&type=comment.created`)).toEqual(["writer"]);
+    expect(await apps(`app=my-agent&resource=${shared.id}&type=comment.created`)).toEqual(["my-agent"]);
+    expect(new Set(await apps(`resource=${shared.id}`))).toEqual(new Set(["my-agent", "writer"]));
+  });
+
   test("exit check 12.6: integrations commenting at each other on a page are stopped at the guard's limit, their page writes too, and the session says so", async () => {
     const { h, sessionId, mine, post, app, writer, ana, api } = await twoIntegrations();
     const page = await post("/pages", { title: "Roadmap", connections: [app.id, writer.id] });
@@ -373,40 +428,5 @@ describe("exit check 12.3: Notion integrations", () => {
         /^a bot loop in notion [0-9a-f-]{36} was stopped after 50 app messages .*\((my-agent → writer → )+my-agent/,
       ),
     ]);
-  });
-
-  test("a person and an integration of one session can't share a name", async () => {
-    const { post } = await twoIntegrations();
-    expect(await refusal(post("/users", { name: "writer" }))).toBe("invalid_argument");
-    await post("/users", { name: "editor" });
-    expect(await refusal(post("/apps", { name: "editor" }))).toBe("invalid_argument");
-  });
-
-  test("exit check 12.5: channelstack env --app prints the integration's lines under my-agent's keys", async () => {
-    const { h, app, writer } = await twoIntegrations();
-    expect((await h.call("GET", "/env?app=writer&channel=notion")).body).toMatchObject({
-      NOTION_TOKEN: writer.token,
-      NOTION_VERIFICATION_TOKEN: writer.webhookSecret,
-    });
-    expect((await h.call("GET", "/env?app=my-agent&channel=notion")).body.NOTION_TOKEN).toBe(app.token);
-    // An integration no test made yet is made by asking for its lines, so its agent can start first.
-    expect((await h.call("GET", "/env?app=summarizer&channel=notion")).body.NOTION_TOKEN).toBe(
-      h.secrets.forApp("notion", "summarizer", "token"),
-    );
-  });
-});
-
-describe("R1.12: deliveries by integration", () => {
-  test("deliveries({ app }) lists one integration's, beside the type and resource filters", async () => {
-    const { h, post, get, app, writer, ana } = await twoIntegrations();
-    const shared = await post("/pages", { title: "Shared", connections: [app.id, writer.id] });
-    await post(`/users/${ana.id}/comment`, { text: "please draft", page: shared.id });
-    await h.app.settled();
-
-    const apps = (query: string) =>
-      get(`/deliveries?${query}`).then((list: { app: string; type: string }[]) => list.map((one) => one.app));
-    expect(await apps(`app=${writer.id}&type=comment.created`)).toEqual(["writer"]);
-    expect(await apps(`app=my-agent&resource=${shared.id}&type=comment.created`)).toEqual(["my-agent"]);
-    expect(new Set(await apps(`resource=${shared.id}`))).toEqual(new Set(["my-agent", "writer"]));
   });
 });

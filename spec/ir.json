@@ -2751,7 +2751,7 @@
         {
           "name": "shortcut",
           "kind": "method",
-          "summary": "Run a message shortcut on a message",
+          "summary": "Run an app's message shortcut on a message: it goes to that app alone",
           "stability": "experimental",
           "http": {
             "verb": "POST",
@@ -2789,6 +2789,17 @@
               },
               "optional": false,
               "in": "body"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackApp"
+                ]
+              },
+              "optional": true,
+              "in": "body"
             }
           ],
           "returns": {
@@ -2819,7 +2830,7 @@
         {
           "name": "runCommand",
           "kind": "method",
-          "summary": "Run a slash command in a conversation, e.g. `/deploy web staging`",
+          "summary": "Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone",
           "stability": "experimental",
           "http": {
             "verb": "POST",
@@ -2856,6 +2867,17 @@
                 ]
               },
               "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackApp"
+                ]
+              },
+              "optional": true,
               "in": "body"
             }
           ],
@@ -2947,7 +2969,7 @@
         {
           "name": "openAgentThread",
           "kind": "method",
-          "summary": "Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at",
+          "summary": "Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at",
           "stability": "experimental",
           "http": {
             "verb": "POST",
@@ -2972,6 +2994,17 @@
                 "kind": "ref",
                 "resources": [
                   "SlackConversation"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackApp"
                 ]
               },
               "optional": true,
@@ -5572,7 +5605,7 @@
         {
           "name": "installationId",
           "kind": "method",
-          "summary": "The id of the built-in App's installation, for a repository it is installed on",
+          "summary": "The id of the built-in App's installation, for a repository it is installed on. The same as `github.app.installationId(repo)`",
           "stability": "experimental",
           "http": {
             "verb": "POST",

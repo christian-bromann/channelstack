@@ -306,7 +306,7 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
       },
       {
         "name": "shortcut",
-        "summary": "Run a message shortcut on a message",
+        "summary": "Run an app's message shortcut on a message: it goes to that app alone",
         "method": "POST",
         "path": "/users/{user}/shortcut",
         "params": [
@@ -330,12 +330,24 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
             "optional": false,
             "in": "body",
             "positional": false
+          },
+          {
+            "name": "app",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "SlackApp"
+              ]
+            },
+            "optional": true,
+            "in": "body",
+            "positional": false
           }
         ]
       },
       {
         "name": "runCommand",
-        "summary": "Run a slash command in a conversation, e.g. `/deploy web staging`",
+        "summary": "Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone",
         "method": "POST",
         "path": "/users/{user}/commands",
         "params": [
@@ -357,6 +369,18 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
               ]
             },
             "optional": false,
+            "in": "body",
+            "positional": false
+          },
+          {
+            "name": "app",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "SlackApp"
+              ]
+            },
+            "optional": true,
             "in": "body",
             "positional": false
           }
@@ -385,7 +409,7 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
       },
       {
         "name": "openAgentThread",
-        "summary": "Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at",
+        "summary": "Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at",
         "method": "POST",
         "path": "/users/{user}/agent-threads",
         "params": [
@@ -395,6 +419,18 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
               "kind": "ref",
               "resources": [
                 "SlackConversation"
+              ]
+            },
+            "optional": true,
+            "in": "body",
+            "positional": false
+          },
+          {
+            "name": "app",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "SlackApp"
               ]
             },
             "optional": true,

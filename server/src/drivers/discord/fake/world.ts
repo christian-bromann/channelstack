@@ -115,14 +115,6 @@ export interface FakeDiscordWorld extends DiscordWorld {
    * and shows nothing: a transcript is what was written.
    */
   typing(channel: DiscordChannelRecord): void;
-  /** Send a Gateway event to one app's bot, if it hears it. Returns the delivery. */
-  dispatchTo(
-    app: DiscordAppRecord,
-    session: string | undefined,
-    type: string,
-    payload: unknown,
-    intent: Intent | undefined,
-  ): string | undefined;
   /** The guild's apps, the built-in one first. */
   apps(): DiscordAppRecord[];
   /** The app whose application or bot user this is. */
@@ -693,7 +685,6 @@ export function createFakeWorld(
     threadAs,
     dmWith,
     typing,
-    dispatchTo,
     sessionOf,
     mentionText,
     apps: () => store.apps.all(),

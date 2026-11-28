@@ -1,4 +1,5 @@
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
+import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { GITHUB_IDS } from "../ids.ts";
 import type { GitHubAppRecord } from "../world.ts";
@@ -9,6 +10,49 @@ import { createKit } from "./kit.ts";
 import { createPulls } from "./pulls.ts";
 import { createRepos } from "./repos.ts";
 import type { GitHubStore } from "./store.ts";
+
+/**
+ * The permissions that let an App subscribe to each webhook event the fake sends, any one of them
+ * read or write, as GitHub's App settings offer them. `installation_repositories` needs none, and
+ * isn't subscribed to.
+ */
+const EVENT_PERMISSIONS: Readonly<Record<string, readonly string[]>> = {
+  issues: ["issues"],
+  issue_comment: ["issues", "pull_requests"],
+  pull_request: ["pull_requests"],
+  pull_request_review: ["pull_requests"],
+  pull_request_review_comment: ["pull_requests"],
+  pull_request_review_thread: ["pull_requests"],
+  push: ["contents"],
+  check_run: ["checks"],
+  check_suite: ["checks"],
+};
+
+/** Do these permissions let an App subscribe to this event? */
+const covers = (permissions: Readonly<Record<string, string>>, event: string) =>
+  (EVENT_PERMISSIONS[event] ?? []).some((permission) => permissions[permission] !== undefined);
+
+/** The events a test asked an App to subscribe to, each one its permissions cover, or `invalid_argument`. */
+function checkedEvents(events: readonly string[], permissions: Readonly<Record<string, string>>): string[] {
+  for (const event of events) {
+    const needs = EVENT_PERMISSIONS[event];
+    if (!needs) {
+      throw new ProtocolError(
+        "invalid_argument",
+        `"${event}" isn't a webhook event the GitHub fake sends. It sends: ${Object.keys(EVENT_PERMISSIONS).join(", ")}`,
+        { event },
+      );
+    }
+    if (!covers(permissions, event)) {
+      throw new ProtocolError(
+        "invalid_argument",
+        `An App subscribes to ${event} only with the ${needs.join(" or ")} permission, as GitHub's App settings allow`,
+        { event },
+      );
+    }
+  }
+  return [...events];
+}
 
 /**
  * The fake GitHub world: every change to the state happens in one of its parts, once, for people
@@ -22,10 +66,10 @@ export function createFakeWorld(
   defaults: Pick<GitHubAppRecord, "permissions" | "events">,
 ) {
   const kit = createKit(context, store, git);
-  const repos = createRepos(kit);
+  const checks = createChecks(kit);
+  const repos = createRepos(kit, checks);
   const issues = createIssues(kit, repos);
   const pulls = createPulls(kit, repos, issues);
-  const checks = createChecks(kit);
   const { ids, clock } = context;
   const { deliveries } = kit;
 
@@ -62,7 +106,10 @@ export function createFakeWorld(
       },
     ): GitHubAppRecord {
       const permissions = { ...(options.permissions ?? defaults.permissions) };
-      const events = [...(options.events ?? defaults.events)];
+      // GitHub lets an App subscribe only to the events its permissions cover.
+      const events = options.events
+        ? checkedEvents(options.events, permissions)
+        : defaults.events.filter((event) => covers(permissions, event));
       const by =
         session === undefined
           ? undefined

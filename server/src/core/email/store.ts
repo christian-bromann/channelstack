@@ -124,16 +124,41 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
 
   /**
    * Which conversation an app's email joins (the one it answers by `In-Reply-To` and `References`),
-   * and whose session it is in: that conversation's, or else the session of a person it reaches.
+   * and whose session it is in: that conversation's, or else the session of a person it reaches,
+   * or else, for a new email between apps alone, the session of the apps it is between.
    */
   placeOf(
     message: { readonly inReplyTo?: string | undefined; readonly references: readonly string[] },
     recipients: readonly Mailbox[],
+    sender: App,
   ): { thread: string | undefined; session: string | undefined } {
     const thread = threadOf(message, (id) => this.byMessageId(id)?.thread);
     if (thread !== undefined) return { thread, session: this.threads.owner(thread) };
     const reached = recipients.map((mailbox) => this.personAt(mailbox.address)).find(Boolean);
-    return { thread, session: reached === undefined ? undefined : this.users.owner(reached.id) };
+    if (reached !== undefined) return { thread, session: this.users.owner(reached.id) };
+    return { thread, session: this.#sessionBetween(sender, this.appsAmong(recipients)) };
+  }
+
+  /**
+   * The session an email between apps alone is in (decision 0027): one that used each app made
+   * with `createApp` among them. Where several did, the one the sender last wrote or was written
+   * to in, else the last to use them. None when no open session used them.
+   */
+  #sessionBetween(sender: App, recipients: readonly App[]): string | undefined {
+    const made = [sender, ...recipients].filter((app) => app !== this.app);
+    if (made.length === 0) return undefined;
+    const [first, ...rest] = made.map((app) => this.apps.sessionsOf(app));
+    const shared = (first ?? []).filter((session) => rest.every((sessions) => sessions.includes(session)));
+    const latest = this.emails
+      .values()
+      .filter(
+        (email) =>
+          email.author === sender.id ||
+          [...email.to, ...email.cc, ...email.bcc].some((mailbox) => mailbox.address === sender.address),
+      )
+      .map((email) => this.emails.owner(email.id))
+      .findLast((session) => session !== undefined && shared.includes(session));
+    return latest ?? shared.at(-1);
   }
 
   /** The person with this address, in any session. */
