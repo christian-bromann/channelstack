@@ -938,6 +938,93 @@ describe("timing and breaks on the injected clock, as the SDK sees them", () => 
     expect(seen).toEqual(["one", "one", "one two", "one two", "one two three"]);
   });
 
+  test("firstToken holds a scripted error too, counted from the call's arrival", async () => {
+    const { client, respond, h, prompt } = await setup();
+    await respond({ turns: [{ error: "content_policy", timing: { firstToken: 2000 } }] });
+    // The server's clock moves only when the test moves it.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const before = h.timers.waiting();
+
+    let refused = false;
+    const answer = client.chat.completions
+      .create({ model: "gpt-5", messages: ask(prompt) })
+      .catch((caught: unknown) => caught)
+      .finally(() => (refused = true));
+    await until(() => h.timers.waiting() > before, "the error to wait for its first token");
+    h.clock.advance(1999);
+    h.timers.advance(1999);
+    await settle();
+    const early = refused;
+    h.clock.advance(1);
+    h.timers.advance(1);
+
+    expect(await answer).toBeInstanceOf(BadRequestError);
+    expect(early).toBe(false);
+  });
+
+  /** A responder script on the control API: the call held for it, once one is, and how to answer it. */
+  async function responder(control: Awaited<ReturnType<typeof setup>>["control"], firstToken: number) {
+    const { id } = await control("POST", "/scripts", { responder: true, timing: { firstToken } });
+    const held = async () => {
+      let calls: Array<{ id: string }> = [];
+      await until(async () => {
+        calls = (await control("GET", `/scripts/${id}/requests`)).held;
+        return calls.length === 1;
+      }, "the call to be held for the responder");
+      return calls[0]?.id ?? "";
+    };
+    const answer = (heldId: string, text: string) =>
+      control("POST", `/scripts/${id}/answers`, { held: heldId, turn: text });
+    return { held, answer };
+  }
+
+  test("a responder's time counts toward firstToken: the answer waits only what is left", async () => {
+    const { client, control, h, prompt } = await setup();
+    const script = await responder(control, 1500);
+    vi.useFakeTimers({ toFake: ["Date"] });
+
+    let answered = false;
+    const answer = client.chat.completions
+      .create({ model: "gpt-5", messages: ask(prompt) })
+      .finally(() => (answered = true));
+    const held = await script.held();
+    // The responder takes a second of the 1.5 seconds.
+    h.clock.advance(1000);
+    h.timers.advance(1000);
+    await script.answer(held, "Two incidents yesterday.");
+    await settle();
+    const waited = answered;
+    h.clock.advance(499);
+    h.timers.advance(499);
+    await settle();
+    const early = answered;
+    h.clock.advance(1);
+    h.timers.advance(1);
+
+    expect((await answer).choices[0]?.message.content).toBe("Two incidents yesterday.");
+    expect(waited).toBe(false);
+    expect(early).toBe(false);
+  });
+
+  test("a responder slower than firstToken is answered as soon as it answers", async () => {
+    const { client, control, h, prompt } = await setup();
+    const script = await responder(control, 800);
+    vi.useFakeTimers({ toFake: ["Date"] });
+
+    let answered = false;
+    const answer = client.chat.completions
+      .create({ model: "gpt-5", messages: ask(prompt) })
+      .finally(() => (answered = true));
+    const held = await script.held();
+    h.clock.advance(1200);
+    h.timers.advance(1200);
+    await script.answer(held, "Two incidents yesterday.");
+
+    // No time passes after the responder's answer: nothing is left of firstToken.
+    await until(() => answered, "the answer, with no time passing");
+    expect((await answer).choices[0]?.message.content).toBe("Two incidents yesterday.");
+  });
+
   test.each(ENDPOINTS)(
     "%s: failAfter drop cuts the connection, and the SDK throws after the chunks it had",
     async (endpoint) => {

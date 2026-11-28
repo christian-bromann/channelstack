@@ -315,3 +315,53 @@ async fn first_token_holds_with_a_slow_responder_it_counts_from_the_calls_arriva
     );
     session.close().await
 }
+
+#[tokio::test]
+async fn respond_with_takes_when_times_and_timing_as_respond_does() -> channelstack::Result<()> {
+    if !has_server() {
+        return Ok(());
+    }
+    let client = connect(Mode::Start).await?;
+    let env = client.env().await?;
+    let key = env["OPENAI_API_KEY"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    let session = client.open_session().await?;
+    let openai = session.openai().await?;
+    let id = session.session_id();
+    let base = openai.base_url();
+    // The responder answers only calls about the deploy, only once, and holds its first token.
+    let responder = openai
+        .respond_with(|_: Value| async move { json!("The deploy is fine.") })
+        .when(json!({ "text": "deploy" }))
+        .times(1)
+        .timing(json!({ "firstToken": 600 }))
+        .await?;
+    let rest = openai.respond(json!(["Something else."])).times(-1).await?;
+
+    let started = Instant::now();
+    let (_, deploy) = ask(&base, &key, &id, "how did the deploy go?")
+        .await
+        .expect("the fake answers");
+    let took = started.elapsed();
+    let (_, other) = ask(&base, &key, &id, "and the DNS blip?")
+        .await
+        .expect("the fake answers");
+    let (_, again) = ask(&base, &key, &id, "the deploy again?")
+        .await
+        .expect("the fake answers");
+
+    assert_eq!(
+        deploy["choices"][0]["message"]["content"],
+        "The deploy is fine."
+    );
+    assert!(took >= Duration::from_millis(600), "{took:?}");
+    // `when` left this call to the next script.
+    assert_eq!(other["choices"][0]["message"]["content"], "Something else.");
+    // `times(1)`: the responder answered once; the next script took the second call about the deploy.
+    assert_eq!(again["choices"][0]["message"]["content"], "Something else.");
+    expect(&responder).to_have_answered().times(1).await?;
+    expect(&rest).to_have_answered().times(2).await?;
+    session.close().await
+}

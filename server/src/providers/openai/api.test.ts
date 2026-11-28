@@ -5,7 +5,7 @@
  * sessions that sent the same text, tool results without their call, and Chat Completions'
  * obfuscation.
  */
-import OpenAI, { APIError } from "openai";
+import OpenAI, { type APIError } from "openai";
 import { afterEach, describe, expect, test } from "vitest";
 
 import type { Harness } from "../../../test/app-harness.ts";

@@ -1140,11 +1140,6 @@ async fn to_have_sent_compares_text_as_attribution_does_a_slack_link_is_its_url(
         .to_have_sent("<@U08B5K2M9QX> deploy <https://example.com/runs/7|the run> now")
         .timeout(FAST)
         .await?;
-    // The server's own case (`attribution.test.ts`), with the same answer.
-    assert_eq!(
-        super::normalised("<@U08B5K2M9QX>  Deploy   <https://example.com|the page> NOW"),
-        "deploy https://example.com now"
-    );
     Ok(())
 }
 

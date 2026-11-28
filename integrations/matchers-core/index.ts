@@ -24,6 +24,7 @@ import {
 } from "../../sdks/typescript/client.ts";
 import { CONTEXT, type WithContext } from "../../sdks/typescript/runtime/client.ts";
 import { segment } from "../../sdks/typescript/runtime/transport.ts";
+import { normalisedText } from "../../sdks/typescript/runtime/wait.ts";
 
 export interface MatcherResult {
   pass: boolean;
@@ -999,22 +1000,9 @@ async function modelCalls(subject: unknown): Promise<readonly ModelCallData[]> {
 const asText = (item: string | RegExp | Texted): string | RegExp =>
   typeof item === "object" && "text" in item ? item.text : item;
 
-/**
- * Text as the server compares it for attribution (`normalise` in `server/src/core/attribution`):
- * mentions removed, a Slack link resolved to its URL, whitespace collapsed, case ignored.
- */
-export const normalised = (text: string) =>
-  text
-    .replace(/<[@#!][^>]*>/g, " ")
-    .replace(/<(https?:[^>|]+)(\|[^>]*)?>/g, " $1 ")
-    .replace(/(^|\s)@[\w.-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-
 /** Whether a request's text has every wanted piece, in order when asked. */
 function sentIn(text: string, wanted: readonly (string | RegExp | Texted)[], ordered: boolean): boolean {
-  const haystack = normalised(text);
+  const haystack = normalisedText(text);
   let from = 0;
   for (const item of wanted) {
     const piece = asText(item);
@@ -1024,7 +1012,7 @@ function sentIn(text: string, wanted: readonly (string | RegExp | Texted)[], ord
       if (!match) return false;
       continue;
     }
-    const needle = normalised(piece);
+    const needle = normalisedText(piece);
     const at = haystack.indexOf(needle, ordered ? from : 0);
     if (at === -1) return false;
     from = at + needle.length;

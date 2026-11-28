@@ -170,7 +170,7 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
       return new Response(null, { status: 408 });
     }
     if (outcome.kind === "error") {
-      if (await world.wait(outcome.afterMs, hangUp)) return abandoned();
+      if (await world.firstToken(call, outcome.firstTokenMs, hangUp)) return abandoned();
       done({ status: outcome.error.status, error: outcome.error.code ?? outcome.error.type }, outcome.error.body());
       throw outcome.error;
     }
@@ -230,7 +230,7 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     };
 
     const timing = turn.timing ?? {};
-    if (await world.wait(timing.firstToken ?? 0, hangUp)) return abandoned();
+    if (await world.firstToken(call, timing.firstToken ?? 0, hangUp)) return abandoned();
     if (!request.stream) {
       keep();
       done({ status: 200 });

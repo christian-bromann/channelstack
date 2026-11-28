@@ -33,8 +33,8 @@ use crate::runtime::client::{BoxFuture, IntoArg};
 use crate::runtime::duration::parse_duration;
 use crate::runtime::error::{Error, Result};
 use crate::runtime::wait::{
-    DEFAULT_QUIET_FOR, DEFAULT_TIMEOUT, check_text, from_matches, model_problems, text_matches,
-    until_quiet, wait_for,
+    DEFAULT_QUIET_FOR, DEFAULT_TIMEOUT, check_text, from_matches, model_problems, normalised_text,
+    text_matches, until_quiet, wait_for,
 };
 
 pub mod subjects;
@@ -1968,25 +1968,9 @@ fn answered(script: &Value) -> i64 {
     i64::try_from(count).unwrap_or(i64::MAX)
 }
 
-/// Text as the server compares it for attribution (`normalise` in `server/src/core/attribution`):
-/// mentions removed, a Slack link resolved to its URL, whitespace collapsed, case ignored.
-fn normalised(text: &str) -> String {
-    let mentions = regex::Regex::new(r"<[@#!][^>]*>").expect("a pattern");
-    let links = regex::Regex::new(r"<(https?:[^>|]+)(\|[^>]*)?>").expect("a pattern");
-    let names = regex::Regex::new(r"(?:^|\s)@[\w.-]+").expect("a pattern");
-    let unmentioned = mentions.replace_all(text, " ");
-    let linked = links.replace_all(&unmentioned, " $1 ");
-    names
-        .replace_all(&linked, " ")
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
-}
-
 /// Whether a request's text has every wanted piece, in order when asked.
 fn sent_in(text: &str, wanted: &[Value], ordered: bool) -> bool {
-    let haystack = normalised(text);
+    let haystack = normalised_text(text);
     let mut from = 0;
     for piece in wanted {
         if piece.get("source").is_some() {
@@ -1995,7 +1979,7 @@ fn sent_in(text: &str, wanted: &[Value], ordered: bool) -> bool {
             }
             continue;
         }
-        let needle = normalised(piece.as_str().unwrap_or_else(|| text_of(piece, "text")));
+        let needle = normalised_text(piece.as_str().unwrap_or_else(|| text_of(piece, "text")));
         let start = if ordered { from } else { 0 };
         let Some(at) = haystack.get(start..).and_then(|rest| rest.find(&needle)) else {
             return false;

@@ -1,0 +1,49 @@
+{
+  "description": "Text as the server compares it for attribution (`normalise` in server/src/core/attribution) and as every SDK's matchers compare it (`normalisedText` / `normalised_text` in each runtime's wait module): each case's text and what it normalises to. The server's test and each SDK's test read this file, so they agree on one table.",
+  "cases": [
+    {
+      "text": "<@U08B5K2M9QX>  Deploy   <https://example.com|the page> NOW",
+      "normalised": "deploy https://example.com now"
+    },
+    {
+      "text": "<#C08B5K2M9QX|incidents> <!here> what broke?",
+      "normalised": "what broke?"
+    },
+    {
+      "text": "see <https://example.com/runs/7>",
+      "normalised": "see https://example.com/runs/7"
+    },
+    {
+      "text": "<mailto:ana@example.com|Ana> wrote",
+      "normalised": "<mailto:ana@example.com|ana> wrote"
+    },
+    {
+      "text": "@my-agent what broke in the web deploy?",
+      "normalised": "what broke in the web deploy?"
+    },
+    {
+      "text": "ask @my-agent.bot_2 and ana@example.com",
+      "normalised": "ask and ana@example.com"
+    },
+    {
+      "text": "@my-agent\t@robin  hello",
+      "normalised": "hello"
+    },
+    {
+      "text": "  Two\n\nincidents\t yesterday  ",
+      "normalised": "two incidents yesterday"
+    },
+    {
+      "text": "hi @agént there",
+      "normalised": "hi ént there"
+    },
+    {
+      "text": "Ünïcode ÉTÉ",
+      "normalised": "ünïcode été"
+    },
+    {
+      "text": "",
+      "normalised": ""
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -13,6 +13,7 @@ import { readChanges, readDocument, readTree, setFilesRoot } from "./files.ts";
 import { resolveServerBinary, serverBinaryName, serverPackageName } from "./launcher.ts";
 import { ChannelstackError, onRefusal, segment, Transport, unreportedRefusals } from "./transport.ts";
 import {
+  normalisedText,
   patternOnWire,
   retryWhile,
   setWaitDefaults,
@@ -174,6 +175,17 @@ describe("waiting", () => {
     } finally {
       setWaitDefaults(before);
     }
+  });
+});
+
+describe("text as the server compares it", () => {
+  // The server's own cases (`server/src/core/attribution/attribution.test.ts` reads the same file).
+  const { cases } = JSON.parse(
+    readFileSync(new URL("../../../test/text-normalisation.json", import.meta.url), "utf8"),
+  ) as { cases: Array<{ text: string; normalised: string }> };
+
+  test.each(cases)("the generated rules normalise %o as the server does", ({ text, normalised }) => {
+    expect(normalisedText(text)).toBe(normalised);
   });
 });
 

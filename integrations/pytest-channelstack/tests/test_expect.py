@@ -801,9 +801,6 @@ class SentCall:
 async def test_to_have_sent_compares_text_as_attribution_does_a_slack_link_is_its_url() -> None:
     call = SentCall(type("Request", (), {"text": "Ana: Deploy   https://example.com/runs/7 NOW", "tools": []})())
     await expect(call).to_have_sent(Message(ANA, "<@U08B5K2M9QX> deploy <https://example.com/runs/7|the run> now"))
-    # The server's own case (`attribution.test.ts`), with the same answer.
-    normalised = matchers._normalised  # pyright: ignore[reportPrivateUsage]
-    assert normalised("<@U08B5K2M9QX>  Deploy   <https://example.com|the page> NOW") == "deploy https://example.com now"
 
 
 class ModelReads:

@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { ChannelstackError, QUIET } from "../../sdks/typescript/client.ts";
 import { CONTEXT } from "../../sdks/typescript/runtime/client.ts";
-import { matchers, modelNotes, normalised } from "./index.ts";
+import { matchers, modelNotes } from "./index.ts";
 
 const state = { isNot: false, timeout: "100ms", quietFor: "10ms" } as const;
 const negated = { ...state, isNot: true };
@@ -226,10 +226,6 @@ describe("the model", () => {
       text: "<@U08B5K2M9QX> deploy <https://example.com/runs/7|the run> now",
     });
     expect(sent.pass).toBe(true);
-    // The server's own case (`attribution.test.ts`), with the same answer.
-    expect(normalised("<@U08B5K2M9QX>  Deploy   <https://example.com|the page> NOW")).toBe(
-      "deploy https://example.com now",
-    );
   });
 
   /** A handle in session `ses_1` whose server answers these model reads. */

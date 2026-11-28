@@ -24,6 +24,7 @@ from channelstack.runtime.wait import (
     ModelProblemError,
     WaitTimeoutError,
     from_matches,
+    normalised_text,
     pattern_on_wire,
     text_matches,
     until_quiet,
@@ -93,15 +94,6 @@ def _operation(call: Any) -> str:
     return str(getattr(call, "operation", None) or getattr(call, "endpoint", ""))
 
 
-def _normalised(text: str) -> str:
-    """Text as the server compares it for attribution (`normalise` in `server/src/core/attribution`):
-    mentions removed, a Slack link resolved to its URL, whitespace collapsed, case ignored."""
-    text = re.sub(r"<[@#!][^>]*>", " ", text)
-    text = re.sub(r"<(https?:[^>|]+)(\|[^>]*)?>", r" \1 ", text)
-    text = re.sub(r"(^|\s)@[\w.-]+", " ", text)
-    return re.sub(r"\s+", " ", text).strip().lower()
-
-
 def _text_of(item: Any) -> Text:
     """What to look for: a string or pattern as it is, a message, comment or email by its text."""
     if isinstance(item, str):
@@ -113,7 +105,7 @@ def _text_of(item: Any) -> Text:
 
 def _sent_in(text: str, wanted: Sequence[Any], ordered: bool) -> bool:
     """Whether a request's text has every wanted piece, in order when asked."""
-    haystack = _normalised(text)
+    haystack = normalised_text(text)
     start = 0
     for item in wanted:
         piece = _text_of(item)
@@ -121,7 +113,7 @@ def _sent_in(text: str, wanted: Sequence[Any], ordered: bool) -> bool:
             if piece.search(text) is None:
                 return False
             continue
-        needle = _normalised(piece)
+        needle = normalised_text(piece)
         at = haystack.find(needle, start if ordered else 0)
         if at == -1:
             return False

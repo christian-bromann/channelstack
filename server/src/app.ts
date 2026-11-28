@@ -3,7 +3,14 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 
-import { type Attribution, Attributor, bodyStrings, type KnownString, stringsOf } from "./core/attribution/index.ts";
+import {
+  type Attribution,
+  Attributor,
+  bodyStrings,
+  type KnownString,
+  stringsOf,
+  TEXT_NORMALISATION,
+} from "./core/attribution/index.ts";
 import { requireAccess } from "./core/auth/index.ts";
 import { UI_COOKIE, UiAccess } from "./core/auth/ui.ts";
 import { BrowserActors, type Launch } from "./core/browser/index.ts";
@@ -651,6 +658,8 @@ export function createApp(options: AppOptions): App {
       "x-channelstack-errors": CORE_ERRORS,
       // The drivers in the binary, so generators and scripts don't keep their own list.
       "x-channelstack-channels": channelsExtension(),
+      // How the server compares text for attribution, so every SDK's `toHaveSent` compares the same way.
+      "x-channelstack-text-normalisation": TEXT_NORMALISATION,
     }),
     hosts: () => ["channelstack", ...driverNames],
     settled: () => delivery.settled(),

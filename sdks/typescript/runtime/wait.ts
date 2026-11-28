@@ -1,3 +1,4 @@
+import { TEXT_NORMALISATION } from "../generated/normalisation.ts";
 import { type Duration, parseDuration } from "./duration.ts";
 
 export interface WaitOptions {
@@ -137,6 +138,23 @@ export function textMatches(text: string, expected: string | RegExp | undefined)
   // A pattern with the `g` or `y` flag remembers where it stopped; every test starts afresh.
   expected.lastIndex = 0;
   return expected.test(text);
+}
+
+const NORMALISATION_RULES = TEXT_NORMALISATION.rules.map(
+  ({ pattern, replacement }) => [new RegExp(pattern, "g"), replacement] as const,
+);
+
+/**
+ * Text as the server compares it for attribution, by the rules the spec publishes
+ * (`TEXT_NORMALISATION`, generated): what `toHaveSent` compares.
+ */
+export function normalisedText(text: string): string {
+  let normalised = NORMALISATION_RULES.reduce(
+    (current, [pattern, replacement]) => current.replace(pattern, replacement),
+    text,
+  );
+  if (TEXT_NORMALISATION.collapseWhitespace) normalised = normalised.replace(/\s+/g, " ").trim();
+  return TEXT_NORMALISATION.lowercase ? normalised.toLowerCase() : normalised;
 }
 
 /** Text to find as it goes to the server: a string as it is, a `RegExp` as its source and flags. */

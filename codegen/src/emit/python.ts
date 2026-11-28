@@ -18,6 +18,25 @@ export function pythonName(name: string): string {
 const snakeCase = pythonName;
 
 const OUT = "sdks/python/channelstack/generated/__init__.py";
+const NORMALISATION_OUT = "sdks/python/channelstack/generated/normalisation.py";
+
+/** How the server compares text (`x-channelstack-text-normalisation`), for the runtime's `normalised_text`. */
+function normalisationFile(ir: Ir): string {
+  const { rules, collapseWhitespace, lowercase } = ir.textNormalisation;
+  return [
+    `# ${BANNER}`,
+    '"""Text as the server compares it for attribution: each rule replaces every match of its pattern',
+    "(`$1` is its first group), in order; then, as its flags say, whitespace collapsed and trimmed and case lowered.",
+    '"""',
+    "",
+    "RULES: tuple[tuple[str, str], ...] = (",
+    ...rules.map((rule) => `    (${JSON.stringify(rule.pattern)}, ${JSON.stringify(rule.replacement)}),`),
+    ")",
+    `COLLAPSE_WHITESPACE = ${pythonLiteral(collapseWhitespace)}`,
+    `LOWERCASE = ${pythonLiteral(lowercase)}`,
+    "",
+  ].join("\n");
+}
 
 /** A string, number or boolean as Python writes it: `True`, `3`, `"open"`. */
 function pythonLiteral(value: string | number | boolean): string {
@@ -573,5 +592,8 @@ export function emitPython(ir: Ir): Map<string, string> {
     `    return await connect_with(${ir.root}, protocol, mode=mode, server=server, token=token)`,
     "",
   ];
-  return new Map([[OUT, lines.join("\n")]]);
+  return new Map([
+    [OUT, lines.join("\n")],
+    [NORMALISATION_OUT, normalisationFile(ir)],
+  ]);
 }

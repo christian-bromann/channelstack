@@ -54,7 +54,7 @@ export interface CallRecord {
  */
 export type Outcome =
   | { readonly kind: "answer"; readonly answer: Answer; readonly turn: Turn; readonly script: ScriptRecord }
-  | { readonly kind: "error"; readonly error: OpenAIError; readonly afterMs: number }
+  | { readonly kind: "error"; readonly error: OpenAIError; readonly firstTokenMs: number }
   | { readonly kind: "timeout" }
   | { readonly kind: "aborted" };
 
@@ -221,7 +221,7 @@ export class OpenAIWorld {
   async outcome(call: CallRecord, abort: AbortSignal): Promise<Outcome> {
     const { session, request } = call;
     if (session === undefined) {
-      return { kind: "error", error: noScript(this.unattributedMessage(call)), afterMs: 0 };
+      return { kind: "error", error: noScript(this.unattributedMessage(call)), firstTokenMs: 0 };
     }
     const limiter = this.limiter(session);
     if (limiter) {
@@ -233,7 +233,7 @@ export class OpenAIWorld {
           limit: refusal,
           organization: this.organization,
         });
-        return { kind: "error", error, afterMs: 0 };
+        return { kind: "error", error, firstTokenMs: 0 };
       }
     }
     const context: CallContext = {
@@ -244,7 +244,7 @@ export class OpenAIWorld {
     if (!script) {
       const message = this.#missingMessage(call);
       this.problem(session, message);
-      return { kind: "error", error: noScript(message), afterMs: 0 };
+      return { kind: "error", error: noScript(message), firstTokenMs: 0 };
     }
     call.script = script.id;
     script.calls.push(call.id);
@@ -257,7 +257,7 @@ export class OpenAIWorld {
         if (error instanceof HungUp) return { kind: "aborted" };
         const message = error instanceof Error ? error.message : String(error);
         script.problems.push(message);
-        return { kind: "error", error: noScript(message), afterMs: 0 };
+        return { kind: "error", error: noScript(message), firstTokenMs: 0 };
       }
     } else {
       turn = this.scripts.take(script);
@@ -265,7 +265,7 @@ export class OpenAIWorld {
     if (turn === undefined) {
       const message = `${script.id} has no turn for call ${script.used}`;
       this.problem(session, message);
-      return { kind: "error", error: noScript(message), afterMs: 0 };
+      return { kind: "error", error: noScript(message), firstTokenMs: 0 };
     }
     const timing = { ...script.timing, ...turn.timing };
     if (turn.error === "timeout") return { kind: "timeout" };
@@ -278,12 +278,12 @@ export class OpenAIWorld {
         endpoint: request.endpoint,
         organization: this.organization,
       });
-      return { kind: "error", error, afterMs: timing.firstToken ?? 0 };
+      return { kind: "error", error, firstTokenMs: timing.firstToken ?? 0 };
     }
     const problems = this.scripts.problemsOf(script, turn, request);
     if (problems.length > 0) {
       for (const problem of problems) if (!script.problems.includes(problem)) script.problems.push(problem);
-      return { kind: "error", error: noScript(problems.join("; ")), afterMs: 0 };
+      return { kind: "error", error: noScript(problems.join("; ")), firstTokenMs: 0 };
     }
     return {
       kind: "answer",
@@ -429,9 +429,13 @@ export class OpenAIWorld {
     return `this call couldn't be attributed to any test: nothing in it matches what a test's people wrote, an id a test owns, or an earlier answer. ${this.#missingMessage(call).replace(/^no openai\.respond\(…\) in this test answers this call\. /, "")}`;
   }
 
-  /** Wait the time a turn asks before its answer starts, unless the agent hangs up first: whether it did. */
-  wait(ms: number, hangUp: AbortSignal): Promise<boolean> {
+  /**
+   * Hold the answer until `firstTokenMs` after the call arrived, unless the agent hangs up first:
+   * whether it did. Time already spent on the call (a responder's) counts toward it.
+   */
+  firstToken(call: CallRecord, firstTokenMs: number, hangUp: AbortSignal): Promise<boolean> {
     if (hangUp.aborted) return Promise.resolve(true);
+    const ms = firstTokenMs - this.ageOf(call);
     if (ms <= 0) return Promise.resolve(false);
     return new Promise((resolve) => {
       const hungUp = () => {

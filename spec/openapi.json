@@ -33050,5 +33050,23 @@
       "title": "OpenAI",
       "provider": true
     }
-  ]
+  ],
+  "x-channelstack-text-normalisation": {
+    "rules": [
+      {
+        "pattern": "<[@#!][^>]*>",
+        "replacement": " "
+      },
+      {
+        "pattern": "<(https?:[^>|]+)(\\|[^>]*)?>",
+        "replacement": " $1 "
+      },
+      {
+        "pattern": "(^|\\s)@[A-Za-z0-9_.-]+",
+        "replacement": " "
+      }
+    ],
+    "collapseWhitespace": true,
+    "lowercase": true
+  }
 }

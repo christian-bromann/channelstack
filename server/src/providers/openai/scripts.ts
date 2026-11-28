@@ -67,20 +67,20 @@ function matches(when: Match | undefined, request: ModelRequest, text: string, c
   return true;
 }
 
-/** What a template in a turn's text names, from the request; each value through `escape` (JSON text's). */
+/** What a template in a turn's text names, from the request; each value through `encode` (JSON text's). */
 export function fillTemplate(
   text: string,
   request: ModelRequest,
   call: number,
-  escape: (value: string) => string = (value) => value,
+  encode: (value: string) => string = (value) => value,
 ): string {
   return text.replace(/\{(lastUserText|toolResult(?:\.[\w-]+)?|model|call)\}/g, (_, name: string) => {
-    if (name === "lastUserText") return escape(request.lastUserText ?? "");
-    if (name === "model") return escape(request.model);
+    if (name === "lastUserText") return encode(request.lastUserText ?? "");
+    if (name === "model") return encode(request.model);
     if (name === "call") return String(call);
-    if (name === "toolResult") return escape(request.lastToolResults.at(-1)?.text ?? "");
+    if (name === "toolResult") return encode(request.lastToolResults.at(-1)?.text ?? "");
     const tool = name.slice("toolResult.".length);
-    return escape(request.lastToolResults.find((result) => result.name === tool)?.text ?? "");
+    return encode(request.lastToolResults.find((result) => result.name === tool)?.text ?? "");
   });
 }
 

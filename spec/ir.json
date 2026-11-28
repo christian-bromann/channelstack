@@ -25861,5 +25861,23 @@
       "title": "OpenAI",
       "provider": true
     }
-  ]
+  ],
+  "textNormalisation": {
+    "rules": [
+      {
+        "pattern": "<[@#!][^>]*>",
+        "replacement": " "
+      },
+      {
+        "pattern": "<(https?:[^>|]+)(\\|[^>]*)?>",
+        "replacement": " $1 "
+      },
+      {
+        "pattern": "(^|\\s)@[A-Za-z0-9_.-]+",
+        "replacement": " "
+      }
+    ],
+    "collapseWhitespace": true,
+    "lowercase": true
+  }
 }
