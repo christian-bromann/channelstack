@@ -644,10 +644,6 @@ export function registerGitHubRoutes(
             issue: GitHubIssue,
             title: z.string().openapi({ description: "Its title as it is now." }),
             pullRequest: z.boolean().openapi({ description: "It is a pull request." }),
-            updatedAt: z.string().openapi({
-              description:
-                "When it last changed (a comment changes it too), to the millisecond: GitHub's own times are to the second.",
-            }),
           })
           .openapi("GitHubIssueListing"),
       )
@@ -664,7 +660,6 @@ export function registerGitHubRoutes(
           issue: issueWire(issue),
           title: issue.title,
           pullRequest: issue.pull !== undefined,
-          updatedAt: new Date(issue.updatedAt).toISOString(),
         }));
     },
   });

@@ -4,7 +4,7 @@ Instructions for coding agents implementing channelstack. Read this first.
 
 ## What channelstack is
 
-A test harness for AI agents that live in Slack, GitHub, Linear, Notion, email (Resend and Gmail) and Discord. One server fakes those platforms in memory. Tests script people (`ana.say("@my-agent hi", { channel })`) and assert on what a person would see (`expect(thread).toHaveReplyFrom("my-agent")`). The same API can also act on the real platforms (live mode).
+A test harness for AI agents that live in Slack, GitHub, Linear, Notion, email (Resend and Gmail) and Discord. One server fakes those platforms in memory, and OpenAI's API for the agent's model ([decision 0029](docs/decisions/0029-fake-openai.md)). Tests script people (`ana.say("@my-agent hi", { channel })`) and assert on what a person would see (`expect(thread).toHaveReplyFrom("my-agent")`). The same API can also act on the real platforms (live mode).
 
 ## Reading order
 
@@ -94,7 +94,7 @@ Don't reopen these without asking.
 | Area | Decision |
 |---|---|
 | Channels | Slack, GitHub, Linear, Notion, email (Resend and Google (Gmail), [decision 0021](docs/decisions/0021-email-channels.md)), and Discord ([decision 0026](docs/decisions/0026-discord.md), reopened on the maintainer's instruction). No Teams for now |
-| Addresses | portless names: `https://channelstack.localhost` (UI and control API at `/_channelstack`), `slack.localhost`, `github.localhost`, `linear.localhost`, `notion.localhost`, `resend.localhost`, `google.localhost`, `discord.localhost` |
+| Addresses | portless names: `https://channelstack.localhost` (UI and control API at `/_channelstack`), `slack.localhost`, `github.localhost`, `linear.localhost`, `notion.localhost`, `resend.localhost`, `google.localhost`, `discord.localhost`; the fake model at `openai.localhost` |
 | World | One shared fake world per channel per server: the workspace, org or guild every app of the channel is installed in (for Resend, the teams; for Twilio, the account and its numbers). Sessions are scopes inside it, not separate worlds |
 | State | In memory. A restart starts fresh |
 | The agent | channelstack never starts or wraps it. `channelstack env` prints what it needs |
@@ -103,7 +103,7 @@ Don't reopen these without asking.
 | Apps | A channel holds any number of apps, each a real app of its platform with its own identity, credentials and endpoint (`createApp({ name })`, `participants: [ana, slack.app, coder]`; `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, `channelstack env --app <name>`). `my-agent` stays the default, and apps belong to the shared world, not to a session. [Decision 0027](docs/decisions/0027-multiple-apps.md), reopened on the maintainer's instruction; built in phase 12 |
 | Ids | Every handle uses the platform's own id format, in fake mode too (architecture.md 3.2) |
 | Tests | Integrate into Vitest and pytest with fixtures and matchers. No separate test package, no own runner. No Jest ([decision 0017](docs/decisions/0017-no-jest.md)) |
-| Models | channelstack doesn't mock LLMs. Agents use their framework's own fake model |
+| Models | channelstack fakes OpenAI's API on the wire at `openai.localhost` (Chat Completions, Responses, Conversations; images, audio, files and built-in tools), scripted per test with `openai.respond(…)`. Realistic on the wire, never realistic content; no answer-quality evals. An unscripted call fails the test. Only OpenAI: no other provider. [Decision 0029](docs/decisions/0029-fake-openai.md), reopened on the maintainer's instruction; built in phases 13 and 14 |
 | Live mode | Acts on real platforms and reads results back. **Never relays, forwards or synthesizes events to the agent.** Delivery chaos is fake only |
 | Secrets | Fake tokens and signing secrets come from a CSPRNG once per install, stored in `~/.channelstack/secrets.json` (0600). No hard-coded secrets anywhere. Live credentials stay in memory, are never logged and never returned by the control API |
 | UI | Functional (transcripts, inspector, chaos controls), not a pixel copy of each product |

@@ -37,7 +37,7 @@ The architecture copies WebDriver:
 
 ### Non-goals (for now)
 
-- **Faking the LLM.** Agents bring their own deterministic model: the AI SDK mock models, emulate's AI service, or LangChain's `FakeListChatModel`, which MDA's tests use in `defineDeepAgent`. Section 10 shows the recipes.
+- **LLM content.** channelstack fakes OpenAI's API on the wire, scripted per test ([decision 0029](decisions/0029-fake-openai.md)), but never generates realistic content and never judges an answer. Agents may still bring their framework's own fake model (section 10).
 - **Waits and assertions in the protocol.** The server only serves reads (transcripts, event logs). The waiting matchers (`toHaveRepliesFrom`, `toHaveCommentsFrom`, …) live client-side in the test-framework integrations (`channelstack/vitest`, `pytest-channelstack`), which poll those reads.
 - **Hosting or a cloud product.**
 - **A unified "message" abstraction across platforms.** Each driver defines its own nouns: a Slack thread, a GitHub timeline, a Linear agent session, a Notion page with comments.

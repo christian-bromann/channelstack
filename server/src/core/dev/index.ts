@@ -182,9 +182,7 @@ export async function devEnsurePlace(
     return { place: found, created: false };
   }
   const made = placeOf(adapter, await adapter.create({ ...acting, name: name.replace(/^#/, ""), text: acting.text }));
-  // As the list route has it now, with what only it says (when GitHub's issue last changed).
-  const listed = (await devPlaces(api, adapter)).find((place) => place.id === made.id);
-  return { place: listed ?? made, created: true };
+  return { place: made, created: true };
 }
 
 // --- Transcripts, `last` and references -----------------------------------------------------------

@@ -53,6 +53,7 @@ pub mod codes {
     pub const INVALID_FORM_BODY: &str = "invalid_form_body";
     pub const LIVE_MISCONFIGURED: &str = "live_misconfigured";
     pub const LIVE_NOT_ALLOWLISTED: &str = "live_not_allowlisted";
+    pub const METHOD_NOT_SUPPORTED_FOR_CHANNEL_TYPE: &str = "method_not_supported_for_channel_type";
     pub const MISSING_ACCESS: &str = "missing_access";
     pub const MISSING_PERMISSIONS: &str = "missing_permissions";
     pub const MSG_TOO_LONG: &str = "msg_too_long";

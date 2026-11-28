@@ -1,7 +1,7 @@
 # channelstack: interface and developer experience (draft)
 
 > Status: draft v2, 2026-11-19. Nothing is built.
-> Decided: `slack.localhost`-style names · one workspace per service · Slack, GitHub, Linear, Notion, email (Resend and Google, [decision 0021](decisions/0021-email-channels.md)) and Discord ([decision 0026](decisions/0026-discord.md)); no Teams for now · in-memory state · integrate into existing test frameworks, no separate test package · extend the test framework's `expect` · no model mocking · MCP plus an attach CLI.
+> Decided: `slack.localhost`-style names · one workspace per service · Slack, GitHub, Linear, Notion, email (Resend and Google, [decision 0021](decisions/0021-email-channels.md)) and Discord ([decision 0026](decisions/0026-discord.md)); no Teams for now · in-memory state · integrate into existing test frameworks, no separate test package · extend the test framework's `expect` · a fake OpenAI scripted per test ([decision 0029](decisions/0029-fake-openai.md)) · MCP plus an attach CLI.
 > Also decided: tests use an actor-first API (`ana.say("…", { channel })`). The UI is functional, not a faithful copy of each product ([section 7](#7-the-ui-is-functional-not-faithful)).
 > How it's built (server, protocol, SDK generation, live verification) is in [implementation-plan.md](implementation-plan.md); its section 1.1 lists the decisions both documents share. The architecture in short: [architecture.md](architecture.md).
 
@@ -17,6 +17,7 @@ https://slack.localhost        Slack Web API, Socket Mode (wss); sends Events AP
 https://github.localhost       GitHub REST + GraphQL; sends App webhooks
 https://linear.localhost       Linear GraphQL; sends webhooks + Agent Session events
 https://notion.localhost       Notion API; sends integration webhooks (comments, page changes)
+https://openai.localhost       OpenAI API for the agent's model, scripted per test (phases 13 and 14)
 
 https://my-agent.localhost     your agent, under its own portless name, so channelstack can deliver to it
 ```
@@ -30,7 +31,7 @@ The names don't collide with emulate: its portless mode uses `*.emulate.localhos
 - **Channels:** Slack, GitHub, Linear, Notion, email (Resend and Google (Gmail), [decision 0021](decisions/0021-email-channels.md)), and Discord ([decision 0026](decisions/0026-discord.md)). No Teams for now.
 - **One workspace or org per channel:** one Slack workspace, one GitHub org, one Linear workspace, one Notion workspace. Multi-workspace installs are out of scope until a real test case needs them.
 - **State lives in memory.** Restarting the server gives a fresh world.
-- **No model mocking.** channelstack fakes the channel, not the LLM. Use your framework's own fake model, or a real one (see [section 6](#6-the-model-is-yours)).
+- **A fake model, on the wire.** channelstack fakes OpenAI's API too, and each test scripts what the model answers. It's realistic on the wire, never in content. A framework's own fake model or a real one works as well (see [section 6](#6-the-model)).
 - **Fake by default, real with credentials.** The same test runs against the fakes on every PR and against real sandbox workspaces nightly (see [section 10](#10-live-mode-the-same-tests-against-the-real-platforms)).
 - **One shared world, many scopes.** The agent is configured once, so all tests share one workspace per channel. Each test runs in its own session: it owns what it creates, sees only the deliveries its own conversations caused, and is cleaned up at the end. The CLI and UI share a long-lived `dev` session.
 
@@ -85,6 +86,7 @@ Point the agent at it, using only options the SDKs already have. When the variab
 | Google (`googleapis`, `google-auth-library`) | `rootUrl` per API; `endpoints` | `GOOGLE_API_URL=https://google.localhost/`, `GOOGLE_TOKEN_URL`, `GOOGLE_CERTS_URL` |
 | Discord (discord.js) | `rest: { api }`; the Gateway from `GET /gateway/bot` | `DISCORD_API_URL=https://discord.localhost/api`, with `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_GUILD_ID` |
 | Chat SDK, Mastra, Flue | the adapter's API URL option | the same variables |
+| The model: `openai`, the AI SDK, LangChain, the Agents SDK, or an OpenAI-compatible gateway | the environment, or the client's `baseURL` | `OPENAI_BASE_URL=https://openai.localhost/v1`, `OPENAI_API_KEY` |
 
 ```bash
 npx channelstack env >> .env.local
@@ -463,16 +465,34 @@ Each check is named after a bug class found in real apps (`app-developers.md`). 
 
 Ten of the Slack checks need nothing but the prompt. The stream and Stop checks need `streamPrompt` (text that makes the agent stream a longer answer), and the two click checks need `approval: { prompt, button }` (text that makes it ask for an approval, and the button's label). Without those options the checks are left out, as with `skip: ["slack.stream-stop"]`. `slack.double-click` counts messages: it expects the agent to answer one approval with exactly one new message in the thread (replacing the question as well is fine); an agent that answers only in place, or with several messages, skips it. Every check's id is in its test name.
 
-## 6. The model is yours
+## 6. The model
 
-channelstack doesn't mock or intercept LLM calls. Every framework already has its own fake model:
-- the AI SDK has `MockLanguageModelV2`;
-- Pi and Flue have `fauxProvider`;
-- LangChain has `FakeListChatModel`;
-- MDA's tests use LangChain's `FakeListChatModel` in `defineDeepAgent`;
-- OpenClaw has mock-openai.
+channelstack fakes OpenAI's API at `https://openai.localhost/v1`: Chat Completions, the Responses API and the Conversations API, and images, audio, files and OpenAI's built-in tools. It's realistic on the wire (event shapes, tool calls, errors, rate-limit headers, timing) and never in content: the model says what the test scripted ([decision 0029](decisions/0029-fake-openai.md); built in phases 13 and 14). The full interface is in [the approved design](../phase-log/model-providers/interface-draft.md).
 
-A test can use one of those, or a real model. The matchers are designed for this split: they check *how* the agent behaved in the channel, not *what* the model said. For example, `toHaveRepliesFrom` holds with any reply text.
+```ts
+test("a slow model and Slack's 3s retry still give one reply", async ({ slack, openai }) => {
+  const ana = await slack.createUser({ name: "Ana" });
+  const ai = await openai.respond([
+    { toolCalls: [{ name: "search_incidents", arguments: { since: "yesterday" } }] },
+    "Two incidents yesterday: the web deploy and a DNS blip.",
+  ], { timing: { firstToken: "5s" } });
+
+  const msg = await ana.say("@my-agent what broke yesterday?", { to: slack.app });
+  await msg.delivery!.retry({ after: "3s" });
+
+  await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
+  await expect(ai).toHaveAnswered({ times: 2 });
+  await expect(openai).not.toHaveSentSecrets();
+});
+```
+
+- **Scripted per test:** a list of turns (text, stream chunks, tool calls, reasoning, errors), or a function of the request that runs in the test process. Each script belongs to the test's session.
+- **Unscripted calls fail the test.** The agent gets a 400 naming the missing `openai.respond(…)`, and the test fails with the same message.
+- **Timing and failures are scripted:** a slow first token, a stream that breaks halfway, OpenAI's documented errors, a rate limit with truthful headers.
+- **What the agent sent is readable:** `calls()`, `toolCalls()`, and matchers for thread history, private text and secrets.
+- **The gateways come with it:** anything with an OpenAI base URL, from the official SDKs to OpenRouter, LiteLLM, Groq, Ollama and Azure OpenAI.
+
+A framework's own fake model still works (the AI SDK's `MockLanguageModelV4`, Pi's and Flue's `fauxProvider`, LangChain's `fakeModel`), as does a real model. The matchers check *how* the agent behaved in the channel, not *what* the model said, so they hold either way.
 
 ## 7. The UI is functional, not faithful
 

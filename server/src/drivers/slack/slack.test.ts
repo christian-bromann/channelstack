@@ -468,6 +468,14 @@ describe("messages and the events they send", () => {
       "not_in_channel",
     );
     expect(await refusal(post(`/users/${ana.id}/open-dm`, { participants: [ana.id] }))).toBe("invalid_argument");
+    // A DM is between two: talking with a third is a group DM of its own.
+    const dm = await post(`/users/${ana.id}/open-dm`, { participants: [ben.id] });
+    expect(await refusal(post(`/users/${ana.id}/invite`, { participants: [app.id], channel: dm.id }))).toBe(
+      "method_not_supported_for_channel_type",
+    );
+    expect(await refusal(post(`/users/${ana.id}/kick`, { participant: ben.id, channel: dm.id }))).toBe(
+      "method_not_supported_for_channel_type",
+    );
   });
 
   test("kicking the app tells it once, then it hears nothing more", async () => {
