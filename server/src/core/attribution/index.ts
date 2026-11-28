@@ -10,7 +10,8 @@
  *    matching delivery is the oldest still unanswered (`order`).
  *
  * A retry (the same request again, as the SDK says it is) goes where its first attempt went,
- * with the same evidence: never by order to another session.
+ * with the same evidence: never by order to another session. When several sessions' first
+ * attempts were the same request, a retry goes to the oldest of them whose call failed.
  */
 
 /** How a request was attributed. */
@@ -62,8 +63,14 @@ export interface AttributionRequest {
 const MIN_EVIDENCE = 8;
 /** The longest string that is compared: past this, a string is a document, not something a person said. */
 const MAX_EVIDENCE = 4000;
-/** How many first attempts are remembered for their retries. */
+/** How many requests' first attempts are remembered for their retries. */
 const ATTEMPTS = 1000;
+
+/** A first attempt that a retry may follow: where it went, and whether its call failed. */
+interface FirstAttempt {
+  readonly attribution: Attribution;
+  failed: boolean;
+}
 
 /** A rule of `TEXT_NORMALISATION`: every match of `pattern` becomes `replacement`, where `$1` is the pattern's first group. */
 interface NormalisationRule {
@@ -150,8 +157,11 @@ export class Attributor {
   readonly #minted = new Map<string, string>();
   /** Per session: the deliveries an attributed call already answered. */
   readonly #answered = new Map<string, Set<string>>();
-  /** How each request was attributed, by its key: where its retries go. */
-  readonly #attempts = new Map<string, Attribution>();
+  /**
+   * Per request key: its first attempts, one per session, oldest first. When two sessions send the
+   * same request, each keeps its own, so a retry never takes another session's place.
+   */
+  readonly #attempts = new Map<string, Map<string, FirstAttempt>>();
 
   constructor(sources: AttributionSources) {
     this.#sources = sources;
@@ -166,20 +176,58 @@ export class Attributor {
   forget(session: string): void {
     for (const [id, owner] of this.#minted) if (owner === session) this.#minted.delete(id);
     this.#answered.delete(session);
-    for (const [key, attribution] of this.#attempts) if (attribution.session === session) this.#attempts.delete(key);
+    for (const [key, firsts] of this.#attempts) {
+      firsts.delete(session);
+      if (firsts.size === 0) this.#attempts.delete(key);
+    }
   }
 
   attribute(request: AttributionRequest): Attribution | undefined {
     const { attempt } = request;
-    const first = attempt?.retry ? this.#attempts.get(attempt.key) : undefined;
-    if (first && this.#sources.sessions().includes(first.session)) return first;
+    const first = attempt?.retry ? this.#retried(attempt.key) : undefined;
+    if (first) return first;
     const found = this.#attribute(request);
-    if (attempt && found) {
-      this.#attempts.delete(attempt.key);
-      this.#attempts.set(attempt.key, found);
-      if (this.#attempts.size > ATTEMPTS) this.#attempts.delete(this.#attempts.keys().next().value as string);
-    }
+    if (attempt && found) this.#remember(attempt.key, found);
     return found;
+  }
+
+  /**
+   * How the call of a request (`key`) attributed to `session` ended: one that failed may be
+   * retried; one that didn't is no longer waiting for a retry.
+   */
+  settled(key: string, session: string, failed: boolean): void {
+    const firsts = this.#attempts.get(key);
+    const first = firsts?.get(session);
+    if (!firsts || !first) return;
+    if (failed) {
+      first.failed = true;
+      return;
+    }
+    firsts.delete(session);
+    if (firsts.size === 0) this.#attempts.delete(key);
+  }
+
+  /** The first attempt a retry follows: the oldest of an open session whose call failed, else the oldest. */
+  #retried(key: string): Attribution | undefined {
+    const open = new Set(this.#sources.sessions());
+    const firsts = [...(this.#attempts.get(key)?.values() ?? [])].filter((first) =>
+      open.has(first.attribution.session),
+    );
+    const first = firsts.find((candidate) => candidate.failed) ?? firsts[0];
+    if (!first) return undefined;
+    // In flight again, until it settles.
+    first.failed = false;
+    return first.attribution;
+  }
+
+  #remember(key: string, attribution: Attribution): void {
+    const firsts = this.#attempts.get(key) ?? new Map<string, FirstAttempt>();
+    // The newest request last, so the oldest is forgotten first; a session's newer attempt replaces its older one.
+    this.#attempts.delete(key);
+    firsts.delete(attribution.session);
+    firsts.set(attribution.session, { attribution, failed: false });
+    this.#attempts.set(key, firsts);
+    if (this.#attempts.size > ATTEMPTS) this.#attempts.delete(this.#attempts.keys().next().value as string);
   }
 
   #attribute(request: AttributionRequest): Attribution | undefined {

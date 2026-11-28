@@ -2,18 +2,20 @@
  * The fake OpenAI's HTTP API and control API on the edges the SDK tests don't reach: every
  * endpoint on the record, secrets kept out of what the control API returns, scripts that follow
  * one another, templates in tool arguments, calls the agent abandons, SDK retries between two
- * sessions that sent the same text, tool results without their call, and Chat Completions'
- * obfuscation.
+ * sessions that sent the same text, strict schemas that aren't JSON Schema, a call the fake fails
+ * on, tool results whose call is a reference or missing, and Chat Completions' obfuscation.
  */
 import OpenAI, { type APIError } from "openai";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import type { Harness } from "../../../test/app-harness.ts";
 import { slackWorkspace } from "../../../test/slack-workspace.ts";
+import { Scripts } from "./scripts.ts";
 
 type Workspace = Awaited<ReturnType<typeof slackWorkspace>>;
 let open: Workspace | undefined;
 afterEach(async () => {
+  vi.restoreAllMocks();
   await open?.agent.close();
   open = undefined;
 });
@@ -57,6 +59,20 @@ async function anotherSession(h: Harness, appId: string, prompt: string) {
 }
 
 const ask = (prompt: string) => [{ role: "user" as const, content: prompt }];
+
+/** A Chat Completions request as the SDK sends it, attempt `retry` of it (`x-stainless-retry-count`). */
+const attemptOf = (h: Harness, body: unknown, retry = 0) =>
+  h.app.fetch(
+    new Request(`${BASE}/chat/completions`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${h.secrets.get("openai", "apiKey")}`,
+        "content-type": "application/json",
+        "x-stainless-retry-count": String(retry),
+      },
+      body: JSON.stringify(body),
+    }),
+  );
 
 /** The fake model's calls in a session's event log, as `channelstack tail` and the inspector read them. */
 async function recorded(h: Harness, sessionId: string) {
@@ -156,6 +172,37 @@ describe("secrets never come back from the control API", () => {
   });
 });
 
+describe("a secret where a quote of the agent's text is cut", () => {
+  test("is scrubbed whole before the cut: nothing of it on /problems, /quiet, /unattributed or the record", async () => {
+    const { h, sessionId, client, control, prompt } = await setup();
+    const secret = h.secrets.get("slack", "signingSecret");
+    // The newest user message is quoted to 80 characters (cut at 77), an unattributed call's to 200:
+    // a 32-character secret across each cut.
+    const attributed = `${prompt} use this: ${secret} please`;
+    const early = `summarise the backlog every morning, with ${secret} please`;
+    const late = `summarise the backlog every morning ${"and the night before ".repeat(7)}with ${secret} please`;
+    expect(attributed.indexOf(secret)).toBeLessThan(77);
+    expect(attributed.indexOf(secret) + secret.length).toBeGreaterThan(77);
+    expect(early.indexOf(secret)).toBeLessThan(77);
+    expect(late.indexOf(secret)).toBeLessThan(200);
+    expect(late.indexOf(secret) + secret.length).toBeGreaterThan(200);
+
+    for (const text of [attributed, early, late]) {
+      await client.chat.completions.create({ model: "gpt-5", messages: ask(text) }, { maxRetries: 0 }).catch(() => {});
+    }
+
+    const read = JSON.stringify([
+      await control("GET", "/problems"),
+      await control("GET", "/unattributed"),
+      (await h.call("GET", `/sessions/${sessionId}/quiet`)).body,
+      await recorded(h, sessionId),
+    ]);
+    expect(read).toContain("use this: [redacted]");
+    expect(read).toContain("summarise the backlog every morning");
+    for (let at = 0; at + 8 <= secret.length; at += 1) expect(read).not.toContain(secret.slice(at, at + 8));
+  });
+});
+
 describe("scripts in sequence", () => {
   test("a script that ran out is no problem when a later one answers the call", async () => {
     const { client, respond, control, prompt } = await setup();
@@ -230,6 +277,157 @@ describe("an SDK retry", () => {
 
     expect(answer.choices[0]?.message.content).toBe("Yours is green.");
     expect(await other.control("GET", "/calls")).toEqual([]);
+  });
+
+  test("goes to its own session when the other session's identical first attempt came before it", async () => {
+    const prompt = "how is my change doing today?";
+    const { h, control, respond, app } = await setup(prompt);
+    const other = await anotherSession(h, app.id as string, prompt);
+    await respond({ turns: [{ error: "server_error" }, "Yours is green."] });
+    await other.control("POST", "/scripts", { turns: ["The other session's answer."] });
+    const body = { model: "gpt-5", messages: ask(prompt) };
+
+    // This session's first attempt fails; the other's, the same body, comes while the SDK waits to retry.
+    const failed = await attemptOf(h, body, 0);
+    const theirs = await attemptOf(h, body, 0);
+    const retried = await attemptOf(h, body, 1);
+
+    const textOf = async (response: Response) =>
+      ((await response.json()) as { choices: Array<{ message: { content: string } }> }).choices[0]?.message.content;
+    expect(failed.status).toBe(500);
+    expect(await textOf(theirs)).toBe("The other session's answer.");
+    expect(await textOf(retried)).toBe("Yours is green.");
+    expect((await control("GET", "/calls")).map((call: { attempt: number }) => call.attempt)).toEqual([0, 1]);
+    expect(await other.control("GET", "/calls")).toHaveLength(1);
+  });
+});
+
+describe("a strict schema that isn't JSON Schema", () => {
+  test("is refused as OpenAI refuses it, a 400 naming the function, and the SDK doesn't retry it", async () => {
+    const { client, control, respond, prompt } = await setup();
+    const script = await respond({ turns: [{ toolCalls: [{ name: "lookup", arguments: { q: "deploy" } }] }] });
+    const parameters = {
+      type: "object",
+      properties: { q: { type: "strin" } },
+      required: ["q"],
+      additionalProperties: false,
+    };
+
+    const chat = (await client.chat.completions
+      .create({
+        model: "gpt-5",
+        messages: ask(prompt),
+        tools: [{ type: "function", function: { name: "lookup", strict: true, parameters } }],
+      })
+      .catch((caught: unknown) => caught)) as APIError;
+    const responses = (await client.responses
+      .create({
+        model: "gpt-5",
+        input: prompt,
+        tools: [{ type: "function", name: "lookup", strict: true, parameters }],
+      })
+      .catch((caught: unknown) => caught)) as APIError;
+
+    for (const [error, param] of [
+      [chat, "tools[0].function.parameters"],
+      [responses, "tools[0].parameters"],
+    ] as const) {
+      expect(error.status).toBe(400);
+      expect(error.type).toBe("invalid_request_error");
+      expect(error.code).toBe("invalid_function_parameters");
+      expect(error.param).toBe(param);
+      expect(error.message).toMatch(/^400 Invalid schema for function 'lookup': .+\.$/);
+    }
+    // Refused before it was a model call: nothing in flight, and the script still has its turn.
+    expect(await control("GET", "/calls")).toEqual([]);
+    expect((await control("GET", `/scripts/${script.id}`)).used).toBe(0);
+  });
+
+  test("a strict response format that isn't JSON Schema is refused the same way", async () => {
+    const { client, respond, prompt } = await setup();
+    await respond({ turns: ['{"q":"deploy"}'] });
+
+    const error = (await client.chat.completions
+      .create({
+        model: "gpt-5",
+        messages: ask(prompt),
+        response_format: {
+          type: "json_schema",
+          json_schema: { name: "answer", strict: true, schema: { type: "object", properties: { q: { type: 7 } } } },
+        },
+      })
+      .catch((caught: unknown) => caught)) as APIError;
+
+    expect(error.status).toBe(400);
+    expect(error.code).toBe("invalid_json_schema");
+    expect(error.param).toBe("response_format");
+    expect(error.message).toMatch(/^400 Invalid schema for response_format 'answer': /);
+  });
+});
+
+describe("a model call the fake fails on", () => {
+  test("ends: on record with its 500, not in flight, and a problem of its session", async () => {
+    const { h, sessionId, client, control, respond, prompt } = await setup();
+    await respond({ turns: ["ok"] });
+    vi.spyOn(Scripts.prototype, "problemsOf").mockImplementation(() => {
+      throw new Error("a bug in the fake");
+    });
+
+    const error = (await client.chat.completions
+      .create({ model: "gpt-5", messages: ask(prompt) }, { maxRetries: 0 })
+      .catch((caught: unknown) => caught)) as APIError;
+
+    expect(error.status).toBe(500);
+    const [call] = await control("GET", "/calls");
+    expect(call).toMatchObject({ done: true, response: { status: 500, error: "server_error" } });
+    expect(JSON.stringify((await h.call("GET", `/sessions/${sessionId}/quiet`)).body)).not.toContain("model call");
+    expect(await control("GET", "/problems")).toEqual([
+      expect.stringMatching(/^the fake OpenAI failed answering chatcmpl-\w+: a bug in the fake$/),
+    ]);
+    expect(await recorded(h, sessionId)).toEqual([expect.objectContaining({ responseStatus: 500 })]);
+  });
+});
+
+describe("a tool result whose call is an item_reference", () => {
+  test("Responses finds the stored call the reference names, as OpenAI does", async () => {
+    const { client, respond, prompt } = await setup();
+    await respond({
+      turns: [{ toolCalls: [{ name: "lookup", arguments: { q: "deploy" } }] }, "Found it: {toolResult}"],
+    });
+    const tools = [{ type: "function" as const, name: "lookup", strict: false, parameters: { type: "object" } }];
+
+    const first = await client.responses.create({ model: "gpt-5", input: prompt, tools });
+    const call = first.output.find((item) => item.type === "function_call");
+    const answer = await client.responses.create({
+      model: "gpt-5",
+      tools,
+      input: [
+        { role: "user", content: prompt },
+        { type: "item_reference", id: call?.id ?? "" },
+        { type: "function_call_output", call_id: call?.call_id ?? "", output: "run 7 failed" },
+      ],
+    });
+
+    expect(answer.output_text).toBe("Found it: run 7 failed");
+  });
+
+  test("a reference to an item the fake doesn't keep finds no call", async () => {
+    const { client, respond, prompt } = await setup();
+    await respond({ turns: ["ok"] });
+
+    const error = (await client.responses
+      .create({
+        model: "gpt-5",
+        input: [
+          { role: "user", content: prompt },
+          { type: "item_reference", id: "fc_unknown" },
+          { type: "function_call_output", call_id: "call_unknown", output: "42" },
+        ],
+      })
+      .catch((caught: unknown) => caught)) as APIError;
+
+    expect(error.status).toBe(400);
+    expect(error.message).toMatch(/No tool call found for function call output with call_id call_unknown\./);
   });
 });
 

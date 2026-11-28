@@ -186,10 +186,15 @@ def _model_notes(unattributed: Sequence[dict[str, Any]], calls: Sequence[dict[st
 def _answered(call: Any) -> bool:
     """Whether a script's turn reached the agent: an answer (text, tool calls, a refusal) or a scripted error.
     Not a call the fake refused for the script (`channelstack_no_script`: a turn the real API can't give, a
-    list that ran out, a responder that threw), nor one a responder still holds."""
+    list that ran out, a responder that threw), nor one a responder still holds, nor one the agent hung up on
+    before anything was sent (status 0 without a scripted error)."""
     response: dict[str, Any] = call.response
     error = response.get("error")
-    return error != "channelstack_no_script" and (response.get("text") is not None or error is not None)
+    return (
+        error != "channelstack_no_script"
+        and (response.get("text") is not None or error is not None)
+        and (response.get("status") != 0 or error is not None)
+    )
 
 
 def _comment_text(comment: Any) -> str:

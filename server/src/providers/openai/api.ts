@@ -139,6 +139,7 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     const body = overrides.model === undefined ? parsed : { ...parsed, model: overrides.model };
     const normalised = normalise(body);
     const { request } = normalised;
+    world.scripts.refuseInvalidSchemas(request);
     seen.add(request.model);
     const call = world.begin(request, body, c.req.raw.headers);
     belongsTo(c, call.session);
@@ -146,13 +147,43 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     let ended: (outcome: StreamOutcome) => void = () => {};
     recordAs(c, { operation: endpoint, ended: new Promise((resolve) => (ended = resolve)) });
     call.open = "a model call in flight";
-    const hangUp = c.req.raw.signal;
-    const outcome = await world.outcome(call, hangUp);
 
     const done = (result: Parameters<OpenAIWorld["finish"]>[1], response: unknown = summary(call)) => {
       world.finish(call, result);
       ended({ status: call.status, response, ...(call.error === undefined ? {} : { error: call.error }) });
     };
+    try {
+      return await reply(c, endpoint, call, body, normalised, startedAt, done);
+    } catch (error) {
+      // Whatever went wrong, the call ends: on record, not in flight, and a problem of its session
+      // unless it is OpenAI's own refusal.
+      if (!call.done) {
+        if (error instanceof OpenAIError) done({ status: error.status, error: error.code ?? error.type }, error.body());
+        else {
+          world.problem(
+            call.session,
+            `the fake OpenAI failed answering ${call.id}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          done({ status: 500, error: "server_error" });
+        }
+      }
+      throw error;
+    }
+  };
+
+  /** What answers a call once it is on record: its outcome, held, streamed or refused. `done` ends it. */
+  const reply = async (
+    c: Context,
+    endpoint: ModelRequest["endpoint"],
+    call: CallRecord,
+    body: Json,
+    normalised: { request: ModelRequest; history?: { conversation?: Conversation; previous?: string } },
+    startedAt: number,
+    done: (result: Parameters<OpenAIWorld["finish"]>[1], response?: unknown) => void,
+  ): Promise<Response> => {
+    const { request } = normalised;
+    const hangUp = c.req.raw.signal;
+    const outcome = await world.outcome(call, hangUp);
     /** The agent hung up before anything was sent: nothing is stored, and the call is `aborted`. */
     const abandoned = () => {
       done({ status: 0, end: "aborted" });
@@ -356,7 +387,7 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
         }
       }
       return {
-        request: responsesRequest(body, c.req.raw.headers, history),
+        request: responsesRequest(body, c.req.raw.headers, history, (id) => world.store.item(id)),
         history: {
           ...(previous === undefined ? {} : { previous }),
           ...(conversation === undefined ? {} : { conversation }),

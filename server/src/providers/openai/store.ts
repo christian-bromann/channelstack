@@ -39,6 +39,19 @@ export class OpenAIStore {
     return stored === undefined ? undefined : [...stored.input, ...stored.output];
   }
 
+  /** The stored item an `item_reference` names: in a stored response's output or input, or a conversation. */
+  item(id: string): InputItem | undefined {
+    for (const response of this.responses.values()) {
+      const found = response.output.find((item) => item.id === id) ?? response.input.find((item) => item.id === id);
+      if (found) return found;
+    }
+    for (const conversation of this.conversations.values()) {
+      const found = conversation.items.find((item) => item.id === id);
+      if (found) return found;
+    }
+    return undefined;
+  }
+
   openConversation(conversation: Conversation): Conversation {
     this.conversations.set(conversation.id, conversation);
     if (this.conversations.size > LIMIT) this.conversations.delete(this.conversations.keys().next().value as string);

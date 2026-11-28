@@ -1955,7 +1955,8 @@ check!(
 /// How many of a script's calls its turn reached the agent in: an answer (text, tool calls, a
 /// refusal) or a scripted error. Not a call the fake refused for the script
 /// (`channelstack_no_script`: a turn the real API can't give, a list that ran out, a responder that
-/// panicked), nor one a responder still holds.
+/// panicked), nor one a responder still holds, nor one the agent hung up on before anything was
+/// sent (status 0 without a scripted error).
 fn answered(script: &Value) -> i64 {
     let count = items(script["calls"].clone())
         .iter()
@@ -1963,6 +1964,7 @@ fn answered(script: &Value) -> i64 {
             let response = &call["response"];
             response["error"] != "channelstack_no_script"
                 && (!response["text"].is_null() || !response["error"].is_null())
+                && (response["status"] != 0 || !response["error"].is_null())
         })
         .count();
     i64::try_from(count).unwrap_or(i64::MAX)
