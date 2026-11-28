@@ -158,6 +158,8 @@ What an app is, how it gets its credentials, and which of one app's actions the 
 
 #### Twilio (phase 10)
 
+Phase 10 is deferred (`docs/phases.md`, status table). This section applies when it is resumed.
+
 - **An app:** a phone number of its own on the agent's account, with its own messaging webhook URL. Twilio signs every webhook with the account's Auth Token, so two numbers on one account share it; that is the platform, not a shortcut. `createApp({ subaccount: true })` puts the number on a subaccount with its own Account SID and Auth Token instead (open question 7).
 - **What it hears from another app B:** B's text to its number is an inbound message on its webhook, as a person's is; B gets its own status callbacks. A text costs money live, and two numbers texting each other is the most expensive loop there is, so the guard below matters most here.
 - **Opt-out:** `STOP` from B stops it texting B, as for a person.

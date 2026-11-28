@@ -496,7 +496,7 @@ A framework's own fake model still works (the AI SDK's `MockLanguageModelV4`, Pi
 
 ## 7. The UI is functional, not faithful
 
-Nobody needs the UI to look like Slack, GitHub, Linear, Notion or an inbox. What matters is that a developer can **use** each channel and **see what happened**. So the UI uses one neutral design for every channel and shows the same transcript the matchers read. Its list of places is every channel's, from the same dev adapters the CLI and MCP use (`GET /sessions/{session}/places`, decision 0027):
+Nobody needs the UI to look like Slack, GitHub, Linear, Notion or an inbox. What matters is that a developer can **use** each channel and **see what happened**. So the UI uses one neutral design for every channel and shows the same transcript the matchers read. Its list of places is every channel's, from the same dev adapters the CLI and MCP use (`GET /sessions/{session}/places`, decision 0028):
 
 - **Threads and conversations as text:** who said what, in which thread, edited or deleted, streaming or done, and the agent's status ("thinking…", "stopped").
 - **Interactive elements that work:** a button is a button, a select is a select, and a modal opens as a plain form. Clicking one sends the real `block_actions` or `view_submission` delivery. The same goes for GitHub review comments (shown with path and line), Linear Stop, and Notion comment replies.

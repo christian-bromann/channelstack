@@ -18,6 +18,7 @@
 | 7 | done | 2026-11-25, [#32](https://github.com/christian-bromann/channelstack/pull/32) (7.2 dropped, decision 0017; MCP tools for GitHub, Linear and Notion dropped, #33) |
 | 8 | done | 2026-11-25, [#57](https://github.com/christian-bromann/channelstack/pull/57) (Resend attachments and raw MIME built since, #64, but for a person's attachments, #84; HTML to text on a library, #65) |
 | 9 | done | 2026-11-26, [#66](https://github.com/christian-bromann/channelstack/pull/66) (Gmail verified live against two accounts and a Pub/Sub topic; conformance without a difference) |
+| 10 | deferred | Twilio isn't shipping for now: [#102](https://github.com/christian-bromann/channelstack/pull/102) is closed without merging, and its branch `phase-10-twilio` is kept, to reopen if users ask for it |
 | 11 | done | 2026-11-27, [#103](https://github.com/christian-bromann/channelstack/pull/103) (built in parallel with phase 10; Discord verified live with the agent's bot and two people's bots; conformance without a difference) |
 
 ## When a phase is done
@@ -357,7 +358,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ## Phase 11: Discord
 
-[Decision 0026](decisions/0026-discord.md): Discord as channel 8, and why the Gateway, HTTP interactions, and a second bot as a person live. Phase 10 (Twilio) is built at the same time, in its own pull request, at the maintainer's request.
+[Decision 0026](decisions/0026-discord.md): Discord as channel 8, and why the Gateway, HTTP interactions, and a second bot as a person live. Phase 10 (Twilio) was built at the same time, in its own pull request, and is deferred (see the status table).
 
 **Build:**
 - **The Discord fake on the kit:**
@@ -387,7 +388,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ## Phase 12: any number of agent apps per channel
 
-[Decision 0027](decisions/0027-multiple-apps.md): a channel holds any number of people and apps, each app a real agent app with its own identity, and `my-agent` stays. Phase 12 started before phases 10 (Twilio) and 11 (Discord) merged, at the maintainer's request. Phase 11 merged while it ran, so it covers the seven channels on `main` (Slack, GitHub, Linear, Notion, Resend, Google and Discord) and echo; Twilio gets its apps once phase 10 lands ([#113](https://github.com/christian-bromann/channelstack/issues/113)). Its open questions are answered by the maintainer before it starts, or it takes their defaults.
+[Decision 0027](decisions/0027-multiple-apps.md): a channel holds any number of people and apps, each app a real agent app with its own identity, and `my-agent` stays. Phase 12 started before phases 10 (Twilio) and 11 (Discord) merged, at the maintainer's request. Phase 11 merged while it ran, so it covers the seven channels on `main` (Slack, GitHub, Linear, Notion, Resend, Google and Discord) and echo. Twilio is deferred: the decision's Twilio section applies when phase 10 resumes ([#113](https://github.com/christian-bromann/channelstack/issues/113)). Its open questions are answered by the maintainer before it starts, or it takes their defaults.
 
 **Build:**
 - **Apps by name, on every channel and echo:** `createApp({ name, … })` and `apps()` on each fixture; apps in the shared world, ids derived from `CHANNELSTACK_SEED` and the name, secrets per app in `secrets.json`, `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, `channelstack env --app` and `channelstack.env({ app })`.
