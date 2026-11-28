@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, test } from "vitest";
 
 import { DEV_CHANNELS } from "../drivers/index.ts";
@@ -120,7 +122,10 @@ describe("finding a command", () => {
   test("every channel has the same commands", () => {
     for (const channel of DEV_CHANNELS) {
       const found = find([channel.name]);
-      const names = found.ok ? (found.path.at(-1)?.commands?.[0]?.commands.map((command) => command.name) ?? []) : [];
+      const listed = found.ok ? (found.path.at(-1)?.commands?.[0]?.commands ?? []) : [];
+      const names = listed.filter((command) => !command.hidden).map((command) => command.name);
+      // `react` is there on every channel, to say why where people don't react.
+      expect(find([channel.name, "react"]).ok, channel.name).toBe(true);
       const expected = VERBS.filter(
         (verb) =>
           (verb !== "react" || channel.adapter.react) &&
@@ -130,4 +135,21 @@ describe("finding a command", () => {
       expect(names, channel.name).toEqual(expected);
     }
   });
+});
+
+test("every section a command's help links to is a heading on the CLI reference", () => {
+  const page = readFileSync(new URL("../../../website/docs/reference/cli.md", import.meta.url), "utf8");
+  // As the site slugs a heading: lower case, punctuation dropped, spaces as hyphens.
+  const anchors = new Set(
+    [...page.matchAll(/^#{2,3} (.+)$/gm)].map(([, text]) =>
+      (text as string)
+        .toLowerCase()
+        .replace(/[^a-z0-9 -]/g, "")
+        .trim()
+        .replace(/ /g, "-"),
+    ),
+  );
+  const linked = walk().flatMap((path) => (path.at(-1)?.docs ? [path.at(-1)?.docs] : []));
+  expect(linked.length).toBeGreaterThan(20);
+  expect(linked.filter((anchor) => !anchors.has(anchor as string))).toEqual([]);
 });

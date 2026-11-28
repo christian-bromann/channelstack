@@ -49,6 +49,8 @@ export interface Command {
   readonly sections?: ReadonlyArray<{ readonly title: string; readonly rows: readonly Row[] }>;
   /** Where its reference is: an anchor on the CLI page. */
   readonly docs?: string;
+  /** Found and run, but not listed: a command that only says why it can't be used here. */
+  readonly hidden?: true;
 }
 
 const DOCS = "https://channelstack.dev/docs/reference/cli";
@@ -557,7 +559,9 @@ function channelCommand(channel: DevChannel): Command {
     attaches: true,
     docs: "channelstack-channel-reply",
   };
-  const react: Command | undefined = adapter.react && {
+  // On a channel whose people don't react, `react` is kept out of the help but still runs, to say so.
+  const react: Command = {
+    ...(adapter.react ? {} : { hidden: true as const, about: `People don't react on ${title}.` }),
     name: "react",
     summary: "React to an entry with an emoji as a person",
     description: [referenceText(channel), ...ownName("react")],
@@ -590,15 +594,19 @@ function channelCommand(channel: DevChannel): Command {
         title: "Flags",
         flags: [
           { name: "in", value: "place", text: `The ${adapter.place}, by its name` },
-          ...(adapter.thread
-            ? [{ name: "thread", value: "ref", text: "Only that entry's thread (`last` is the newest entry)" }]
-            : []),
+          {
+            name: "thread",
+            value: "ref",
+            text: adapter.thread
+              ? "Only that entry's thread (`last` is the newest entry)"
+              : `The ${adapter.place} that entry is in (${title} has no threads)`,
+          },
           { name: "json", text: "The entries as JSON, with their ids, authors and controls" },
         ],
       },
     ],
     attaches: true,
-    docs: "channelstack-show",
+    docs: "channelstack-channel-show",
   };
   const listActions: Command = {
     name: "actions",
@@ -622,7 +630,7 @@ function channelCommand(channel: DevChannel): Command {
 
   return {
     name,
-    summary: `Act as people on ${title}: say, reply${react ? ", react" : ""}, show, and ${actions.length} actions`,
+    summary: `Act as people on ${title}: say, reply${adapter.react ? ", react" : ""}, show, and ${actions.length} actions`,
     description: [
       `In the running server's shared "dev" session. A place on ${title} is ${a(adapter.place)}, named like ${adapter.example}. People and places are made the first time they are named, with the app in them.`,
       referenceText(channel),
@@ -636,7 +644,7 @@ function channelCommand(channel: DevChannel): Command {
     commands: [
       {
         title: "Commands",
-        commands: [say, reply, ...(react ? [react] : []), showPlace, listActions, ...(hidden.length > 0 ? [act] : [])],
+        commands: [say, reply, react, showPlace, listActions, ...(hidden.length > 0 ? [act] : [])],
       },
       { title: "Actions", commands: own.map((action) => actionCommand(channel, action, name)) },
     ],
@@ -833,7 +841,8 @@ export function renderHelp(path: readonly Command[], options: { version: string;
     ]),
   );
   for (const group of command.commands ?? []) {
-    section(group.title, rows(group.commands.map((child) => ({ name: child.name, text: child.summary }))));
+    const listed = group.commands.filter((child) => !child.hidden);
+    section(group.title, rows(listed.map((child) => ({ name: child.name, text: child.summary }))));
   }
   if (command.args) section("Arguments", rows(command.args));
   for (const group of command.flags ?? []) {
