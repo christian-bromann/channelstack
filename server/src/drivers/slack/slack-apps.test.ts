@@ -326,10 +326,12 @@ describe("R1.12: deliveries, faults and the event log by app", () => {
       "my-agent",
       "coder",
     ]);
-    expect(events.filter((event) => event.kind === "delivery_attempt").map((event) => event.summary?.text)).toEqual([
-      "→ slack app_mention to coder",
-      "→ slack message",
-      "→ slack message to coder",
-    ]);
+    // The attempts are logged as each endpoint answers, so in no set order.
+    expect(
+      events
+        .filter((event) => event.kind === "delivery_attempt")
+        .map((event) => event.summary?.text)
+        .sort(),
+    ).toEqual(["→ slack app_mention to coder", "→ slack message", "→ slack message to coder"]);
   });
 });
