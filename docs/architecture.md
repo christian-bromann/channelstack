@@ -4,7 +4,7 @@
 
 ## 1. The big picture
 
-One server process fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail) and Discord in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
+One server process fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail) and Discord in memory, and OpenAI's API for the agent's model (section 3.4). Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
 
 ```
  Vitest / pytest / Rust tests        channelstack CLI      MCP (coding agents)      UI (browser)
@@ -16,8 +16,9 @@ One server process fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail) a
 │  control API      Hono + zod-openapi routes, bearer token, loopback only                                     │
 │  core             sessions · object registry · event log · delivery queue · reality rules ·                  │
 │                   secrets · safety allowlist · cleanup ledger · recorder · proxy + CA                        │
-│  drivers          slack │ github │ linear │ notion        (each: fake backend · live backend · inbound ·     │
+│  drivers          slack │ github │ linear │ notion │ …    (each: fake backend · live backend · inbound ·     │
 │                                                            transcript · capabilities)                        │
+│  providers        openai                                   (the agent's model: fake only, scripted per test) │
 └───────────────┬───────────────────────────────────────────────────────────────┬──────────────────────────────┘
        fake      │ provider APIs at https://slack.localhost, github.localhost, … │ live: real provider APIs
                  ▼                                                                ▼   (acting as the app or a person)
@@ -133,7 +134,14 @@ That keeps the fake and the real platform from drifting apart in code. The night
 
 ### 3.4 Providers: the agent's model
 
-A **provider** is a fake the agent calls but that has no people, apps, deliveries or transcripts: the fake OpenAI at `openai.localhost` ([decision 0029](decisions/0029-fake-openai.md), phases 13 and 14). It lives in `server/src/providers/<name>/`, beside the drivers, and uses the same core: the event log for its calls, the quiet detector for calls in flight, the secrets store for its key, and the proxy for `api.openai.com`. A model call carries no session, so `core/attribution/` assigns it to one from the evidence in the request: ids the fake minted, a tag the agent sent, ids the session owns, or text its people wrote. Scripts belong to the session, like faults. A responder (a function of the request) runs in the test process: the server holds the agent's request until the SDK answers it over a long poll.
+A **provider** is a fake the agent calls that isn't a channel: it has no people, apps, deliveries or transcripts. The one provider is the fake OpenAI ([decision 0029](decisions/0029-fake-openai.md), phase 13), in `server/src/providers/openai/`, beside the drivers.
+
+- **A driver definition with `provider: true`.** It registers like a driver (`DriverDefinition`: ids, token patterns, `secrets` for its API key, `hosts: ["api.openai.com"]` for proxy mode) and is listed in `DRIVERS`, but `CHANNELS`, and so the dev adapters, the channel unions and the UI's places, leave it out. Its `Driver` has a fake backend, `routes`, `env()` (`OPENAI_BASE_URL`, `OPENAI_API_KEY`), `openWork` and `problems`, and no live backend: it is fake in every run.
+- **Served like the fakes.** Its API is at `https://openai.localhost/v1` (`/openai/v1` without portless, `api.openai.com` through the proxy), and its control routes are under the session like a channel's (`/sessions/{s}/openai/scripts`, `…/calls`, `…/rate-limits`). The spec says `provider: true` in `x-channelstack-channels`, the IR carries it on the channel (`IrChannel.provider`), and the emitters give it a fixture (`openai` in Vitest and pytest, `session.openai()` in Rust) with no people or places.
+- **The same core.** The event log records its calls, the quiet detector counts a call in flight, the secrets store holds its key, and the redactor knows the `sk-proj-` shape. Streams go out through `core/stream` (server-sent events with first-token and between-chunk timing, a break by error, drop or stall, and a hold at `pauseAfter`).
+- **Attribution.** A model call carries no session, so `core/attribution` gives it to one from the evidence in the request, strongest first: an id the fake minted for an earlier answer, a tag the agent sent (`user`, metadata, the `x-channelstack-session` header), an id or name only one session's deliveries and API answers hold, or text its people wrote. `core/attribution/place.ts` reads from the deciding delivery where in the channels the call belongs (`request.context`, `when: { from, in }`). A call it can't attribute is kept apart (`openai.unattributed()`) and refused.
+- **Scripts belong to the session,** like faults, and go with it. A call no script answers gets a 400 `channelstack_no_script`; the driver's `problems(session)` reports it, so a waiting matcher fails at once and the session's close fails.
+- **Responders run in the test process.** For `openai.respond(fn)` the server holds the agent's request, and the SDK long-polls `GET …/openai/scripts/{s}/requests` for held calls, runs the function and posts the turn to `POST …/openai/scripts/{s}/answers` (or the error its function threw). The routes are ordinary routes; the runtime's responder module drives them in each language.
 
 ### 3.5 Core services
 
@@ -280,7 +288,7 @@ In Rust (`sdks/rust`, crate `channelstack`), every handle is a struct with typed
 
 ```
 channelstack/
-  server/            Bun + Hono: src/app.ts, src/serve.ts, src/cli.ts, src/core/, src/drivers/{echo,slack,github,linear,notion}/
+  server/            Bun + Hono: src/app.ts, src/serve.ts, src/cli.ts, src/core/, src/drivers/{echo,slack,github,linear,notion,resend,google,discord}/, src/providers/openai/
   ui/                functional browser UI (transcripts, inspector, chaos controls)
   spec/              openapi.json, ir.json (generated, committed)
   codegen/           src/ir.ts (OpenAPI → IR) + src/emit/{typescript,python,rust}.ts

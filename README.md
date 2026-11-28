@@ -83,7 +83,7 @@ There are no hand-built webhook payloads and no mocked SDK calls. Ana posts, the
 
 Apps that live in these platforms break in the gaps between systems: a webhook signed the wrong way, a payload shape that changed last month, a stray progress message nobody asserted on.
 
-- **Your app's real code path.** `channelstack env` prints the URLs and tokens that point your app's own SDKs at `slack.localhost`, `github.localhost`, `linear.localhost` and `notion.localhost`. Apps that can't change their base URL send their traffic through channelstack's proxy instead ([proxy mode](docs/devx.md#9-proxy-mode-for-agents-that-cant-change-their-base-url)).
+- **Your app's real code path.** `channelstack env` prints the URLs and tokens that point your app's own SDKs at `slack.localhost`, `github.localhost`, `linear.localhost` and `notion.localhost`, and its model at `openai.localhost`. Apps that can't change their base URL send their traffic through channelstack's proxy instead ([proxy mode](docs/devx.md#9-proxy-mode-for-agents-that-cant-change-their-base-url)).
 - **Shapes checked against the real platforms.** channelstack's own tests validate what the fakes send against the platforms' published schemas (GitHub, Linear) and against recorded real traffic where no usable schema exists (Slack). When a platform changes, channelstack's build goes red, instead of your tests passing against a stale fake.
 - **People, not payloads.** Write `ana.click("Approve", { message })` instead of hand-building a `block_actions` body. People post, reply, review, delegate and press Stop, with correct signatures, retries and delivery ids.
 - **Assert what people see.** Streams, status lines, edits and ephemeral messages render into one transcript. `toHaveRepliesFrom(…, { count: 1 })` catches the double post.
@@ -104,26 +104,48 @@ Each channel is a fixture your test receives by name (`async ({ slack, github })
 
 The same tests can also run against the real platforms in sandbox workspaces ([live mode](docs/live-mode.md)).
 
+### The model
+
+An AI agent's model is faked too: channelstack serves OpenAI's API at `https://openai.localhost/v1` (Chat Completions, the Responses and Conversations APIs), and each test scripts what the model answers with the `openai` fixture. It's realistic on the wire, with OpenAI's event shapes, tool calls, errors, rate-limit headers and timing, and never in content. A call no script answers fails the test.
+
+```ts
+test("a tool loop ends in one answer, in the thread", async ({ slack, openai }) => {
+  const ana = await slack.createUser({ name: "Ana" });
+  const channel = await slack.createChannel({ participants: [ana, slack.app] });
+  const ai = await openai.respond([
+    { toolCalls: [{ name: "search_incidents", arguments: { since: "yesterday" } }] },
+    "Two incidents yesterday: the web deploy and a DNS blip.",
+  ]);
+
+  const msg = await ana.say("@my-agent what broke yesterday?", { channel });
+
+  await expect(msg.thread).toHaveReplyFrom("my-agent", { text: /DNS blip/ });
+  await expect(ai).toHaveAnswered({ times: 2 });
+});
+```
+
+Anything that takes an OpenAI base URL works: the official `openai` SDKs, the AI SDK's OpenAI provider, the OpenAI Agents SDK, and gateways such as OpenRouter, LiteLLM and Azure OpenAI. Images, audio, files and OpenAI's built-in tools come in [phase 14](docs/phases.md).
+
 ## How it works
 
 ```mermaid
 flowchart LR
   T["<b>Your test</b><br/>ana.say(…)<br/>expect(thread)"]
-  C["<b>channelstack</b><br/>fake workspaces, people,<br/>platform APIs"]
+  C["<b>channelstack</b><br/>fake workspaces, people,<br/>platform APIs, the model"]
   A["<b>Your agent</b><br/>unchanged code,<br/>real SDKs"]
   T -- "script + assert" --> C
   C -- "signed webhooks" --> A
   A -. "API calls" .-> C
 ```
 
-One server process fakes the platforms in memory. Your test drives it through a control API, it delivers what the platform would deliver, and your app talks to it as if it were the real thing. channelstack never starts or wraps your app. More in [docs/architecture.md](docs/architecture.md).
+One server process fakes the platforms, and OpenAI's API for the agent's model, in memory. Your test drives it through a control API, it delivers what the platform would deliver, and your app talks to it as if it were the real thing. channelstack never starts or wraps your app. More in [docs/architecture.md](docs/architecture.md).
 
 ## Quick start
 
 ```bash
 npm i -D channelstack
 CHANNELSTACK_SLACK_WEBHOOK_URL=https://my-agent.localhost/slack/events npx channelstack &   # the fakes, each with an app named my-agent
-npx channelstack env >> .env.local        # tokens and URLs for your agent
+npx channelstack env >> .env.local        # tokens and URLs for your agent, and its model's
 portless run my-agent pnpm dev            # your usual start command, reachable at https://my-agent.localhost
 ```
 
@@ -163,7 +185,7 @@ There is no config file. Each fake has a built-in app named `my-agent`, and wher
 
 | Path                                         | What it is                                                           |
 | -------------------------------------------- | -------------------------------------------------------------------- |
-| [`server/`](server/)                         | The server: control API and the fake platforms                       |
+| [`server/`](server/)                         | The server: control API, the fake platforms and the fake OpenAI      |
 | [`test/acceptance/`](test/acceptance/)       | The acceptance tests, the examples among them                        |
 | [`codegen/`](codegen/), [`sdks/`](sdks/)     | The SDK generator and the SDKs it produces                           |
 | [`website/`](website/)                       | [channelstack.dev](https://channelstack.dev)                          |
@@ -172,4 +194,4 @@ There is no config file. Each fake has a built-in app named `my-agent`, and wher
 
 ## License
 
-[MIT](LICENSE). channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub, Linear, Notion, Resend, Google or Discord.
+[MIT](LICENSE). channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub, Linear, Notion, Resend, Google, Discord or OpenAI.

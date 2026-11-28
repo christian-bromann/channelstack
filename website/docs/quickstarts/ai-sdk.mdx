@@ -1,12 +1,12 @@
 ---
 title: "AI SDK"
 order: 3
-description: "Stream an AI SDK answer into Slack from a Bolt app, with the AI SDK's mock model, and test the status line, the stream and Stop."
+description: "Stream an AI SDK answer into Slack from a Bolt app, on the AI SDK's OpenAI provider pointed at the fake OpenAI, and test the status line, the stream and Stop."
 ---
 
 # AI SDK
 
-In this tutorial you write a Bolt app that answers a direct message by streaming text from the [AI SDK](https://ai-sdk.dev)'s `streamText` into Slack, with the AI SDK's own mock model, so every run streams the same answer. Then you test the status line, the stream and the Stop button, and break the agent once. It follows the `bolt-ai-sdk` reference agent that channelstack's CI runs.
+In this tutorial you write a Bolt app that answers a direct message by streaming text from the [AI SDK](https://ai-sdk.dev)'s `streamText` into Slack. Its model is OpenAI, through the AI SDK's OpenAI provider (`@ai-sdk/openai`), and in tests that is channelstack's [fake OpenAI](/docs/guide/the-model): each test scripts what the model streams, so every run streams the same answer and needs no API key. Then you test the status line, the stream and the Stop button, and break the agent once. It's a short version of the `openai-ai-sdk` reference agent that channelstack's CI runs.
 
 [Getting started](/docs/getting-started) explains the server, `channelstack env` and a first test in more detail. This page builds on it.
 
@@ -18,7 +18,7 @@ You need Node.js 24 or newer, which runs the TypeScript files below as they are.
 mkdir streaming-agent && cd streaming-agent
 npm init -y
 npm pkg set type=module
-npm i @slack/bolt@5.1.0 ai@7.0.177
+npm i @slack/bolt@5.1.0 ai@7.0.177 @ai-sdk/openai@4.0.124
 npm i -D channelstack vitest
 ```
 
@@ -41,60 +41,25 @@ npx channelstack env > .env.local
 
 ## 3. The model
 
-The agent gets its answers from the AI SDK's `MockLanguageModelV4`, which streams scripted pieces of text the way a real model streams tokens. It waits a moment before the first piece, so the status line has time to show, and a prompt with "long" in it streams for a few seconds, long enough for someone to press Stop. This is the reference agents' own model:
+Among the lines `channelstack env` printed are two for the model:
 
-```ts title="model.ts"
-import { simulateReadableStream } from "ai";
-import { MockLanguageModelV4 } from "ai/test";
-
-/** A model that streams the same answer to the same prompt on every run. */
-export function writer(prompt: string) {
-  const subject = prompt.replace(/^write (the |a )?/i, "");
-  const pieces = [
-    `# ${subject}\n\n`,
-    "## What changed\n\nThe delivery queue now retries a slow acknowledgement the way the platform does, signatures are checked before anything else is read, and a rate-limited call waits for as long as it was told to before it tries again. None of this needs a change in your code.\n\n",
-    "## What to do\n\nUpdate, run the tests once and read the new failure messages: they name the message a person would still see, which is usually the line you need to fix.\n\n",
-    "## Thanks\n\nTo everyone who reported a conversation that went wrong and sent the transcript along with it.\n",
-    // A long piece of writing keeps going for a few seconds.
-    ...(/\blong\b/i.test(prompt)
-      ? Array.from({ length: 16 }, (_, index) => `\n## Appendix ${index + 1}\n\nMore detail, for those who asked.\n`)
-      : []),
-  ];
-  return new MockLanguageModelV4({
-    doStream: async () => ({
-      stream: simulateReadableStream({
-        initialDelayInMs: 700,
-        chunkDelayInMs: 250,
-        chunks: [
-          { type: "text-start" as const, id: "answer" },
-          ...pieces.map((delta) => ({ type: "text-delta" as const, id: "answer", delta })),
-          { type: "text-end" as const, id: "answer" },
-          {
-            type: "finish" as const,
-            finishReason: { unified: "stop" as const, raw: undefined },
-            usage: {
-              inputTokens: { total: 12, noCache: 12, cacheRead: undefined, cacheWrite: undefined },
-              outputTokens: { total: 180, text: 180, reasoning: undefined },
-            },
-          },
-        ],
-      }),
-    }),
-  });
-}
+```ini title=".env.local"
+OPENAI_BASE_URL=http://127.0.0.1:4500/openai/v1
+OPENAI_API_KEY=sk-proj-…
 ```
 
-In production you pass a real provider's model to `streamText` instead, and the rest of the agent stays the same.
+(With portless, the base URL is `https://openai.localhost/v1`.) The AI SDK's `openai` provider reads both by itself, so the agent needs no setting of its own: with them it talks to the fake OpenAI, and in production, without `OPENAI_BASE_URL` and with your real key, to OpenAI.
+
+The fake has no default answer. A model call that no test scripted gets a 400 (`channelstack_no_script`), and the test fails, saying which `openai.respond(…)` would have answered it.
 
 ## 4. Write the agent
 
 The agent answers each direct message in three steps: it sets a status line, streams the model's text into one message with `chat.startStream` and `chat.appendStream`, and ends the stream with `chat.stopStream`. When the person presses Stop, Slack sends `agent_session_stopped`, and the agent aborts the model:
 
 ```ts title="agent.ts"
+import { openai } from "@ai-sdk/openai";
 import { App } from "@slack/bolt";
 import { streamText } from "ai";
-
-import { writer } from "./model.ts";
 
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
@@ -121,7 +86,13 @@ app.message(async ({ message, client }) => {
   await client.assistant.threads.setStatus({ channel_id: channel, thread_ts: thread, status: "is thinking…" });
   const stop = new AbortController();
   writing.set(`${channel}:${thread}`, stop);
-  const { textStream } = streamText({ model: writer(prompt), prompt, abortSignal: stop.signal });
+  const { textStream } = streamText({
+    model: openai("gpt-5-mini"),
+    prompt,
+    abortSignal: stop.signal,
+    // The person's Slack id as OpenAI's `user`: it tells channelstack whose question the call answers.
+    providerOptions: { openai: { user: message.user } },
+  });
   let stream: string | undefined;
   try {
     for await (const text of textStream) {
@@ -165,7 +136,7 @@ export default defineConfig({
 });
 ```
 
-And two tests: one watches the answer from the status line to the end of the stream, the other presses Stop halfway:
+And two tests. Each first scripts what the model answers with the `openai` fixture: the first streams four pieces of release notes, a little slowly, and watches the answer from the status line to the end of the stream; the second holds a long answer after three pieces, presses Stop, and checks that the agent cancelled its model call:
 
 <Example id="ai-sdk-streaming" />
 
@@ -180,7 +151,7 @@ npx vitest run
       Tests  2 passed (2)
 ```
 
-`toHaveStatus` reads what a person sees of the agent in that thread: `working` while the status line is set, `streaming` while a stream is open, `idle` once it has ended, and `stopped` after Stop. Each check waits until it holds, so the first test follows the answer through those states in order, and `reply.stream` says how the stream ended: `completed` here. In the second, `toHaveRepliesFrom` waits until the agent is quiet and then counts: one message, the stream, and nothing after it.
+`toHaveStatus` reads what a person sees of the agent in that thread: `working` while the status line is set, `streaming` while a stream is open, `idle` once it has ended, and `stopped` after Stop. Each check waits until it holds, so the first test follows the answer through those states in order, and `reply.stream` says how the stream ended: `completed` here. `toHaveSent(msg)` checks that Ana's message is what the agent asked the model. In the second, `pauseAfter: 3` holds the model's stream after three pieces, `ai.waitForPause()` returns that call, `toHaveRepliesFrom` waits until the agent is quiet and then counts (one message, the stream, and nothing after it), and `toBeAborted` checks that Stop cancelled the model's request instead of leaving it running.
 
 ## 6. Break it on purpose
 
@@ -195,7 +166,7 @@ Restart the agent and run the tests again. The first test fails once its wait ru
 ```
  FAIL  agent.test.ts > streams a reply and shows a status while working
 Error: Expected the thread to be idle, it is streaming
-Still open: a stream my-agent started and never stopped: "# release notes for 0.10"
+Still open: a stream my-agent started and never stopped: "# Release notes for 0.10"
 ```
 
 Every piece of text arrived, so the message looks complete in a test that only reads its text. In Slack it would still show as being written. The `Still open:` line is channelstack telling you what the agent left unfinished, which is often the bug itself. Put `stopStream` back, restart the agent, and both tests pass.
@@ -203,6 +174,7 @@ Every piece of text arrived, so the message looks complete in a test that only r
 ## Next steps
 
 - [Slack](/docs/platforms/slack): streams, the status line, Stop and the agent split view, and the errors the fake answers with.
+- [The model](/docs/guide/the-model): tool calls, a slow first token, a stream that breaks, errors, and what the agent sent.
 - [Waiting and quiet](/docs/guide/waiting-and-quiet): why `toHaveRepliesFrom` waits for quiet and the other checks don't.
-- [Standard checks](/docs/guide/standard-checks): `slackChecks()` includes a Stop check for every Slack agent.
+- [Standard checks](/docs/guide/standard-checks): `slackChecks({ app: "my-agent", model: "openai" })` adds the model checks to the Slack ones.
 - [Chat SDK](/docs/quickstarts/chat-sdk): the same kind of agent on the Chat SDK, where `thread.post(textStream)` streams for you.

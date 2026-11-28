@@ -36,18 +36,19 @@ One per agent framework, in the order people use them with channelstack. Each is
 | Page | Kind | What it covers |
 |---|---|---|
 | Chat SDK | Tutorial | A Chat SDK bot (`chat` with `@chat-adapter/slack`, and the GitHub and Linear adapters) |
-| AI SDK | Tutorial | A Bolt app that streams an AI SDK answer, with the AI SDK's mock model |
+| AI SDK | Tutorial | A Bolt app that streams an AI SDK answer, on `@ai-sdk/openai` pointed at the fake OpenAI, with tests that script the model |
 | Pi | Tutorial | A Pi agent in Slack |
 
 **Guide** (`docs/guide/`)
 
 | Page | Kind | What it covers |
 |---|---|---|
-| How it works | Explanation | One server, six fakes, the control API; sessions in one shared world; the transcript the matchers and UI read. Animated: the architecture, and parallel sessions |
+| How it works | Explanation | One server, eight fakes (the seven platforms and the model), the control API; sessions in one shared world; the transcript the matchers and UI read. Animated: the architecture, and parallel sessions |
 | Connecting your app | How-to | `channelstack env`, each SDK's base-URL option, where the server delivers (`CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`), Socket Mode, TLS trust per runtime, `--no-portless` |
 | Writing tests | How-to | The Vitest plugin, fixtures, actor-first calls, giving the app access explicitly, shared people with `test.extend`, files and fixtures paths, cleanup |
 | Waiting and quiet | Explanation | Why matchers wait, positive vs negative and exact-count checks, the quiet window, "Still open:" messages, timeouts. Animated: the quiet window |
 | Delivery and failures | How-to | Retries, bad signatures, stale timestamps, redelivery, faults (rate limits, dropped sockets), what each proves. Animated: Slack's retry |
+| The model | How-to | The fake OpenAI: `openai.respond(…)`, answers computed from the request, timing and failures, what the agent sent, how a call finds its test |
 | Standard checks | How-to | `slackChecks()` and the others: what each check catches, the options they need, skipping one |
 | pytest | How-to | `pytest-channelstack`: fixtures, `expect(...)`, the ini settings, modes |
 | The dev loop: CLI and UI | How-to | `channelstack slack say`, `show`, `tail`, `deliveries`, `redeliver`, the UI's login link, the shared `dev` session |

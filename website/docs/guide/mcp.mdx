@@ -45,17 +45,20 @@ Every tool acts in the shared `dev` session, the same one the CLI and the UI use
 | `tail`            | none                                                                            | `channelstack tail`, but each call returns only what happened since the last one (everything, the first time) |
 | `list_deliveries` | `channel`?; every channel's without it                                          | `channelstack deliveries`                                                                                     |
 | `redeliver`       | `channel`?, `delivery`? (`last`, the default, or an id from `list_deliveries`)  | `channelstack redeliver`                                                                                      |
+| `openai_respond`  | `text`?, `when`?, `times`? (`-1` for every call), `tool`?, `args`? (JSON)        | `channelstack openai respond`: what the [fake OpenAI](/docs/guide/the-model) answers the bot's next model calls |
+| `openai_calls`    | none                                                                            | `channelstack openai calls`                                                                                   |
 
 - **`as`** is a person's name, such as `ana`. The person is created the first time the name is used.
 - **`in`** names a place: a Slack channel (`"#support"`), a GitHub issue or pull request by its title (in the org's public `dev` repository), a Linear issue by its title (in a team named Dev), a Notion page by its title, an email thread by its subject, a Discord channel (`"#support"`). `say` makes it the first time, with the person and the bot in it.
 - **`to`**, **`on`** and **`thread`** take `"last"` (the default: the newest entry of the channel's most recently active place), or `"<place>:<entry>"`, as `say` and `reply` print it and `show` with `json` lists the entries' ids.
+- **`openai_respond`** scripts the bot's model when the bot is on the fake OpenAI (`OPENAI_BASE_URL` from `channelstack env`). There is no default answer: a model call nothing scripted gets a 400 (`channelstack_no_script`). The `text` may use `{lastUserText}` and `{toolResult}`; `when` answers only calls whose newest user message has that text; with `tool`, the model calls that tool first, with `args`, and `text` answers its result.
 - **`<channel>_act`**'s actions are generated from the channel's routes: each thing its people do that isn't a read (`click`, `stop`, `select` on Slack; `review`, `merge`, `label` on GitHub; `delegate`, `setState`, `prompt` on Linear; …). The tool's description lists each action with its values. `params` takes them by name; a person or the app (`"app"`) by name, a reference as `"last"` or an id. A reference the action needs and isn't given comes from the target: the entry `on` names, the newest one in the place `in` names, or the newest anywhere. Without `as`, whoever started the target's thread acts (`slack_act` `stop` presses Stop as the person who asked).
 
 ## The loop
 
 This is what a coding agent does with the tools while it works on the bot:
 
-1. **Act as a person.** `say` with `{ "channel": "slack", "as": "ana", "in": "#support", "text": "@my-agent summarize today" }` returns `ana said it in #support (C0A1B2C3D4E:1732451234.000100)`. Follow up with `reply`, `react`, or `slack_act` with `{ "action": "click", "params": { "button": "Approve" } }`.
+1. **Act as a person.** If the bot's model is the fake OpenAI, script it first: `openai_respond` with `{ "text": "Here's what I found.", "times": -1 }`. Then `say` with `{ "channel": "slack", "as": "ana", "in": "#support", "text": "@my-agent summarize today" }` returns `ana said it in #support (C0A1B2C3D4E:1732451234.000100)`. Follow up with `reply`, `react`, or `slack_act` with `{ "action": "click", "params": { "button": "Approve" } }`.
 2. **Read the answer.** `show` returns the most recently active place as a person reads it:
 
    ```
@@ -65,7 +68,7 @@ This is what a coding agent does with the tools while it works on the bot:
 
    The bot answers asynchronously. If its reply isn't there yet, call `show` again.
 
-3. **See why.** `tail` returns the events delivered to the bot (`→ slack app_mention  200`) and the API calls it made (`← slack chat.postMessage  200`). A failed delivery, or a call refused with an error code, is usually the bug.
+3. **See why.** `tail` returns the events delivered to the bot (`→ slack app_mention  200`) and the API calls it made (`← slack chat.postMessage  200`). A failed delivery, or a call refused with an error code, is usually the bug. `openai_calls` shows what the bot asked its model and what the model answered.
 4. **Change the bot, then send the same event again.** `list_deliveries` with `{ "channel": "slack" }` lists each delivery's id, event, outcome and attempts. `redeliver` with that id sends it again, the way Slack retries it, and returns `Retried Ev0A1B2C3D4E (slack)`. A bot that now answers twice doesn't handle retries.
 5. **Check again** with `show`.
 
@@ -77,7 +80,7 @@ A mistake comes back as the tool's error, in one sentence, the same sentence the
 
 ## What it never returns
 
-The tools return the same text as `show`, `tail` and `deliveries`. None of it carries the server's bearer token, which stays in `server.json` and in the MCP server's memory. Don't paste the tokens from `.env.local` into the chat either: the coding agent doesn't need them to use the tools.
+The tools return the same text as `show`, `tail`, `deliveries` and `openai calls`. None of it carries the server's bearer token, which stays in `server.json` and in the MCP server's memory. Don't paste the tokens from `.env.local` into the chat either: the coding agent doesn't need them to use the tools.
 
 ## The skill
 
