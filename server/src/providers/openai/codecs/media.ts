@@ -74,8 +74,8 @@ const clock = (seconds: number, separator: "," | ".") => {
   return `${pad(Math.floor(ms / 3_600_000))}:${pad(Math.floor(ms / 60_000) % 60)}:${pad(Math.floor(ms / 1000) % 60)}${separator}${pad(ms % 1000, 3)}`;
 };
 
-/** How long the request's audio plays: from its header when it has one, a second otherwise. */
-const durationOf = (request: ModelRequest, file: Media | undefined) =>
+/** How long the audio plays: from its header when it has one, a second otherwise. */
+const durationOf = (file: Media | undefined) =>
   Math.round(((file === undefined ? undefined : audioSeconds(file)) ?? 1) * 100) / 100;
 
 /**
@@ -88,7 +88,7 @@ export function transcriptBody(
   file: Media | undefined,
 ): { json: Record<string, unknown> } | { text: string } {
   const format = request.media?.responseFormat ?? "json";
-  const seconds = durationOf(request, file);
+  const seconds = durationOf(file);
   const segments = segmentsOf(answer.text, seconds);
   const whisper = request.model === "whisper-1";
   const usage = whisper

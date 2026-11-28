@@ -6,7 +6,7 @@
  */
 import { crc32, inflateSync } from "node:zlib";
 
-import { APIError, toFile } from "openai";
+import { type APIError, toFile } from "openai";
 import { describe, expect, test } from "vitest";
 
 import { useOpenAIWorkspace } from "../../../test/openai-workspace.ts";

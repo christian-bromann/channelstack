@@ -1,7 +1,7 @@
 import { OPENAI_IDS } from "../ids.ts";
 import { answerMedia, base64Of } from "../media.ts";
 import { TOOL_TYPES } from "./names.ts";
-import { type BuiltInTool, type ToolEvent } from "./shared.ts";
+import type { BuiltInTool, ToolEvent } from "./shared.ts";
 
 /**
  * `image_generation`, run by OpenAI: an `image_generation_call` with the base64 image in the

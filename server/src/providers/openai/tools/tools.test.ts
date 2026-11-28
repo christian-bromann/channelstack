@@ -4,7 +4,7 @@
  * description; a tool the request didn't offer is a script problem; the MCP approval round trip;
  * a client-run tool's output joined in `toolCalls()`. And a code interpreter's container files.
  */
-import { APIError } from "openai";
+import type { APIError } from "openai";
 import { describe, expect, test } from "vitest";
 
 import { useOpenAIWorkspace } from "../../../../test/openai-workspace.ts";

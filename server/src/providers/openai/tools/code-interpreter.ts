@@ -1,7 +1,7 @@
 import { OPENAI_IDS } from "../ids.ts";
 import { anyMedia, base64Of } from "../media.ts";
 import { TOOL_TYPES } from "./names.ts";
-import { type BuiltInTool, type ToolEvent } from "./shared.ts";
+import type { BuiltInTool, ToolEvent } from "./shared.ts";
 
 /**
  * `code_interpreter`, run by OpenAI in a container: a `code_interpreter_call` with its code and,
