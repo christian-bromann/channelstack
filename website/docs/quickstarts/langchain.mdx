@@ -6,7 +6,7 @@ description: "Stream a LangChain answer into Slack from a Bolt app, on ChatOpenA
 
 # LangChain
 
-In this tutorial you write a Bolt app that answers a direct message by streaming a [LangChain](https://js.langchain.com) chat model into Slack, and that runs a tool when the model calls one. Its model is OpenAI, through LangChain's `ChatOpenAI` (`@langchain/openai`), and in tests that is channelstack's [fake OpenAI](/docs/guide/the-model): each test scripts what the model answers, so every run gets the same answer and needs no API key. Then you test the stream, the status line and a tool call, and break the agent once.
+In this tutorial you write a Bolt app that answers a direct message by streaming a [LangChain](https://js.langchain.com) chat model into Slack, and that runs a tool when the model calls one. Its model is OpenAI, through LangChain's `ChatOpenAI` (`@langchain/openai`), and in tests that is channelstack's [fake OpenAI](/docs/platforms/openai): each test scripts what the model answers, so every run gets the same answer and needs no API key. Then you test the stream, the status line and a tool call, and break the agent once.
 
 [Getting started](/docs/getting-started) explains the server, `channelstack env` and a first test in more detail. This page builds on it.
 
@@ -193,7 +193,7 @@ A real model can't call a tool the request doesn't offer, so the fake answers th
 
 ## Next steps
 
-- [The model](/docs/guide/the-model): tool calls, a slow first token, a stream that breaks, errors, and what the agent sent.
+- [OpenAI](/docs/platforms/openai): tool calls, a slow first token, a stream that breaks, errors, and what the agent sent.
 - [Slack](/docs/platforms/slack): streams, the status line, Stop and the agent split view, and the errors the fake answers with.
 - [Waiting and quiet](/docs/guide/waiting-and-quiet): why `toHaveRepliesFrom` waits for quiet and the other checks don't.
 - [Standard checks](/docs/guide/standard-checks): `slackChecks({ app: "my-agent", model: "openai" })` adds the model checks to the Slack ones.

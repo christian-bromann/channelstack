@@ -273,7 +273,7 @@ It fails with `nothing was delivered to the agent yet.` (or `… on <channel> ye
 channelstack openai respond "<text>" [--when <text>] [--times <n>] [--tool <name> --args <json>]
 ```
 
-Scripts what the [fake OpenAI](/docs/guide/the-model) answers the app's next model calls in the `dev` session. A model call no script answers gets a 400 (`channelstack_no_script`), so an app on the fake model needs one before it can answer. Scripts are tried in the order they were added. The text may use `{lastUserText}` (the newest user message of the call) and `{toolResult}` (what the app sent back from a tool).
+Scripts what the [fake OpenAI](/docs/platforms/openai) answers the app's next model calls in the `dev` session. A model call no script answers gets a 400 (`channelstack_no_script`), so an app on the fake model needs one before it can answer. Scripts are tried in the order they were added. The text may use `{lastUserText}` (the newest user message of the call) and `{toolResult}` (what the app sent back from a tool).
 
 | Flag | Meaning |
 |---|---|

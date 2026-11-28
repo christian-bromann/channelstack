@@ -231,7 +231,7 @@ const EXAMPLES: Example[] = [
   },
   {
     id: "model",
-    label: "The model",
+    label: "OpenAI",
     host: "openai.localhost",
     code: {
       ts: { file: "incidents.test.ts", sample: model },

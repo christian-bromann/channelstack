@@ -34,7 +34,7 @@ Your app talks to a fake as if it were the real platform. It uses the platform's
 - **Refusals are real.** A fake refuses what the platform refuses, with the same error code: `not_in_channel` when the bot posts where it isn't a member, `missing_scope`, `msg_too_long`.
 - **Deliveries are real.** Events arrive signed the way each platform signs them, within the same ack windows, and Slack retries the way Slack does. See [delivery and failures](/docs/guide/delivery-and-failures).
 
-The fake OpenAI isn't a platform: it has no people, apps or deliveries, and your agent only calls it. It's realistic on the wire, with OpenAI's event shapes, ids, tool calls, errors and rate-limit headers, and never in content: the model says what the test scripted with the `openai` fixture, and a call no script answers fails the test. A model call carries no session, so channelstack gives it to the test whose conversation it answers, from what the call carries. See [The model](/docs/guide/the-model).
+The fake OpenAI isn't a platform: it has no people, apps or deliveries, and your agent only calls it. It's realistic on the wire, with OpenAI's event shapes, ids, tool calls, errors and rate-limit headers, and never in content: the model says what the test scripted with the `openai` fixture, and a call no script answers fails the test. A model call carries no session, so channelstack gives it to the test whose conversation it answers, from what the call carries. See [OpenAI](/docs/platforms/openai).
 
 Each platform's fake has one built-in app, named `my-agent`, that your code acts as. There is one workspace, org or integration per fake, and the state lives in memory: a restart starts a fresh world.
 

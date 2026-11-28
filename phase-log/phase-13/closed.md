@@ -15,7 +15,7 @@ Pull request: [christian-bromann/channelstack#116](https://github.com/christian-
 - **Reference agents** on the official `openai` SDK (Chat Completions) and the AI SDK (Responses), the examples (13.1), and a LangChain quickstart.
 - **The shape lane** (13.13): `pnpm openai:shapes` sends the same requests to the fake and, with `CHANNELSTACK_OPENAI_LIVE_KEY`, to the real API; the fake side runs in the gate.
 - **Shared fixes the phase needed:** the server no longer cuts a connection idle for 10s (`Bun.serve`'s `idleTimeout`), which cut held model calls and the control API's long polls; the REST kit records streamed and abandoned answers and keeps a refusal's headers; `check:channels` scans providers; every channel's deliveries name their place.
-- **The website:** an OpenAI card with OpenAI's official mark (recorded in `website/public/logos/SOURCES.md`) and a "The model" example in the hero player, in TypeScript, Python and Rust.
+- **The website:** an OpenAI card with OpenAI's official mark (recorded in `website/public/logos/SOURCES.md`) and an "OpenAI" example in the hero player, in TypeScript, Python and Rust; the model's guide is the platforms guide's OpenAI page.
 
 ## The gate
 

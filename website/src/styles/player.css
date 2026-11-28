@@ -1749,7 +1749,7 @@ html:not(.js) .lang {
   font-size: 14px;
 }
 
-/* ---------- The model: a Slack thread above the calls the fake OpenAI recorded ---------- */
+/* ---------- OpenAI: a Slack thread above the calls the fake OpenAI recorded ---------- */
 
 .app-model {
   background: var(--code-bg);

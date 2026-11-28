@@ -49,7 +49,6 @@ One per agent framework, in the order people use them with channelstack. Each is
 | Writing tests | How-to | The Vitest plugin, fixtures, actor-first calls, giving the app access explicitly, shared people with `test.extend`, files and fixtures paths, cleanup |
 | Waiting and quiet | Explanation | Why matchers wait, positive vs negative and exact-count checks, the quiet window, "Still open:" messages, timeouts. Animated: the quiet window |
 | Delivery and failures | How-to | Retries, bad signatures, stale timestamps, redelivery, faults (rate limits, dropped sockets), what each proves. Animated: Slack's retry |
-| The model | How-to | The fake OpenAI: `openai.respond(…)`, answers computed from the request, timing and failures, what the agent sent, how a call finds its test |
 | Standard checks | How-to | `slackChecks()` and the others: what each check catches, the options they need, skipping one |
 | pytest | How-to | `pytest-channelstack`: fixtures, `expect(...)`, the ini settings, modes |
 | The dev loop: CLI and UI | How-to | `channelstack slack say`, `show`, `tail`, `deliveries`, `redeliver`, the UI's login link, the shared `dev` session |
@@ -71,6 +70,8 @@ One page per platform, the same shape on each: what the fake covers, connecting 
 | Notion | How-to |
 | Resend | How-to |
 | Google | How-to |
+| Discord | How-to |
+| OpenAI | How-to: the fake model, not a platform your app lives in. `openai.respond(…)`, answers computed from the request, timing and failures, what the agent sent, how a call finds its test |
 
 **Reference** (`docs/reference/`)
 

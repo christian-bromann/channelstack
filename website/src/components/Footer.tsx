@@ -12,6 +12,7 @@ const DOCS = [
   ["Resend", "/docs/platforms/resend"],
   ["Google", "/docs/platforms/google"],
   ["Discord", "/docs/platforms/discord"],
+  ["OpenAI", "/docs/platforms/openai"],
   ["Live mode", "/docs/guide/live-mode"],
   ["Reference", "/docs/reference"],
 ] as const;

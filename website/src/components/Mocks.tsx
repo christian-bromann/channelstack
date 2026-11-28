@@ -603,7 +603,7 @@ export function DiscordMock({ step }: MockProps) {
 }
 
 // ---------------------------------------------------------------------------
-// The model: a Slack thread, and below it the calls the fake OpenAI recorded, in the site's code
+// OpenAI: a Slack thread, and below it the calls the fake OpenAI recorded, in the site's code
 // colours. No OpenAI artwork.
 
 function ModelCall({
