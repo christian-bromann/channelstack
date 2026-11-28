@@ -112,6 +112,12 @@ export class AppRoster<App extends Named> {
 
   #make(name: string, settings: Readonly<Record<string, unknown>>, build: () => App): App {
     checkAppName(name);
+    // The built-in app's own name is reserved too, where a channel calls it otherwise (echo's `echo-agent`).
+    if (name === this.#builtIn?.name) {
+      throw new ProtocolError("invalid_argument", `"${name}" is the built-in ${this.#noun}: use the fixture's app`, {
+        app: name,
+      });
+    }
     const key = settingsKey(settings);
     const known = this.#apps.get(name);
     if (known) {
@@ -134,9 +140,9 @@ export class AppRoster<App extends Named> {
     return app;
   }
 
-  /** The app with this name, the built-in one included. */
+  /** The app with this name, the built-in one included, by `my-agent` or by the name its channel gives it. */
   named(name: string): App | undefined {
-    return name === BUILT_IN_APP ? this.#builtIn : this.#apps.get(name)?.app;
+    return name === BUILT_IN_APP || name === this.#builtIn?.name ? this.#builtIn : this.#apps.get(name)?.app;
   }
 
   /** The apps a session used: the built-in one first, then each it got from `createApp`, in the order it first did. */
