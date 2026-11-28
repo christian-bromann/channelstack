@@ -53,7 +53,11 @@ The kit the driver is built on, all in `server/src/core/`:
    `test/acceptance/checks/<name>-checks-coder.test.ts`, the checks against `coder`, in the
    channel's `HARNESS` suites.
 6. **Delivery cases**: `server/test/integration/<name>-delivery.test.ts`, the platform's own
-   receiver against the binary (`docs/phases.md`, appendix).
+   receiver against the binary (`docs/phases.md`, appendix), and the channel's two-app cases in
+   `server/test/integration/apps-delivery.test.ts`: `A1 <name>: …` (each app's receiver accepts its
+   own delivery and rejects the other's), and `A2 <name>: …` and `A3 <name>: …` where the appendix
+   has them. `<name>-apps.test.ts` has a case for the per-app env (`channelstack env --app`, read
+   from `/env?app=…&channel=<name>`).
 7. **Live mode**: `live/` (client, identity, world, cleanup, maintenance), the definition's `live`
    (credentials, allowlist), the variables in `.github/workflows/live.yml`, and the reference agent's
    start in `scripts/lib/live-agents.ts` (`LIVE_AGENTS`).
