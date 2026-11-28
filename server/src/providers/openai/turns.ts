@@ -50,7 +50,7 @@ export type Endpoint = (typeof ENDPOINTS)[number];
  * Media in an answer, as the SDK sends it: a file's bytes (the SDK reads a path in the test
  * process), or a placeholder the fake makes: a PNG of a size, or WAV or PCM silence of a length.
  */
-export const MediaSourceSchema = z
+const MediaSourceSchema = z
   .union([
     z.object({
       content: z.base64().openapi({ description: "The bytes, in base64." }),

@@ -22,7 +22,7 @@ export interface ToolItem {
 }
 
 /** The kinds `toolCalls()` reports, by the tool's `type`. */
-export type ToolCallType =
+type ToolCallType =
   "web_search" | "file_search" | "code_interpreter" | "image_generation" | "mcp" | "shell" | "computer" | "apply_patch";
 
 /** A built-in tool call of an answer: its items, and what `toolCalls()` says about it. */

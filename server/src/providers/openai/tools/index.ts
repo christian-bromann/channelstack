@@ -5,11 +5,12 @@ import { computer } from "./computer.ts";
 import { fileSearch } from "./file-search.ts";
 import { imageGeneration } from "./image-generation.ts";
 import { mcp } from "./mcp.ts";
+import { undated } from "./names.ts";
 import type { BuiltInCall, BuiltInTool, ToolContext } from "./shared.ts";
 import { shell } from "./shell.ts";
 import { webSearch } from "./web-search.ts";
 
-export type { BuiltInCall, ToolCallType, ToolEvent, ToolItem } from "./shared.ts";
+export type { BuiltInCall } from "./shared.ts";
 
 const TOOLS: { readonly [K in BuiltInKind]: BuiltInTool<K> } = {
   webSearch,
@@ -21,16 +22,6 @@ const TOOLS: { readonly [K in BuiltInKind]: BuiltInTool<K> } = {
   computer,
   applyPatch,
 };
-
-/** Every tool type the Responses API offers as a built-in tool: what a request may name besides functions and custom tools. */
-export const BUILT_IN_TYPES: ReadonlySet<string> = new Set([
-  ...Object.values(TOOLS).flatMap((tool) => tool.types),
-  "web_search_2025_08_26",
-  "web_search_preview_2025_03_11",
-]);
-
-/** A built-in tool type, without its date: `web_search_2025_08_26` is `web_search`. */
-export const undated = (type: string): string => type.replace(/_\d{4}_\d{2}_\d{2}$/, "");
 
 /** The built-in kind of a scripted tool call, if it is one. */
 export const builtInKindOf = (spec: ToolCallInput): BuiltInKind | undefined =>

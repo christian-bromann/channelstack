@@ -66,7 +66,7 @@ const byExtension = (name: string | undefined): string | undefined =>
   name === undefined ? undefined : FORMAT_TYPES[name.split(".").at(-1)?.toLowerCase() ?? ""];
 
 /** `data:<type>;base64,<bytes>`, or bare base64 (`input_audio`'s `data`). */
-export function decodeData(data: string): { mediaType?: string; bytes: Uint8Array } | undefined {
+function decodeData(data: string): { mediaType?: string; bytes: Uint8Array } | undefined {
   const match = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(data);
   if (!match)
     return /^[A-Za-z0-9+/=\s]*$/.test(data) ? { bytes: new Uint8Array(Buffer.from(data, "base64")) } : undefined;
@@ -107,7 +107,7 @@ export function placeholderPng(width = 1024, height = 1024): Uint8Array {
 
 /** OpenAI's PCM: 24 kHz, 16-bit, mono, little-endian. Silence of a length. */
 const SAMPLE_RATE = 24_000;
-export const placeholderPcm = (seconds = 1): Uint8Array => new Uint8Array(Math.round(seconds * SAMPLE_RATE) * 2);
+const placeholderPcm = (seconds = 1): Uint8Array => new Uint8Array(Math.round(seconds * SAMPLE_RATE) * 2);
 
 /** WAV silence of a length: the PCM above with a RIFF header. */
 export function placeholderWav(seconds = 1): Uint8Array {

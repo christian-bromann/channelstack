@@ -226,6 +226,17 @@ pub mod enc {
         }
     }
 
+    /// One of several types, told apart by the value's JSON kind: an object is encoded as the
+    /// union's object member, a list as its list member, anything else goes as it is.
+    pub fn union(value: &Value, object: Option<Encode>, list: Option<Encode>) -> Result<Value> {
+        let encode = match value {
+            Value::Object(_) => object,
+            Value::Array(_) => list,
+            _ => None,
+        };
+        encode.map_or_else(|| plain(value), |encode| encode(value))
+    }
+
     /// An argument whose plain text stands for an object: `"hi"` for `{ "text": "hi" }`.
     pub fn shorthand(value: &Value, field: &str, encode: Encode) -> Result<Value> {
         match value {

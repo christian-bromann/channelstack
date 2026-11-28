@@ -7883,9 +7883,74 @@ fn run_open_ai_fixture_respond<'a>(
                 let mut wire = Map::new();
                 wire.insert(
                     "turns".into(),
-                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::plain(v)))(&p_turns)?,
+                    (&|v: &Value| {
+                        enc::array(v, true, &|v: &Value| {
+                            enc::union(
+                                v,
+                                Some(&|v: &Value| {
+                                    enc::object(
+                                        v,
+                                        None,
+                                        &[
+                                            ("toolCalls", &|v: &Value| {
+                                                enc::array(v, false, &|v: &Value| {
+                                                    enc::object(
+                                                        v,
+                                                        None,
+                                                        &[
+                                                            ("codeInterpreter", &|v: &Value| {
+                                                                enc::object(
+                                                                    v,
+                                                                    None,
+                                                                    &[("files", &|v: &Value| {
+                                                                        enc::array(
+                                                                            v,
+                                                                            false,
+                                                                            &|v: &Value| {
+                                                                                files::read_media(v)
+                                                                            },
+                                                                        )
+                                                                    })],
+                                                                )
+                                                            }),
+                                                            ("imageGeneration", &|v: &Value| {
+                                                                enc::object(
+                                                                    v,
+                                                                    None,
+                                                                    &[("image", &|v: &Value| {
+                                                                        files::read_media(v)
+                                                                    })],
+                                                                )
+                                                            }),
+                                                        ],
+                                                    )
+                                                })
+                                            }),
+                                            ("image", &|v: &Value| {
+                                                files::read_media_one_or_many(v)
+                                            }),
+                                            ("audio", &|v: &Value| files::read_media(v)),
+                                        ],
+                                    )
+                                }),
+                                None,
+                            )
+                        })
+                    })(&p_turns)?,
                 );
-                wire.insert("when".into(), p_when.clone());
+                wire.insert(
+                    "when".into(),
+                    (&|v: &Value| {
+                        enc::object(
+                            v,
+                            None,
+                            &[
+                                ("from", &|v: &Value| enc::ref_ids(v, &["id"])),
+                                ("in", &|v: &Value| enc::ref_ids(v, &["id"])),
+                            ],
+                        )
+                    })(&p_when)?,
+                );
                 wire.insert("times".into(), p_times.clone());
                 wire.insert("timing".into(), p_timing.clone());
                 wire.insert("responder".into(), p_responder.clone());
@@ -8236,7 +8301,59 @@ fn run_open_ai_script_answer_held<'a>(
             Some({
                 let mut wire = Map::new();
                 wire.insert("held".into(), p_held.clone());
-                wire.insert("turn".into(), p_turn.clone());
+                wire.insert(
+                    "turn".into(),
+                    (&|v: &Value| {
+                        enc::union(
+                            v,
+                            Some(&|v: &Value| {
+                                enc::object(
+                                    v,
+                                    None,
+                                    &[
+                                        ("toolCalls", &|v: &Value| {
+                                            enc::array(v, false, &|v: &Value| {
+                                                enc::object(
+                                                    v,
+                                                    None,
+                                                    &[
+                                                        ("codeInterpreter", &|v: &Value| {
+                                                            enc::object(
+                                                                v,
+                                                                None,
+                                                                &[("files", &|v: &Value| {
+                                                                    enc::array(
+                                                                        v,
+                                                                        false,
+                                                                        &|v: &Value| {
+                                                                            files::read_media(v)
+                                                                        },
+                                                                    )
+                                                                })],
+                                                            )
+                                                        }),
+                                                        ("imageGeneration", &|v: &Value| {
+                                                            enc::object(
+                                                                v,
+                                                                None,
+                                                                &[("image", &|v: &Value| {
+                                                                    files::read_media(v)
+                                                                })],
+                                                            )
+                                                        }),
+                                                    ],
+                                                )
+                                            })
+                                        }),
+                                        ("image", &|v: &Value| files::read_media_one_or_many(v)),
+                                        ("audio", &|v: &Value| files::read_media(v)),
+                                    ],
+                                )
+                            }),
+                            None,
+                        )
+                    })(&p_turn)?,
+                );
                 wire.insert("error".into(), p_error.clone());
                 wire
             }),
@@ -10839,6 +10956,10 @@ impl SlackMessage {
     /// `blocks`.
     pub fn blocks(&self) -> &Value {
         self.data.get("blocks").unwrap_or(&Value::Null)
+    }
+    /// `files`.
+    pub fn files(&self) -> &Value {
+        self.data.get("files").unwrap_or(&Value::Null)
     }
     /// `postedAt`.
     pub fn posted_at(&self) -> String {

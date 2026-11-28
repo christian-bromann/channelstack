@@ -1,4 +1,5 @@
 import { OPENAI_IDS } from "../ids.ts";
+import { TOOL_TYPES } from "./names.ts";
 import { type BuiltInTool, statusEvents } from "./shared.ts";
 
 /**
@@ -8,7 +9,7 @@ import { type BuiltInTool, statusEvents } from "./shared.ts";
  */
 export const fileSearch: BuiltInTool<"fileSearch"> = {
   kind: "fileSearch",
-  types: ["file_search"],
+  types: TOOL_TYPES.fileSearch,
   build(spec, { ids, request, media }) {
     const id = ids.next(OPENAI_IDS.fileSearch);
     const results = (spec.results ?? []).map((result) => {

@@ -1,5 +1,6 @@
 import { OPENAI_IDS } from "../ids.ts";
 import { answerMedia, base64Of } from "../media.ts";
+import { TOOL_TYPES } from "./names.ts";
 import { type BuiltInTool, type ToolEvent } from "./shared.ts";
 
 /**
@@ -8,7 +9,7 @@ import { type BuiltInTool, type ToolEvent } from "./shared.ts";
  */
 export const imageGeneration: BuiltInTool<"imageGeneration"> = {
   kind: "imageGeneration",
-  types: ["image_generation"],
+  types: TOOL_TYPES.imageGeneration,
   build(spec, { ids, tool }) {
     const settings = tool.settings ?? {};
     const format = typeof settings.output_format === "string" ? settings.output_format : "png";

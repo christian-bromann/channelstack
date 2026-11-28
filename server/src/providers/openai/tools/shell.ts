@@ -1,5 +1,6 @@
 import { OPENAI_IDS } from "../ids.ts";
 import type { ModelTool } from "../request.ts";
+import { TOOL_TYPES } from "./names.ts";
 import type { BuiltInTool, ToolEvent, ToolItem } from "./shared.ts";
 
 /** A `shell` tool runs in OpenAI's container when its environment is one; otherwise, and `local_shell` always, the agent runs it. */
@@ -17,7 +18,7 @@ const hostedShell = (tool: ModelTool): boolean => {
  */
 export const shell: BuiltInTool<"shell"> = {
   kind: "shell",
-  types: ["shell", "local_shell"],
+  types: TOOL_TYPES.shell,
   problems(spec, { tool }) {
     if (!hostedShell(tool) && spec.output !== undefined)
       return ["gave a shell's output, but the request's shell runs on the agent's side: the agent sends the output"];

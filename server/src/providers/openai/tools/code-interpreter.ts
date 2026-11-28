@@ -1,5 +1,6 @@
 import { OPENAI_IDS } from "../ids.ts";
 import { anyMedia, base64Of } from "../media.ts";
+import { TOOL_TYPES } from "./names.ts";
 import { type BuiltInTool, type ToolEvent } from "./shared.ts";
 
 /**
@@ -9,7 +10,7 @@ import { type BuiltInTool, type ToolEvent } from "./shared.ts";
  */
 export const codeInterpreter: BuiltInTool<"codeInterpreter"> = {
   kind: "codeInterpreter",
-  types: ["code_interpreter"],
+  types: TOOL_TYPES.codeInterpreter,
   build(spec, { ids, clock, request, tool, media }) {
     const id = ids.next(OPENAI_IDS.codeInterpreter);
     // `container` is a container's id, or `{ type: "auto" }`: a new one.

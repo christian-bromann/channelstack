@@ -2454,6 +2454,7 @@ class SlackMessage:
         self.author: SlackUser | SlackApp = SlackUser(ctx, data["author"]) if data["author"]["kind"] == "user" else SlackApp(ctx, data["author"])
         self.text: str = data["text"]
         self.blocks: list[Any] = data["blocks"]
+        self.files: list[str] = data["files"]
         self.posted_at: str = data["postedAt"]
         self.thread_ts: str | None = data.get("threadTs")
         self.edited: bool = data["edited"]

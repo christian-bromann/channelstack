@@ -148,14 +148,14 @@ fn read_list(items: &[Value]) -> Result<Value> {
     Ok(Value::Array(files))
 }
 
-/// A whole tree of files: a fixture directory, or a list of files.
+/// A whole tree of files: a fixture directory, one fixture file (by its name), or a list of files.
 pub fn read_tree(input: &Value) -> Result<Value> {
     match input {
         Value::Null => Ok(Value::Null),
-        Value::String(directory) => Ok(Value::Array(walk(&located(directory)?)?)),
+        Value::String(path) => Ok(Value::Array(read(&json!({ "path": path }))?)),
         Value::Array(items) => read_list(items),
         other => Err(Error::Invalid(format!(
-            "Not a directory or a list of files: {other}"
+            "Not a directory, a file or a list of files: {other}"
         ))),
     }
 }
@@ -366,11 +366,10 @@ mod tests {
                 paths(&read_tree(&web).unwrap()),
                 ["README.md", "src/app.ts"]
             );
-            let file = json!(format!("{relative}/web/README.md"));
-            assert_eq!(
-                kind(read_tree(&file).unwrap_err()),
-                ErrorKind::NotADirectory
-            );
+            // A path to one file is that file, by its name.
+            let file = read_tree(&json!(format!("{relative}/web/README.md"))).unwrap();
+            assert_eq!(paths(&file), ["README.md"]);
+            assert_eq!(text(&file[0]["content"]).unwrap(), "# web\n");
         });
     }
 

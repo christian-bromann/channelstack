@@ -227,7 +227,9 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
         const bytes = new Uint8Array(await entry.arrayBuffer());
         const extension = entry.name.split(".").at(-1)?.toLowerCase() ?? "";
         const mediaType = sniff(bytes) ?? (entry.type || FORMAT_TYPES[extension] || "application/octet-stream");
-        (files[name] ??= []).push({ bytes, mediaType, filename: entry.name });
+        const list = files[name] ?? [];
+        list.push({ bytes, mediaType, filename: entry.name });
+        files[name] = list;
         described.push({ filename: entry.name, mediaType, bytes: bytes.length, sha256: sha256(bytes) });
       }
       body[name] = described.length === 1 && !key.endsWith("[]") ? described[0] : described;

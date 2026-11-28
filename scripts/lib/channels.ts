@@ -149,7 +149,11 @@ export const PROVIDERS = {
       "what the agent sends the model > ",
       "a missing script fails the test > ",
     ],
-    suites: ["test/acceptance/checks/openai-checks.test.ts", "test/acceptance/providers/openai-parallel.test.ts"],
+    suites: [
+      "test/acceptance/checks/openai-checks.test.ts",
+      "test/acceptance/providers/openai-parallel.test.ts",
+      "test/acceptance/providers/openai-media.test.ts",
+    ],
     broken: { agent: "broken-openai", channel: "slack", path: "/slack/events" },
     agents: {
       "openai-node": { channel: "slack", path: "/slack/events" },

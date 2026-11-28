@@ -1,6 +1,6 @@
 import type { Media } from "../media.ts";
 import type { ModelRequest } from "../request.ts";
-import type { BuiltInCall } from "../tools/index.ts";
+import type { BuiltInCall } from "../tools/shared.ts";
 
 /** A tool call in an answer, its id minted and its arguments as the JSON text the model sends. */
 interface AnswerToolCall {

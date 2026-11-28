@@ -198,8 +198,10 @@ def test_a_relative_path_starts_from_the_root_an_integration_set_or_from_the_wor
         read_tree("./web")
     monkeypatch.chdir(fixture)
     assert [file["path"] for file in read_tree("./web")] == ["README.md", "src/app.ts"]
-    with pytest.raises(NotADirectoryError):
-        read_tree("./web/README.md")
+    # A path to one file is that file, by its name.
+    assert [(file["path"], text(file["content"])) for file in read_tree("./web/README.md")] == [
+        ("README.md", "# web\n")
+    ]
 
 
 def test_a_list_takes_inline_contents_a_file_on_disk_under_a_name_and_a_directory_under_a_prefix(

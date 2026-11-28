@@ -1,4 +1,5 @@
 import { OPENAI_IDS } from "../ids.ts";
+import { TOOL_TYPES } from "./names.ts";
 import { type BuiltInTool, statusEvents } from "./shared.ts";
 
 /**
@@ -7,7 +8,7 @@ import { type BuiltInTool, statusEvents } from "./shared.ts";
  */
 export const webSearch: BuiltInTool<"webSearch"> = {
   kind: "webSearch",
-  types: ["web_search", "web_search_preview"],
+  types: TOOL_TYPES.webSearch,
   build(spec, { ids, request }) {
     const id = ids.next(OPENAI_IDS.webSearch);
     const sources = spec.sources ?? [];

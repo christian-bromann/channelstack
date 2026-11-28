@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import base64
-import errno
 import os
 from pathlib import Path
 from typing import Any
 
 # Inline contents (`{"name", "content"}`) or a path to a fixture file or directory (`{"path", "name"?}`).
 type FileInput = dict[str, Any]
-# A whole tree of files: a fixture directory, or a list of files.
+# A whole tree of files: a fixture directory, one fixture file, or a list of files.
 type TreeInput = str | list[FileInput]
 # Changes to files: a list of files, or a map of path to its new contents, where `None` deletes the file.
 type ChangesInput = list[FileInput] | dict[str, str | None]
@@ -40,10 +39,6 @@ def _base64(content: str | bytes) -> str:
 
 def _walk(directory: Path) -> list[dict[str, Any]]:
     """Every file under a directory, by its path inside it, with forward slashes."""
-    if not directory.is_dir():
-        # `rglob` finds nothing under a path that isn't a directory: a mistyped fixture path fails, as in TypeScript.
-        code = errno.ENOTDIR if directory.exists() else errno.ENOENT
-        raise OSError(code, os.strerror(code), str(directory))
     files = sorted(path for path in directory.rglob("*") if path.is_file())
     return [{"path": path.relative_to(directory).as_posix(), "content": _base64(path.read_bytes())} for path in files]
 
@@ -60,8 +55,9 @@ def _read(file: FileInput) -> list[dict[str, Any]]:
 
 
 def read_tree(files: TreeInput) -> list[dict[str, Any]]:
+    """A whole tree of files: a fixture directory, one fixture file (by its name), or a list of files."""
     if isinstance(files, str):
-        return _walk(_located(files))
+        return _read({"path": files})
     return [wire for file in files for wire in _read(file)]
 
 

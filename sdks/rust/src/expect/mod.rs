@@ -27,11 +27,15 @@
 use std::future::{Future, IntoFuture};
 use std::sync::Mutex;
 
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 
 use crate::runtime::client::{BoxFuture, IntoArg};
 use crate::runtime::duration::parse_duration;
 use crate::runtime::error::{Error, Result};
+use crate::runtime::files::read_media;
 use crate::runtime::wait::{
     DEFAULT_QUIET_FOR, DEFAULT_TIMEOUT, check_text, from_matches, model_problems, text_matches,
     until_quiet, wait_for,
@@ -1843,6 +1847,10 @@ check!(
     Sent { ordered("ordered"): bool }
 );
 check!(
+    /// [`Expectation::to_have_sent_file`].
+    SentFile {}
+);
+check!(
     /// [`Expectation::to_have_sent_secrets`].
     SentSecrets {}
 );
@@ -1996,6 +2004,103 @@ impl<'a, S: ModelCalls + ?Sized> Expectation<'a, S> {
             .await
         }))
     }
+}
+
+impl<'a, S: ModelCalls + ?Sized> Expectation<'a, S> {
+    /// Subject: the openai fixture, a script, or a call. The agent sent the model this image, file
+    /// or audio, compared by its SHA-256: a fixture file's path (read as a media source is, from
+    /// the files root) or its bytes (`Vec<u8>`).
+    pub fn to_have_sent_file(self, file: impl IntoArg) -> SentFile<'a, false> {
+        self.sent_file(file.into_arg())
+    }
+    /// Once the agent is quiet, it sent the model no part with this file's hash.
+    pub fn not_to_have_sent_file(self, file: impl IntoArg) -> SentFile<'a, true> {
+        self.sent_file(file.into_arg())
+    }
+    fn sent_file<const NOT: bool>(self, file: Value) -> SentFile<'a, NOT> {
+        let subject = self.subject;
+        SentFile(Check::new(move |options| async move {
+            let read = read_media(&file)?;
+            let bytes = STANDARD
+                .decode(text_of(&read, "content"))
+                .map_err(|_| Error::Invalid(format!("Not a path or bytes: {file}")))?;
+            let sha256 = hex(&Sha256::digest(&bytes));
+            let named = match text_of(&read, "name") {
+                "" => "these bytes",
+                name => name,
+            };
+            settle(
+                subject,
+                NOT,
+                false,
+                &options,
+                || async {
+                    Ok(items(subject.read_model_calls().await?)
+                        .iter()
+                        .flat_map(|call| {
+                            let request = &call["request"];
+                            items(request["messages"].clone())
+                                .iter()
+                                .flat_map(|message| items(message["parts"].clone()))
+                                .chain(request.get("file").filter(|file| file.is_object()).cloned())
+                                .collect::<Vec<_>>()
+                        })
+                        .collect::<Vec<_>>())
+                },
+                |parts| parts.iter().any(|part| text_of(part, "sha256") == sha256),
+                |parts| {
+                    let sent = if parts.is_empty() {
+                        "It sent no image, file or audio.".to_owned()
+                    } else {
+                        format!(
+                            "What it sent, newest first:\n{}",
+                            listing(parts.iter().rev().map(part_of))
+                        )
+                    };
+                    format!(
+                        "Expected the agent {}to send the model {named} ({}, sha256 {}). {sent}",
+                        not(NOT),
+                        size_of(bytes.len()),
+                        &sha256[..12]
+                    )
+                },
+            )
+            .await
+        }))
+    }
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn size_of(bytes: usize) -> String {
+    format!("{bytes} {}", if bytes == 1 { "byte" } else { "bytes" })
+}
+
+/// A part as a failure lists it: type, media type, size and hash, or where it is when the fake didn't read it.
+fn part_of(part: &Value) -> String {
+    let field = |name: &str| Some(text_of(part, name)).filter(|value| !value.is_empty());
+    let size = part["bytes"]
+        .as_u64()
+        .and_then(|bytes| usize::try_from(bytes).ok())
+        .map(size_of);
+    let where_ = match field("sha256") {
+        Some(sha256) => Some(format!("sha256 {}", sha256.get(..12).unwrap_or(sha256))),
+        None => field("url")
+            .map(str::to_owned)
+            .or_else(|| field("fileId").map(|id| format!("file {id}"))),
+    };
+    [
+        field("type").map(str::to_owned),
+        field("mediaType").map(str::to_owned),
+        size,
+        where_,
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>()
+    .join(", ")
 }
 
 /// A tool as a request offered it: a function by its name, a built-in by its type.

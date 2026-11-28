@@ -44,9 +44,9 @@ function read(input: FileInput): WireFile[] {
   return [{ path: input.name ?? input.path.split(/[\\/]/).at(-1) ?? input.path, content: base64(readFileSync(path)) }];
 }
 
-/** A whole tree of files: a fixture directory, or a list of files. */
+/** A whole tree of files: a fixture directory, one fixture file, or a list of files. */
 export function readTree(input: string | FileInput[]): WireFile[] {
-  return typeof input === "string" ? walk(located(input)) : input.flatMap(read);
+  return typeof input === "string" ? read({ path: input }) : input.flatMap(read);
 }
 
 /** Changes to files: a list of files, or a map of path to its new contents, where `null` deletes the file. */

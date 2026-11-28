@@ -1,6 +1,7 @@
 import { jsonChunks } from "../codecs/answer.ts";
 import { OPENAI_IDS } from "../ids.ts";
 import type { ModelTool } from "../request.ts";
+import { TOOL_TYPES } from "./names.ts";
 import { type BuiltInTool, type Json, statusEvents, type ToolEvent, type ToolItem } from "./shared.ts";
 
 /** The names a filter lists: a list of names, or `{ tool_names }`. */
@@ -29,7 +30,7 @@ function needsApproval(tool: ModelTool, name: string): boolean {
  */
 export const mcp: BuiltInTool<"mcp"> = {
   kind: "mcp",
-  types: ["mcp"],
+  types: TOOL_TYPES.mcp,
   pick: (spec, offered) => offered.find((tool) => tool.settings?.server_label === spec.server),
   problems(spec, { tool, request }) {
     const allowed = namesOf(tool.settings?.allowed_tools);

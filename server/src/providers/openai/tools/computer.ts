@@ -1,10 +1,11 @@
 import { OPENAI_IDS } from "../ids.ts";
+import { TOOL_TYPES } from "./names.ts";
 import type { BuiltInTool } from "./shared.ts";
 
 /** `computer`, run by the agent: a `computer_call` with its actions; the agent answers with a screenshot (`computer_call_output`). */
 export const computer: BuiltInTool<"computer"> = {
   kind: "computer",
-  types: ["computer", "computer_use_preview"],
+  types: TOOL_TYPES.computer,
   build(spec, { ids, tool }) {
     const id = ids.next(OPENAI_IDS.computer);
     const call = ids.next(OPENAI_IDS.call);

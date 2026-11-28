@@ -1,6 +1,6 @@
 import { invalidRequest, unsupportedInFake } from "./errors.ts";
 import type { ModelPart } from "./media.ts";
-import { BUILT_IN_TYPES, undated } from "./tools/index.ts";
+import { BUILT_IN_TYPES, undated } from "./tools/names.ts";
 import type { Endpoint } from "./turns.ts";
 
 interface ModelToolCallRef {
@@ -27,7 +27,7 @@ export interface ModelTool {
 }
 
 /** What a media endpoint's request asks for: the format, the count, the voice. */
-export interface MediaOptions {
+interface MediaOptions {
   /** `response_format`: `b64_json`/`url` for images; the audio format for speech; `json`, `text`, `srt`, … for transcripts. */
   readonly responseFormat?: string;
   /** An image's `output_format` (`png`, `jpeg`, `webp`). */
@@ -664,7 +664,7 @@ export function requestText(request: ModelRequest): string {
 }
 
 /** The formats each media endpoint answers in, by its `response_format` (the first is the default). */
-export const MEDIA_FORMATS = {
+const MEDIA_FORMATS = {
   "images.generations": ["b64_json", "url"],
   "images.edits": ["b64_json", "url"],
   "audio.speech": ["mp3", "opus", "aac", "flac", "wav", "pcm"],

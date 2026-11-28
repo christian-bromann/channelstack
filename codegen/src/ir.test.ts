@@ -561,6 +561,24 @@ describe("media a test hands over (14.5)", () => {
   };
   const schemas = {
     OpenAIMediaSource: media,
+    /** A turn: text, or an object whose image, and whose tool calls' images, are media. */
+    OpenAITurn: {
+      type: "object",
+      properties: {
+        text: { type: "string" },
+        image: { type: "array", items: ref("OpenAIMediaSource"), "x-channelstack-one-or-many": true },
+        toolCalls: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              imageGeneration: { type: "object", properties: { image: ref("OpenAIMediaSource") } },
+            },
+          },
+        },
+      },
+    },
+    OpenAITurnInput: { anyOf: [{ type: "string" }, ref("OpenAITurn")] },
     WidgetBody: {
       type: "object",
       required: ["label"],
@@ -569,6 +587,7 @@ describe("media a test hands over (14.5)", () => {
         image: ref("OpenAIMediaSource"),
         images: { type: "array", items: ref("OpenAIMediaSource"), "x-channelstack-one-or-many": true },
         audio: media,
+        turn: ref("OpenAITurnInput"),
       },
     },
   };
@@ -577,7 +596,7 @@ describe("media a test hands over (14.5)", () => {
       on: "Widget",
       name: "update",
       args: ["label"],
-      options: ["image", "images", "audio", "since"],
+      options: ["image", "images", "audio", "turn", "since"],
     },
   };
   const ir = buildIr(spec({ schemas, operation }));
@@ -620,6 +639,41 @@ describe("media a test hands over (14.5)", () => {
     expect(code).toContain(
       '"images": None if images is None else [read_media(item) for item in (images if isinstance(images, list) else [images])]',
     );
+  });
+
+  test("a turn: text as it is, an object's media read wherever it is, in every SDK", () => {
+    const [[, ts = ""] = ["", ""]] = [...emitTypeScript(ir)];
+    expect(ts).toContain(
+      'turn: options.turn === undefined ? undefined : (typeof options.turn === "object" && options.turn !== null && !Array.isArray(options.turn) ? { ...options.turn, image: options.turn.image === undefined ? undefined : [options.turn.image].flat().map((item) => readMedia(item)), toolCalls: options.turn.toolCalls === undefined ? undefined : options.turn.toolCalls.map((item) => ({ ...item, imageGeneration: item.imageGeneration === undefined ? undefined : { ...item.imageGeneration, image: item.imageGeneration.image === undefined ? undefined : readMedia(item.imageGeneration.image) } })) } : options.turn)',
+    );
+    // Python's turn is a dataclass, which reads its own media.
+    const [[, py = ""] = ["", ""]] = [...emitPython(ir)];
+    expect(py).toContain('"turn": None if turn is None else to_wire(turn)');
+    expect(py).toContain(
+      '"image": None if self.image is None else [read_media(item) for item in (self.image if isinstance(self.image, list) else [self.image])]',
+    );
+    expect(py).toContain('read_media(item["imageGeneration"]["image"])');
+    const rust = [...emitRust(ir).values()].join("\n");
+    expect(rust).toContain(
+      'wire.insert("turn".into(), (&|v: &Value| enc::union(v, Some(&|v: &Value| enc::object(v, None, &[("image", &|v: &Value| files::read_media_one_or_many(v)), ("toolCalls", &|v: &Value| enc::array(v, false, &|v: &Value| enc::object(v, None, &[("imageGeneration", &|v: &Value| enc::object(v, None, &[("image", &|v: &Value| files::read_media(v))]))])))])), None))(&p_turn)?);',
+    );
+  });
+
+  test("a union whose members hold files of the same JSON kind is refused", () => {
+    const twins = { anyOf: [ref("OpenAITurn"), { type: "object", properties: { audio: media } }] };
+    const refused = buildIr(
+      spec({
+        schemas: {
+          ...schemas,
+          WidgetBody: { ...schemas.WidgetBody, properties: { label: { type: "string" }, turn: twins } },
+        },
+        operation: {
+          "x-channelstack-method": { on: "Widget", name: "update", args: ["label"], options: ["turn", "since"] },
+        },
+      }),
+    );
+    expect(() => emitTypeScript(refused)).toThrow("needs them of different JSON kinds");
+    expect(() => emitRust(refused)).toThrow("needs them of different JSON kinds");
   });
 
   test("Rust: read by files::read_media, bytes in a one-or-many list being one source", () => {

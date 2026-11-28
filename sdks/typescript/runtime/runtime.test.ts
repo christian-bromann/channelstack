@@ -388,7 +388,10 @@ describe("files a test hands over", () => {
     try {
       const relative = basename(here);
       expect(readTree(`${relative}/web`).map((file) => file.path)).toEqual(["README.md", "src/app.ts"]);
-      expect(() => readTree(`${relative}/web/README.md`)).toThrow(/ENOTDIR/);
+      // A path to one file is that file, by its name.
+      expect(readTree(`${relative}/web/README.md`).map((file) => [file.path, text(file.content)])).toEqual([
+        ["README.md", "# web\n"],
+      ]);
     } finally {
       rmSync(here, { recursive: true });
     }

@@ -4,9 +4,22 @@
 Vitest examples of `test/acceptance/examples/openai.test.ts`.
 """
 
+import base64
 import re
+from pathlib import Path
 
-from channelstack import OpenAIFixture, OpenAIRequest, OpenAIToolCallSpec, OpenAITurn, SlackFixture
+import httpx
+
+from channelstack import (
+    Channelstack,
+    OpenAIFixture,
+    OpenAIMatch,
+    OpenAIRequest,
+    OpenAIToolCallSpec,
+    OpenAITurn,
+    Session,
+    SlackFixture,
+)
 from pytest_channelstack import expect
 
 
@@ -47,3 +60,27 @@ async def test_a_responder_computes_the_answer_from_what_the_agent_sent(
     await expect(msg.thread).to_have_reply_from("my-agent", text=re.compile("2 messages"))
     await expect(openai).to_have_sent([msg])
     await expect(openai).not_to_have_sent_secrets()
+
+
+async def test_an_image_given_as_a_path_is_served_byte_for_byte(
+    channelstack: Channelstack, channelstack_session: Session, openai: OpenAIFixture
+) -> None:
+    """Exit check 14.5, in Python: a `MediaSource` path is read in the test process, and the fake serves those bytes.
+
+    The test plays the agent, calling the Images API as the official SDK does, tagged with its session.
+    """
+    key = (await channelstack.env())["OPENAI_API_KEY"]
+    await openai.respond(
+        OpenAITurn(image="../examples/fixtures/chart.png"), when=OpenAIMatch(endpoint="images.generations")
+    )
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{openai.base_url}/images/generations",
+            headers={"authorization": f"Bearer {key}"},
+            json={"model": "gpt-image-1", "prompt": "this week's deploys", "user": channelstack_session.session_id},
+        )
+
+    assert response.status_code == 200, response.text
+    served = base64.b64decode(response.json()["data"][0]["b64_json"])
+    assert served == (Path(__file__).parent.parent / "examples" / "fixtures" / "chart.png").read_bytes()

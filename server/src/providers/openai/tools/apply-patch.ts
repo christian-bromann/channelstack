@@ -1,4 +1,5 @@
 import { OPENAI_IDS } from "../ids.ts";
+import { TOOL_TYPES } from "./names.ts";
 import type { BuiltInCall, BuiltInTool } from "./shared.ts";
 
 /**
@@ -7,7 +8,7 @@ import type { BuiltInCall, BuiltInTool } from "./shared.ts";
  */
 export const applyPatch: BuiltInTool<"applyPatch"> = {
   kind: "applyPatch",
-  types: ["apply_patch"],
+  types: TOOL_TYPES.applyPatch,
   problems(spec) {
     const missing = spec.operations.find(
       (operation) => operation.type !== "delete_file" && operation.diff === undefined,

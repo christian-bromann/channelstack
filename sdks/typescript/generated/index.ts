@@ -2144,6 +2144,7 @@ export interface SlackMessageData {
   author: SlackUserData | SlackAppData;
   text: string;
   blocks: unknown[];
+  files: string[];
   postedAt: string;
   threadTs?: string;
   edited: boolean;
@@ -2160,6 +2161,7 @@ export class SlackMessage {
   readonly author: SlackUser | SlackApp;
   readonly text: string;
   readonly blocks: unknown[];
+  readonly files: string[];
   readonly postedAt: string;
   readonly threadTs: string | undefined;
   readonly edited: boolean;
@@ -2178,6 +2180,7 @@ export class SlackMessage {
     this.author = data.author.kind === "user" ? new SlackUser(ctx, data.author) : new SlackApp(ctx, data.author);
     this.text = data.text;
     this.blocks = data.blocks;
+    this.files = data.files;
     this.postedAt = data.postedAt;
     this.threadTs = data.threadTs;
     this.edited = data.edited;
@@ -5770,7 +5773,7 @@ export class OpenAIFixture {
   async respond(turns?: OpenAITurnInput | OpenAITurnInput[] | Responder<OpenAIRequest, OpenAITurnInput>, options: { when?: OpenAIMatch; times?: number; timing?: OpenAITiming } = {}): Promise<OpenAIScript> {
     const ctx = this.#ctx;
     const answer = typeof turns === "function" ? turns : undefined;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts`, { body: { turns: (answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined) === undefined ? undefined : [(answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined)].flat(), when: options.when === undefined ? undefined : { ...options.when, text: options.when.text === undefined ? undefined : patternOnWire(options.when.text), prompt: options.when.prompt === undefined ? undefined : patternOnWire(options.when.prompt), model: options.when.model === undefined ? undefined : patternOnWire(options.when.model), from: options.when.from === undefined ? undefined : options.when.from.id, in: options.when.in === undefined ? undefined : options.when.in.id }, times: options.times, timing: options.timing, responder: answer !== undefined } })) as OpenAIScriptData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts`, { body: { turns: (answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined) === undefined ? undefined : [(answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined)].flat().map((item) => (typeof item === "object" && item !== null && !Array.isArray(item) ? { ...item, toolCalls: item.toolCalls === undefined ? undefined : item.toolCalls.map((item) => ({ ...item, codeInterpreter: item.codeInterpreter === undefined ? undefined : { ...item.codeInterpreter, files: item.codeInterpreter.files === undefined ? undefined : item.codeInterpreter.files.map((item) => readMedia(item)) }, imageGeneration: item.imageGeneration === undefined ? undefined : { ...item.imageGeneration, image: readMedia(item.imageGeneration.image) } })), image: item.image === undefined ? undefined : [item.image].flat().map((item) => readMedia(item)), audio: item.audio === undefined ? undefined : readMedia(item.audio) } : item)), when: options.when === undefined ? undefined : { ...options.when, text: options.when.text === undefined ? undefined : patternOnWire(options.when.text), prompt: options.when.prompt === undefined ? undefined : patternOnWire(options.when.prompt), model: options.when.model === undefined ? undefined : patternOnWire(options.when.model), from: options.when.from === undefined ? undefined : options.when.from.id, in: options.when.in === undefined ? undefined : options.when.in.id }, times: options.times, timing: options.timing, responder: answer !== undefined } })) as OpenAIScriptData;
     const handle = new OpenAIScript(ctx, data);
     if (answer !== undefined) respondWith({ held: (o) => handle.heldCalls(o), answer: (id, o) => handle.answerHeld(id, o) }, answer);
     return handle;
@@ -5916,7 +5919,7 @@ export class OpenAIScript implements AsyncDisposable {
   /** For a responder's SDK: answer a held call with a turn, or report that the test's function threw. Experimental. */
   async answerHeld(held: string, options: { turn?: OpenAITurnInput; error?: string } = {}): Promise<void> {
     const ctx = this.#ctx;
-    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/answers`, { body: { held, turn: options.turn, error: options.error } });
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/answers`, { body: { held, turn: options.turn === undefined ? undefined : (typeof options.turn === "object" && options.turn !== null && !Array.isArray(options.turn) ? { ...options.turn, toolCalls: options.turn.toolCalls === undefined ? undefined : options.turn.toolCalls.map((item) => ({ ...item, codeInterpreter: item.codeInterpreter === undefined ? undefined : { ...item.codeInterpreter, files: item.codeInterpreter.files === undefined ? undefined : item.codeInterpreter.files.map((item) => readMedia(item)) }, imageGeneration: item.imageGeneration === undefined ? undefined : { ...item.imageGeneration, image: readMedia(item.imageGeneration.image) } })), image: options.turn.image === undefined ? undefined : [options.turn.image].flat().map((item) => readMedia(item)), audio: options.turn.audio === undefined ? undefined : readMedia(options.turn.audio) } : options.turn), error: options.error } });
   }
 
   /** Wait for the next new model call this script answers, after the last one this handle saw. */
