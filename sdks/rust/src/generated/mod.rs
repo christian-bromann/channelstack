@@ -8003,11 +8003,25 @@ fn run_open_ai_fixture_unattributed<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_within_ms = options.get("withinMs").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/openai/unattributed",
             encode_segment(ctx.session()?)
         );
-        send(ctx, "GET", path, None, None, false, &[]).await
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("withinMs".into(), p_within_ms.clone());
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -23136,15 +23150,15 @@ impl OpenAIFixture {
         )
     }
 
-    /// Model calls no session could be given (the agent calling the model at startup, for example). Experimental.
-    pub fn unattributed(&self) -> Call<Value> {
-        Call::new(
+    /// Model calls no session could be given (the agent calling the model at startup, for example), oldest first: what a failing matcher names. Experimental.
+    pub fn unattributed(&self) -> OpenAIFixtureUnattributed {
+        OpenAIFixtureUnattributed(Call::new(
             &self.ctx,
             &self.data,
             vec![],
             run_open_ai_fixture_unattributed,
             as_value,
-        )
+        ))
     }
 
     /// Limit this session's model calls: requests and tokens per window, with truthful x-ratelimit-* headers. Experimental.
@@ -23254,6 +23268,28 @@ impl OpenAIFixtureToolCalls {
 }
 
 impl IntoFuture for OpenAIFixtureToolCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`OpenAIFixture::unattributed`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct OpenAIFixtureUnattributed(Call<Value>);
+
+impl OpenAIFixtureUnattributed {
+    /// `withinMs`.
+    pub fn within_ms(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("withinMs", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for OpenAIFixtureUnattributed {
     type Output = Result<Value>;
     type IntoFuture = BoxFuture<'static, Result<Value>>;
     fn into_future(self) -> Self::IntoFuture {

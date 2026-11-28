@@ -1299,6 +1299,8 @@ export interface OpenAIContext {
   thread?: OpenAIRef;
   message?: OpenAIRef;
   attributedBy?: "minted_id" | "tag" | "owned_id" | "text" | "order";
+  matched?: string;
+  tiedWith?: string[];
 }
 
 export interface OpenAIRef {
@@ -1363,6 +1365,8 @@ export interface OpenAIUnattributedCall {
   at: string;
   lastUserText?: string;
   tools: string[];
+  sinceMs: number;
+  message: string;
 }
 
 export type Places = Place[];
@@ -5764,10 +5768,10 @@ export class OpenAIFixture {
     return data;
   }
 
-  /** Model calls no session could be given (the agent calling the model at startup, for example). Experimental. */
-  async unattributed(): Promise<OpenAIUnattributedCalls> {
+  /** Model calls no session could be given (the agent calling the model at startup, for example), oldest first: what a failing matcher names. Experimental. */
+  async unattributed(options: { withinMs?: number | undefined } = {}): Promise<OpenAIUnattributedCalls> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/unattributed`)) as OpenAIUnattributedCalls;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/unattributed`, { query: { withinMs: options.withinMs } })) as OpenAIUnattributedCalls;
     return data;
   }
 

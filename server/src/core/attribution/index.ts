@@ -8,6 +8,9 @@
  *    ids and names (`owned_id`), and what its people wrote (`text`);
  * 5. when several sessions hold the same text and nothing else tells them apart: the one whose
  *    matching delivery is the oldest still unanswered (`order`).
+ *
+ * A retry (the same request again, as the SDK says it is) goes where its first attempt went,
+ * with the same evidence: never by order to another session.
  */
 
 /** How a request was attributed. */
@@ -51,12 +54,16 @@ export interface AttributionRequest {
   readonly tags: readonly string[];
   /** Everything the request says: instructions, messages, tool results. */
   readonly text: string;
+  /** The request as sent (`key`, its body's hash), and whether the client says it is sending it again. */
+  readonly attempt?: { readonly key: string; readonly retry: boolean };
 }
 
 /** The shortest string that counts as evidence: "hi" or "thanks" decides nothing. */
 const MIN_EVIDENCE = 8;
 /** The longest string that is compared: past this, a string is a document, not something a person said. */
 const MAX_EVIDENCE = 4000;
+/** How many first attempts are remembered for their retries. */
+const ATTEMPTS = 1000;
 
 /**
  * Text as both sides are compared: mentions and links removed (the agent strips `<@U…>` or
@@ -116,6 +123,8 @@ export class Attributor {
   readonly #minted = new Map<string, string>();
   /** Per session: the deliveries an attributed call already answered. */
   readonly #answered = new Map<string, Set<string>>();
+  /** How each request was attributed, by its key: where its retries go. */
+  readonly #attempts = new Map<string, Attribution>();
 
   constructor(sources: AttributionSources) {
     this.#sources = sources;
@@ -130,9 +139,23 @@ export class Attributor {
   forget(session: string): void {
     for (const [id, owner] of this.#minted) if (owner === session) this.#minted.delete(id);
     this.#answered.delete(session);
+    for (const [key, attribution] of this.#attempts) if (attribution.session === session) this.#attempts.delete(key);
   }
 
   attribute(request: AttributionRequest): Attribution | undefined {
+    const { attempt } = request;
+    const first = attempt?.retry ? this.#attempts.get(attempt.key) : undefined;
+    if (first && this.#sources.sessions().includes(first.session)) return first;
+    const found = this.#attribute(request);
+    if (attempt && found) {
+      this.#attempts.delete(attempt.key);
+      this.#attempts.set(attempt.key, found);
+      if (this.#attempts.size > ATTEMPTS) this.#attempts.delete(this.#attempts.keys().next().value as string);
+    }
+    return found;
+  }
+
+  #attribute(request: AttributionRequest): Attribution | undefined {
     const open = new Set(this.#sources.sessions());
     for (const id of request.minted) {
       const session = this.#minted.get(id);

@@ -93,6 +93,25 @@ describe("two sessions sent the same text", () => {
     expect(second).toMatchObject({ session: "ses_b", by: "order", tiedWith: ["ses_a"] });
   });
 
+  test("a retry goes to the session its first attempt went to, and the next new call to the other", () => {
+    const attributor = world({
+      ses_a: [{ text: "@my-agent how's my change doing?", delivery: "d_a", at: 1 }],
+      ses_b: [{ text: "@my-agent how's my change doing?", delivery: "d_b", at: 2 }],
+    });
+    const asked = (key: string, retry: boolean) => ({
+      ...request("how's my change doing?"),
+      attempt: { key, retry },
+    });
+
+    const first = attributor.attribute(asked("body-1", false));
+    const retried = attributor.attribute(asked("body-1", true));
+    const next = attributor.attribute(asked("body-2", false));
+
+    expect(first).toMatchObject({ session: "ses_a", by: "order" });
+    expect(retried).toMatchObject({ session: "ses_a", by: "order", tiedWith: ["ses_b"] });
+    expect(next).toMatchObject({ session: "ses_b", by: "order" });
+  });
+
   test("something only one of them has still decides", () => {
     const attributor = world({
       ses_a: ["@my-agent how's my change doing?", "U08B5K2M9QX"],

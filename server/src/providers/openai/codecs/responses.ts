@@ -1,7 +1,6 @@
-import { randomString } from "../../../core/secrets/index.ts";
 import type { SseFrame } from "../../../core/stream/index.ts";
 import type { OpenAIError } from "../errors.ts";
-import { type Answer, jsonChunks } from "./answer.ts";
+import { type Answer, jsonChunks, obfuscation } from "./answer.ts";
 
 /** What the response object repeats of its request. */
 export interface ResponseMeta {
@@ -133,9 +132,6 @@ export function responseObject(
 /** The status a finished answer gives its response. */
 export const finalStatus = (answer: Answer): "completed" | "incomplete" =>
   answer.finish === "length" || answer.finish === "content_filter" ? "incomplete" : "completed";
-
-/** Padding that makes every delta's length uninformative, as OpenAI adds unless `include_obfuscation: false`. */
-const obfuscation = () => randomString(16, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
 
 /**
  * The events of an answer, each with its `sequence_number`: `response.created` and

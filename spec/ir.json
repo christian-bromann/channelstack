@@ -19526,7 +19526,7 @@
         {
           "name": "unattributed",
           "kind": "method",
-          "summary": "Model calls no session could be given (the agent calling the model at startup, for example)",
+          "summary": "Model calls no session could be given (the agent calling the model at startup, for example), oldest first: what a failing matcher names",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -19539,7 +19539,19 @@
             ]
           },
           "args": [],
-          "options": [],
+          "options": [
+            {
+              "name": "withinMs",
+              "type": {
+                "kind": "nullable",
+                "type": {
+                  "kind": "integer"
+                }
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
           "returns": {
             "kind": "named",
             "name": "OpenAIUnattributedCalls"
@@ -25228,6 +25240,23 @@
               ]
             },
             "optional": true
+          },
+          {
+            "name": "matched",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "tiedWith",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": true
           }
         ]
       }
@@ -25518,6 +25547,20 @@
               "items": {
                 "kind": "string"
               }
+            },
+            "optional": false
+          },
+          {
+            "name": "sinceMs",
+            "type": {
+              "kind": "number"
+            },
+            "optional": false
+          },
+          {
+            "name": "message",
+            "type": {
+              "kind": "string"
             },
             "optional": false
           }

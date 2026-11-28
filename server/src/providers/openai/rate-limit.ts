@@ -10,8 +10,29 @@ export interface RateLimits {
 /** Without a limit, the headers show a generous tier, so an agent that reads them sees plausible numbers. */
 const DEFAULT_TIER = { requests: 10_000, tokens: 30_000_000 } as const;
 
-/** A duration as OpenAI's reset headers write it: Go's style, `1s`, `6m0s`, `120ms`. */
-function goDuration(ms: number): string {
+/** Why a call is over a limit: which one, its numbers, and how long until the call would fit. */
+export interface RateLimitRefusal {
+  readonly limit: "requests" | "tokens";
+  /** The limit itself. */
+  readonly of: number;
+  readonly used: number;
+  readonly requested: number;
+  readonly perMs: number;
+  readonly waitMs: number;
+}
+
+/** A refusal no session's limit made (a scripted `rate_limit`): the default tier's requests, used up for `waitMs`. */
+export const scriptedRefusal = (waitMs: number): RateLimitRefusal => ({
+  limit: "requests",
+  of: DEFAULT_TIER.requests,
+  used: DEFAULT_TIER.requests,
+  requested: 1,
+  perMs: 60_000,
+  waitMs,
+});
+
+/** A duration as OpenAI's reset headers and rate-limit messages write it: Go's style, `1s`, `6m0s`, `120ms`. */
+export function goDuration(ms: number): string {
   if (ms < 1000) return `${Math.max(0, Math.round(ms))}ms`;
   const totalSeconds = ms / 1000;
   const minutes = Math.floor(totalSeconds / 60);
@@ -49,16 +70,30 @@ export class SessionRateLimit {
       this.#tokens = { startedAt: now, requests: 0, tokens: 0 };
   }
 
-  /** How long until a slot frees up, when this call is over the limit; undefined when it may go on. */
-  admit(tokens: number): number | undefined {
+  /** Count a call of `tokens`, unless it is over a limit: then which one and why, and nothing is counted. */
+  refusal(tokens: number): RateLimitRefusal | undefined {
     this.#roll();
     const now = this.#clock();
     const { requests: requestLimit, tokens: tokenLimit } = this.limits;
     if (requestLimit && this.#requests.requests >= requestLimit.limit) {
-      return requestLimit.perMs - (now - this.#requests.startedAt);
+      return {
+        limit: "requests",
+        of: requestLimit.limit,
+        used: this.#requests.requests,
+        requested: 1,
+        perMs: requestLimit.perMs,
+        waitMs: requestLimit.perMs - (now - this.#requests.startedAt),
+      };
     }
     if (tokenLimit && this.#tokens.tokens + tokens > tokenLimit.limit) {
-      return tokenLimit.perMs - (now - this.#tokens.startedAt);
+      return {
+        limit: "tokens",
+        of: tokenLimit.limit,
+        used: this.#tokens.tokens,
+        requested: tokens,
+        perMs: tokenLimit.perMs,
+        waitMs: tokenLimit.perMs - (now - this.#tokens.startedAt),
+      };
     }
     this.#requests.requests += 1;
     this.#tokens.tokens += tokens;

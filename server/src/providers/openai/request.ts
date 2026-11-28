@@ -382,6 +382,13 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
   if (body.background === true) throw unsupportedInFake("`background: true`", "background");
   const own = inputItems(body.input);
   const items = [...history, ...own];
+  // A tool's output answers a call the input, its chain or its conversation holds, as OpenAI requires.
+  const calls = new Set(
+    items.flatMap((item) =>
+      item.type === "function_call" || item.type === "custom_tool_call" ? [str(item.call_id)] : [],
+    ),
+  );
+  const referenced = items.some((item) => item.type === "item_reference");
   const messages: ModelMessage[] = [];
   const refs: string[] = [];
   if (str(body.previous_response_id)) refs.push(str(body.previous_response_id) as string);
@@ -429,6 +436,13 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
             `Missing required parameter: '${where}.call_id'.`,
             `${where}.call_id`,
             "missing_required_parameter",
+          );
+        }
+        // A custom tool's call may be an `item_reference` to a stored item; a function's never is.
+        if (!calls.has(callId) && (type === "function_call_output" || !referenced)) {
+          throw invalidRequest(
+            `No tool call found for ${type === "function_call_output" ? "function call" : "custom tool call"} output with call_id ${callId}.`,
+            "input",
           );
         }
         refs.push(callId);

@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
+import { stringsOf } from "../../core/attribution/index.ts";
 import { iso, type Timers } from "../../core/clock/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { IdGenerator } from "../../core/ids/index.ts";
@@ -23,7 +24,17 @@ const Context = z
     conversation: Ref.optional(),
     thread: Ref.optional(),
     message: Ref.optional(),
-    attributedBy: z.enum(["minted_id", "tag", "owned_id", "text", "order"]).optional(),
+    attributedBy: z
+      .enum(["minted_id", "tag", "owned_id", "text", "order"])
+      .optional()
+      .openapi({ description: "The evidence that gave the call to this session, strongest first." }),
+    matched: z.string().optional().openapi({
+      description: "The string that decided it: the minted id, the tag, the owned id, or the text the person wrote.",
+    }),
+    tiedWith: z.array(z.string()).optional().openapi({
+      description:
+        'With `attributedBy: "order"`: the other sessions whose people sent the same text. The call went to the oldest unanswered message.',
+    }),
   })
   .openapi("OpenAIContext");
 
@@ -149,6 +160,8 @@ const Unattributed = z
     at: z.string(),
     lastUserText: z.string().optional(),
     tools: z.array(z.string()),
+    sinceMs: z.number().openapi({ description: "How long ago it arrived, on the server's clock." }),
+    message: z.string().openapi({ description: "What the agent was told: why no session claimed it." }),
   })
   .openapi("OpenAIUnattributedCall");
 
@@ -193,6 +206,8 @@ function rawRequestWire(call: CallRecord) {
       ...(call.place.thread === undefined ? {} : { thread: { id: call.place.thread } }),
       ...(call.place.message === undefined ? {} : { message: { id: call.place.message } }),
       ...(call.attribution === undefined ? {} : { attributedBy: call.attribution.by }),
+      ...(call.attribution?.matched === undefined ? {} : { matched: call.attribution.matched }),
+      ...(call.attribution?.tiedWith === undefined ? {} : { tiedWith: [...call.attribution.tiedWith] }),
     },
     body: call.body,
     headers: call.headers,
@@ -232,8 +247,9 @@ function toolCallsOf(calls: readonly CallRecord[], made: readonly CallRecord[] =
   );
 }
 
+/** A call as a test reads it: its request, answer and tool calls (with what the agent sent back), scrubbed. */
 function callWire(call: CallRecord, all: readonly CallRecord[], scrub: Scrub) {
-  return {
+  return scrub({
     id: call.id,
     endpoint: call.endpoint,
     model: call.request.model,
@@ -253,7 +269,7 @@ function callWire(call: CallRecord, all: readonly CallRecord[], scrub: Scrub) {
     },
     toolCalls: toolCallsOf(all, [call]),
     ...(call.script === undefined ? {} : { script: call.script }),
-  };
+  });
 }
 
 /** How long a responder's long poll waits for a held call before it answers with none. */
@@ -278,7 +294,7 @@ export function registerOpenAIRoutes(
     responder: script.turns === undefined,
     times: Number.isFinite(script.times) ? script.times : -1,
     used: script.used,
-    problems: [...script.problems],
+    problems: scrub([...script.problems]),
   });
   const scriptOf = (session: string, id: string) => {
     const script = world.scripts.get(session, id);
@@ -375,7 +391,7 @@ export function registerOpenAIRoutes(
     sdkMethod: { on: "OpenAIScript", name: "undo", dispose: true },
     stability,
     handler: ({ session, params }) => {
-      world.scripts.remove(session.id, params.script);
+      world.scripts.remove(session.id, scriptOf(session.id, params.script).id);
     },
   });
 
@@ -446,10 +462,12 @@ export function registerOpenAIRoutes(
     handler: ({ session, params, query }) => {
       const script = scriptOf(session.id, params.script);
       const all = world.calls(session.id);
-      return toolCallsOf(
-        all,
-        all.filter((call) => call.script === script.id),
-      ).filter((tool) => query.name === undefined || tool.name === query.name);
+      return scrub(
+        toolCallsOf(
+          all,
+          all.filter((call) => call.script === script.id),
+        ).filter((tool) => query.name === undefined || tool.name === query.name),
+      );
     },
   });
 
@@ -596,7 +614,9 @@ export function registerOpenAIRoutes(
     sdkMethod: { on: "OpenAIFixture", name: "toolCalls", options: ["name"] },
     stability,
     handler: ({ session, query }) =>
-      toolCallsOf(world.calls(session.id)).filter((tool) => query.name === undefined || tool.name === query.name),
+      scrub(
+        toolCallsOf(world.calls(session.id)).filter((tool) => query.name === undefined || tool.name === query.name),
+      ),
   });
 
   router.route({
@@ -607,7 +627,7 @@ export function registerOpenAIRoutes(
     response: z.array(z.string()).openapi("OpenAIProblems"),
     sdkMethod: { on: "OpenAIFixture", name: "problems" },
     stability,
-    handler: ({ session }) => world.problems(session.id),
+    handler: ({ session }) => scrub(world.problems(session.id)),
   });
 
   router.route({
@@ -622,7 +642,8 @@ export function registerOpenAIRoutes(
     stability,
     handler: ({ session }) =>
       world.calls(session.id).flatMap((call) => {
-        const kinds = deps.findSecrets(JSON.stringify(call.body ?? ""));
+        // Each string as sent (a PEM key keeps its newlines), and the body as JSON.
+        const kinds = deps.findSecrets([JSON.stringify(call.body ?? ""), ...stringsOf(call.body)].join("\n"));
         return kinds.length === 0 ? [] : [{ call: call.id, kinds }];
       }),
   });
@@ -630,19 +651,35 @@ export function registerOpenAIRoutes(
   router.route({
     method: "get",
     path: "/unattributed",
-    summary: "Model calls no session could be given (the agent calling the model at startup, for example)",
+    summary:
+      "Model calls no session could be given (the agent calling the model at startup, for example), oldest first: what a failing matcher names",
+    query: z.object({
+      withinMs: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .openapi({
+          param: { name: "withinMs", in: "query" },
+          description: "Only the calls that arrived this recently.",
+        }),
+    }),
     response: z.array(Unattributed).openapi("OpenAIUnattributedCalls"),
-    sdkMethod: { on: "OpenAIFixture", name: "unattributed" },
+    sdkMethod: { on: "OpenAIFixture", name: "unattributed", options: ["withinMs"] },
     stability,
-    handler: () =>
-      world.unattributed().map((call) => ({
-        id: call.id,
-        endpoint: call.endpoint,
-        model: call.request.model,
-        at: iso(call.startedAt),
-        ...(call.request.lastUserText === undefined ? {} : { lastUserText: call.request.lastUserText.slice(0, 200) }),
-        tools: call.request.tools.map((tool) => tool.name ?? tool.type),
-      })),
+    handler: ({ query }) =>
+      scrub(
+        world.unattributed(query.withinMs).map((call) => ({
+          id: call.id,
+          endpoint: call.endpoint,
+          model: call.request.model,
+          at: iso(call.startedAt),
+          ...(call.request.lastUserText === undefined ? {} : { lastUserText: call.request.lastUserText.slice(0, 200) }),
+          tools: call.request.tools.map((tool) => tool.name ?? tool.type),
+          sinceMs: world.ageOf(call),
+          message: world.unattributedMessage(call),
+        })),
+      ),
   });
 
   router.route({

@@ -34,7 +34,8 @@ Changelog = "https://github.com/christian-bromann/channelstack/blob/main/CHANGEL
 channelstack = "pytest_channelstack.plugin"
 
 [dependency-groups]
-dev = ["pyright==1.1.414", "ruff==0.17.6"]
+# `openai` is the official SDK the fake OpenAI's wire test parses with (test/acceptance/pytest/test_openai_wire.py).
+dev = ["openai==3.60.0", "pyright==1.1.414", "ruff==0.17.6"]
 
 [tool.uv.sources]
 channelstack = { path = "../../sdks/python", editable = true }

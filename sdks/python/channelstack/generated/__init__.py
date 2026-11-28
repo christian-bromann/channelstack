@@ -1715,6 +1715,8 @@ class OpenAIContext:
     thread: OpenAIRef | None = None
     message: OpenAIRef | None = None
     attributed_by: Literal["minted_id", "tag", "owned_id", "text", "order"] | None = None
+    matched: str | None = None
+    tied_with: list[str] | None = None
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAIContext:
@@ -1725,6 +1727,8 @@ class OpenAIContext:
             thread=None if data.get("thread") is None else OpenAIRef._from_wire(ctx, data["thread"]),
             message=None if data.get("message") is None else OpenAIRef._from_wire(ctx, data["message"]),
             attributed_by=data.get("attributedBy"),
+            matched=data.get("matched"),
+            tied_with=data.get("tiedWith"),
         )
 
 
@@ -1829,6 +1833,8 @@ class OpenAIUnattributedCall:
     model: str
     at: str
     tools: list[str]
+    since_ms: float
+    message: str
     last_user_text: str | None = None
 
     @classmethod
@@ -1839,6 +1845,8 @@ class OpenAIUnattributedCall:
             model=data["model"],
             at=data["at"],
             tools=data["tools"],
+            since_ms=data["sinceMs"],
+            message=data["message"],
             last_user_text=data.get("lastUserText"),
         )
 
@@ -4467,10 +4475,10 @@ class OpenAIFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/sent-secrets")
         return [OpenAISentSecret._from_wire(ctx, item) for item in data]
 
-    async def unattributed(self) -> OpenAIUnattributedCalls:
-        """Model calls no session could be given (the agent calling the model at startup, for example). Experimental."""
+    async def unattributed(self, *, within_ms: int | None | None = None) -> OpenAIUnattributedCalls:
+        """Model calls no session could be given (the agent calling the model at startup, for example), oldest first: what a failing matcher names. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/unattributed")
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/openai/unattributed", query={"withinMs": within_ms})
         return [OpenAIUnattributedCall._from_wire(ctx, item) for item in data]
 
     async def rate_limit(self, *, requests: dict[str, Any] | None = None, tokens: dict[str, Any] | None = None, error: Literal["rate_limit", "slow_down"] | None = None) -> OpenAIRateLimit:

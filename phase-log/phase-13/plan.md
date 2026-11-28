@@ -10,7 +10,7 @@ Phase 13 of [docs/phases.md](../../docs/phases.md): a fake OpenAI, scripted per 
 |---|---|---|
 | 13.1 The OpenAI examples pass | `test/acceptance/examples/openai.test.ts` against `examples/agents/openai-node` (official `openai` SDK, Chat Completions) and `examples/agents/openai-ai-sdk` (`@ai-sdk/openai`, Responses) | the provider, the SDKs, `integrations/vitest`, `scripts/lib/channels.ts`, `scripts/accept.ts` |
 | 13.2 Responses match OpenAI's description | `server/test/schemas/openai.ts` (every answer and stream event in a test run, against the pinned OpenAPI description), `scripts/pinned-schema.ts openai` | `server/test/schemas/`, `scripts/pinned-schema.ts` |
-| 13.3 The official SDKs parse it all | `server/src/providers/openai/sdk.test.ts` (the `openai` Node SDK against the fake in process); `sdks/python/tests/test_openai_wire.py` (the Python SDK) | `providers/openai/api.ts`, `codecs/`, `errors.ts` |
+| 13.3 The official SDKs parse it all | `server/src/providers/openai/sdk.test.ts` (the `openai` Node SDK against the fake in process); `test/acceptance/pytest/test_openai_wire.py` (the Python SDK, through pytest-channelstack) | `providers/openai/api.ts`, `codecs/`, `errors.ts` |
 | 13.4 A missing script fails the test | `server/src/providers/openai/scripts.test.ts` (the 400 and its message); `integrations/matchers-core/matchers.test.ts` (a waiting matcher fails at once on a model problem); `test/acceptance/stack/openai-no-script.test.ts` (a test that asserts nothing fails when its session closes, Vitest); the pytest and Rust counterparts | `providers/openai/scripts.ts`, `matchers-core`, `integrations/vitest/setup.ts`, pytest plugin, Rust session close |
 | 13.5 Attribution | `server/src/core/attribution/attribution.test.ts` (each kind of evidence, order, the message); `test/acceptance/stack/openai-parallel.test.ts` (20 parallel scripted tool loops) | `core/attribution/`, the drivers' authored-text hooks |
 | 13.6 Responders in every SDK | `sdks/typescript/runtime/runtime.test.ts`, `sdks/python/tests/test_responder.py`, `sdks/rust/tests/responder.rs` | `x-channelstack-responder`, `codegen`, each SDK's `responder` runtime module |
@@ -53,7 +53,7 @@ New:
 |---|---|---|---|---|
 | `openai` (dev) | 7.64.0 | The official SDK: the conformance client and the reference agent. The platforms' official SDKs belong in tests and reference agents (AGENTS.md) | Apache-2.0 | Yes, released weekly |
 | `@ai-sdk/openai` (dev) | 4.0.124 | The AI SDK's OpenAI provider, for the second reference agent (Responses), matching `ai` 7.0.177 | Apache-2.0 | Yes |
-| `openai` (Python, test only) | the latest 2.x a day old | The official Python SDK for 13.3 | Apache-2.0 | Yes |
+| `openai` (Python, test only, pytest-channelstack's dev group) | 3.60.0 | The official Python SDK for 13.3 | Apache-2.0 | Yes |
 | `ajv` (server runtime) | 8.20.0 | The script's own checks validate the agent's tool arguments and structured output against the JSON Schema it sent; a JSON Schema validator is what AGENTS.md says not to hand-write. The same version the repository's tests already use; pure JavaScript, so it compiles into the binary | MIT | Yes |
 
 ## Docs to update
