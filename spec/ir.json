@@ -19388,11 +19388,8 @@
             {
               "name": "endpoint",
               "type": {
-                "kind": "enum",
-                "values": [
-                  "chat.completions",
-                  "responses"
-                ]
+                "kind": "named",
+                "name": "OpenAIEndpoint"
               },
               "optional": true,
               "in": "query"
@@ -20081,11 +20078,8 @@
         {
           "name": "endpoint",
           "type": {
-            "kind": "enum",
-            "values": [
-              "chat.completions",
-              "responses"
-            ]
+            "kind": "named",
+            "name": "OpenAIEndpoint"
           },
           "optional": false
         },
@@ -24479,6 +24473,66 @@
             "optional": true
           },
           {
+            "name": "citations",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "quote",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "url",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "title",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "file",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  }
+                ]
+              }
+            },
+            "optional": true
+          },
+          {
+            "name": "image",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "OpenAIMediaSource"
+              },
+              "oneOrMany": true
+            },
+            "optional": true
+          },
+          {
+            "name": "audio",
+            "type": {
+              "kind": "named",
+              "name": "OpenAIMediaSource"
+            },
+            "optional": true
+          },
+          {
             "name": "reasoning",
             "type": {
               "kind": "object",
@@ -24678,7 +24732,7 @@
             "type": {
               "kind": "string"
             },
-            "optional": false
+            "optional": true
           },
           {
             "name": "arguments",
@@ -24700,6 +24754,360 @@
           },
           {
             "name": "input",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "webSearch",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "query",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "action",
+                  "type": {
+                    "kind": "enum",
+                    "values": [
+                      "search",
+                      "open_page",
+                      "find_in_page"
+                    ]
+                  },
+                  "optional": true
+                },
+                {
+                  "name": "url",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": true
+                },
+                {
+                  "name": "pattern",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": true
+                },
+                {
+                  "name": "sources",
+                  "type": {
+                    "kind": "array",
+                    "items": {
+                      "kind": "object",
+                      "fields": [
+                        {
+                          "name": "url",
+                          "type": {
+                            "kind": "string"
+                          },
+                          "optional": false
+                        },
+                        {
+                          "name": "title",
+                          "type": {
+                            "kind": "string"
+                          },
+                          "optional": true
+                        }
+                      ]
+                    }
+                  },
+                  "optional": true
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "fileSearch",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "queries",
+                  "type": {
+                    "kind": "array",
+                    "items": {
+                      "kind": "string"
+                    }
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "results",
+                  "type": {
+                    "kind": "array",
+                    "items": {
+                      "kind": "object",
+                      "fields": [
+                        {
+                          "name": "file",
+                          "type": {
+                            "kind": "string"
+                          },
+                          "optional": false
+                        },
+                        {
+                          "name": "text",
+                          "type": {
+                            "kind": "string"
+                          },
+                          "optional": false
+                        },
+                        {
+                          "name": "score",
+                          "type": {
+                            "kind": "number"
+                          },
+                          "optional": true
+                        }
+                      ]
+                    }
+                  },
+                  "optional": true
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "codeInterpreter",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "code",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "logs",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": true
+                },
+                {
+                  "name": "files",
+                  "type": {
+                    "kind": "array",
+                    "items": {
+                      "kind": "named",
+                      "name": "OpenAIMediaSource"
+                    }
+                  },
+                  "optional": true
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "imageGeneration",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "image",
+                  "type": {
+                    "kind": "named",
+                    "name": "OpenAIMediaSource"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "revisedPrompt",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": true
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "mcp",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "server",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "tool",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "arguments",
+                  "type": {
+                    "kind": "record",
+                    "values": {
+                      "kind": "unknown"
+                    }
+                  },
+                  "optional": true
+                },
+                {
+                  "name": "output",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": true
+                },
+                {
+                  "name": "error",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": true
+                },
+                {
+                  "name": "approval",
+                  "type": {
+                    "kind": "boolean"
+                  },
+                  "optional": true
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "shell",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "commands",
+                  "type": {
+                    "kind": "array",
+                    "items": {
+                      "kind": "string"
+                    }
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "output",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": true
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "computer",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "actions",
+                  "type": {
+                    "kind": "array",
+                    "items": {
+                      "kind": "named",
+                      "name": "OpenAIComputerAction"
+                    }
+                  },
+                  "optional": false
+                }
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "applyPatch",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "operations",
+                  "type": {
+                    "kind": "array",
+                    "items": {
+                      "kind": "named",
+                      "name": "OpenAIPatchOperation"
+                    }
+                  },
+                  "optional": false
+                }
+              ]
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAIMediaSource",
+      "type": {
+        "kind": "files",
+        "mode": "media"
+      }
+    },
+    {
+      "name": "OpenAIComputerAction",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "type",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAIPatchOperation",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "type",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "create_file",
+                "update_file",
+                "delete_file"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "path",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "diff",
             "type": {
               "kind": "string"
             },
@@ -24796,7 +25204,12 @@
               "kind": "enum",
               "values": [
                 "chat.completions",
-                "responses"
+                "responses",
+                "images.generations",
+                "images.edits",
+                "audio.speech",
+                "audio.transcriptions",
+                "audio.translations"
               ]
             },
             "optional": true
@@ -24847,6 +25260,13 @@
               ]
             },
             "optional": true
+          },
+          {
+            "name": "approval",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": true
           }
         ]
       }
@@ -24862,6 +25282,21 @@
       }
     },
     {
+      "name": "OpenAIEndpoint",
+      "type": {
+        "kind": "enum",
+        "values": [
+          "chat.completions",
+          "responses",
+          "images.generations",
+          "images.edits",
+          "audio.speech",
+          "audio.transcriptions",
+          "audio.translations"
+        ]
+      }
+    },
+    {
       "name": "OpenAIRequest",
       "type": {
         "kind": "object",
@@ -24869,11 +25304,8 @@
           {
             "name": "endpoint",
             "type": {
-              "kind": "enum",
-              "values": [
-                "chat.completions",
-                "responses"
-              ]
+              "kind": "named",
+              "name": "OpenAIEndpoint"
             },
             "optional": false
           },
@@ -24890,6 +25322,21 @@
               "kind": "boolean"
             },
             "optional": false
+          },
+          {
+            "name": "prompt",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "file",
+            "type": {
+              "kind": "named",
+              "name": "OpenAIPart"
+            },
+            "optional": true
           },
           {
             "name": "instructions",
@@ -25010,6 +25457,80 @@
       }
     },
     {
+      "name": "OpenAIPart",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "type",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "image",
+                "file",
+                "audio"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "from",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "data",
+                "file_id",
+                "url"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "url",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "fileId",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "mediaType",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "bytes",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": true
+          },
+          {
+            "name": "sha256",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "filename",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
       "name": "OpenAIMessage",
       "type": {
         "kind": "object",
@@ -25087,40 +25608,8 @@
             "type": {
               "kind": "array",
               "items": {
-                "kind": "object",
-                "fields": [
-                  {
-                    "name": "type",
-                    "type": {
-                      "kind": "enum",
-                      "values": [
-                        "image",
-                        "file",
-                        "audio"
-                      ]
-                    },
-                    "optional": false
-                  },
-                  {
-                    "name": "from",
-                    "type": {
-                      "kind": "enum",
-                      "values": [
-                        "data",
-                        "file_id",
-                        "url"
-                      ]
-                    },
-                    "optional": false
-                  },
-                  {
-                    "name": "url",
-                    "type": {
-                      "kind": "string"
-                    },
-                    "optional": true
-                  }
-                ]
+                "kind": "named",
+                "name": "OpenAIPart"
               }
             },
             "optional": true
@@ -25165,6 +25654,16 @@
             "name": "strict",
             "type": {
               "kind": "boolean"
+            },
+            "optional": true
+          },
+          {
+            "name": "settings",
+            "type": {
+              "kind": "record",
+              "values": {
+                "kind": "unknown"
+              }
             },
             "optional": true
           }
@@ -25265,7 +25764,15 @@
               "kind": "enum",
               "values": [
                 "function",
-                "custom"
+                "custom",
+                "web_search",
+                "file_search",
+                "code_interpreter",
+                "image_generation",
+                "mcp",
+                "shell",
+                "computer",
+                "apply_patch"
               ]
             },
             "optional": false
@@ -25482,11 +25989,8 @@
           {
             "name": "endpoint",
             "type": {
-              "kind": "enum",
-              "values": [
-                "chat.completions",
-                "responses"
-              ]
+              "kind": "named",
+              "name": "OpenAIEndpoint"
             },
             "optional": false
           },

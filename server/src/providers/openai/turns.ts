@@ -227,17 +227,12 @@ export const TurnObject = z
       )
       .optional()
       .openapi({ description: "Citations on the text, after a web or file search." }),
-    image: z
-      .array(MediaSourceSchema)
-      .min(1)
-      .optional()
-      .openapi({
-        "x-channelstack-one-or-many": true,
-        description: "The Images API's answer: one image, or one per `n`.",
-      }),
-    audio: MediaSourceSchema.optional().openapi({
-      description: "`audio.speech`'s answer, or Chat Completions' audio output with `text` as its transcript.",
+    image: z.array(MediaSourceSchema).min(1).optional().openapi({
+      "x-channelstack-one-or-many": true,
+      description: "The Images API's answer: one image, or one per `n`.",
     }),
+    // `audio.speech`'s answer, or Chat Completions' audio output with `text` as its transcript.
+    audio: MediaSourceSchema.optional(),
     reasoning: z
       .object({
         summary: z.union([z.string(), z.array(z.string())]).optional(),

@@ -243,7 +243,6 @@ export const fileWire = (file: StoredFile) => ({
   filename: file.filename,
   purpose: file.purpose,
   status: "processed",
-  status_details: null,
 });
 
 export const containerFileWire = (file: ContainerFile) => ({
