@@ -291,22 +291,6 @@ importers:
       vitest:
         specifier: '>=5.0.0 <6'
         version: 5.1.1(@types/node@26.6.6)(vite@7.3.8(@types/node@26.6.6)(jiti@2.7.0)(yaml@2.9.1))
-    optionalDependencies:
-      '@channelstack/server-darwin-arm64':
-        specifier: 0.1.1
-        version: 0.1.1
-      '@channelstack/server-darwin-x64':
-        specifier: 0.1.1
-        version: 0.1.1
-      '@channelstack/server-linux-arm64':
-        specifier: 0.1.1
-        version: 0.1.1
-      '@channelstack/server-linux-x64':
-        specifier: 0.1.1
-        version: 0.1.1
-      '@channelstack/server-win32-x64':
-        specifier: 0.1.1
-        version: 0.1.1
 
   server:
     dependencies:
@@ -494,31 +478,6 @@ packages:
   '@biomejs/cli-win32-x64@2.6.8':
     resolution: {integrity: sha512-cD6HvGczZUiAYsY8s2TxxXj2AHFzEdMomvVJfEjzOjBM45nGqIDfBpbtvwGQzDCN8X2yKKk9u1jnDZisT2nxIg==}
     engines: {node: '>=14.21.3'}
-    cpu: [x64]
-    os: [win32]
-
-  '@channelstack/server-darwin-arm64@0.1.1':
-    resolution: {integrity: sha512-lLGRKHbZ64F/e7kuGKRWL05EoI6Qb06E667Z2wwC8obcqPVEj8XgKDpmT93ALudFsg+ZNiqbhODqHrBWykjrxA==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@channelstack/server-darwin-x64@0.1.1':
-    resolution: {integrity: sha512-bO0/tmpTK8kfPVxNdgEZcdREJJWj+8At4a7SAamQGzTaOGPJdYkL+g71rD5kLl1Bs/Ju7OI6K/4WP1og2nssOQ==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@channelstack/server-linux-arm64@0.1.1':
-    resolution: {integrity: sha512-nmRhYdwoFZLir2BxW7yTk4Hef67+AWCKke9x+oAfQrw6uKZz+zhO/COylyESad3cQ+wXcpEmBm21XvLGb6Dzww==}
-    cpu: [arm64]
-    os: [linux]
-
-  '@channelstack/server-linux-x64@0.1.1':
-    resolution: {integrity: sha512-FX61If3qCTdt/Dfv0axhBWKYH3j2DJ+a4kzIR8HUXFVPBnEwIdjiFkb+wOAarmauGsjcF8k7/9haVz2NB2LkDQ==}
-    cpu: [x64]
-    os: [linux]
-
-  '@channelstack/server-win32-x64@0.1.1':
-    resolution: {integrity: sha512-nzOZG7Q8fToin74iEZ+BDr6kgbq3xn7LYtolgrYr6rBf7NdR0x/LQHSoKVoOEwjHv2GGODE/8CflA7fWVse8MA==}
     cpu: [x64]
     os: [win32]
 
@@ -4061,6 +4020,13 @@ packages:
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
+ignoredOptionalDependencies:
+  - '@channelstack/server-darwin-arm64'
+  - '@channelstack/server-darwin-x64'
+  - '@channelstack/server-linux-arm64'
+  - '@channelstack/server-linux-x64'
+  - '@channelstack/server-win32-x64'
+
 snapshots:
 
   '@ai-sdk/gateway@4.0.150(zod@4.6.7)':
@@ -4142,21 +4108,6 @@ snapshots:
     optional: true
 
   '@biomejs/cli-win32-x64@2.6.8':
-    optional: true
-
-  '@channelstack/server-darwin-arm64@0.1.1':
-    optional: true
-
-  '@channelstack/server-darwin-x64@0.1.1':
-    optional: true
-
-  '@channelstack/server-linux-arm64@0.1.1':
-    optional: true
-
-  '@channelstack/server-linux-x64@0.1.1':
-    optional: true
-
-  '@channelstack/server-win32-x64@0.1.1':
     optional: true
 
   '@chat-adapter/catalog@4.45.0': {}

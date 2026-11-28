@@ -13,3 +13,14 @@ allowBuilds:
   # install script, so the Edge and Firefox drivers aren't downloaded.
   edgedriver: false
   geckodriver: false
+
+# The TypeScript SDK names the server binary for each platform as an optional dependency, at its own
+# version. Here the binary is built from source (scripts/build-binary.ts), so the published ones are
+# never resolved: the lockfile doesn't depend on the version, and a release isn't on npm yet when its
+# version pull request is checked.
+ignoredOptionalDependencies:
+  - "@channelstack/server-darwin-arm64"
+  - "@channelstack/server-darwin-x64"
+  - "@channelstack/server-linux-arm64"
+  - "@channelstack/server-linux-x64"
+  - "@channelstack/server-win32-x64"
