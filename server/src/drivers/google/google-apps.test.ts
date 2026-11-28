@@ -10,6 +10,7 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
 import { googlePushProblems, googleResponseProblems } from "../../../test/schemas/google.ts";
+import { LOOP_LIMIT } from "../../core/loops/index.ts";
 import { PUBSUB, pubsubOf } from "./fake/world.ts";
 
 const agents: RecordingAgent[] = [];
@@ -78,7 +79,24 @@ async function twoMailboxes() {
       };
     });
   };
-  return { h, mine, theirs, base, post, get, app, coder, tokenOf, grant, gmail, mineToken, coderToken, ana, pushes };
+  return {
+    h,
+    sessionId: sessionId as string,
+    mine,
+    theirs,
+    base,
+    post,
+    get,
+    app,
+    coder,
+    tokenOf,
+    grant,
+    gmail,
+    mineToken,
+    coderToken,
+    ana,
+    pushes,
+  };
 }
 
 /** A message as an agent's client writes it for `users.messages.send`. */
@@ -260,6 +278,37 @@ describe("exit check 12.3: Google apps", () => {
     expect(await refusal(post(`/apps/${app.id}/send`, { to: [ana.id], subject: "x", text: "x" }))).toBe(
       "invalid_argument",
     );
+  });
+
+  test("exit check 12.6: an app answering its own answers is stopped at the guard's limit, its SENT pushes too, and the session says so", async () => {
+    const { h, sessionId, theirs, post, coder, coderToken, gmail, ana, pushes } = await twoMailboxes();
+    // coder's watch takes every change, its own sent mail too: the loop of one agent.
+    await gmail(coderToken, "POST", "/watch", { topicName: pubsubOf("coder").topic });
+    const asked = await post(`/users/${encodeURIComponent(ana.id)}/send`, {
+      to: [coder.id],
+      subject: "Loop",
+      text: "Answer this",
+    });
+    let last = asked;
+    for (let i = 0; i < LOOP_LIMIT + 5; i++) {
+      h.timers.advance(1000);
+      last = await post(`/apps/${coder.id}/reply`, { email: asked.id, text: `turn ${i}` });
+    }
+    h.timers.advance(1000);
+    expect(last.thread.id).toBe(asked.thread.id);
+
+    // coder heard Ana's email, then its own SENT change for each answer up to the limit, and nothing after.
+    expect(await pushes(theirs)).toHaveLength(1 + LOOP_LIMIT);
+    const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
+    expect(quiet.loops).toEqual([expect.stringMatching(/^a bot loop in google \S+ was stopped after 50 app messages/)]);
+    // A person writing again starts the conversation over.
+    h.timers.advance(1000);
+    const again = await post(`/users/${encodeURIComponent(ana.id)}/reply`, { email: last.id, text: "Again" });
+    expect(again.thread.id).toBe(asked.thread.id);
+    h.timers.advance(1000);
+    await post(`/apps/${coder.id}/reply`, { email: again.id, text: "back" });
+    h.timers.advance(1000);
+    expect(await pushes(theirs)).toHaveLength(3 + LOOP_LIMIT);
   });
 
   test("a person and an app can't share a name", async () => {
