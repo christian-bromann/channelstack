@@ -334,7 +334,14 @@ describe("the server binary", () => {
 
   test("CHANNELSTACK_SERVER_BIN wins; without a binary the error says what to do", () => {
     expect(resolveServerBinary({ CHANNELSTACK_SERVER_BIN: "/opt/channelstack" })).toBe("/opt/channelstack");
-    expect(() => resolveServerBinary({})).toThrow(
+    // Whether this checkout has the published binary installed is beside the point: none is found here.
+    const missing = (specifier: string): string => {
+      throw new Error(`Cannot find module '${specifier}'`);
+    };
+    expect(resolveServerBinary({}, (specifier) => `/node_modules/${specifier}`)).toBe(
+      `/node_modules/${serverPackageName()}/bin/${serverBinaryName()}`,
+    );
+    expect(() => resolveServerBinary({}, missing)).toThrow(
       /optional dependency @channelstack\/server-.* isn't installed.*CHANNELSTACK_SERVER_BIN/,
     );
   });

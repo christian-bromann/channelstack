@@ -175,7 +175,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   /** Does a value of this type carry handles that have to be sent as ids? */
   const holdsRefs = (type: IrType, seen: ReadonlySet<string> = new Set()): boolean =>
     // A named type holds them when its own type does (`OpenAIMatch`'s patterns and handles).
-    (type.kind === "named" && !seen.has(type.name) && holdsRefs(index.named(type.name), new Set([...seen, type.name]))) ||
+    (type.kind === "named" &&
+      !seen.has(type.name) &&
+      holdsRefs(index.named(type.name), new Set([...seen, type.name]))) ||
     type.kind === "ref" ||
     type.kind === "duration" ||
     type.kind === "files" ||

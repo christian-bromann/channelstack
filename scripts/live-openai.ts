@@ -163,7 +163,8 @@ async function fakeShapes(): Promise<Map<string, Shape>> {
   for (const lane of CASES) {
     if (lane.turn !== undefined) {
       const scripted = await h.call("POST", `/sessions/${sessionId}/openai/scripts`, { turns: [lane.turn] });
-      if (scripted.status >= 400) throw new Error(`${lane.name}: the fake refused the script: ${scripted.body.message}`);
+      if (scripted.status >= 400)
+        throw new Error(`${lane.name}: the fake refused the script: ${scripted.body.message}`);
     }
     const response = await h.app.fetch(
       new Request(`http://127.0.0.1:4500/openai${lane.path}`, {
@@ -256,7 +257,9 @@ async function main() {
     ),
     ...expired(divergences, today)
       .filter((divergence) => divergence.scenario === "shapes/openai")
-      .map((divergence) => `shapes/openai: the divergence for ${String(divergence.path)} expired on ${divergence.expires}`),
+      .map(
+        (divergence) => `shapes/openai: the divergence for ${String(divergence.path)} expired on ${divergence.expires}`,
+      ),
   ];
   console.log(`openai shapes: ${results.length} operations compared against ${model}, ${failures.length} failing`);
   for (const failure of failures) console.error(failure);

@@ -13,8 +13,8 @@ export interface ResponderIo<Request, Turn> {
   answer(id: string, options: { turn?: Turn; error?: string }): Promise<void>;
 }
 
-/** A function a test answers model calls with. */
-export type Responder<Request, Turn> = (request: Request) => Turn | Promise<Turn>;
+/** A function a test answers model calls with: `Responder<OpenAIRequest, OpenAITurnInput>` for the fake OpenAI. */
+export type Responder<Request = unknown, Turn = unknown> = (request: Request) => Turn | Promise<Turn>;
 
 /** How long one read waits on the server for a held call: well inside any HTTP timeout. */
 const LONG_POLL_MS = 20_000;

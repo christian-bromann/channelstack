@@ -246,7 +246,8 @@ export function buildIr(openapi: Json): Ir {
       const byRole = Object.keys(schemas).filter((name) =>
         roles.includes(schemas[name]["x-channelstack-resource"]?.role),
       );
-      if (byRole.length === 0) throw new SpecError(where, `x-channelstack-ref-role names no resource's role (${roles.join(", ")})`);
+      if (byRole.length === 0)
+        throw new SpecError(where, `x-channelstack-ref-role names no resource's role (${roles.join(", ")})`);
       return { kind: "ref", resources: byRole };
     }
     const refs: unknown = schema["x-channelstack-ref"];

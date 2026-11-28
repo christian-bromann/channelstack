@@ -4,13 +4,13 @@
  */
 import { afterEach, describe, expect, test } from "vitest";
 
-import { githubWorkspace } from "../../../test/github-workspace.ts";
-import { linearWorkspace } from "../../../test/linear-workspace.ts";
-import { slackWorkspace } from "../../../test/slack-workspace.ts";
-import { githubPlace } from "../../drivers/github/place.ts";
-import { linearPlace } from "../../drivers/linear/place.ts";
-import { slackPlace } from "../../drivers/slack/place.ts";
-import { placeFrom } from "./place.ts";
+import { githubWorkspace } from "../../test/github-workspace.ts";
+import { linearWorkspace } from "../../test/linear-workspace.ts";
+import { slackWorkspace } from "../../test/slack-workspace.ts";
+import { placeFrom } from "../core/attribution/place.ts";
+import { githubPlace } from "./github/place.ts";
+import { linearPlace } from "./linear/place.ts";
+import { slackPlace } from "./slack/place.ts";
 
 const closing: Array<() => Promise<void>> = [];
 afterEach(async () => {
