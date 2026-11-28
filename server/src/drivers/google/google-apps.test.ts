@@ -191,6 +191,22 @@ describe("exit check 12.3: Google apps", () => {
     expect(thread[1].delivery).toMatchObject({ app: "my-agent", type: "gmail.history" });
   });
 
+  test("a new email between two apps, with no person on it, lands and pushes in the session that used them", async () => {
+    const { h, theirs, get, gmail, app, coder, coderToken, mineToken, pushes } = await twoMailboxes();
+    await gmail(coderToken, "POST", "/watch", { topicName: pubsubOf("coder").topic, labelIds: ["INBOX"] });
+    const sent = await gmail(mineToken, "POST", "/messages/send", {
+      raw: raw([`From: my-agent <${app.address}>`, `To: ${coder.address}`, "Subject: Refunds queue", "", "Yours now."]),
+    });
+    expect(sent.status).toBe(200);
+    h.timers.advance(1000);
+
+    const [push] = await pushes(theirs);
+    expect(push?.notification.emailAddress).toBe(coder.address);
+    const inbox = (await gmail(coderToken, "GET", "/messages?labelIds=INBOX")).body.messages;
+    expect(inbox).toHaveLength(1);
+    expect((await get("/deliveries?app=coder")).map((one: { type: string }) => one.type)).toEqual(["gmail.history"]);
+  });
+
   test("A1: an email two mailboxes get is two pushes, each to its own endpoint, which verifyIdToken accepts for its own audience only", async () => {
     const { h, mine, theirs, base, post, gmail, app, coder, coderToken, mineToken, ana, pushes } = await twoMailboxes();
     await gmail(mineToken, "POST", "/watch", { topicName: PUBSUB.topic, labelIds: ["INBOX"] });

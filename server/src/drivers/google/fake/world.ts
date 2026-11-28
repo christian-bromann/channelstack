@@ -327,8 +327,8 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
       ...(parsed.messageId ? {} : { "Message-ID": ownId }),
     };
     const sent = Object.keys(stamped).length === 0 ? raw : withHeaders(raw, stamped);
-    // The email belongs to the session of the conversation it answers, or of a person it reaches.
-    const place = store.placeOf(parsed, to);
+    // The email belongs to the session of the conversation it answers, of a person it reaches, or of the apps it is between.
+    const place = store.placeOf(parsed, to, app);
     const session = acting ?? place.session;
     const email: GoogleEmailRecord = {
       id,

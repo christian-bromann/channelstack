@@ -214,8 +214,8 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
     const references = messageIdsIn(headers.references);
     const cc = parseAddresses(input.cc);
     const bcc = parseAddresses(input.bcc);
-    // The email belongs to the session of the thread it answers, or of a person it reaches.
-    const { thread, session } = store.placeOf({ inReplyTo, references }, [...to, ...cc, ...bcc]);
+    // The email belongs to the session of the thread it answers, of a person it reaches, or of the apps it is between.
+    const { thread, session } = store.placeOf({ inReplyTo, references }, [...to, ...cc, ...bcc], team);
     return { from, to, cc, bcc, inReplyTo, references, thread, session };
   };
 

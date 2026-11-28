@@ -145,6 +145,7 @@ What an app is, how it gets its credentials, and which of one app's actions the 
 - **An app:** a team of its own: its own API key, webhook secret and webhook URL, and its own receiving domain, `<name>.acme.example` unless `createApp({ domain })` says otherwise, with the address `<name>@<domain>`. A domain belongs to one team, so two teams can't share `acme.example`. Open question 6: a second address on `my-agent`'s team instead, one webhook routed by recipient, as many real setups do.
 - **It joins** a thread by being a recipient: `ana.send({ to: [resend.app, billing] })`, or an agent's email to it.
 - **What it hears from another app B:** an email B sends to its address is an `email.received` on its team's webhook, threaded by `Message-ID` and `References` like a person's. B's team gets B's own `email.sent` and `email.delivered`.
+- **Whose session:** an email answers a conversation and is in its session, or reaches a person and is in theirs. A new email between apps alone, with no person on it, is in the session that used those apps (got them from `createApp`; a scripted app's is the session acting as it). Where several sessions did, it is the one the sender last wrote or was written to in, else the last to use them. Gmail places its mail the same way.
 - **Loops:** an auto-reply to an auto-reply is the oldest email loop. The fake keeps every header an agent sets, so a check can see whether an agent marks its answers (`Auto-Submitted: auto-replied`, RFC 3834) and leaves a message so marked unanswered.
 
 #### Google (Gmail)

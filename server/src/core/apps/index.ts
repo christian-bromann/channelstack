@@ -78,14 +78,14 @@ export class AppRoster<App extends Named> {
   readonly #channel: string;
   readonly #noun: string;
   readonly #refs: (app: App) => readonly string[];
-  /** The names of the apps each session used beside the built-in one, in the order it first did. */
-  readonly #used: Collection<string>;
+  /** The apps each session used beside the built-in one, by name, in the order it first did. */
+  readonly #used: Collection<{ readonly session: string; readonly name: string }>;
 
   constructor(channel: string, registry: Registry, options: RosterOptions<App> = {}) {
     this.#channel = channel;
     this.#noun = options.noun ?? "app";
     this.#refs = options.refs ?? (() => []);
-    this.#used = registry.collection<string>(channel, "app in use");
+    this.#used = registry.collection<{ session: string; name: string }>(channel, "app in use");
   }
 
   /** The built-in app, set when the fake is seeded (again after a reset). */
@@ -106,7 +106,7 @@ export class AppRoster<App extends Named> {
   make(name: string, settings: Readonly<Record<string, unknown>>, build: () => App, by?: Asker): App {
     if (by) checkNameFree(name, by.people, "app");
     const app = this.#make(name, settings, build);
-    if (by) this.#used.add(`${by.session}\u0000${app.name}`, app.name, by.session);
+    if (by) this.#used.add(`${by.session}\u0000${app.name}`, { session: by.session, name: app.name }, by.session);
     return app;
   }
 
@@ -141,11 +141,22 @@ export class AppRoster<App extends Named> {
 
   /** The apps a session used: the built-in one first, then each it got from `createApp`, in the order it first did. */
   of(session: string): App[] {
-    const used = this.#used.list(session).flatMap((name) => {
+    const used = this.#used.list(session).flatMap(({ name }) => {
       const app = this.#apps.get(name)?.app;
       return app ? [app] : [];
     });
     return [this.builtIn, ...used];
+  }
+
+  /**
+   * The open sessions that used this app from `createApp`, in the order they first did. The
+   * built-in app is every session's, so it names none.
+   */
+  sessionsOf(app: App): string[] {
+    return this.#used
+      .values()
+      .filter((use) => use.name === app.name && app !== this.#builtIn)
+      .map((use) => use.session);
   }
 
   /** The app a name means in a session, in any case: one of the apps that session used. */

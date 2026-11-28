@@ -88,6 +88,21 @@ describe("exit check 12.12: names and limits", () => {
     expect(apps.named("reviewer")).toBe(reviewer);
   });
 
+  test("R1.13: the sessions that used an app, in the order they first did; my-agent's are nobody's in particular", () => {
+    const registry = new Registry();
+    const apps = new AppRoster<{ name: string; made: number }>("resend", registry);
+    apps.seed({ name: "my-agent", made: 0 });
+    const build = () => ({ name: "coder", made: 1 });
+    const coder = apps.make("coder", {}, build, { session: "s2", people: [] });
+    apps.make("coder", {}, build, { session: "s1", people: [] });
+    apps.make("coder", {}, build, { session: "s2", people: [] });
+
+    expect(apps.sessionsOf(coder)).toEqual(["s2", "s1"]);
+    expect(apps.sessionsOf(apps.builtIn)).toEqual([]);
+    registry.release("s2");
+    expect(apps.sessionsOf(coder)).toEqual(["s1"]);
+  });
+
   test("each name has one variable name", () => {
     expect(appVariableName("code-reviewer")).toBe("CODE_REVIEWER");
     expect(appWebhookVariable("slack", "coder")).toBe("CHANNELSTACK_SLACK_APP_CODER_WEBHOOK_URL");
