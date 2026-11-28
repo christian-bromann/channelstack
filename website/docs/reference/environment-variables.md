@@ -133,7 +133,7 @@ Read by the **app**. `channelstack env` (and the `channelstack.env()` fixture) p
 | `DISCORD_APPLICATION_ID` | Discord | The application's id, the bot's too: for registering commands |
 | `DISCORD_PUBLIC_KEY` | Discord | The application's Ed25519 public key (hex), which interactions over HTTP are checked against with `verifyKey` |
 | `DISCORD_GUILD_ID` | Discord | The guild the bot is in: for registering guild commands |
-| `OPENAI_BASE_URL` | The model | The fake OpenAI's base URL with its `/v1`, e.g. `https://openai.localhost/v1`. The official `openai` SDKs and the AI SDK's OpenAI provider read it themselves; give it to anything else that takes an OpenAI base URL. See [The model](/docs/guide/the-model) |
+| `OPENAI_BASE_URL` | The model | The fake OpenAI's base URL with its `/v1`, e.g. `https://openai.localhost/v1`. The official `openai` SDKs and the AI SDK's OpenAI provider read it themselves; give it to anything else that takes an OpenAI base URL. See [OpenAI](/docs/platforms/openai) |
 | `OPENAI_API_KEY` | The model | The fake's key (`sk-proj-…`), random per install. The fake refuses calls without it, as OpenAI does |
 | `ECHO_API_URL`, `ECHO_APP_TOKEN`, `ECHO_SIGNING_SECRET` | Echo | channelstack's own test platform. Ignore them |
 

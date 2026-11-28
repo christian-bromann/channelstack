@@ -6,7 +6,7 @@ description: "Stream an AI SDK answer into Slack from a Bolt app, on the AI SDK'
 
 # AI SDK
 
-In this tutorial you write a Bolt app that answers a direct message by streaming text from the [AI SDK](https://ai-sdk.dev)'s `streamText` into Slack. Its model is OpenAI, through the AI SDK's OpenAI provider (`@ai-sdk/openai`), and in tests that is channelstack's [fake OpenAI](/docs/guide/the-model): each test scripts what the model streams, so every run streams the same answer and needs no API key. Then you test the status line, the stream and the Stop button, and break the agent once. It's a short version of the `openai-ai-sdk` reference agent that channelstack's CI runs.
+In this tutorial you write a Bolt app that answers a direct message by streaming text from the [AI SDK](https://ai-sdk.dev)'s `streamText` into Slack. Its model is OpenAI, through the AI SDK's OpenAI provider (`@ai-sdk/openai`), and in tests that is channelstack's [fake OpenAI](/docs/platforms/openai): each test scripts what the model streams, so every run streams the same answer and needs no API key. Then you test the status line, the stream and the Stop button, and break the agent once. It's a short version of the `openai-ai-sdk` reference agent that channelstack's CI runs.
 
 [Getting started](/docs/getting-started) explains the server, `channelstack env` and a first test in more detail. This page builds on it.
 
@@ -174,7 +174,7 @@ Every piece of text arrived, so the message looks complete in a test that only r
 ## Next steps
 
 - [Slack](/docs/platforms/slack): streams, the status line, Stop and the agent split view, and the errors the fake answers with.
-- [The model](/docs/guide/the-model): tool calls, a slow first token, a stream that breaks, errors, and what the agent sent.
+- [OpenAI](/docs/platforms/openai): tool calls, a slow first token, a stream that breaks, errors, and what the agent sent.
 - [Waiting and quiet](/docs/guide/waiting-and-quiet): why `toHaveRepliesFrom` waits for quiet and the other checks don't.
 - [Standard checks](/docs/guide/standard-checks): `slackChecks({ app: "my-agent", model: "openai" })` adds the model checks to the Slack ones.
 - [Chat SDK](/docs/quickstarts/chat-sdk): the same kind of agent on the Chat SDK, where `thread.post(textStream)` streams for you.

@@ -140,7 +140,7 @@ On Slack this is Slack's own retry, with its retry headers, so an app that answe
 
 ## Script the model
 
-An app whose model is the [fake OpenAI](/docs/guide/the-model) (`OPENAI_BASE_URL` from `channelstack env`) needs a script before it can answer: the fake has no default answer, and a call nothing scripted gets a 400 (`channelstack_no_script`).
+An app whose model is the [fake OpenAI](/docs/platforms/openai) (`OPENAI_BASE_URL` from `channelstack env`) needs a script before it can answer: the fake has no default answer, and a call nothing scripted gets a 400 (`channelstack_no_script`).
 
 ```bash
 npx channelstack openai respond --times -1 "Here's what I found about {lastUserText}."

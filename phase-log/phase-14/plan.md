@@ -49,4 +49,4 @@ The server and the TypeScript and Python SDKs need none: `node:crypto` and `node
 
 - reality-matrix: the media endpoints and built-in tools;
 - `code-map.md`: `media.ts`, `tools/`, `codecs/media.ts`, `fetchFake`, `readMedia`;
-- the website's page for the fake model (`website/docs/guide/the-model.mdx`): images, audio, files and built-in tools.
+- the website's page for the fake model (`website/docs/platforms/openai.mdx`, the platforms guide's OpenAI page): images, audio, files and built-in tools.

@@ -76,7 +76,7 @@ What it prints, per platform:
 | Resend   | `RESEND_BASE_URL`, `RESEND_API_KEY` (`re_…`), `RESEND_WEBHOOK_SECRET` (`whsec_…`), `RESEND_FROM` (`my-agent <my-agent@acme.example>`, the address it sends from) |
 | Google   | `GOOGLE_API_URL` (the root for `googleapis`), `GOOGLE_TOKEN_URL`, `GOOGLE_CERTS_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (`GOCSPX-…`), `GOOGLE_REFRESH_TOKEN` (`1//0…`), `GMAIL_ADDRESS`, `GOOGLE_PUBSUB_TOPIC`, `GOOGLE_PUSH_SERVICE_ACCOUNT`, `GOOGLE_PUSH_AUDIENCE` |
 | Discord  | `DISCORD_API_URL` (discord.js's `rest.api`), `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_GUILD_ID` |
-| The model | `OPENAI_BASE_URL` (ends in `/v1`), `OPENAI_API_KEY` (`sk-proj-…`), for the [fake OpenAI](/docs/guide/the-model) |
+| The model | `OPENAI_BASE_URL` (ends in `/v1`), `OPENAI_API_KEY` (`sk-proj-…`), for the [fake OpenAI](/docs/platforms/openai) |
 
 It also prints three `ECHO_*` lines for the internal driver. A platform that runs [live](/docs/guide/live-mode) prints nothing: there, the app uses its own real configuration.
 

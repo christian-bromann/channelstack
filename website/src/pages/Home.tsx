@@ -15,7 +15,7 @@ import { useReveal } from "../lib/hooks";
 import { SITE } from "../lib/site";
 
 /**
- * Official logo files per channel, by theme, shown unmodified. Sources, guidelines and the
+ * Official logo files per card, by theme, shown unmodified. Sources, guidelines and the
  * decision to show them are recorded in public/logos/SOURCES.md.
  */
 const LOGOS: Partial<Record<string, { onLight: string; onDark: string }>> = {
@@ -25,6 +25,7 @@ const LOGOS: Partial<Record<string, { onLight: string; onDark: string }>> = {
   notion: { onLight: "/logos/notion.svg", onDark: "/logos/notion.svg" },
   resend: { onLight: "/logos/resend.svg", onDark: "/logos/resend-white.svg" },
   discord: { onLight: "/logos/discord.svg", onDark: "/logos/discord.svg" },
+  openai: { onLight: "/logos/openai.svg", onDark: "/logos/openai-white.svg" },
 };
 
 const CHANNELS = [
@@ -70,6 +71,12 @@ const CHANNELS = [
     text: "Discord bots: a guild your bot hears over the Gateway, threads and DMs, and slash commands and buttons as Ed25519-signed interactions it answers within 3 seconds.",
     chips: ["MESSAGE_CREATE", "RESUME", "slash commands", "X-Signature-Ed25519", "verifyEndpoint"],
   },
+  {
+    id: "openai",
+    name: "OpenAI",
+    text: "The model your agent runs on, scripted per test: text, streams, tool calls, errors and a slow first token, on OpenAI’s API. A call no script answers fails the test.",
+    chips: ["chat.completions", "responses", "conversations", "tool calls", "x-ratelimit-*"],
+  },
 ];
 
 const PRINCIPLES: Array<{ icon: ReactNode; title: string; body: ReactNode }> = [
@@ -79,8 +86,8 @@ const PRINCIPLES: Array<{ icon: ReactNode; title: string; body: ReactNode }> = [
     body: (
       <>
         <code>channelstack env</code> points your app’s own SDKs at <code>slack.localhost</code>,{" "}
-        <code>github.localhost</code> and friends. Apps with hard-coded hosts use proxy mode instead: set{" "}
-        <code>HTTPS_PROXY</code> and trust a CA that only that app sees.
+        <code>github.localhost</code> and friends, and its model at <code>openai.localhost</code>. Apps with hard-coded
+        hosts use proxy mode instead: set <code>HTTPS_PROXY</code> and trust a CA that only that app sees.
       </>
     ),
   },
@@ -145,16 +152,17 @@ export default function Home() {
             <HeroWaves />
             <p className="eyebrow">
               <span className="rec" aria-hidden="true" />
-              Test harness for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord apps
+              Test harness for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord apps, and the model behind them
             </p>
             <h1 id="hero-title">
               Your app’s whole world, <em>on localhost.</em>
             </h1>
             <p className="lede">
               channelstack recreates <strong>Slack, GitHub, Linear, Notion, Resend, Gmail and Discord</strong> on your
-              machine, for the bots, integrations and AI agents you build on them. Script the people, let your app
-              answer through its real code path, and assert on what a person would see. Signed webhooks, real payload
-              shapes and real ids, with no changes to how your app works.
+              machine, for the bots, integrations and AI agents you build on them, and fakes OpenAI’s API for your
+              agent’s model too. Script the people and what the model answers, let your app answer through its real code
+              path, and assert on what a person would see. Signed webhooks, real payload shapes and real ids, with no
+              changes to how your app works.
             </p>
             <div className="cta">
               <a className="btn primary" href="#quick-start">
@@ -189,11 +197,11 @@ export default function Home() {
         <section id="channels" aria-labelledby="channels-title">
           <div className="wrap">
             <div className="sec-head">
-              <p className="kicker">Seven platforms, one API</p>
+              <p className="kicker">Seven platforms and the model, one API</p>
               <h2 id="channels-title">Everywhere your app gets an event.</h2>
               <p className="sec-lede">
-                One package fakes all seven, with the people, events and API calls apps actually use. Use one in a test,
-                or several when your app spans them. Stripe comes next.
+                One package fakes all seven, with the people, events and API calls apps actually use, and the OpenAI API
+                your agent’s model runs on. Use one in a test, or several when your app spans them. Stripe comes next.
               </p>
             </div>
             <div className="channels" ref={channels}>
@@ -389,8 +397,8 @@ export default function Home() {
             </div>
             <p className="why-name">
               <strong>Why “channelstack”?</strong> Your app lives in a stack of channels: Slack, GitHub, Linear, Notion,
-              Resend, Gmail, Discord. channelstack runs that whole stack on localhost, with the people in it, so you can
-              test the conversation end to end before your users have it.
+              Resend, Gmail, Discord. channelstack runs that whole stack on localhost, with the people in it and the
+              model your agent runs on, so you can test the conversation end to end before your users have it.
             </p>
           </div>
           <div className="wrap">

@@ -45,7 +45,7 @@ Every tool acts in the shared `dev` session, the same one the CLI and the UI use
 | `tail`            | none                                                                            | `channelstack tail`, but each call returns only what happened since the last one (everything, the first time) |
 | `list_deliveries` | `channel`?; every channel's without it                                          | `channelstack deliveries`                                                                                     |
 | `redeliver`       | `channel`?, `delivery`? (`last`, the default, or an id from `list_deliveries`)  | `channelstack redeliver`                                                                                      |
-| `openai_respond`  | `text`?, `when`?, `times`? (`-1` for every call), `tool`?, `args`? (JSON)        | `channelstack openai respond`: what the [fake OpenAI](/docs/guide/the-model) answers the bot's next model calls |
+| `openai_respond`  | `text`?, `when`?, `times`? (`-1` for every call), `tool`?, `args`? (JSON)        | `channelstack openai respond`: what the [fake OpenAI](/docs/platforms/openai) answers the bot's next model calls |
 | `openai_calls`    | none                                                                            | `channelstack openai calls`                                                                                   |
 
 - **`as`** is a person's name, such as `ana`. The person is created the first time the name is used.

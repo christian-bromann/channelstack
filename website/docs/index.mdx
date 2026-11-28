@@ -17,7 +17,7 @@ The test never touches your app. Ana's message goes into a fake Slack workspace,
 ## What you get
 
 - **Fakes of seven platforms** on localhost: Slack, GitHub, Linear, Notion, Resend, Google (Gmail) and Discord, with their real APIs, webhooks, signatures, ids and error codes. Your app runs unchanged; one environment variable per platform points it at the fake.
-- **A fake model for AI agents.** OpenAI's API at `openai.localhost`, scripted per test: text, streams, tool calls, errors and a slow first token. Anything that takes an OpenAI base URL works, from the `openai` SDKs and the AI SDK to OpenRouter and Azure OpenAI. See [The model](/docs/guide/the-model).
+- **A fake model for AI agents.** OpenAI's API at `openai.localhost`, scripted per test: text, streams, tool calls, errors and a slow first token. Anything that takes an OpenAI base URL works, from the `openai` SDKs and the AI SDK to OpenRouter and Azure OpenAI. See [OpenAI](/docs/platforms/openai).
 - **Tests that read like the conversation.** Every action belongs to the person who takes it (`ana.say(…)`, `ben.click("Approve", …)`, `mo.comment(…)`), and every check is about what a person would see.
 - **Checks that wait for your app.** Replies arrive when they arrive. Positive checks wait until they hold; negative and exact-count checks wait until the app has gone quiet. A test never sleeps.
 - **The failures that matter, on demand.** Slack's 3-second retry, redelivered webhooks, bad signatures, rate limits and dropped sockets, so you can test what happens on a bad day.
@@ -38,5 +38,5 @@ The test never touches your app. Ana's message goes into a fake Slack workspace,
 | Get a first test passing in ten minutes                       | [Getting started](/docs/getting-started)                                                                 |
 | Understand the pieces                                         | [How it works](/docs/guide/how-it-works)                                                                 |
 | Connect your own app                                          | [Connecting your app](/docs/guide/connecting-your-agent)                                                 |
-| Script what your agent's model answers                        | [The model](/docs/guide/the-model)                                                                       |
+| Script what your agent's model answers                        | [OpenAI](/docs/platforms/openai)                                                                       |
 | Look something up                                             | [Slack API](/docs/reference/api/slack), [Matchers](/docs/reference/matchers), [CLI](/docs/reference/cli) |

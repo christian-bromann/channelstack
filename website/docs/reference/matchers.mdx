@@ -617,7 +617,7 @@ It reads `calls()`, so live it needs proxy mode, which doesn't read the app's ca
 
 ## The model
 
-The [fake OpenAI](/docs/guide/the-model)'s matchers read what your agent sent the model and how each script answered. Their subjects are the `openai` fixture (every model call of the test), a script (what `openai.respond(…)` returned: the calls it answered), or one call ([`OpenAICall`](/docs/reference/api/openai#openaicall), from `openai.latestCall()` or `ai.waitForPause()`). An unscripted model call fails a waiting matcher at once, with the `openai.respond(…)` that would have answered it.
+The [fake OpenAI](/docs/platforms/openai)'s matchers read what your agent sent the model and how each script answered. Their subjects are the `openai` fixture (every model call of the test), a script (what `openai.respond(…)` returned: the calls it answered), or one call ([`OpenAICall`](/docs/reference/api/openai#openaicall), from `openai.latestCall()` or `ai.waitForPause()`). An unscripted model call fails a waiting matcher at once, with the `openai.respond(…)` that would have answered it.
 
 ### toHaveSent
 

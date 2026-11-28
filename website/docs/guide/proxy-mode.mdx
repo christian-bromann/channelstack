@@ -49,7 +49,7 @@ The proxy routes exactly these hosts to the fakes, over HTTPS:
 | `api.resend.com` | The Resend fake |
 | `gmail.googleapis.com`, `oauth2.googleapis.com`, `www.googleapis.com` | The Google fake: Gmail's API, the token endpoint, the certificates |
 | `discord.com`, `gateway.discord.gg` | The Discord fake: REST v10 and the Gateway. discord.js's Gateway client (`ws`) doesn't use `HTTPS_PROXY`, so point discord.js at the fake with `DISCORD_API_URL` instead |
-| `api.openai.com` | The [fake OpenAI](/docs/guide/the-model), so the app's model calls need a script in each test |
+| `api.openai.com` | The [fake OpenAI](/docs/platforms/openai), so the app's model calls need a script in each test |
 
 Every other host, including subdomains of these such as `app.slack.com`, is a plain tunnel to the real host: another model provider, package registries, anything else the app calls. Plain `http://` to a routed host is refused with `403`, since the platforms are HTTPS only. The proxy doesn't tell sessions apart: the app's calls reach the fakes as they would through base-URL mode, so tests and the dev loop work as usual.
 
