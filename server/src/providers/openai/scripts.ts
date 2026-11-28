@@ -1,4 +1,6 @@
 import { Ajv } from "ajv";
+import { Ajv2019 } from "ajv/dist/2019.js";
+import { Ajv2020 } from "ajv/dist/2020.js";
 
 import { CursorList } from "../../core/events/index.ts";
 import { matchesText } from "../../core/router/inspect.ts";
@@ -89,7 +91,22 @@ export function fillTemplate(
 export class Scripts {
   readonly #bySession = new Map<string, ScriptRecord[]>();
   readonly #byId = new Map<string, ScriptRecord>();
-  readonly #ajv = new Ajv({ strict: false, allErrors: false });
+  /**
+   * A validator per JSON Schema draft, picked by the schema's `$schema` (Zod 4 writes 2020-12, most
+   * hand-written schemas none, which is draft-07). Quiet: an agent's unknown `format` is no server log line.
+   */
+  readonly #ajvs = {
+    draft7: new Ajv({ strict: false, allErrors: false, logger: false }),
+    draft2019: new Ajv2019({ strict: false, allErrors: false, logger: false }),
+    draft2020: new Ajv2020({ strict: false, allErrors: false, logger: false }),
+  };
+
+  #ajvFor(schema: object): Ajv {
+    const declared = (schema as { $schema?: unknown }).$schema;
+    if (typeof declared === "string" && declared.includes("2020-12")) return this.#ajvs.draft2020;
+    if (typeof declared === "string" && declared.includes("2019-09")) return this.#ajvs.draft2019;
+    return this.#ajvs.draft7;
+  }
 
   add(
     record: Omit<ScriptRecord, "used" | "calls" | "problems" | "requests" | "held" | "paused" | "waiting">,
@@ -195,13 +212,14 @@ export class Scripts {
   /** Why a schema the agent sent isn't JSON Schema, if it isn't. */
   #schemaProblem(schema: unknown): string | undefined {
     if (typeof schema !== "object" || schema === null || Array.isArray(schema)) return "schema must be an object";
+    const ajv = this.#ajvFor(schema);
     try {
-      this.#ajv.compile(schema);
+      ajv.compile(schema);
       return undefined;
     } catch (error) {
       return error instanceof Error ? error.message : String(error);
     } finally {
-      this.#ajv.removeSchema(schema);
+      ajv.removeSchema(schema);
     }
   }
 
@@ -210,11 +228,12 @@ export class Scripts {
    * so the server doesn't keep every request's, and another request's `$id` is no clash.
    */
   #validate(schema: object, value: unknown): string | undefined {
+    const ajv = this.#ajvFor(schema);
     try {
-      const validate = this.#ajv.compile(schema);
-      return validate(value) ? undefined : this.#ajv.errorsText(validate.errors);
+      const validate = ajv.compile(schema);
+      return validate(value) ? undefined : ajv.errorsText(validate.errors);
     } finally {
-      this.#ajv.removeSchema(schema);
+      ajv.removeSchema(schema);
     }
   }
 

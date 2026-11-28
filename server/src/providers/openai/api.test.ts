@@ -343,6 +343,26 @@ describe("a strict schema that isn't JSON Schema", () => {
     expect((await control("GET", `/scripts/${script.id}`)).used).toBe(0);
   });
 
+  test("a draft 2020-12 schema, as Zod 4 writes it, is JSON Schema: accepted, and the tool call held to it", async () => {
+    const { client, control, respond, prompt } = await setup();
+    const parameters = {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: { q: { type: "string", format: "date" }, tags: { type: "array", prefixItems: [{ type: "string" }] } },
+      required: ["q", "tags"],
+      additionalProperties: false,
+    };
+    const tools = [{ type: "function" as const, function: { name: "lookup", strict: true, parameters } }];
+    await respond({ turns: [{ toolCalls: [{ name: "lookup", arguments: { q: "2026-11-27", tags: ["web"] } }] }] });
+    const answer = await client.chat.completions.create({ model: "gpt-5", messages: ask(prompt), tools });
+    expect(answer.choices[0]?.message.tool_calls?.[0]?.type).toBe("function");
+
+    // A turn whose arguments break the 2020-12 schema is the script's problem, as for any strict tool.
+    const wrong = await respond({ turns: [{ toolCalls: [{ name: "lookup", arguments: { q: 7, tags: [] } }] }] });
+    await client.chat.completions.create({ model: "gpt-5", messages: ask(prompt), tools }).catch(() => undefined);
+    expect(JSON.stringify((await control("GET", `/scripts/${wrong.id}`)).problems)).toMatch(/lookup/);
+  });
+
   test("a strict response format that isn't JSON Schema is refused the same way", async () => {
     const { client, respond, prompt } = await setup();
     await respond({ turns: ['{"q":"deploy"}'] });
