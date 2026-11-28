@@ -220,14 +220,7 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
         delivery: undefined,
       });
       touch(issue);
-      // The loop guard counts what Apps write on an issue where no person writes in between (decision 0027).
-      const session = store.sessionOf(repo);
-      const writer = store.appOfBot(actor);
-      const thread = `${repo.id}#${issue.number}`;
-      if (session !== undefined) {
-        if (!context.loops.wrote(session, thread, writer ? { kind: "app", name: writer.slug } : { kind: "person" }))
-          return comment;
-      }
+      if (!kit.wrote(repo, issue.number, actor)) return comment;
       comment.delivery = kit.emit(repo, "issue_comment", actor, {
         action: "created",
         issue: objects.issue(issue),
@@ -242,6 +235,7 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
       const from = comment.body;
       comment.body = body;
       comment.updatedAt = clock();
+      if (!kit.wrote(repo, issue.number, actor)) return undefined;
       return kit.emit(repo, "issue_comment", actor, {
         action: "edited",
         changes: { body: { from } },
@@ -255,6 +249,7 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
       const issue = kit.requireIssue(repo, comment.issue);
       const payload = objects.comment(comment, issue);
       store.forget(store.comments, store.sessionOf(repo), comment.id);
+      if (!kit.wrote(repo, issue.number, actor)) return undefined;
       return kit.emit(repo, "issue_comment", actor, {
         action: "deleted",
         issue: objects.issue(issue),
