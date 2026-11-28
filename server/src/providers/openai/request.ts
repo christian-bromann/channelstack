@@ -61,8 +61,8 @@ export interface ModelRequest {
   /** Chat Completions' audio output: `modalities: ["text", "audio"]` and its `audio` settings. */
   readonly audioOutput?: { readonly format: string; readonly voice: string };
   /**
-   * The MCP approval responses in the request's own input (not its history) that no `mcp_call`
-   * has used yet, by the approval request they answer, with its server and tool.
+   * The MCP approval responses the model hasn't answered yet (those after its last output item),
+   * by the approval request they answer, with its server and tool.
    */
   readonly approvals: readonly {
     readonly requestId: string;
@@ -449,13 +449,14 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
   const refs: string[] = [];
   const listedMcp: string[] = [];
   const asked = new Map<string, { server: string; tool: string }>();
-  const approvals: { requestId: string; approve: boolean; server?: string; tool?: string }[] = [];
-  /** The approvals an `mcp_call` in the conversation already used. */
-  const used = new Set<string>();
+  const approvals: { at: number; requestId: string; approve: boolean; server?: string; tool?: string }[] = [];
+  /** Where the model last said something: an approval before it was answered there. */
+  let lastModelItem = -1;
   if (str(body.previous_response_id)) refs.push(str(body.previous_response_id) as string);
   for (const [at, item] of items.entries()) {
     const where = `input[${at - history.length}]`;
     const type = str(item.type) ?? "message";
+    if (MODEL_ITEMS.has(type) || (type === "message" && item.role === "assistant")) lastModelItem = at;
     switch (type) {
       case "message": {
         const role = str(item.role);
@@ -518,8 +519,6 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
         break;
       case "mcp_call":
         if (str(item.id)) refs.push(str(item.id) as string);
-        // The call an approval allowed: that approval is used.
-        if (str(item.approval_request_id)) used.add(str(item.approval_request_id) as string);
         break;
       case "mcp_list_tools":
         if (str(item.id)) refs.push(str(item.id) as string);
@@ -543,8 +542,7 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
         refs.push(requestId);
         const approve = item.approve === true;
         const request = asked.get(requestId);
-        // An approval answers the call that follows it: one from an earlier turn of the conversation was used there.
-        if (at >= history.length) approvals.push({ requestId, approve, ...(request ?? {}) });
+        approvals.push({ at, requestId, approve, ...(request ?? {}) });
         // The agent's answer to the approval request, as a tool result is an answer to a call.
         messages.push({
           role: "tool",
@@ -608,9 +606,9 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
     endpoint: "responses",
     model,
     stream: body.stream === true,
-    // An agent that sends the whole conversation again, instead of chaining it, sends the old
-    // approvals too: only those no call has used yet count.
-    approvals: approvals.filter((approval) => !used.has(approval.requestId)),
+    // An approval answers what the model asks next. One the model already answered (an earlier
+    // turn's, chained or sent again whole, approved or declined) counts no more.
+    approvals: approvals.filter(({ at }) => at > lastModelItem).map(({ at: _at, ...approval }) => approval),
     listedMcp,
     ...(joined === "" ? {} : { instructions: joined }),
     messages: named,
@@ -631,6 +629,24 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
       : [],
   };
 }
+
+/** The items only the model makes: what comes after the newest of them is what it hasn't answered yet. */
+const MODEL_ITEMS = new Set([
+  "reasoning",
+  "function_call",
+  "custom_tool_call",
+  "web_search_call",
+  "file_search_call",
+  "code_interpreter_call",
+  "image_generation_call",
+  "mcp_call",
+  "mcp_list_tools",
+  "mcp_approval_request",
+  "shell_call",
+  "local_shell_call",
+  "computer_call",
+  "apply_patch_call",
+]);
 
 /** What a client-run tool's output says, as text: a shell's output, a patch's result, a screenshot's kind. */
 function outputText(type: string, item: Json): string {
@@ -684,6 +700,38 @@ type MediaEndpoint = keyof typeof MEDIA_FORMATS;
 
 const IMAGE_FORMATS = ["png", "jpeg", "webp"];
 
+/**
+ * A format the request's model doesn't answer in, as OpenAI's description lists them: the
+ * GPT-4o transcribe models answer JSON only, the diarizing one also text and diarized JSON, and
+ * only it diarized JSON; `tts-1` and `tts-1-hd` don't stream server-sent events. Any other model
+ * name takes every format of its endpoint.
+ */
+function formatRefused(
+  endpoint: MediaEndpoint,
+  model: string,
+  responseFormat: string | undefined,
+  streamFormat: string | undefined,
+): { message: string; param: string } | undefined {
+  const refuse = (format: string, param: string) => ({
+    message: `${param} '${format}' is not compatible with model '${model}'.`,
+    param,
+  });
+  if (endpoint === "audio.speech") {
+    return streamFormat === "sse" && /^tts-1(-hd)?$/.test(model) ? refuse("sse", "stream_format") : undefined;
+  }
+  if (endpoint !== "audio.transcriptions" || responseFormat === undefined) return undefined;
+  const allowed = /^gpt-4o(-mini)?-transcribe-diarize/.test(model)
+    ? ["json", "text", "diarized_json"]
+    : /^gpt-4o(-mini)?-transcribe/.test(model)
+      ? ["json"]
+      : /^whisper-/.test(model)
+        ? ["json", "text", "srt", "verbose_json", "vtt"]
+        : undefined;
+  return allowed === undefined || allowed.includes(responseFormat)
+    ? undefined
+    : refuse(responseFormat, "response_format");
+}
+
 /** The image model an edit without one gets, as the description gives its default. */
 const DEFAULT_IMAGE_MODEL = "gpt-image-2.6-sunburst";
 
@@ -729,6 +777,8 @@ export function mediaRequest(
       "invalid_value",
     );
   }
+  const unsupported = formatRefused(endpoint, str(fields.model) ?? "", responseFormat, str(fields.stream_format));
+  if (unsupported) throw invalidRequest(unsupported.message, unsupported.param, "unsupported_value");
   const outputFormat = str(fields.output_format);
   if (outputFormat !== undefined && !IMAGE_FORMATS.includes(outputFormat)) {
     throw invalidRequest(

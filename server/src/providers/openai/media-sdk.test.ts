@@ -350,6 +350,41 @@ describe("transcriptions and translations", () => {
     expect(((await response.json()) as { text: string }).text).toBe(TRANSCRIPT);
   });
 
+  test("a format the model doesn't answer in is refused, as OpenAI's description lists them", async () => {
+    const { client } = await setup();
+    const refused = (call: Promise<unknown>) =>
+      call.then(
+        () => undefined,
+        (caught: unknown) => [(caught as APIError).status, (caught as APIError).param],
+      );
+
+    // The GPT-4o transcribe models answer JSON only; only the diarizing one answers diarized JSON.
+    const srt = await refused(
+      client.audio.transcriptions.create({
+        model: "gpt-4o-transcribe",
+        file: await voiceNote(),
+        response_format: "srt",
+      }),
+    );
+    const diarized = await refused(
+      client.audio.transcriptions.create({
+        model: "whisper-1",
+        file: await voiceNote(),
+        response_format: "diarized_json",
+      }),
+    );
+    // `tts-1` doesn't stream server-sent events.
+    const sse = await refused(
+      client.audio.speech.create({ model: "tts-1", voice: "alloy", input: NOTE, stream_format: "sse" }),
+    );
+
+    expect([srt, diarized, sse]).toEqual([
+      [400, "response_format"],
+      [400, "response_format"],
+      [400, "stream_format"],
+    ]);
+  });
+
   test.each([
     ["json", (answer: unknown) => (answer as { text: string }).text, "Roll back the deploy."],
     ["text", (answer: unknown) => answer, "Roll back the deploy.\n"],

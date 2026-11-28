@@ -407,6 +407,30 @@ describe("remote MCP: approval, then the call", () => {
     expect(await control("GET", "/problems")).toContainEqual(expect.stringMatching(/without approval/));
   });
 
+  test("resent whole, a decline the model already answered doesn't count for the next call", async () => {
+    const { client, respond, prompt, control } = await setup();
+    await respond({ turns: [{ toolCalls: [{ mcp: { ...deploy, approval: true } }] }] });
+    const declined = await respond({ turns: ["Not deploying."], when: { approval: false }, times: -1 });
+    await respond({ turns: ["Something else."] });
+    const user = { role: "user", content: prompt };
+    const first = await ask(client, { store: false, input: [user], tools: [mcpTool] });
+    const decline = {
+      type: "mcp_approval_response",
+      approval_request_id: (first.output[1] as Item).id,
+      approve: false,
+    };
+    const second = await ask(client, { store: false, input: [user, ...first.output, decline], tools: [mcpTool] });
+
+    const third = await ask(client, {
+      store: false,
+      input: [user, ...first.output, decline, ...second.output, { role: "user", content: "what else?" }],
+      tools: [mcpTool],
+    });
+
+    expect(third.output.at(-1)?.content[0].text).toBe("Something else.");
+    expect((await control("GET", `/scripts/${declined.id}`)).used).toBe(1);
+  });
+
   test("a decline earlier in the conversation doesn't block a call approved now", async () => {
     const { client, respond, prompt } = await setup();
     await respond({
