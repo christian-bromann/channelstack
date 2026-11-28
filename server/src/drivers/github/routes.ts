@@ -1713,6 +1713,34 @@ export function registerGitHubRoutes(
     },
   });
 
+  router.route({
+    method: "get",
+    path: "/comments/{comment}/delivery-for",
+    summary:
+      "The `issue_comment` (`created`) delivery this comment caused to this App (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in App's",
+    params: CommentParams,
+    query: z.object({ app: z.string().openapi({ param: { name: "app", in: "query" }, ...refTo("GitHubApp") }) }),
+    response: GitHubDelivery.nullable(),
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubComment", name: "deliveryFor", args: ["app"] },
+    live: APPS_NOT_YET,
+    stability,
+    handler: ({ session, params, query }) => {
+      const comment = store.comments.get(session.id, String(params.comment));
+      const app = store.apps.get(session.id, query.app);
+      const found = fake.deliveries(session.id).find(({ request }) => {
+        const payload = request.meta?.payload as { action?: string; comment?: { id?: number } } | undefined;
+        return (
+          request.app === app.name &&
+          request.type === "issue_comment" &&
+          payload?.action === "created" &&
+          payload.comment?.id === comment.id
+        );
+      });
+      return found ? deliveryWire(found) : null;
+    },
+  });
+
   /** The thread a comment on the diff is in: its first comment, then the replies. */
   const threadOf = (session: string, id: number) => {
     const [head, ...replies] = pulls.threadOf(reviewCommentOf(session, id));

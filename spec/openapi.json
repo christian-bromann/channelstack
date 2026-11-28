@@ -22029,6 +22029,99 @@
         }
       }
     },
+    "/sessions/{session}/github/comments/{comment}/delivery-for": {
+      "get": {
+        "summary": "The `issue_comment` (`created`) delivery this comment caused to this App (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in App's",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubComment",
+          "name": "deliveryFor",
+          "args": [
+            "app"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "comment",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "GitHubApp"
+              ]
+            },
+            "required": true,
+            "name": "app",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/GitHubDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session}/github/review-comments/{comment}/replies": {
       "get": {
         "summary": "The replies in this comment's thread, once the agent is quiet",
@@ -29802,6 +29895,99 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotionTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/notion/comments/{comment}/delivery-for": {
+      "get": {
+        "summary": "The `comment.created` delivery this comment caused to this integration (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in integration's",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "NotionComment",
+          "name": "deliveryFor",
+          "args": [
+            "app"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: integrations beside the built-in one aren't built live"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "comment",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "NotionIntegration"
+              ]
+            },
+            "required": true,
+            "name": "app",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/NotionDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               }
             }

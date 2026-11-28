@@ -913,6 +913,34 @@ Returned by [`NotionIntegration.comment()`](/docs/reference/api/notion#comment),
 | `createdAt` | `created_at` | `string` |
 | `delivery` | `delivery` | `NotionDelivery \| undefined` |
 
+### deliveryFor()
+
+The `comment.created` delivery this comment caused to this integration (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in integration's.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await comment.deliveryFor(app);
+```
+
+```python title="Python"
+delivery = await comment.delivery_for(app)
+```
+
+```rust title="Rust"
+let delivery = comment.delivery_for(&app).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `app` | `NotionIntegration` | yes | positional |
+
+**Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: integrations beside the built-in one aren't built live.
+
 ## NotionDiscussion
 
 | Field | Type |

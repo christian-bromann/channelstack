@@ -3364,6 +3364,13 @@ export class GitHubComment {
     return decodeGitHubReactions(ctx, data);
   }
 
+  /** The `issue_comment` (`created`) delivery this comment caused to this App (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in App's. Experimental. */
+  async deliveryFor(app: GitHubApp): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/comments/${segment(this.id)}/delivery-for`, { query: { app: app.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
   [QUIET](): Promise<QuietState> {
     return quietOf(this.#ctx);
@@ -4467,6 +4474,13 @@ export class NotionComment {
     this.text = data.text;
     this.createdAt = data.createdAt;
     this.delivery = data.delivery === undefined ? undefined : new NotionDelivery(ctx, data.delivery);
+  }
+
+  /** The `comment.created` delivery this comment caused to this integration (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in integration's. Experimental. */
+  async deliveryFor(app: NotionIntegration): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/comments/${segment(this.id)}/delivery-for`, { query: { app: app.id } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

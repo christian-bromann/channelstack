@@ -5004,6 +5004,41 @@ fn run_git_hub_comment_reactions<'a>(
     })
 }
 
+fn run_git_hub_comment_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/comments/{}/delivery-for",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
 fn run_git_hub_review_comment_replies<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -7467,6 +7502,41 @@ fn run_notion_user_disconnect<'a>(
                 wire
             }),
             None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_comment_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/notion/comments/{}/delivery-for",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
             false,
             &[],
         )
@@ -17376,6 +17446,17 @@ impl GitHubComment {
             as_value,
         )
     }
+
+    /// The `issue_comment` (`created`) delivery this comment caused to this App (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in App's. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<GitHubDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_git_hub_comment_delivery_for,
+            GitHubDelivery::wrap_opt,
+        )
+    }
 }
 
 /// A handle: `GitHubReviewComment`.
@@ -21227,6 +21308,17 @@ impl NotionComment {
         self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
             NotionDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
         })
+    }
+
+    /// The `comment.created` delivery this comment caused to this integration (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in integration's. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<NotionDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_notion_comment_delivery_for,
+            NotionDelivery::wrap_opt,
+        )
     }
 }
 
@@ -27909,6 +28001,9 @@ pub async fn call_by_name(
         ("GitHubComment", "reactions") => {
             run_git_hub_comment_reactions(&target.ctx, &target.data, args, options).await?
         }
+        ("GitHubComment", "deliveryFor") => {
+            run_git_hub_comment_delivery_for(&target.ctx, &target.data, args, options).await?
+        }
         ("GitHubReviewComment", "replies") => {
             run_git_hub_review_comment_replies(&target.ctx, &target.data, args, options).await?
         }
@@ -28149,6 +28244,9 @@ pub async fn call_by_name(
         }
         ("NotionUser", "disconnect") => {
             run_notion_user_disconnect(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionComment", "deliveryFor") => {
+            run_notion_comment_delivery_for(&target.ctx, &target.data, args, options).await?
         }
         ("NotionDiscussion", "comments") => {
             run_notion_discussion_comments(&target.ctx, &target.data, args, options).await?

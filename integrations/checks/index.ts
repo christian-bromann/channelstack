@@ -14,13 +14,13 @@ import {
   type DiscordFixture,
   type Duration,
   type GitHubApp,
-  type GitHubDelivery,
+  type GitHubComment,
   type GitHubFixture,
   type GoogleApp,
   type GoogleFixture,
   type LinearApp,
   type LinearFixture,
-  type NotionDelivery,
+  type NotionComment,
   type NotionFixture,
   type NotionIntegration,
   type ResendApp,
@@ -217,6 +217,25 @@ const deliveryOf = <D>(subject: { readonly delivery?: D | undefined }, { skip }:
   subject.delivery ?? skip(`live: ${platform} delivers to the agent itself, so delivery checks are fake-only`);
 
 /**
+ * The delivery an event caused to the app under test: the built-in app's `delivery`, or another
+ * app's `deliveryFor(app)` (decision 0027), waited for as a push may come a moment later. An app
+ * that was never sent it fails the check: that is the bug the delivery checks are there to find.
+ */
+async function deliveryTo<App extends { readonly id: string; readonly name: string }, D>(
+  subject: { readonly delivery?: D | undefined; deliveryFor(app: App): Promise<D | undefined> },
+  agent: App,
+  fixtureApp: { readonly id: string },
+  context: TestContext,
+  platform: string,
+  wait: { timeout?: Duration },
+): Promise<D> {
+  if (agent.id === fixtureApp.id) return deliveryOf(subject, context, platform);
+  return waitFor(`${platform}'s delivery of this event to ${agent.name}`, () => subject.deliveryFor(agent), {
+    timeout: wait.timeout ?? "5s",
+  });
+}
+
+/**
  * Registers one check as a test, with its id in the name. A check that was skipped, or whose
  * prompt wasn't given, is left out. An id in `skip` that no check has is a mistake worth hearing about.
  */
@@ -284,10 +303,8 @@ export function slackChecks(options: ChecksOptions): void {
   const agentOf = async (slack: SlackFixture): Promise<SlackApp> =>
     builtIn(app, slack.app) ? slack.app : slack.createApp({ name: app });
   /** The delivery a message caused to the app under test. */
-  const slackDelivery = async (msg: SlackMessage, agent: SlackApp, context: TestContext) =>
-    agent.id === context.slack.app.id
-      ? deliveryOf(msg, context, "Slack")
-      : ((await msg.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this message`));
+  const slackDelivery = (msg: SlackMessage, agent: SlackApp, context: TestContext) =>
+    deliveryTo(msg, agent, context.slack.app, context, "Slack", wait);
 
   describe(`slack checks: ${app}`, () => {
     check("slack.dm-once", "replies once to a DM", async ({ slack }) => {
@@ -502,11 +519,9 @@ export function githubChecks(options: ChecksOptions): void {
     const repo = await github.createRepo({ collaborators: [ana], apps: [agent, ...also] });
     return { ana, agent, repo };
   };
-  /** The delivery checks read the built-in App's delivery: another App's has no `delivery` on a comment yet. */
-  const githubDelivery = (comment: { readonly delivery?: GitHubDelivery | undefined }, context: TestContext) =>
-    builtIn(app, context.github.app)
-      ? deliveryOf(comment, context, "GitHub")
-      : context.skip(`the GitHub delivery checks read the built-in App's delivery, not ${app}'s`);
+  /** The delivery a comment caused to the App under test. */
+  const githubDelivery = (comment: GitHubComment, agent: GitHubApp, context: TestContext) =>
+    deliveryTo(comment, agent, context.github.app, context, "GitHub", wait);
   const pullRequest = async (context: TestContext) => {
     const { ana, repo } = await setup(context);
     const pr = await ana.openPullRequest(
@@ -544,10 +559,10 @@ export function githubChecks(options: ChecksOptions): void {
     });
 
     check("github.redelivery", "a redelivered webhook doesn't produce a second answer", async (context) => {
-      const { ana, repo } = await setup(context);
+      const { ana, agent, repo } = await setup(context);
       const issue = await ana.openIssue({ title: "Delivered twice" }, { repo });
       const comment = await ana.comment(prompt, { issue });
-      const delivery = githubDelivery(comment, context);
+      const delivery = await githubDelivery(comment, agent, context);
       await expect(issue).toHaveCommentFrom(app, wait);
       // GitHub redelivers with the same `X-GitHub-Delivery`, from its UI and its API.
       await delivery.redeliver();
@@ -563,9 +578,9 @@ export function githubChecks(options: ChecksOptions): void {
     });
 
     check("github.bad-signature", "rejects a webhook with a bad signature", async (context) => {
-      const { ana, repo } = await setup(context);
+      const { ana, agent, repo } = await setup(context);
       const issue = await ana.openIssue({ title: "Signed by someone else" }, { repo });
-      const delivery = githubDelivery(await ana.comment(prompt, { issue }), context);
+      const delivery = await githubDelivery(await ana.comment(prompt, { issue }), agent, context);
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
     });
@@ -707,11 +722,9 @@ export function notionChecks(options: ChecksOptions): void {
     const comment = await ana.comment(prompt, { page });
     return { ana, agent, page, comment };
   };
-  /** The delivery checks read the built-in integration's delivery: another's has no `delivery` on a comment yet. */
-  const notionDelivery = (comment: { readonly delivery?: NotionDelivery | undefined }, context: TestContext) =>
-    builtIn(app, context.notion.app)
-      ? deliveryOf(comment, context, "Notion")
-      : context.skip(`the Notion delivery checks read the built-in integration's delivery, not ${app}'s`);
+  /** The delivery a comment caused to the integration under test. */
+  const notionDelivery = (comment: NotionComment, agent: NotionIntegration, context: TestContext) =>
+    deliveryTo(comment, agent, context.notion.app, context, "Notion", wait);
 
   describe(`notion checks: ${app}`, () => {
     check("notion.reply-in-discussion", "answers a comment in its discussion", async (context) => {
@@ -729,8 +742,8 @@ export function notionChecks(options: ChecksOptions): void {
     });
 
     check("notion.redelivery", "a webhook sent again doesn't produce a second answer", async (context) => {
-      const { comment } = await commented(context);
-      const delivery = notionDelivery(comment, context);
+      const { agent, comment } = await commented(context);
+      const delivery = await notionDelivery(comment, agent, context);
       await expect(comment.discussion).toHaveCommentFrom(app, wait);
       // Notion retries with the same event id.
       await delivery.redeliver();
@@ -738,7 +751,8 @@ export function notionChecks(options: ChecksOptions): void {
     });
 
     check("notion.bad-signature", "rejects a webhook with a bad signature", async (context) => {
-      const delivery = notionDelivery((await commented(context)).comment, context);
+      const { agent, comment } = await commented(context);
+      const delivery = await notionDelivery(comment, agent, context);
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
     });
@@ -786,10 +800,7 @@ export function resendChecks(options: ChecksOptions): void {
   /** The delivery an email caused to the app under test. */
   const delivered = async (context: TestContext) => {
     const { agent, email } = await emailed(context);
-    const delivery =
-      agent.id === context.resend.app.id
-        ? deliveryOf(email, context, "Resend")
-        : ((await email.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this email`));
+    const delivery = await deliveryTo(email, agent, context.resend.app, context, "Resend", wait);
     return { email, delivery };
   };
 
@@ -854,10 +865,7 @@ export function googleChecks(options: ChecksOptions): void {
   /** The delivery an email caused to the app under test. */
   const delivered = async (context: TestContext) => {
     const { agent, email } = await emailed(context);
-    const delivery =
-      agent.id === context.google.app.id
-        ? deliveryOf(email, context, "Gmail")
-        : ((await email.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this email`));
+    const delivery = await deliveryTo(email, agent, context.google.app, context, "Gmail", wait);
     return { email, delivery };
   };
 
