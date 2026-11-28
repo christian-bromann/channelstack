@@ -68,6 +68,8 @@ const CASES: Record<string, Case | Case[]> = {
     { channel: "resend", method: "POST", path: "/apps", body: { name: "coder" } },
   "Several apps: `google.createApp({ name })`, `apps()`, a scripted app's `send` / `reply` with its headers, `email.deliveryFor(app)`":
     { channel: "google", method: "POST", path: "/apps", body: { name: "coder" } },
+  "Several apps: `discord.createApp({ name, privilegedIntents })`, `apps()`, a scripted app's `say` / `reply` / `react`, `msg.deliveryFor(app)`, `runCommand(…, { app })`":
+    { channel: "discord", method: "POST", path: "/apps", body: { name: "coder" } },
   "`slack.createChannel({ shared: true })` (Slack Connect)": {
     channel: "slack",
     method: "POST",

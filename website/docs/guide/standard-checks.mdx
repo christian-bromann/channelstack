@@ -155,13 +155,14 @@ Each check has Ana email `prompt` (default `hello`) to the agent's Gmail address
 
 ## Discord checks
 
-Each check has Ana mention the app with `prompt` in a channel with the bot, or DM it, as the check says.
+Each check has Ana mention the app with `prompt` in a channel with the bot, or DM it, as the check says. With `app: "coder"`, the checks run against the bot of the app `coder`, and `command` is that app's command.
 
 | Id                        | What the test does                                                                                   | What it catches                                                                 |
 | ------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `discord.mention-once`    | Ana mentions the app in a channel; expects exactly one reply                                         | Answering both a mention and the message it is in, or answering twice            |
 | `discord.dm-once`         | Ana DMs the prompt; expects exactly one reply                                                        | Two answers to one DM                                                           |
 | `discord.ignores-bots`    | Another bot writes the prompt; expects no reply                                                      | A bot that answers bots (`author.bot`), and the loops that follow                |
+| `discord.no-reply-loop`   | Another app in the channel replies to each of the app's answers, mentioning it; expects at most `loopTurns` answers to it | Two bots answering each other without end: Discord sends a bot the other bots' messages, mentions included, with `author.bot` |
 | `discord.resume`          | Drops the Gateway connection just before Ana's DM; expects one reply once the bot resumes            | A bot that identifies anew instead of resuming, and loses or repeats what it missed |
 | `discord.long-answer`     | Ana sends `longPrompt`; expects the answer split over several messages, and no 50035 refusal          | An answer over 2000 characters, which Discord refuses, or one cut short          |
 | `discord.interaction-3s`  | Ana runs `command`; expects the answer within 3 seconds, and no "This interaction failed"            | An interaction answered late, after Discord has given up on it                    |

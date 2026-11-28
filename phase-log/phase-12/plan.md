@@ -7,7 +7,8 @@ stays the default. The open questions of the decision take their defaults (no an
 **Started before phases 10 and 11 merged**, on the maintainer's instruction (2026-11-27): the
 spec (#105) was merged and phase 12 is built for the six channels on `main` (Slack, GitHub,
 Linear, Notion, Resend, Google) and echo. Twilio (#102) and Discord (#103) get their apps in a
-follow-up once they land; that is recorded in `closed.md` with its issue.
+follow-up once they land; that is recorded in `closed.md` with its issue. Discord landed while
+phase 12 was open, was merged into this branch, and got its apps here; Twilio's stay in #113.
 
 ## Exit checks → work
 

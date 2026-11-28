@@ -37,6 +37,7 @@ Each app is a real app of its platform, with its own ids, credentials and endpoi
 | [Notion](/docs/platforms/notion#several-integrations) | An internal integration with its own bot user, token and verification token | `connections` on a page |
 | [Resend](/docs/platforms/resend#several-apps) | A team of its own, with its key, webhook secret and domain (`<name>.acme.example`) | An email to its address |
 | [Google](/docs/platforms/google#several-apps) | A mailbox of its own, `<name>@acme.example`, with its OAuth client, refresh token and Pub/Sub topic | An email to its address |
+| [Discord](/docs/platforms/discord#several-apps) | An application with its own bot user, bot token, Ed25519 key and interactions endpoint, on its own Gateway connection | `participants`, `invite` |
 
 `apps()` lists a channel's apps, `my-agent` first. Matchers take an app's handle or its name as the author: `toHaveReplyFrom(coder)` and `toHaveReplyFrom("coder")` mean the same.
 
@@ -60,15 +61,15 @@ npx channelstack env --channel slack > .env.agent
 npx channelstack env --app coder --channel slack > .env.coder
 ```
 
-The variable is `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, with the name in upper case and `-` as `_` (`code-reviewer` is `CODE_REVIEWER`), read once when the server starts. An app without one receives nothing, unless it opens its own Socket Mode connection with its app token.
+The variable is `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, with the name in upper case and `-` as `_` (`code-reviewer` is `CODE_REVIEWER`), read once when the server starts. An app without one receives nothing, unless it opens its own connection: Slack's Socket Mode with its app token, or Discord's Gateway with its bot token (on Discord, the variable is its interactions endpoint).
 
 `channelstack env --app coder` prints the app's lines under the same keys `my-agent`'s have (`SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, …), so the same agent code starts as `coder` from a different `.env`. Asking makes the app if no test has yet, so the agent can start first; without `--channel` it makes it on every channel, so name the one the agent is on. In a test, `channelstack.env({ app: "coder" })` gives the same. The agent also needs to know its own name, to tell a mention of itself from one of the other app's.
 
-Every delivery says which app it went to (`delivery.app`). A message's or an email's `delivery` is still the one to `my-agent`; `deliveryFor(coder)` reads another app's, where the platform has one per message: Slack messages, Linear comments, Resend and Google emails.
+Every delivery says which app it went to (`delivery.app`). A message's or an email's `delivery` is still the one to `my-agent`; `deliveryFor(coder)` reads another app's, where the platform has one per message: Slack and Discord messages, Linear comments, Resend and Google emails.
 
 ## An app the test acts as
 
-An app that no agent drives can be played by the test. Its handle has the acting methods a person has on that platform (`say`, `reply`, `react` on Slack; `comment`, `openIssue`, `review` on GitHub; `send`, `reply` on email), and they go through the fake's own API with the app's token, so what the others receive is exactly what that app's own call would send: `bot_id`, `app_id` and `bot_profile` on Slack, `sender.type: "Bot"` on GitHub.
+An app that no agent drives can be played by the test. Its handle has the acting methods a person has on that platform (`say`, `reply`, `react` on Slack and Discord; `comment`, `openIssue`, `review` on GitHub; `send`, `reply` on email), and they go through the fake's own API with the app's token, so what the others receive is exactly what that app's own call would send: `bot_id`, `app_id` and `bot_profile` on Slack, `author.bot` and the bot's id on Discord, `sender.type: "Bot"` on GitHub.
 
 ```ts
 test("another app's mention doesn't set the agent off", async ({ slack }) => {
@@ -89,7 +90,7 @@ Slack's `createUser({ bot: true })` stays the cheapest way to say "a bot wrote t
 
 ## Agents that answer each other
 
-The bug that only shows with two real apps in one place is the reply loop: two agents that answer each other without end. Bolt's `ignoreSelf` drops only an app's own messages, and GitHub sends an App the other Apps' comments with nothing to stop them.
+The bug that only shows with two real apps in one place is the reply loop: two agents that answer each other without end. Bolt's `ignoreSelf` drops only an app's own messages, a discord.js bot that checks only `message.author.id === client.user.id` answers every other bot, and GitHub sends an App the other Apps' comments with nothing to stop them.
 
 `toGoQuiet` checks for it. It waits until the conversation is quiet, as the negative matchers do, and fails when that takes longer than `within`, or when the conversation holds more than `maxReplies` app messages since a person last wrote, those before the check included. Its message names the authors in turn:
 

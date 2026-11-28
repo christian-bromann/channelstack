@@ -328,12 +328,13 @@ discordChecks({ app: "my-agent", command: "/deploy web", longPrompt: "write a lo
 | `discord.mention-once` | Answers a mention once |
 | `discord.dm-once` | Answers a DM once |
 | `discord.ignores-bots` | Ignores what other bots write |
+| `discord.no-reply-loop` | Stops answering another app that replies to everything it says, within `loopTurns` (default 3) |
 | `discord.resume` | After a dropped Gateway connection, resumes and answers what it missed, once |
 | `discord.long-answer` | Writes a long answer in messages of at most 2000 characters: no 50035 |
 | `discord.interaction-3s` | Answers `command` within 3 seconds, so nobody sees "This interaction failed" |
 | `discord.bad-signature` | Rejects `command` again with a bad signature, over HTTP |
 
-Without `command`, the two interaction checks are left out; without `longPrompt`, the long-answer check is. `prompt` (default `@my-agent hello`) is what Ana says. See [Standard checks](/docs/guide/standard-checks).
+Without `command`, the two interaction checks are left out; without `longPrompt`, the long-answer check is. `prompt` (default `@my-agent hello`) is what Ana says. `app: "coder"` runs every check against the bot of the app `coder`. See [Standard checks](/docs/guide/standard-checks).
 
 ## Delivery and faults
 
@@ -369,6 +370,29 @@ test("backs off on rate limits and still answers", async ({ discord }) => {
 ```
 
 [Delivery and failures](/docs/guide/delivery-and-failures) covers what each proves.
+
+## Several apps
+
+A test adds another app to the guild with `discord.createApp({ name })`: an application with its own bot user (whose id is in its token, as on Discord), bot token and Ed25519 key, and `my-agent`'s privileged intents (`GUILD_MEMBERS`, `MESSAGE_CONTENT`) unless `privilegedIntents` says otherwise. It sees a channel as `my-agent` does, through `participants` or `invite`. Its bot connects to the Gateway with its own token and gets only its own dispatches; its interactions go to `CHANNELSTACK_DISCORD_APP_<NAME>_WEBHOOK_URL`, or over its Gateway connection without one. `channelstack env --app coder --channel discord` prints its `.env` lines under `my-agent`'s keys (`DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`). See [several apps](/docs/guide/several-apps).
+
+```ts
+const coder = await discord.createApp({ name: "coder" });
+const ana = await discord.createUser({ name: "Ana" });
+const channel = await discord.createChannel({ participants: [ana, discord.app, coder] });
+
+const msg = await ana.say("@coder what's the status of the web deploy?", { channel });
+
+await expect(msg).toHaveReplyFrom(coder);
+await expect(msg).toGoQuiet({ within: "10s", maxReplies: 1 });
+```
+
+What one bot hears of another, as Discord sends it:
+
+- Another bot's messages arrive as `MESSAGE_CREATE`, with `author.bot: true` and that bot's id, and its edits, deletes and reactions as `MESSAGE_UPDATE`, `MESSAGE_DELETE` and `MESSAGE_REACTION_ADD` / `_REMOVE`. Without `MESSAGE_CONTENT`, the content is empty unless the message mentions the bot. A bot that checks only `message.author.id === client.user.id` answers them all.
+- Each bot's own messages come back to it, as Discord sends them.
+- No bot writes to another bot in a DM: `POST /users/@me/channels` with another bot answers 50007. Interactions are people's only: a person's command goes to the app it belongs to, `my-agent`'s unless they pick another (`ana.runCommand("/deploy web", { channel, app: coder })`), and a button press to the app whose message it is, signed with that app's key.
+
+A test can act as an app it made: `coder.say`, `coder.reply`, `coder.react` and `coder.unreact` go through the fake's REST API as its bot, where its bot sees the channel; acting as `my-agent` is refused, because your agent is that app. `msg.delivery` is still the dispatch to `my-agent`; `msg.deliveryFor(coder)` reads another app's, and every delivery says which app it went to (`delivery.app`).
 
 ## Live mode
 
