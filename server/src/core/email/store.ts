@@ -1,4 +1,4 @@
-import { AppRoster, checkNameFree } from "../apps/index.ts";
+import { AppRoster } from "../apps/index.ts";
 import { ProtocolError } from "../errors/index.ts";
 import type { DriverLoops } from "../loops/index.ts";
 import type { Collection, Registry } from "../registry/index.ts";
@@ -71,7 +71,7 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
     this.users = registry.collection(driver, "user");
     this.emails = registry.collection(driver, "email");
     this.threads = registry.collection(driver, "thread");
-    this.apps = new AppRoster(title);
+    this.apps = new AppRoster(title, registry);
   }
 
   /** The agent's mailbox: the built-in app, `my-agent`. It belongs to no session. */
@@ -104,20 +104,20 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
    * can't be a person's of the session asking, nor its address anyone's.
    */
   makeApp(session: string | undefined, name: string, settings: Record<string, unknown>, build: () => App): App {
-    if (session !== undefined) {
-      checkNameFree(
-        name,
-        this.users.list(session).map((user) => user.name),
-        "app",
-      );
-    }
-    return this.apps.make(name, settings, () => {
-      const app = build();
-      if (this.personAt(app.address) || this.appAt(app.address)) {
-        throw new ProtocolError("invalid_argument", `Someone has the address ${app.address} already`, { app: name });
-      }
-      return app;
-    });
+    const by =
+      session === undefined ? undefined : { session, people: this.users.list(session).map((user) => user.name) };
+    return this.apps.make(
+      name,
+      settings,
+      () => {
+        const app = build();
+        if (this.personAt(app.address) || this.appAt(app.address)) {
+          throw new ProtocolError("invalid_argument", `Someone has the address ${app.address} already`, { app: name });
+        }
+        return app;
+      },
+      by,
+    );
   }
 
   /** The app `channelstack env --app` prints: the built-in one, or the one named, made by `make` if no test has yet. */
@@ -213,12 +213,8 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
 
   /** A person in the fake: a mailbox at `<name>@example.com` unless the test gives an address. */
   addPerson(session: string, input: { name: string; address?: string | undefined }): EmailPersonRecord {
-    // A name in a matcher means one author: a person can't take an app's.
-    checkNameFree(
-      input.name,
-      this.apps.all().map((app) => app.name),
-      "person",
-    );
+    // A name in a matcher means one author: a person can't take the name of an app their session used.
+    this.apps.checkPerson(session, input.name);
     let address = input.address?.toLowerCase();
     if (address !== undefined) {
       if (parseAddresses(address)[0]?.address !== address) {

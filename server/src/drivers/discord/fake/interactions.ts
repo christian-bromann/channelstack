@@ -420,7 +420,7 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
       if (option.type === OPTION.USER) {
         const wanted = text.replace(/^@/, "").toLowerCase();
         const found =
-          store.apps.named(wanted)?.botUserId ??
+          store.apps.namedIn(session, wanted)?.botUserId ??
           store
             .usersOf(session)
             .find((user) => user.name.toLowerCase() === wanted || user.username === wanted || user.id === text)?.id;

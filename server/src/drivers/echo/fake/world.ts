@@ -96,6 +96,7 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
     app: () => store.app,
 
     createUser(session, input) {
+      store.apps.checkPerson(session, input.name);
       const id = ids.next(ECHO_IDS.user);
       const user = store.users.add(id, { id, name: input.name, kind: "user" }, session);
       events.append(session, "echo", "action", { action: "createUser", user: id });
@@ -105,11 +106,14 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
     apps: () => store.apps.all(),
 
     createApp(session, input) {
-      const app = store.apps.make(input.name, {}, () => ({
-        id: context.apps.ids(input.name).next(ECHO_IDS.app),
-        name: input.name,
-        kind: "app",
-      }));
+      const by =
+        session === undefined ? undefined : { session, people: store.users.list(session).map((user) => user.name) };
+      const app = store.apps.make(
+        input.name,
+        {},
+        () => ({ id: context.apps.ids(input.name).next(ECHO_IDS.app), name: input.name, kind: "app" }),
+        by,
+      );
       if (session !== undefined) events.append(session, "echo", "action", { action: "createApp", app: app.id });
       return app;
     },

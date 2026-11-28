@@ -1,4 +1,4 @@
-import { BUILT_IN_APP, checkNameFree } from "../../../core/apps/index.ts";
+import { BUILT_IN_APP } from "../../../core/apps/index.ts";
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
 import { deliveryKit } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
@@ -563,7 +563,7 @@ export function createFakeWorld(
 
   const mentionText = (session: string, text: string) => {
     const lookup = (name: string) => {
-      const named = store.apps.named(name);
+      const named = store.apps.namedIn(session, name);
       if (named) return named.botUserId;
       const wanted = name.toLowerCase();
       return store.usersOf(session).find((user) => user.name.toLowerCase() === wanted || user.username === wanted)?.id;
@@ -705,27 +705,27 @@ export function createFakeWorld(
     appOf: (id) => store.appOf(id),
 
     createApp(session, options) {
-      if (session !== undefined) {
-        checkNameFree(
-          options.name,
-          store.usersOf(session).map((user) => user.name),
-          "app",
-        );
-      }
       const privilegedIntents = [...(options.privilegedIntents ?? defaults.privilegedIntents)];
-      return store.apps.make(options.name, { privilegedIntents }, () => {
-        // A bot's id is in its token, as Discord's are: the app's token is made once per install, so its bot is too.
-        const token = context.apps.secret(options.name, "botToken");
-        const id = botIdOf(token);
-        if (id === undefined) throw new Error(`The Discord app "${options.name}" has a token without a bot id`);
-        return {
-          id,
-          name: options.name,
-          botUserId: id,
-          roleId: context.apps.ids(options.name).next(DISCORD_IDS.role),
-          privilegedIntents,
-        };
-      });
+      const by =
+        session === undefined ? undefined : { session, people: store.usersOf(session).map((user) => user.name) };
+      return store.apps.make(
+        options.name,
+        { privilegedIntents },
+        () => {
+          // A bot's id is in its token, as Discord's are: the app's token is made once per install, so its bot is too.
+          const token = context.apps.secret(options.name, "botToken");
+          const id = botIdOf(token);
+          if (id === undefined) throw new Error(`The Discord app "${options.name}" has a token without a bot id`);
+          return {
+            id,
+            name: options.name,
+            botUserId: id,
+            roleId: context.apps.ids(options.name).next(DISCORD_IDS.role),
+            privilegedIntents,
+          };
+        },
+        by,
+      );
     },
 
     sayAsApp(session, name, input, where) {
@@ -758,11 +758,7 @@ export function createFakeWorld(
     },
 
     createUser(session, options: DiscordUserOptions) {
-      checkNameFree(
-        options.name,
-        store.apps.all().map((bot) => bot.name),
-        "person",
-      );
+      store.apps.checkPerson(session, options.name);
       const id = options.id === undefined ? ids.next(DISCORD_IDS.user) : ids.reserve(DISCORD_IDS.user, options.id);
       const username = options.name.toLowerCase().replace(/[^a-z0-9._]/g, "") || "user";
       return store.users.add(

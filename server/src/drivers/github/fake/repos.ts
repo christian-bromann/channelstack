@@ -1,4 +1,3 @@
-import { checkNameFree } from "../../../core/apps/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import { GITHUB_IDS } from "../ids.ts";
 import type {
@@ -233,11 +232,7 @@ export function createRepos(kit: GitHubKit) {
         throw new ProtocolError("invalid_argument", `"${input.login}" is not a valid GitHub login`);
       }
       // A login in a matcher names one author: a person can't take the name of an App (decision 0027).
-      checkNameFree(
-        input.login,
-        store.apps.all().map((app) => app.name),
-        "person",
-      );
+      store.apps.checkPerson(session, input.login);
       // Logins are unique among one session's people; two sessions can each have an `ana` (decision 0013).
       if (store.byLogin(session, input.login)) {
         throw new ProtocolError("invalid_argument", `There is already a person "${input.login}" in this session`);

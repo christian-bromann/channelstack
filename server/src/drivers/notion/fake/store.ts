@@ -21,10 +21,11 @@ export class NotionStore {
   readonly comments: Collection<NotionCommentRecord>;
   #workspace: NotionWorkspaceRecord | undefined;
   /** The built-in integration and the ones tests made (decision 0027), all in the one workspace. */
-  readonly apps = new AppRoster<NotionBotRecord>("Notion");
+  readonly apps: AppRoster<NotionBotRecord>;
   #owner: NotionUserRecord | undefined;
 
   constructor(registry: Registry) {
+    this.apps = new AppRoster("Notion", registry);
     this.users = registry.collection("notion", "user");
     this.pages = registry.collection("notion", "page");
     this.databases = registry.collection("notion", "database");

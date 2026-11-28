@@ -1,9 +1,11 @@
 import { ProtocolError } from "../errors/index.ts";
 import type { NamedIds } from "../ids/index.ts";
+import type { Collection, Registry } from "../registry/index.ts";
 
 /**
  * A channel's apps (decision 0027): the built-in `my-agent` and the ones tests make by name.
- * Apps belong to the shared world, as `my-agent` does, not to a session.
+ * Apps belong to the shared world, as `my-agent` does, not to a session. A name in a session
+ * means one of the apps that session used, so what another test makes never changes it.
  */
 
 /** The name of every channel's built-in app. */
@@ -40,17 +42,30 @@ interface Named {
   readonly name: string;
 }
 
+/** Who asks for an app with `createApp`: a session, and the names of its people, which the app may not take. */
+interface Asker {
+  readonly session: string;
+  readonly people: Iterable<string>;
+}
+
 /**
  * One channel's apps, the built-in one first. `make` is what `createApp` does: the first call for
  * a name makes the app, later calls with the same settings return it, and anything else is refused.
+ *
+ * It also keeps which apps each session used: the built-in one, and each it got from `createApp`.
+ * Those are the apps its names mean (`namedIn`, `checkPerson`). They are kept in the registry,
+ * owned by the session, so they go when it closes.
  */
 export class AppRoster<App extends Named> {
   readonly #apps = new Map<string, { app: App; settings: string }>();
   #builtIn: App | undefined;
   readonly #channel: string;
+  /** The names of the apps each session used beside the built-in one, in the order it first did. */
+  readonly #used: Collection<string>;
 
-  constructor(channel: string) {
+  constructor(channel: string, registry: Registry) {
     this.#channel = channel;
+    this.#used = registry.collection<string>(channel, "app in use");
   }
 
   /** The built-in app, set when the fake is seeded (again after a reset). */
@@ -63,8 +78,19 @@ export class AppRoster<App extends Named> {
     return this.#builtIn;
   }
 
-  /** Make the app named `name` with `settings`, or return the one already made with the same settings. */
-  make(name: string, settings: Readonly<Record<string, unknown>>, build: () => App): App {
+  /**
+   * Make the app named `name` with `settings`, or return the one already made with the same
+   * settings. Asked for by a session, the app is one of that session's from then on, and it can't
+   * have the name of one of its people.
+   */
+  make(name: string, settings: Readonly<Record<string, unknown>>, build: () => App, by?: Asker): App {
+    if (by) checkNameFree(name, by.people, "app");
+    const app = this.#make(name, settings, build);
+    if (by) this.#used.add(`${by.session}\u0000${app.name}`, app.name, by.session);
+    return app;
+  }
+
+  #make(name: string, settings: Readonly<Record<string, unknown>>, build: () => App): App {
     checkAppName(name);
     const key = settingsKey(settings);
     const known = this.#apps.get(name);
@@ -91,6 +117,27 @@ export class AppRoster<App extends Named> {
   /** The app with this name, the built-in one included. */
   named(name: string): App | undefined {
     return name === BUILT_IN_APP ? this.#builtIn : this.#apps.get(name)?.app;
+  }
+
+  /** The apps a session used: the built-in one first, then each it got from `createApp`, in the order it first did. */
+  of(session: string): App[] {
+    const used = this.#used.list(session).flatMap((name) => {
+      const app = this.#apps.get(name)?.app;
+      return app ? [app] : [];
+    });
+    return [this.builtIn, ...used];
+  }
+
+  /** The app a name means in a session, in any case: one of the apps that session used. */
+  namedIn(session: string, name: string): App | undefined {
+    const wanted = name.toLowerCase();
+    return this.of(session).find((app) => app.name.toLowerCase() === wanted);
+  }
+
+  /** A person of this session may take none of these names: each is the name of an app the session used. */
+  checkPerson(session: string, ...names: string[]): void {
+    const apps = this.of(session).map((app) => app.name);
+    for (const name of names) checkNameFree(name, apps, "person");
   }
 
   /** The built-in app first, then the others in the order they were made. */

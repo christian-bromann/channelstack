@@ -1,4 +1,3 @@
-import { checkNameFree } from "../../../core/apps/index.ts";
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
@@ -77,29 +76,31 @@ export function createFakeWorld(
         events?: readonly string[] | undefined;
       },
     ): GitHubAppRecord {
-      if (session !== undefined) {
-        checkNameFree(
-          options.name,
-          store.list(store.users, session).map((user) => user.login),
-          "app",
-        );
-      }
       const permissions = { ...(options.permissions ?? defaults.permissions) };
       const events = [...(options.events ?? defaults.events)];
-      const app = store.apps.make(options.name, { permissions, events }, () => {
-        const appIds = context.apps.ids(options.name);
-        return {
-          id: Number(appIds.next(GITHUB_IDS.app)),
-          slug: options.name,
-          name: options.name,
-          clientId: appIds.next(GITHUB_IDS.clientId),
-          botId: Number(appIds.next(GITHUB_IDS.user)),
-          installationId: Number(appIds.next(GITHUB_IDS.installation)),
-          events,
-          permissions,
-          createdAt: clock(),
-        };
-      });
+      const by =
+        session === undefined
+          ? undefined
+          : { session, people: store.list(store.users, session).map((user) => user.login) };
+      const app = store.apps.make(
+        options.name,
+        { permissions, events },
+        () => {
+          const appIds = context.apps.ids(options.name);
+          return {
+            id: Number(appIds.next(GITHUB_IDS.app)),
+            slug: options.name,
+            name: options.name,
+            clientId: appIds.next(GITHUB_IDS.clientId),
+            botId: Number(appIds.next(GITHUB_IDS.user)),
+            installationId: Number(appIds.next(GITHUB_IDS.installation)),
+            events,
+            permissions,
+            createdAt: clock(),
+          };
+        },
+        by,
+      );
       if (session !== undefined) {
         context.events.append(session, "github", "action", { action: "createApp", app: String(app.id) });
       }

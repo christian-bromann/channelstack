@@ -37,11 +37,12 @@ export class GitHubStore {
   readonly suites = new Map<string, number>();
   #org: GitHubOrgRecord | undefined;
   /** The built-in App and the ones tests made (decision 0027), all installed on the one org. */
-  readonly apps = new AppRoster<GitHubAppRecord>("GitHub");
+  readonly apps: AppRoster<GitHubAppRecord>;
   /** The bot user of each App, by App name. Bots belong to no session. */
   readonly #bots = new Map<string, GitHubUserRecord>();
 
   constructor(registry: Registry) {
+    this.apps = new AppRoster("GitHub", registry);
     this.users = registry.collection("github", "user");
     this.repos = registry.collection("github", "repo");
     this.issues = registry.collection("github", "issue");

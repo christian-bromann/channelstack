@@ -76,11 +76,12 @@ export class DiscordStore {
   readonly faults: DiscordFault[] = [];
   #guild: DiscordGuildRecord | undefined;
   /** The built-in app and the ones tests made (decision 0027), each a bot in the one guild. */
-  readonly apps = new AppRoster<DiscordAppRecord>("Discord");
+  readonly apps: AppRoster<DiscordAppRecord>;
   #everyoneRole = "";
   #adminRole = "";
 
   constructor(registry: Registry) {
+    this.apps = new AppRoster("Discord", registry);
     this.users = registry.collection<DiscordUserRecord>("discord", "user");
     this.channels = registry.collection<DiscordChannelRecord>("discord", "channel");
   }

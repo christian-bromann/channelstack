@@ -64,9 +64,10 @@ export class SlackStore {
   readonly faults: SlackFault[] = [];
   #team: SlackTeam | undefined;
   /** The built-in app and the ones tests made (decision 0027), installed in the one workspace. */
-  readonly apps = new AppRoster<SlackAppRecord>("Slack");
+  readonly apps: AppRoster<SlackAppRecord>;
 
   constructor(registry: Registry) {
+    this.apps = new AppRoster("Slack", registry);
     this.users = registry.collection<SlackUserRecord>("slack", "user");
     this.conversations = registry.collection<SlackConversationRecord>("slack", "conversation");
   }

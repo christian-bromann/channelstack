@@ -63,7 +63,8 @@ export function notionReads(
   /** `RichText` (`"@my-agent summarize"`) → Notion rich text, with mentions of people and integrations. */
   const richText = (session: string, text: string): RichTextItem[] =>
     richTextPieces(text, (name) => {
-      const app = store.apps.all().find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
+      // A name means one of the integrations the session used, or one of its people (decision 0027).
+      const app = store.apps.namedIn(session, name);
       if (app) return app.id;
       return peopleOf(session).find((user) => user.name.toLowerCase() === name.toLowerCase())?.id;
     }).map((piece) =>

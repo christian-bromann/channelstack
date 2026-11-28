@@ -9,9 +9,10 @@ export class EchoStore {
   readonly rooms: Collection<EchoRoom>;
   readonly #messages = new Map<string, CursorList<EchoMessage>>();
   /** The built-in app and the ones tests made (decision 0027). */
-  readonly apps = new AppRoster<EchoApp>("echo");
+  readonly apps: AppRoster<EchoApp>;
 
   constructor(registry: Registry) {
+    this.apps = new AppRoster("echo", registry);
     this.users = registry.collection<EchoUser>("echo", "user");
     this.rooms = registry.collection<EchoRoom>("echo", "room");
   }

@@ -1,4 +1,4 @@
-import { BUILT_IN_APP, checkNameFree } from "../../../core/apps/index.ts";
+import { BUILT_IN_APP } from "../../../core/apps/index.ts";
 import { delay } from "../../../core/clock/index.ts";
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
 import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
@@ -207,8 +207,9 @@ export function createFakeWorld(
 
   const author = (id: string): SlackUserRecord | undefined => store.users.find(id);
 
+  /** Whom a name means in a session: one of the apps it used, or one of its people (decision 0027). */
   const resolveName = (session: string, name: string): string | undefined => {
-    const app = store.apps.named(name);
+    const app = store.apps.namedIn(session, name);
     if (app) return app.botUserId;
     const wanted = name.toLowerCase();
     return store
@@ -492,28 +493,28 @@ export function createFakeWorld(
     resolveName,
 
     createApp(session, options) {
-      if (session !== undefined) {
-        checkNameFree(
-          options.name,
-          store.usersOf(session).map((user) => user.name),
-          "app",
-        );
-      }
       const scopes = [...(options.scopes ?? defaults.scopes)];
       const botEvents = [...(options.botEvents ?? defaults.botEvents)];
-      const app = store.apps.make(options.name, { scopes, botEvents }, () => {
-        const appIds = context.apps.ids(options.name);
-        return {
-          id: appIds.next(SLACK_IDS.app),
-          name: options.name,
-          botId: appIds.next(SLACK_IDS.bot),
-          botUserId: appIds.next(SLACK_IDS.user),
-          scopes,
-          botEvents,
-          installed: true,
-          updated: Math.floor(clock() / 1000),
-        };
-      });
+      const by =
+        session === undefined ? undefined : { session, people: store.usersOf(session).map((user) => user.name) };
+      const app = store.apps.make(
+        options.name,
+        { scopes, botEvents },
+        () => {
+          const appIds = context.apps.ids(options.name);
+          return {
+            id: appIds.next(SLACK_IDS.app),
+            name: options.name,
+            botId: appIds.next(SLACK_IDS.bot),
+            botUserId: appIds.next(SLACK_IDS.user),
+            scopes,
+            botEvents,
+            installed: true,
+            updated: Math.floor(clock() / 1000),
+          };
+        },
+        by,
+      );
       if (session !== undefined) action(session, "createApp", { app: app.id });
       return app;
     },
@@ -578,11 +579,7 @@ export function createFakeWorld(
     },
 
     createUser(session, options) {
-      checkNameFree(
-        options.name,
-        store.apps.all().map((app) => app.name),
-        "person",
-      );
+      store.apps.checkPerson(session, options.name);
       // A fixed id must be free in the whole world: the agent can't tell two of them apart (decision 0006).
       const id = options.id === undefined ? ids.next(SLACK_IDS.user) : ids.reserve(SLACK_IDS.user, options.id);
       const user: SlackUserRecord = {

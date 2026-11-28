@@ -1,4 +1,4 @@
-import { BUILT_IN_APP, checkNameFree } from "../../../core/apps/index.ts";
+import { BUILT_IN_APP } from "../../../core/apps/index.ts";
 import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
@@ -861,26 +861,26 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
         events?: readonly string[] | undefined;
       },
     ): NotionBotRecord {
-      if (session !== undefined) {
-        checkNameFree(
-          options.name,
-          store.users.list(session).map((user) => user.name),
-          "app",
-        );
-      }
       const capabilities = [...(options.capabilities ?? store.bot.capabilities)];
       const events = [...(options.events ?? store.bot.events)];
-      return store.apps.make(options.name, { capabilities, events }, () => {
-        const appIds = context.apps.ids(options.name);
-        return {
-          id: appIds.next(NOTION_IDS.uuid),
-          integrationId: appIds.next(NOTION_IDS.uuid),
-          subscriptionId: appIds.next(NOTION_IDS.uuid),
-          name: options.name,
-          events,
-          capabilities,
-        };
-      });
+      const by =
+        session === undefined ? undefined : { session, people: store.users.list(session).map((user) => user.name) };
+      return store.apps.make(
+        options.name,
+        { capabilities, events },
+        () => {
+          const appIds = context.apps.ids(options.name);
+          return {
+            id: appIds.next(NOTION_IDS.uuid),
+            integrationId: appIds.next(NOTION_IDS.uuid),
+            subscriptionId: appIds.next(NOTION_IDS.uuid),
+            name: options.name,
+            events,
+            capabilities,
+          };
+        },
+        by,
+      );
     },
 
     /** An integration a test made starts a discussion, as its own `comments.create` would. */
@@ -954,11 +954,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     ) {
       if (store.users.list(session).some((user) => user.name.toLowerCase() === input.name.toLowerCase()))
         throw new ProtocolError("invalid_argument", `There is already a person "${input.name}" in this session`);
-      checkNameFree(
-        input.name,
-        store.apps.all().map((app) => app.name),
-        "person",
-      );
+      store.apps.checkPerson(session, input.name);
       const id = input.id === undefined ? ids.next(NOTION_IDS.uuid) : ids.reserve(NOTION_IDS.uuid, input.id);
       return store.users.add(
         id,

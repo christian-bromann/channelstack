@@ -23,11 +23,12 @@ export class LinearStore {
   readonly activities: Collection<LinearActivityRecord>;
   #org: LinearOrgRecord | undefined;
   /** The built-in app and the ones tests made (decision 0027), each installed workspace-wide. */
-  readonly apps = new AppRoster<LinearAppRecord>("Linear");
+  readonly apps: AppRoster<LinearAppRecord>;
   /** Each app's own user, by its id. They belong to no session. */
   readonly #appUsers = new Map<string, LinearUserRecord>();
 
   constructor(registry: Registry) {
+    this.apps = new AppRoster("Linear", registry);
     this.users = registry.collection("linear", "user");
     this.teams = registry.collection("linear", "team");
     this.issues = registry.collection("linear", "issue");

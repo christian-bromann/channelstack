@@ -1,4 +1,4 @@
-import { BUILT_IN_APP, checkNameFree } from "../../../core/apps/index.ts";
+import { BUILT_IN_APP } from "../../../core/apps/index.ts";
 import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
@@ -78,10 +78,11 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     staleMs: 120_000,
   });
   const links = linearLinks(context.apiUrl, () => store.org);
+  // A name means one of the apps the session used (whose user's display name is the app's), or one of its people.
   const { userOf, markdown, mentioned, readable, rootOf, stateOf } = linearText(store, links, (session, name) => {
+    const app = store.apps.namedIn(session, name);
+    if (app) return app.userId;
     const wanted = name.toLowerCase();
-    const app = store.appUsers().find((user) => user.displayName.toLowerCase() === wanted);
-    if (app) return app.id;
     return store.list(store.users, session).find((user) => user.displayName.toLowerCase() === wanted)?.id;
   });
   const payloads = linearPayloads({
@@ -466,8 +467,9 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
    */
   const comment = (issue: LinearIssueRecord, user: string, body: string, parent?: LinearCommentRecord) => {
     if (body.trim() === "") throw new LinearError("body must not be empty");
-    personOnly(user, mentioned(body), "mention another agent");
     const session = store.sessionOf(issue);
+    const mentions = mentioned(session, body);
+    personOnly(user, mentions, "mention another agent");
     const root = parent ? rootOf(parent) : undefined;
     const now = clock();
     const record = store.add(store.comments, session, {
@@ -501,7 +503,6 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     // A reply in a session's thread prompts each app's session there; an app it mentions that has
     // none there gets one. The built-in app comes first, so its session is the comment's.
     const sessions = root ? store.sessionsOn(issue).filter((candidate) => candidate.thread === root.id) : [];
-    const mentions = mentioned(body);
     for (const app of store.apps.all()) {
       const thread = sessions.find((candidate) => candidate.appUser === app.userId);
       if (thread) {
@@ -572,9 +573,9 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     if (record.status === "stale") throw new LinearError("The session is stale");
     // What becomes a comment is checked as one before anything is kept.
     const writes = type === "response" || type === "elicitation" || type === "error";
-    if (writes) personOnly(record.appUser, mentioned(text("body") ?? ""), "mention another agent");
     const session = store.sessions.owner(record.id);
     if (session === undefined) throw new Error("A session belongs to a test session");
+    if (writes) personOnly(record.appUser, mentioned(session, text("body") ?? ""), "mention another agent");
     const activity = store.add(store.activities, session, {
       id: input.id ? claimId(input.id) : ids.next(LINEAR_IDS.uuid),
       session: record.id,
@@ -708,8 +709,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     ) {
       const displayName = input.displayName ?? input.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "");
       // A mention or a matcher's name means one author: a person can't take an app's name.
-      const apps = store.apps.all().map((app) => app.name);
-      for (const name of [input.name, displayName]) checkNameFree(name, apps, "person");
+      store.apps.checkPerson(session, input.name, displayName);
       if (
         store.list(store.users, session).some((user) => user.displayName.toLowerCase() === displayName.toLowerCase())
       ) {
@@ -737,28 +737,39 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
      * settings (decision 0027): its own app user, token, client and webhook, ids drawn from its name.
      */
     createApp(session: string | undefined, options: { name: string; events?: readonly string[] | undefined }) {
-      if (session !== undefined) {
-        const people = store.list(store.users, session).flatMap((user) => [user.name, user.displayName]);
-        checkNameFree(options.name, people, "app");
-      }
       const events = [...(options.events ?? store.app.events)];
-      return store.apps.make(options.name, { events }, () => {
-        const appIds = context.apps.ids(options.name);
-        const now = clock();
-        const user: LinearUserRecord = {
-          id: appIds.next(LINEAR_IDS.uuid),
-          name: options.name,
-          displayName: options.name,
-          email: `${options.name}@oauthapp.linear.app`,
-          admin: false,
-          guest: false,
-          app: true,
-          fixedId: false,
-          createdAt: now,
-        };
-        store.addAppUser(user);
-        return { userId: user.id, name: options.name, events, webhookId: appIds.next(LINEAR_IDS.uuid), createdAt: now };
-      });
+      const by =
+        session === undefined
+          ? undefined
+          : { session, people: store.list(store.users, session).flatMap((user) => [user.name, user.displayName]) };
+      return store.apps.make(
+        options.name,
+        { events },
+        () => {
+          const appIds = context.apps.ids(options.name);
+          const now = clock();
+          const user: LinearUserRecord = {
+            id: appIds.next(LINEAR_IDS.uuid),
+            name: options.name,
+            displayName: options.name,
+            email: `${options.name}@oauthapp.linear.app`,
+            admin: false,
+            guest: false,
+            app: true,
+            fixedId: false,
+            createdAt: now,
+          };
+          store.addAppUser(user);
+          return {
+            userId: user.id,
+            name: options.name,
+            events,
+            webhookId: appIds.next(LINEAR_IDS.uuid),
+            createdAt: now,
+          };
+        },
+        by,
+      );
     },
 
     /** An app a test made and acts as: never the built-in one, which the agent under test acts as. */
