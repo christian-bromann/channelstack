@@ -121,6 +121,7 @@ What an app is, how it gets its credentials, and which of one app's actions the 
 
 - **An app:** a GitHub App, installed on the org with selected repositories: its own App id, slug, `<name>[bot]` bot user, private key, webhook secret and webhook URL. `GITHUB_APP_ID` and the others, per app, from `env --app`.
 - **It joins** with `createRepo({ apps: [github.app, reviewer] })` or `repo.installApp(reviewer)`, which sends that App `installation_repositories` only.
+- **Its installation id** for a repository is `app.installationId(repo)`, for any App. `github.installationId(repo)` answers the same for the built-in App: it is the path the built-in App had before several Apps, which the tests of phase 5 call, and exit check 12.1 keeps those tests as they are.
 - **Its events** are the ones its permissions cover, as GitHub's App settings allow: by default the built-in App's that its permissions cover, and an event they don't cover (`push` without contents) is refused with `invalid_argument`.
 - **What it hears from another App B,** for every event it subscribes to on a repository it is installed on: B's comments, issues, labels, pull requests, reviews, review comments and pushes, with `sender: { login: "b[bot]", type: "Bot" }`. One event that two Apps hear is two deliveries: each with its own GUID, signed with its own App's secret, with that App's `installation.id` and `X-GitHub-Hook-Installation-Target-ID`.
 - **Its own actions come back to it**, as GitHub sends them: there is no `GITHUB_TOKEN`-style suppression for Apps, which is where the loop comes from.

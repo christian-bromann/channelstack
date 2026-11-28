@@ -669,10 +669,15 @@ export function registerGitHubRoutes(
     },
   });
 
+  // `github.app.installationId(repo)` is the one way the examples and docs ask, on the App's own
+  // path below. This path is the built-in App's from before several Apps: the tests of phase 5
+  // call it, and exit check 12.1 keeps every existing test as it was, so it stays. Every route has
+  // an SDK method, so it is the fixture's (decision 0027, GitHub).
   router.route({
     method: "post",
     path: "/installation-id",
-    summary: "The id of the built-in App's installation, for a repository it is installed on",
+    summary:
+      "The id of the built-in App's installation, for a repository it is installed on. The same as `github.app.installationId(repo)`",
     body: z.object({ repo: repoRef }).openapi("GitHubInstallationIdBody"),
     response: z.number().int(),
     errors: ["not_found"],

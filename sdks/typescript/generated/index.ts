@@ -2507,7 +2507,7 @@ export class GitHubFixture {
     return decodeGitHubIssues(ctx, data);
   }
 
-  /** The id of the built-in App's installation, for a repository it is installed on. Experimental. */
+  /** The id of the built-in App's installation, for a repository it is installed on. The same as `github.app.installationId(repo)`. Experimental. */
   async installationId(repo: GitHubRepo): Promise<number> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/installation-id`, { body: { repo: repo.id } })) as number;

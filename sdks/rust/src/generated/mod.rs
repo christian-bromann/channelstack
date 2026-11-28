@@ -14206,7 +14206,7 @@ impl GitHubFixture {
         )
     }
 
-    /// The id of the built-in App's installation, for a repository it is installed on. Experimental.
+    /// The id of the built-in App's installation, for a repository it is installed on. The same as `github.app.installationId(repo)`. Experimental.
     pub fn installation_id(&self, repo: impl IntoArg) -> Call<Value> {
         Call::new(
             &self.ctx,

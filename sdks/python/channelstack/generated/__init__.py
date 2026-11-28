@@ -2368,7 +2368,7 @@ class GitHubFixture:
         return [GitHubIssueListing._from_wire(ctx, item) for item in data]
 
     async def installation_id(self, repo: GitHubRepo) -> int:
-        """The id of the built-in App's installation, for a repository it is installed on. Experimental."""
+        """The id of the built-in App's installation, for a repository it is installed on. The same as `github.app.installationId(repo)`. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/installation-id", body={"repo": repo.id})
         return data
