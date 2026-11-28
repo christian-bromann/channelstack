@@ -88,6 +88,13 @@ jobs:
       - run: pnpm conformance
         if: ${{ !cancelled() }}
         env: *sandboxes
+      # Exit check 13.13: the fake OpenAI's answers and stream events against the real API's, with a
+      # cheap model. Until the maintainer sets the key it runs the fake side and says it is waiting.
+      - run: pnpm openai:shapes
+        if: ${{ !cancelled() }}
+        env:
+          CHANNELSTACK_OPENAI_LIVE_KEY: ${{ secrets.CHANNELSTACK_OPENAI_LIVE_KEY }}
+          CHANNELSTACK_OPENAI_LIVE_MODEL: ${{ vars.CHANNELSTACK_OPENAI_LIVE_MODEL }}
       - run: pnpm coverage --results build/conformance/results.json --summary "$GITHUB_STEP_SUMMARY"
         if: ${{ !cancelled() && hashFiles('build/conformance/results.json') != '' }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -97,4 +104,5 @@ jobs:
           path: |
             build/coverage/index.html
             build/conformance/results.json
+            build/conformance/openai-shapes.json
           if-no-files-found: ignore

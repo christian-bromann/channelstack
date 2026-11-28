@@ -43,8 +43,10 @@ export interface ChecksOptions {
   /** How long each check waits for the agent. Default: the integration's timeout. */
   timeout?: Duration;
   /**
-   * The agent's model is the fake OpenAI (decision 0029): the checks script it themselves (the
-   * stream checks need no `streamPrompt`), and the model checks are added (`SLACK_MODEL_CHECKS`).
+   * The agent's model is the fake OpenAI (decision 0029): every check that scripts nothing itself
+   * gets a plain answer for each call, so a model-backed agent passes the channel's checks. On
+   * Slack the stream checks also need no `streamPrompt`, and the model checks are added
+   * (`SLACK_MODEL_CHECKS`); the other channels' model checks are issue #120.
    */
   model?: "openai";
 }
