@@ -10,6 +10,8 @@
 import { describe, expect, test, type TestContext } from "vitest";
 
 import {
+  type DiscordApp,
+  type DiscordFixture,
   type Duration,
   type GitHubApp,
   type GitHubDelivery,
@@ -198,6 +200,7 @@ export const DISCORD_CHECKS = [
   "discord.mention-once",
   "discord.dm-once",
   "discord.ignores-bots",
+  "discord.no-reply-loop",
   "discord.resume",
   "discord.long-answer",
   "discord.interaction-3s",
@@ -915,20 +918,26 @@ export function googleChecks(options: ChecksOptions): void {
 }
 
 /**
- * Registers: answers a mention once · answers a DM once · ignores other bots · after a dropped
- * Gateway connection, answers what it missed once · writes a long answer in messages Discord
- * takes · answers an interaction within 3 s · rejects an interaction with a bad signature.
+ * Registers: answers a mention once · answers a DM once · ignores other bots · stops answering
+ * another app that answers everything · after a dropped Gateway connection, answers what it
+ * missed once · writes a long answer in messages Discord takes · answers an interaction within
+ * 3 s · rejects an interaction with a bad signature.
  */
 export function discordChecks(options: ChecksOptions): void {
   const { app } = options;
   const prompt = options.prompt ?? `@${app} hello`;
   const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
   const check = registrar(options, DISCORD_CHECKS);
-  /** A channel with Ana and the bot. */
+  const turns = options.loopTurns ?? 3;
+  /** The app under test: the built-in one, or the app of that name (decision 0027), whose agent runs as it. */
+  const agentOf = async (discord: DiscordFixture): Promise<DiscordApp> =>
+    builtIn(app, discord.app) ? discord.app : discord.createApp({ name: app });
+  /** A channel with Ana and the bot under test. */
   const inChannel = async ({ discord }: TestContext) => {
+    const agent = await agentOf(discord);
     const ana = await discord.createUser({ name: "Ana" });
-    const channel = await discord.createChannel({ participants: [ana, discord.app] });
-    return { ana, channel };
+    const channel = await discord.createChannel({ participants: [ana, agent] });
+    return { agent, ana, channel };
   };
 
   describe(`discord checks: ${app}`, () => {
@@ -939,25 +948,55 @@ export function discordChecks(options: ChecksOptions): void {
     });
 
     check("discord.dm-once", "answers a DM once", async ({ discord }) => {
+      const agent = await agentOf(discord);
       const ana = await discord.createUser({ name: "Ana" });
-      const msg = await ana.say(prompt, { to: discord.app });
+      const msg = await ana.say(prompt, { to: agent });
       await expect(msg.channel).toHaveRepliesFrom(app, { count: 1, ...wait });
     });
 
     check("discord.ignores-bots", "ignores what other bots write", async ({ discord }) => {
+      const agent = await agentOf(discord);
       const bot = await discord.createUser({ name: "Deploy Bot", bot: true });
-      const channel = await discord.createChannel({ participants: [bot, discord.app] });
+      const channel = await discord.createChannel({ participants: [bot, agent] });
       const msg = await bot.say(prompt, { channel });
       await expect(msg).not.toHaveReplyFrom(app, wait);
     });
 
+    check(
+      "discord.no-reply-loop",
+      "stops answering another app that answers everything it says",
+      async ({ discord }) => {
+        const agent = await agentOf(discord);
+        const peer = await discord.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
+        const ana = await discord.createUser({ name: "Ana" });
+        const channel = await discord.createChannel({ participants: [ana, agent, peer] });
+        await ana.say(prompt, { channel });
+        const answers = async () => (await channel.messages()).filter((message) => message.author.id === agent.id);
+        const count = async () => (await answers()).length;
+        // The agent's answer to Ana; then the peer answers each of its answers, mentioning it, as a
+        // second agent without a loop guard would.
+        const first = await answersAgain(count, 0, wait);
+        let seen = first;
+        for (let turn = 0; turn <= turns; turn++) {
+          const latest = (await answers()).at(-1);
+          if (!latest) break;
+          await peer.reply(`@${agent.name} thanks! Anything else?`, { message: latest });
+          const now = await answersAgain(count, seen, wait);
+          if (now === seen) break;
+          seen = now;
+        }
+        expect(seen - first, "times it answered the other app").toBeLessThanOrEqual(turns);
+      },
+    );
+
     check("discord.resume", "after a dropped connection, answers what it missed once", async (context) => {
       const { discord } = context;
+      const agent = await agentOf(discord);
       const ana = await discord.createUser({ name: "Ana" });
       // Live, Discord drops connections itself: the fault is fake-only, and the test skips there.
       await using _drop = await discord.fault({ type: "drop_gateway" });
       // The connection drops just before Ana's message reaches the bot: a bot that resumes gets it then.
-      const msg = await ana.say(prompt, { to: discord.app });
+      const msg = await ana.say(prompt, { to: agent });
       await expect(msg.channel).toHaveRepliesFrom(app, { count: 1, timeout: "20s", ...wait });
     });
 
@@ -965,8 +1004,9 @@ export function discordChecks(options: ChecksOptions): void {
       "discord.long-answer",
       "writes a long answer in messages of at most 2000 characters",
       async ({ discord }) => {
+        const agent = await agentOf(discord);
         const ana = await discord.createUser({ name: "Ana" });
-        const msg = await ana.say(options.longPrompt ?? "", { to: discord.app });
+        const msg = await ana.say(options.longPrompt ?? "", { to: agent });
         await expect(msg.channel).toHaveReplyFrom(app, wait);
         // Discord refuses a longer message (50035, Invalid Form Body): the agent must split it. This waits for quiet.
         await expect(discord).not.toHaveReceivedCall(/.*/, { error: "50035", ...wait });
@@ -981,8 +1021,9 @@ export function discordChecks(options: ChecksOptions): void {
       "discord.interaction-3s",
       "answers an interaction within 3 seconds",
       async (context) => {
-        const { ana, channel } = await inChannel(context);
-        const delivery = await ana.runCommand(options.command ?? "/", { channel });
+        const { agent, ana, channel } = await inChannel(context);
+        // The agent's own command: another app may have one of that name too.
+        const delivery = await ana.runCommand(options.command ?? "/", { channel, app: agent });
         // Late, Discord shows the person "This interaction failed", and takes no answer any more.
         await expect(channel).not.toContainText("This interaction failed", { as: ana, ...wait });
         if (delivery) await expect(delivery).toBeAccepted({ within: "3s", ...wait });
@@ -994,9 +1035,9 @@ export function discordChecks(options: ChecksOptions): void {
       "discord.bad-signature",
       "rejects an interaction with a bad signature",
       async (context) => {
-        const { ana, channel } = await inChannel(context);
+        const { agent, ana, channel } = await inChannel(context);
         const delivery = deliveryOf(
-          { delivery: await ana.runCommand(options.command ?? "/", { channel }) },
+          { delivery: await ana.runCommand(options.command ?? "/", { channel, app: agent }) },
           context,
           "Discord",
         );

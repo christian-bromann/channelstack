@@ -150,9 +150,11 @@ export const HARNESS = {
       "reactions and edits > ",
       "delivery and failures \\(fake only\\) > ",
       "inspecting what the agent did > ",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
     ],
-    // The standard checks as a developer adds them (exit check 11.4).
-    suites: ["test/acceptance/checks/discord-checks.test.ts"],
+    // The standard checks as a developer adds them (exit check 11.4), and against `coder` (12.7).
+    suites: ["test/acceptance/checks/discord-checks.test.ts", "test/acceptance/checks/discord-checks-coder.test.ts"],
     agents: { "discord-node": "/interactions" },
     broken: { agent: "broken-discord", path: "/interactions" },
     unproxied: "discord.js's Gateway client (`ws`) connects directly, without HTTPS_PROXY",
