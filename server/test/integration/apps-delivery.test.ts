@@ -212,9 +212,9 @@ describe("exit check 12.4, A1: each app's official receiver accepts its own deli
   });
 
   test("A1 github: @octokit/webhooks for each App takes its own delivery, with its installation and target, and refuses the other's", async () => {
-    const { act } = await session("github");
+    const { act, app, coder } = await session("github");
     const ana = await act("/users", { login: "ana" });
-    const repo = await act("/repos", { collaborators: [{ user: ana.id }], apps: ["my-agent", "coder"] });
+    const repo = await act("/repos", { collaborators: [{ user: ana.id }], apps: [app.id, coder.id] });
     const issue = await act(`/users/${ana.id}/issues`, { issue: { title: "Login fails" }, repo: repo.id });
     const [mine, theirs] = [seen("my-agent", "github"), seen("coder", "github")];
     await act(`/users/${ana.id}/comment`, {
@@ -446,9 +446,9 @@ describe("exit check 12.4, A2: receivers tell another app's message from their o
   });
 
   test("A2 github: Probot receives another App's issue_comment with sender.type Bot", async () => {
-    const { act } = await session("github");
+    const { act, app, coder } = await session("github");
     const ana = await act("/users", { login: "ana" });
-    const repo = await act("/repos", { collaborators: [{ user: ana.id }], apps: ["my-agent", "coder"] });
+    const repo = await act("/repos", { collaborators: [{ user: ana.id }], apps: [app.id, coder.id] });
     const issue = await act(`/users/${ana.id}/issues`, { issue: { title: "Login fails" }, repo: repo.id });
     const mine = seen("my-agent", "github");
     await act("/apps/coder/comment", { body: "LGTM", issue: { repoId: repo.id, number: issue.number } });

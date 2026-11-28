@@ -311,8 +311,8 @@ export function registerNotionRoutes(
   const databaseOf = (session: string, id: string) => store.databases.get(session, id);
   const discussionOf = (session: string, id: string) => store.discussions.get(session, id);
   const commentOf = (session: string, id: string) => store.comments.get(session, id);
-  /** An integration by a session's handle: the built-in one, or one the session got from `createApp`. */
-  const integration = (session: string, id: string): NotionBotRecord => store.apps.get(session, id);
+  /** An integration by a session's handle (its id): the built-in one, or one the session got from `createApp`. */
+  const integration = (session: string, id: string): NotionBotRecord => store.apps.handle(session, id);
   /** A person may only write in a page they could open: the fake's workspace has no private pages for people. */
   const live = (page: NotionPageRecord) => {
     if (page.inTrash) throw new ProtocolError("not_found", `"${world.titleOf(page)}" is in the trash`);

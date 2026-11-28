@@ -121,7 +121,8 @@ describe("exit check 12.12: names and limits", () => {
     // R2.2: where a person's handle may stand too, an id that is no app's is nobody's here, and
     // another session's app is as unknown as another session's person.
     expect(apps.lookup("s1", "U1")).toBe(coder);
-    expect(apps.lookup("s1", "coder")).toBe(coder);
+    // R3.2: a name where a handle goes is no handle.
+    expect(apps.lookup("s1", "coder")).toBeUndefined();
     expect(apps.lookup("s2", "A0")).toBe(builtIn);
     expect(apps.lookup("s2", "U7")).toBeUndefined();
     expect(apps.lookup("s2", "coder")).toBeUndefined();

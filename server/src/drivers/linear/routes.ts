@@ -574,7 +574,7 @@ export function registerLinearRoutes(
           world.createIssue(team, user.id, {
             ...issue,
             description: issue.description === undefined ? undefined : world.markdown(session.id, issue.description),
-            delegate: issue.delegate === undefined ? undefined : store.apps.get(session.id, issue.delegate).userId,
+            delegate: issue.delegate === undefined ? undefined : store.apps.handle(session.id, issue.delegate).userId,
           }),
         ),
       );
@@ -693,7 +693,7 @@ export function registerLinearRoutes(
     handler: async ({ session, params, body }) => {
       const issue = issueOf(session.id, body.issue);
       const user = actor(session.id, params.user, issue);
-      const app = store.apps.get(session.id, body.app);
+      const app = store.apps.handle(session.id, body.app);
       if (issue.delegate === app.userId)
         throw new ProtocolError("invalid_argument", `${issue.identifier} is already delegated to ${app.name}`);
       await asProtocol(() => world.updateIssue(issue, user.id, { delegateId: app.userId }));

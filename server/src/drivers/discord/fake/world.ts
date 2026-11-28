@@ -577,6 +577,9 @@ export function createFakeWorld(
   // --- People -------------------------------------------------------------------------------
 
   const personIn = (session: string, id: string) => store.users.get(session, id);
+  /** A channel member by a test's handle: an app the session used is its bot user, else a person of the session. */
+  const memberIn = (session: string, id: string) =>
+    store.apps.lookup(session, id)?.botUserId ?? personIn(session, id).id;
 
   /** A person may see this channel, or refuse as Discord's client would: they don't have it. */
   const visibleTo = (session: string, user: string, id: string): DiscordChannelRecord => {
@@ -765,16 +768,14 @@ export function createFakeWorld(
     users: (session) => store.usersOf(session),
 
     createChannel(session, options: DiscordChannelOptions) {
-      for (const participant of options.participants) {
-        if (!store.apps.lookup(session, participant)) personIn(session, participant);
-      }
+      const members = new Set(options.participants.map((participant) => memberIn(session, participant)));
       const id = discordSnowflake(ids);
       const channel = store.addChannel(
         {
           id,
           kind: "text",
           name: options.name ?? `test-${id.slice(-6)}`,
-          members: new Set(options.participants),
+          members,
           readOnly: options.readOnly === true,
           topic: options.topic,
           createdAt: clock(),
@@ -879,10 +880,7 @@ export function createFakeWorld(
         });
       }
       const before = new Set(store.apps.all().filter((bot) => botSees(channel, bot)));
-      for (const participant of participants) {
-        if (!store.apps.lookup(session, participant)) personIn(session, participant);
-        channel.members.add(participant);
-      }
+      for (const participant of participants) channel.members.add(memberIn(session, participant));
       // The channel's overwrites changed: whoever sees it hears CHANNEL_UPDATE, a bot too once it may.
       broadcast(
         channel,

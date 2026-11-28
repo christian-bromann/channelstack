@@ -223,6 +223,14 @@ const HANDED: Record<string, Array<[what: string, hand: (side: Side, app: string
         return side.post(`/users/${ana.id}/connect`, { integration: app, page: page.id });
       },
     ],
+    [
+      "mentioned in a page",
+      async (side, app) => {
+        const ana = await side.post("/users", { name: fresh("Ana") });
+        const page = await side.post("/pages", { title: "Plan" });
+        return side.post(`/users/${ana.id}/mention`, { integration: app, page: page.id });
+      },
+    ],
   ],
   resend: [
     [
@@ -281,4 +289,13 @@ describe("R2.2: a session sees and takes only the apps it used", () => {
       }
     },
   );
+});
+
+describe("R3.2: where an app's handle goes, its name is no handle", () => {
+  test.each(Object.keys(HANDED))("%s: handing over an app by its name is not_found", async (channel) => {
+    const { mine } = await twoSessions(channel, "coder");
+    for (const [what, hand] of HANDED[channel] ?? []) {
+      expect(await refusal(hand(mine, "coder")), what).toBe("not_found");
+    }
+  });
 });

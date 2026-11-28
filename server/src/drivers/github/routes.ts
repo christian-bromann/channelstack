@@ -597,7 +597,7 @@ export function registerGitHubRoutes(
             user: person(session.id, user),
             permission,
           })),
-          apps: body.apps?.map((app) => store.apps.get(session.id, app).name),
+          apps: body.apps?.map((app) => store.apps.handle(session.id, app).name),
           labels: body.labels,
         }),
       ),
@@ -692,7 +692,7 @@ export function registerGitHubRoutes(
     sdkMethod: { on: "GitHubApp", name: "installationId", args: ["repo"] },
     stability,
     handler: ({ session, params, body }) =>
-      installationIdOf(session.id, body.repo, store.apps.get(session.id, params.app)),
+      installationIdOf(session.id, body.repo, store.apps.handle(session.id, params.app)),
   });
 
   // --- Apps -------------------------------------------------------------------------------------
@@ -762,7 +762,7 @@ export function registerGitHubRoutes(
       handler: ({ session, params, body }) =>
         caused(
           session.id,
-          repos.setInstalled(repoOf(session.id, params.repo), store.apps.get(session.id, body.app), installed),
+          repos.setInstalled(repoOf(session.id, params.repo), store.apps.handle(session.id, body.app), installed),
         ),
     });
   }
