@@ -6,7 +6,7 @@ use std::future::IntoFuture;
 
 use serde_json::Value;
 
-use crate::runtime::client::{BoxFuture, Handle, IntoArg};
+use crate::runtime::client::{BoxFuture, Handle, IntoArg, encode_segment};
 use crate::runtime::error::Result;
 use crate::runtime::wait::QuietState;
 use crate::{
@@ -19,11 +19,36 @@ use crate::{
 pub trait Subject: Sync {
     /// Whether the agent is quiet in the subject's session.
     fn quiet(&self) -> BoxFuture<'_, Result<QuietState>>;
+
+    /// What a failing check reads of the session's model calls: the calls no session claimed in
+    /// the last `within_ms`, and the session's own calls, as the server lists them. None outside a session.
+    fn model_reads(&self, within_ms: u64) -> BoxFuture<'_, Result<(Value, Value)>> {
+        let _ = within_ms;
+        Box::pin(async { Ok((Value::Null, Value::Null)) })
+    }
 }
 
 impl<H: Handle + Sync + ?Sized> Subject for H {
     fn quiet(&self) -> BoxFuture<'_, Result<QuietState>> {
         Box::pin(self.ctx().quiet())
+    }
+
+    fn model_reads(&self, within_ms: u64) -> BoxFuture<'_, Result<(Value, Value)>> {
+        let ctx = self.ctx();
+        Box::pin(async move {
+            let base = format!("/sessions/{}/openai", encode_segment(ctx.session()?));
+            let mut query = serde_json::Map::new();
+            query.insert("withinMs".into(), Value::from(within_ms));
+            let unattributed = ctx
+                .transport
+                .request("GET", &format!("{base}/unattributed"), None, Some(query))
+                .await?;
+            let calls = ctx
+                .transport
+                .request("GET", &format!("{base}/calls"), None, None)
+                .await?;
+            Ok((unattributed, calls))
+        })
     }
 }
 
@@ -356,7 +381,7 @@ pub trait ModelCallRefresh: Subject {
     fn read_call(&self) -> BoxFuture<'_, Result<Value>>;
 }
 
-/// A script as it is now: `{ id, used, problems }`.
+/// A script as it is now, with the calls it was given: `{ id, used, problems, calls }`.
 pub trait ScriptRefresh: Subject {
     fn read_script(&self) -> BoxFuture<'_, Result<Value>>;
 }
@@ -398,7 +423,11 @@ impl ModelCallRefresh for OpenAICall {
 }
 impl ScriptRefresh for OpenAIScript {
     fn read_script(&self) -> BoxFuture<'_, Result<Value>> {
-        Box::pin(async move { Ok(self.refresh().await?.data().clone()) })
+        Box::pin(async move {
+            let mut script = self.refresh().await?.data().clone();
+            script["calls"] = self.calls().await?;
+            Ok(script)
+        })
     }
 }
 calls!(OpenAIFixture);

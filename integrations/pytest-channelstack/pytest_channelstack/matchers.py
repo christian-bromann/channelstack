@@ -13,7 +13,8 @@ Each check reads plain SDK methods, the way the TypeScript matchers do (`integra
 import json
 import re
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, Protocol, cast
+from typing import Any, NoReturn, Protocol, cast
+from urllib.parse import quote
 
 from channelstack import ChannelstackError
 from channelstack.runtime.client import quiet_of
@@ -93,8 +94,10 @@ def _operation(call: Any) -> str:
 
 
 def _normalised(text: str) -> str:
-    """Text as the server compares it: mentions gone, whitespace collapsed, case ignored."""
+    """Text as the server compares it for attribution (`normalise` in `server/src/core/attribution`):
+    mentions removed, a Slack link resolved to its URL, whitespace collapsed, case ignored."""
     text = re.sub(r"<[@#!][^>]*>", " ", text)
+    text = re.sub(r"<(https?:[^>|]+)(\|[^>]*)?>", r" \1 ", text)
     text = re.sub(r"(^|\s)@[\w.-]+", " ", text)
     return re.sub(r"\s+", " ", text).strip().lower()
 
@@ -149,6 +152,52 @@ def _excerpt(text: str) -> str:
 
 def _listing(lines: Sequence[str]) -> str:
     return "\n".join(f"  {line}" for line in lines) if lines else "  (nothing)"
+
+
+UNATTRIBUTED_WITHIN_MS = 10_000
+"""How recent a model call no session claimed must be for a failing check to name it (design §8.4)."""
+
+
+def _model_notes(unattributed: Sequence[dict[str, Any]], calls: Sequence[dict[str, Any]]) -> list[str]:
+    """What the session's model calls add to a failing check's message, from what the server answered: the
+    recent calls no session claimed, and the calls given to this session only by order, between sessions
+    that sent the same text."""
+    notes: list[str] = []
+    if unattributed:
+        count = "1 model call" if len(unattributed) == 1 else f"{len(unattributed)} model calls"
+        lines: list[str] = []
+        for call in unattributed:
+            user = call.get("lastUserText")
+            said = "no user message" if user is None else json.dumps(_excerpt(str(user)), ensure_ascii=False)
+            ago = round(float(call.get("sinceMs", 0)) / 1000)
+            lines.append(f"{call['id']} ({said}, {ago}s ago): {call['message']}")
+        within = _number(UNATTRIBUTED_WITHIN_MS / 1000)
+        notes.append(f"{count} in the last {within}s couldn't be attributed to a test:\n{_listing(lines)}")
+    # One line per text the sessions shared, naming every call it decided.
+    tied: dict[str, tuple[list[str], list[str]]] = {}
+    for call in calls:
+        context: dict[str, Any] = call.get("request", {}).get("context", {})
+        tied_with = list(context.get("tiedWith") or [])
+        if context.get("attributedBy") != "order" or not tied_with:
+            continue
+        tied.setdefault(str(context.get("matched") or ""), ([], tied_with))[0].append(str(call["id"]))
+    for text, (ids, others) in tied.items():
+        which = f"Model call {ids[0]} was" if len(ids) == 1 else f"Model calls {', '.join(ids)} were"
+        notes.append(
+            f"{which} attributed by order, between {len(others) + 1} sessions that all sent "
+            f"{json.dumps(_excerpt(text), ensure_ascii=False)} (this one and {', '.join(others)}): each went to the "
+            "oldest unanswered message. Give each test's prompt something of its own, or have the agent send `user`."
+        )
+    return notes
+
+
+def _answered(call: Any) -> bool:
+    """Whether a script's turn reached the agent: an answer (text, tool calls, a refusal) or a scripted error.
+    Not a call the fake refused for the script (`channelstack_no_script`: a turn the real API can't give, a
+    list that ran out, a responder that threw), nor one a responder still holds."""
+    response: dict[str, Any] = call.response
+    error = response.get("error")
+    return error != "channelstack_no_script" and (response.get("text") is not None or error is not None)
 
 
 def _comment_text(comment: Any) -> str:
@@ -206,13 +255,13 @@ class Expectation:
         self._subject = subject
 
     async def _fail_on_problems(self) -> None:
-        """Fail with the session's model problems, if it has any. Nothing for a subject outside a session."""
+        """Raise `ModelProblemError` when the session has model problems. Nothing for a subject outside a session."""
         try:
             problems = (await unreported_refusals(lambda: quiet_of(self._subject._ctx))).problems
         except (ChannelstackError, AttributeError, RuntimeError):
             return
         if problems:
-            raise AssertionError(str(ModelProblemError(problems)))
+            raise ModelProblemError(problems)
 
     async def _still_open(self) -> list[str]:
         """What the agent left open in the subject's session, in words: it only adds to a failure's message.
@@ -223,6 +272,31 @@ class Expectation:
             return list((await unreported_refusals(lambda: quiet_of(self._subject._ctx))).open)
         except (ChannelstackError, AttributeError, RuntimeError):
             return []
+
+    async def _model_notes(self) -> list[str]:
+        """What the session's model calls add to a failing check's message. Nothing for a subject outside a
+        session, or where the server can't tell (live)."""
+        try:
+            ctx = self._subject._ctx
+            if ctx.session is None:
+                return []
+            base = f"/sessions/{quote(str(ctx.session), safe='')}/openai"
+
+            async def read() -> tuple[Any, Any]:
+                unattributed = await ctx.transport.request(
+                    "GET", f"{base}/unattributed", query={"withinMs": UNATTRIBUTED_WITHIN_MS}
+                )
+                return unattributed, await ctx.transport.request("GET", f"{base}/calls")
+
+            unattributed, calls = await unreported_refusals(read)
+        except (ChannelstackError, AttributeError):
+            return []
+        return _model_notes(cast("list[dict[str, Any]]", unattributed), cast("list[dict[str, Any]]", calls))
+
+    async def _fail(self, message: str) -> NoReturn:
+        """Fail the check: its message, then what the session's model calls say about it."""
+        notes = await self._model_notes()
+        raise AssertionError("\n".join([message, *notes])) from None
 
     async def _settle[T](
         self,
@@ -246,7 +320,7 @@ class Expectation:
                     watching=True,
                 )
             except ModelProblemError as error:
-                raise AssertionError(str(error)) from None
+                await self._fail(str(error))
             value = await read()
         else:
             last: list[T] = []
@@ -265,13 +339,19 @@ class Expectation:
 
             try:
                 value = (await wait_for("the condition", attempt, timeout=timeout))[0]
+            except ModelProblemError as error:
+                await self._fail(str(error))
             except WaitTimeoutError:
-                await self._fail_on_problems()
+                # A timeout whose cause is a model problem says so.
+                try:
+                    await self._fail_on_problems()
+                except ModelProblemError as error:
+                    await self._fail(str(error))
                 value = last[0] if last else await read()
         if holds(value) == negate:
             open_work = await self._still_open()
             leftover = f"\nStill open: {'; '.join(open_work)}" if open_work else ""
-            raise AssertionError(f"{describe(value)}{leftover}")
+            await self._fail(f"{describe(value)}{leftover}")
 
     # Replies and messages
 
@@ -1441,15 +1521,22 @@ class Expectation:
     async def _answered(
         self, times: int | None, timeout: Duration | None, quiet_for: Duration | None, negate: bool
     ) -> None:
-        def described(script: Any) -> str:
+        script_id = str(self._subject.id)
+
+        async def read() -> tuple[int, list[str]]:
+            calls = await self._subject.calls()
+            return sum(1 for call in calls if _answered(call)), list((await self._subject.refresh()).problems)
+
+        def described(value: tuple[int, list[str]]) -> str:
+            count, problems = value
             wanted = "a call" if times is None else f"{times} {'call' if times == 1 else 'calls'}"
-            problems = f". Its problems:\n{_listing(list(script.problems))}" if script.problems else ""
-            expected = f"Expected script {script.id} {'not ' if negate else ''}to answer {wanted}"
-            return f"{expected}, it answered {script.used}{problems}"
+            listed = f". Its problems:\n{_listing(problems)}" if problems else ""
+            expected = f"Expected script {script_id} {'not ' if negate else ''}to answer {wanted}"
+            return f"{expected}, it answered {count}{listed}"
 
         await self._settle(
-            read=lambda: self._subject.refresh(),
-            holds=lambda script: script.used > 0 if times is None else script.used == times,
+            read=read,
+            holds=lambda value: value[0] > 0 if times is None else value[0] == times,
             describe=described,
             negate=negate,
             once_quiet=times is not None,
@@ -1460,7 +1547,8 @@ class Expectation:
     async def to_have_answered(
         self, *, times: int | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None
     ) -> None:
-        """Subject: a script. It answered calls (exactly `times` of them, once the agent is quiet)."""
+        """Subject: a script. It answered calls (exactly `times` of them, once the agent is quiet): a call counts
+        once the script's turn reached the agent, not one it was given and the fake refused."""
         await self._answered(times, timeout, quiet_for, negate=False)
 
     async def not_to_have_answered(

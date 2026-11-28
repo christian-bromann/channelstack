@@ -1,33 +1,95 @@
 /**
- * Two tests that must fail (exit check 13.4), run by `openai-no-script.test.ts`: each plays an
- * agent whose model call no script answers. One waits in a matcher, which fails at once instead
- * of timing out; the other asserts nothing, and fails when its session closes.
+ * Tests that must fail (exit check 13.4), run by `openai-no-script.test.ts`: each plays an agent
+ * whose model call goes wrong for want of a script that can answer it. No script answers it, a
+ * list ran out, a responder threw or never answered, or the script asked for what the real API
+ * can't give. A waiting matcher fails at once instead of timing out; a test that asserts nothing
+ * fails when its session closes. Each says why.
  */
 import { expect, test } from "vitest";
 
-/** A model call as an agent makes one, tagged with the test's session, that no script answers. */
-async function unscripted(baseUrl: string, key: string, session: string): Promise<number> {
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      model: "gpt-5",
-      user: session,
-      messages: [{ role: "user", content: "what broke yesterday?" }],
-    }),
-  });
-  return response.status;
-}
+import { callModel, timed } from "../model-call.ts";
 
-test("a waiting matcher fails at once", async ({ openai, channelstack }) => {
+/** What no call in these tests ever sends: a check on it waits until its timeout, unless a model problem stops it. */
+const NEVER_SENT = "words this agent never sends to the model";
+
+test("an unscripted call fails a waiting matcher at once", async ({ openai, channelstack }) => {
   const key = (await channelstack.env()).OPENAI_API_KEY ?? "";
   const ai = await openai.respond("never used", { when: { text: "something else entirely" } });
-  expect(await unscripted(openai.baseUrl, key, channelstack.sessionId)).toBe(400);
+  const answer = await callModel(openai.baseUrl, key, { text: "what broke yesterday?", user: channelstack.sessionId });
+  expect(answer.status).toBe(400);
 
-  await expect(ai).toHaveAnswered({ timeout: "20s" });
+  await timed(expect(ai).toHaveAnswered({ timeout: "20s" }));
 });
 
-test("a test that asserts nothing still fails", async ({ openai, channelstack }) => {
+test("an unscripted call fails a test that asserts nothing", async ({ openai, channelstack }) => {
   const key = (await channelstack.env()).OPENAI_API_KEY ?? "";
-  await unscripted(openai.baseUrl, key, channelstack.sessionId);
+  await callModel(openai.baseUrl, key, { text: "what broke yesterday?", user: channelstack.sessionId });
 });
+
+test("a list that runs out fails a waiting matcher at once", async ({ openai, channelstack }) => {
+  const key = (await channelstack.env()).OPENAI_API_KEY ?? "";
+  await openai.respond(["The only answer."]);
+  const user = channelstack.sessionId;
+  expect((await callModel(openai.baseUrl, key, { text: "what broke yesterday?", user })).status).toBe(200);
+  expect((await callModel(openai.baseUrl, key, { text: "and the day before?", user })).status).toBe(400);
+
+  await timed(expect(openai).toHaveSent(NEVER_SENT, { timeout: "20s" }));
+});
+
+test("a list that runs out fails a test that asserts nothing", async ({ openai, channelstack }) => {
+  const key = (await channelstack.env()).OPENAI_API_KEY ?? "";
+  await openai.respond(["The only answer."]);
+  const user = channelstack.sessionId;
+  await callModel(openai.baseUrl, key, { text: "what broke yesterday?", user });
+  await callModel(openai.baseUrl, key, { text: "and the day before?", user });
+});
+
+test("a responder that throws fails a waiting matcher at once", async ({ openai, channelstack }) => {
+  const key = (await channelstack.env()).OPENAI_API_KEY ?? "";
+  await openai.respond(() => {
+    throw new Error("no incident data in this fixture");
+  });
+  const answer = await callModel(openai.baseUrl, key, { text: "what broke yesterday?", user: channelstack.sessionId });
+  expect(answer.status).toBe(400);
+
+  await timed(expect(openai).toHaveSent(NEVER_SENT, { timeout: "20s" }));
+});
+
+test("a responder that throws fails a test that asserts nothing", async ({ openai, channelstack }) => {
+  const key = (await channelstack.env()).OPENAI_API_KEY ?? "";
+  await openai.respond(() => {
+    throw new Error("no incident data in this fixture");
+  });
+  await callModel(openai.baseUrl, key, { text: "what broke yesterday?", user: channelstack.sessionId });
+});
+
+test("a script problem fails a waiting matcher at once", async ({ openai, channelstack }) => {
+  const key = (await channelstack.env()).OPENAI_API_KEY ?? "";
+  await openai.respond({ toolCalls: [{ name: "search_incidents", arguments: { since: "yesterday" } }] });
+  const answer = await callModel(openai.baseUrl, key, {
+    text: "what broke yesterday?",
+    tools: ["lookup_runbook"],
+    user: channelstack.sessionId,
+  });
+  expect(answer.status).toBe(400);
+
+  await timed(expect(openai).toHaveSent(NEVER_SENT, { timeout: "20s" }));
+});
+
+test("a script problem fails a test that asserts nothing", async ({ openai, channelstack }) => {
+  const key = (await channelstack.env()).OPENAI_API_KEY ?? "";
+  await openai.respond({ toolCalls: [{ name: "search_incidents", arguments: { since: "yesterday" } }] });
+  await callModel(openai.baseUrl, key, {
+    text: "what broke yesterday?",
+    tools: ["lookup_runbook"],
+    user: channelstack.sessionId,
+  });
+});
+
+test("a responder that never answers fails the test with its reason", async ({ openai, channelstack }) => {
+  const key = (await channelstack.env()).OPENAI_API_KEY ?? "";
+  await openai.respond(() => new Promise<string>(() => {}));
+  // The server gives up on the test's answer after its 10s, and refuses the call.
+  const answer = await callModel(openai.baseUrl, key, { text: "what broke yesterday?", user: channelstack.sessionId });
+  expect(answer.status).toBe(400);
+}, 30_000);

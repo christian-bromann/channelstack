@@ -25,6 +25,17 @@ export interface InSession {
   [QUIET](): Promise<QuietState>;
 }
 
+/**
+ * Every generated handle answers this with its context: the server and the session it lives in. A
+ * failing matcher reads the session's model calls with it, whatever handle it was given.
+ */
+export const CONTEXT: unique symbol = Symbol.for("channelstack.context");
+
+/** A handle a matcher can read its session through. */
+export interface WithContext {
+  [CONTEXT](): HandleContext;
+}
+
 /** Give a value its text form: `String(value)` and `value.toString()` return `text`, and the value keeps its fields. */
 export function printsAs<T extends object>(value: T, text: string): T & { toString(): string } {
   return Object.defineProperty(value, "toString", { value: () => text, enumerable: false }) as T & {

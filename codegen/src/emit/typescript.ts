@@ -416,6 +416,11 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
             "  [QUIET](): Promise<QuietState> {",
             "    return quietOf(this.#ctx);",
             "  }",
+            "",
+            "  /** @internal The server and session this handle lives in: what a failing matcher reads the session's model calls with. */",
+            "  [CONTEXT](): HandleContext {",
+            "    return this.#ctx;",
+            "  }",
           ];
     const tail = [
       ...resource.methods.flatMap((m) => method(resource, m)),
@@ -515,7 +520,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   const spec = JSON.stringify(ir);
   const lines = [
     `// ${BANNER}`,
-    `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${ir.types.some((type) => type.stringField !== undefined) ? ", printsAs" : ""}, QUIET, quietOf${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
+    `import { ClientBase, connectWith, CONTEXT${disposes ? ", disposeQuietly" : ""}, type HandleContext${ir.types.some((type) => type.stringField !== undefined) ? ", printsAs" : ""}, QUIET, quietOf${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
     ...(usesCredentials ? ['import { credential } from "../runtime/credentials.ts";'] : []),
     ...(usesDurations ? ['import { type Duration, parseDuration } from "../runtime/duration.ts";'] : []),
     ...(usesFiles

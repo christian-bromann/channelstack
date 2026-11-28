@@ -311,57 +311,146 @@ where
     H: Fn(&T) -> bool,
     D: Fn(&T) -> String,
 {
-    let timeout = options.or("timeout", DEFAULT_TIMEOUT);
-    let value = if once_quiet || negate {
-        // The check watches for the whole quiet window: what arrives while it looks counts.
-        let quiet_for = options.or("quietFor", DEFAULT_QUIET_FOR);
-        until_quiet(|| subject.quiet(), &timeout, &quiet_for, true).await?;
-        read().await?
-    } else {
-        let last = Mutex::new(None);
-        let polls = std::sync::atomic::AtomicUsize::new(0);
-        let held = wait_for("the condition", &timeout, || {
-            let attempt = read();
-            let (last, holds, polls) = (&last, &holds, &polls);
-            async move {
-                let value = attempt.await?;
-                if holds(&value) {
-                    return Ok(Some(value));
+    let checked = async {
+        let timeout = options.or("timeout", DEFAULT_TIMEOUT);
+        let value = if once_quiet || negate {
+            // The check watches for the whole quiet window: what arrives while it looks counts.
+            let quiet_for = options.or("quietFor", DEFAULT_QUIET_FOR);
+            until_quiet(|| subject.quiet(), &timeout, &quiet_for, true).await?;
+            read().await?
+        } else {
+            let last = Mutex::new(None);
+            let polls = std::sync::atomic::AtomicUsize::new(0);
+            let held = wait_for("the condition", &timeout, || {
+                let attempt = read();
+                let (last, holds, polls) = (&last, &holds, &polls);
+                async move {
+                    let value = attempt.await?;
+                    if holds(&value) {
+                        return Ok(Some(value));
+                    }
+                    *last.lock().expect("the last value read") = Some(value);
+                    // A model call no script answered won't be answered by waiting: fail now, with why.
+                    if polls.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 5 == 4 {
+                        fail_on_problems(subject).await?;
+                    }
+                    Ok(None)
                 }
-                *last.lock().expect("the last value read") = Some(value);
-                // A model call no script answered won't be answered by waiting: fail now, with why.
-                if polls.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 5 == 4 {
+            })
+            .await;
+            match held {
+                Ok(value) => value,
+                Err(Error::Timeout { .. }) => {
                     fail_on_problems(subject).await?;
+                    last.into_inner()
+                        .expect("the last value read")
+                        .expect("a wait reads at least once")
                 }
-                Ok(None)
+                Err(error) => return Err(error),
             }
-        })
-        .await;
-        match held {
-            Ok(value) => value,
-            Err(Error::Timeout { .. }) => {
-                fail_on_problems(subject).await?;
-                last.into_inner()
-                    .expect("the last value read")
-                    .expect("a wait reads at least once")
-            }
-            Err(error) => return Err(error),
+        };
+        if holds(&value) != negate {
+            return Ok(());
         }
+        // A failed check also says what the agent left open (a stream it never stopped): often that is the bug.
+        let open = still_open(subject).await?;
+        let leftover = if open.is_empty() {
+            String::new()
+        } else {
+            format!("\nStill open: {}", open.join("; "))
+        };
+        Err(Error::Expectation(format!(
+            "{}{leftover}",
+            describe(&value)
+        )))
     };
-    if holds(&value) != negate {
-        return Ok(());
+    match checked.await {
+        // A failed check also says what the session's model calls tell about it.
+        Err(Error::Expectation(message)) => {
+            let notes = model_notes_of(subject).await?;
+            Err(Error::Expectation(
+                std::iter::once(message)
+                    .chain(notes)
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ))
+        }
+        other => other,
     }
-    // A failed check also says what the agent left open (a stream it never stopped): often that is the bug.
-    let open = still_open(subject).await?;
-    let leftover = if open.is_empty() {
-        String::new()
-    } else {
-        format!("\nStill open: {}", open.join("; "))
-    };
-    Err(Error::Expectation(format!(
-        "{}{leftover}",
-        describe(&value)
-    )))
+}
+
+/// How recent a model call no session claimed must be for a failing check to name it (design §8.4).
+const UNATTRIBUTED_WITHIN_MS: u64 = 10_000;
+
+/// What the session's model calls add to a failing check's message. Nothing outside a session, or
+/// where the server can't tell (live).
+async fn model_notes_of<S: Subject + ?Sized>(subject: &S) -> Result<Vec<String>> {
+    match subject.model_reads(UNATTRIBUTED_WITHIN_MS).await {
+        Ok((unattributed, calls)) => Ok(model_notes(&items(unattributed), &items(calls))),
+        Err(Error::Api { .. } | Error::Invalid(_)) => Ok(vec![]),
+        Err(error) => Err(error),
+    }
+}
+
+/// The lines of `model_notes_of`, from what the server answered: the recent calls no session
+/// claimed, and the calls given to this session only by order, between sessions that sent the same text.
+fn model_notes(unattributed: &[Value], calls: &[Value]) -> Vec<String> {
+    let mut notes = vec![];
+    if !unattributed.is_empty() {
+        let count = match unattributed.len() {
+            1 => "1 model call".to_owned(),
+            n => format!("{n} model calls"),
+        };
+        let lines = unattributed.iter().map(|call| {
+            let said = match call["lastUserText"].as_str() {
+                Some(user) => Value::from(excerpt(user)).to_string(),
+                None => "no user message".to_owned(),
+            };
+            let ago = (call["sinceMs"].as_f64().unwrap_or(0.0) / 1000.0).round();
+            format!(
+                "{} ({said}, {ago}s ago): {}",
+                text_of(call, "id"),
+                text_of(call, "message")
+            )
+        });
+        notes.push(format!(
+            "{count} in the last {}s couldn't be attributed to a test:\n{}",
+            UNATTRIBUTED_WITHIN_MS / 1000,
+            listing(lines)
+        ));
+    }
+    // One line per text the sessions shared, naming every call it decided.
+    let mut tied: Vec<(String, Vec<String>, Vec<String>)> = vec![];
+    for call in calls {
+        let context = &call["request"]["context"];
+        let with: Vec<String> = items(context["tiedWith"].clone())
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect();
+        if context["attributedBy"] != "order" || with.is_empty() {
+            continue;
+        }
+        let text = text_of(context, "matched").to_owned();
+        let id = text_of(call, "id").to_owned();
+        match tied.iter_mut().find(|(shared, _, _)| *shared == text) {
+            Some((_, ids, _)) => ids.push(id),
+            None => tied.push((text, vec![id], with)),
+        }
+    }
+    for (text, ids, with) in tied {
+        let which = match ids.as_slice() {
+            [one] => format!("Model call {one} was"),
+            _ => format!("Model calls {} were", ids.join(", ")),
+        };
+        notes.push(format!(
+            "{which} attributed by order, between {} sessions that all sent {} (this one and {}): each went to the oldest unanswered message. Give each test's prompt something of its own, or have the agent send `user`.",
+            with.len() + 1,
+            Value::from(excerpt(&text)),
+            with.join(", ")
+        ));
+    }
+    notes
 }
 
 /// Fail with the session's model problems, if it has any. Nothing where the server can't tell.
@@ -1863,11 +1952,32 @@ check!(
     Answered counts { times("times"): usize }
 );
 
-/// Text as the server compares it: mentions gone, whitespace collapsed, case ignored.
+/// How many of a script's calls its turn reached the agent in: an answer (text, tool calls, a
+/// refusal) or a scripted error. Not a call the fake refused for the script
+/// (`channelstack_no_script`: a turn the real API can't give, a list that ran out, a responder that
+/// panicked), nor one a responder still holds.
+fn answered(script: &Value) -> i64 {
+    let count = items(script["calls"].clone())
+        .iter()
+        .filter(|call| {
+            let response = &call["response"];
+            response["error"] != "channelstack_no_script"
+                && (!response["text"].is_null() || !response["error"].is_null())
+        })
+        .count();
+    i64::try_from(count).unwrap_or(i64::MAX)
+}
+
+/// Text as the server compares it for attribution (`normalise` in `server/src/core/attribution`):
+/// mentions removed, a Slack link resolved to its URL, whitespace collapsed, case ignored.
 fn normalised(text: &str) -> String {
-    let mentions = regex::Regex::new(r"<[@#!][^>]*>|(?:^|\s)@[\w.-]+").expect("a pattern");
-    let spaced = mentions.replace_all(text, " ");
-    spaced
+    let mentions = regex::Regex::new(r"<[@#!][^>]*>").expect("a pattern");
+    let links = regex::Regex::new(r"<(https?:[^>|]+)(\|[^>]*)?>").expect("a pattern");
+    let names = regex::Regex::new(r"(?:^|\s)@[\w.-]+").expect("a pattern");
+    let unmentioned = mentions.replace_all(text, " ");
+    let linked = links.replace_all(&unmentioned, " $1 ");
+    names
+        .replace_all(&linked, " ")
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
@@ -2126,8 +2236,8 @@ impl<'a, S: ScriptRefresh + ?Sized> Expectation<'a, S> {
                 &options,
                 || async { subject.read_script().await },
                 |script| {
-                    let used = script["used"].as_i64().unwrap_or(0);
-                    times.map_or(used > 0, |times| used == times)
+                    let count = answered(script);
+                    times.map_or(count > 0, |times| count == times)
                 },
                 |script| {
                     let wanted = times.map_or_else(
@@ -2147,7 +2257,7 @@ impl<'a, S: ScriptRefresh + ?Sized> Expectation<'a, S> {
                         "Expected script {} {}to answer {wanted}, it answered {}{problems}",
                         text_of(script, "id"),
                         not(NOT),
-                        script["used"].as_i64().unwrap_or(0)
+                        answered(script)
                     )
                 },
             )
