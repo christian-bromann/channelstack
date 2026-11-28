@@ -17,7 +17,7 @@ https://slack.localhost        Slack Web API, Socket Mode (wss); sends Events AP
 https://github.localhost       GitHub REST + GraphQL; sends App webhooks
 https://linear.localhost       Linear GraphQL; sends webhooks + Agent Session events
 https://notion.localhost       Notion API; sends integration webhooks (comments, page changes)
-https://openai.localhost       OpenAI API for the agent's model, scripted per test (phases 13 and 14)
+https://openai.localhost       OpenAI API for the agent's model at /v1, scripted per test (section 6)
 
 https://my-agent.localhost     your agent, under its own portless name, so channelstack can deliver to it
 ```
@@ -66,6 +66,10 @@ channelstack 0.1 · in-memory
   github   https://github.localhost
   linear   https://linear.localhost
   notion   https://notion.localhost
+  resend   https://resend.localhost
+  google   https://google.localhost
+  discord  https://discord.localhost
+  openai   https://openai.localhost
   UI       https://channelstack.localhost/…   (a one-time login link)
 
   `channelstack env` prints tokens and URLs as .env lines
@@ -86,7 +90,7 @@ Point the agent at it, using only options the SDKs already have. When the variab
 | Google (`googleapis`, `google-auth-library`) | `rootUrl` per API; `endpoints` | `GOOGLE_API_URL=https://google.localhost/`, `GOOGLE_TOKEN_URL`, `GOOGLE_CERTS_URL` |
 | Discord (discord.js) | `rest: { api }`; the Gateway from `GET /gateway/bot` | `DISCORD_API_URL=https://discord.localhost/api`, with `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_GUILD_ID` |
 | Chat SDK, Mastra, Flue | the adapter's API URL option | the same variables |
-| The model: `openai`, the AI SDK, LangChain, the Agents SDK, or an OpenAI-compatible gateway | the environment, or the client's `baseURL` | `OPENAI_BASE_URL=https://openai.localhost/v1`, `OPENAI_API_KEY` |
+| The model: `openai`, the AI SDK, LangChain, the Agents SDK, or an OpenAI-compatible gateway | the environment, or the client's `baseURL` | `OPENAI_BASE_URL=https://openai.localhost/v1`, `OPENAI_API_KEY` (`sk-proj-…`) |
 
 ```bash
 npx channelstack env >> .env.local
@@ -163,6 +167,12 @@ channelstack ui                                           # a one-time link that
 channelstack deliveries [slack]                           # what was delivered, with ids, outcomes and attempts
 channelstack redeliver [slack] [last|<id>]                # again, as the platform does: Slack's retry, with X-Slack-Retry-Num
 
+# The model (section 6)
+channelstack openai respond "Here's what I found."        # script the fake OpenAI's answer; --when <text>, --times <n> (-1: every call),
+                                                          # --tool <name> --args <json> calls a tool first; {lastUserText}, {toolResult}
+channelstack openai calls                                 # the dev session's model calls: what the agent asked, what the model answered
+channelstack openai undo <script>                         # remove a script (ms_…)
+
 # For a coding agent
 channelstack mcp                                          # these commands as MCP tools over stdio (section 4b)
 
@@ -197,6 +207,7 @@ The MCP tools are the attach CLI's commands, each written once for both (`server
 - `say`, `reply`, `react` and `show`, each with a `channel` (`channelstack <channel> say|reply|react|show`; `show` without one is `channelstack show`).
 - `<channel>_act` for everything else that channel's people do (`slack_act`, `github_act`, …): an `action` enum generated from the routes, the action's values as `params`, and `as`, `in` and `on` as on the CLI. Its description lists each action's values.
 - `tail` (what happened since its last call), `list_deliveries` and `redeliver` (`channelstack deliveries [<channel>]`, `channelstack redeliver [<channel>] [last|<id>]`; Slack retries the way Slack does, the others redeliver).
+- `openai_respond` (`text`, `when`, `times`, `tool`, `args`) and `openai_calls`: `channelstack openai respond` and `channelstack openai calls` (section 6).
 
 They act in the shared `dev` session and never return the server's token. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. The `channelstack` skill (`skills/channelstack/SKILL.md`, for skills.sh) comes with it, the same way portless and emulate ship theirs.
 
@@ -362,7 +373,7 @@ await using fault = await slack.fault({ type: "rate_limit" });  // undone when t
 
 `await using` needs TypeScript ≥ 5.2 with the `esnext.disposable` lib, or a runtime with native support. A dispose step only cleans up; it never asserts anything.
 
-- The fixtures (`slack`, `github`, `linear`, `notion`) come from Vitest's own test context, so you import `test` and `expect` from `vitest` as usual.
+- The fixtures (`slack`, `github`, `linear`, `notion`, `resend`, `google`, `discord`, and `openai` for the model) come from Vitest's own test context, so you import `test` and `expect` from `vitest` as usual.
 - Each fixture creates its own channel, PR, issue or page, so tests run in parallel against one server.
 
 ### The integrations
@@ -391,7 +402,7 @@ async def test_a_mention_gets_one_reply(slack):
     await expect(channel).not_to_have_channel_message_from("my-agent")
 ```
 
-- **Fixtures:** `channelstack` is the client for the whole run (`env()`, `reset()`); `channelstack_session` is the test's session, closed after it; `slack`, `github`, `linear` and `notion` are the channels' fixtures in it.
+- **Fixtures:** `channelstack` is the client for the whole run (`env()`, `reset()`); `channelstack_session` is the test's session, closed after it; `slack`, `github`, `linear`, `notion`, `resend`, `google` and `discord` are the channels' fixtures in it, and `openai` is the fake model's.
 - **One event loop.** The client outlives each test, so tests and fixtures run on the run's loop. With pytest-asyncio, set it once:
 
   ```ini
@@ -448,11 +459,13 @@ notionChecks({ app: "my-agent" });   // answers in the discussion it was asked i
 
 Each check is named after a bug class found in real apps (`app-developers.md`). The UI's **Checks** panel runs the same set.
 
+An agent on the fake OpenAI passes `model: "openai"` (`slackChecks({ app: "my-agent", model: "openai" })`): each check that scripts nothing itself gets a plain answer for every model call, the stream and Stop checks script a long stream and need no `streamPrompt`, and on Slack six model checks are added (`SLACK_MODEL_CHECKS`: a slow model with Slack's retry, a model that fails, a call the SDK retries, a stream that breaks, Stop cancelling the model, no secrets in the prompt). The other channels' model checks are [#120](https://github.com/christian-bromann/channelstack/issues/120).
+
 Ten of the Slack checks need nothing but the prompt. The stream and Stop checks need `streamPrompt` (text that makes the agent stream a longer answer), and the two click checks need `approval: { prompt, button }` (text that makes it ask for an approval, and the button's label). Without those options the checks are left out, as with `skip: ["slack.stream-stop"]`. `slack.double-click` counts messages: it expects the agent to answer one approval with exactly one new message in the thread (replacing the question as well is fine); an agent that answers only in place, or with several messages, skips it. Every check's id is in its test name.
 
 ## 6. The model
 
-channelstack fakes OpenAI's API at `https://openai.localhost/v1`: Chat Completions, the Responses API and the Conversations API, and images, audio, files and OpenAI's built-in tools. It's realistic on the wire (event shapes, tool calls, errors, rate-limit headers, timing) and never in content: the model says what the test scripted ([decision 0029](decisions/0029-fake-openai.md); built in phases 13 and 14). The full interface is in [the approved design](../phase-log/model-providers/interface-draft.md).
+channelstack fakes OpenAI's API at `https://openai.localhost/v1`: Chat Completions, the Responses API (stored responses, `previous_response_id`), the Conversations API and `GET /v1/models`. It's realistic on the wire (event shapes, ids, tool calls, errors, rate-limit headers, timing) and never in content: the model says what the test scripted ([decision 0029](decisions/0029-fake-openai.md), phase 13). Images, audio, files and OpenAI's built-in tools come in phase 14. The full interface is in [the approved design](../phase-log/model-providers/interface-draft.md); the website's "The model" page is the user's guide.
 
 ```ts
 test("a slow model and Slack's 3s retry still give one reply", async ({ slack, openai }) => {
@@ -463,19 +476,21 @@ test("a slow model and Slack's 3s retry still give one reply", async ({ slack, o
   ], { timing: { firstToken: "5s" } });
 
   const msg = await ana.say("@my-agent what broke yesterday?", { to: slack.app });
-  await msg.delivery!.retry({ after: "3s" });
+  await msg.delivery!.retry({ after: "3s", reason: "http_timeout" });
 
-  await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
+  await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1, timeout: "15s" });
   await expect(ai).toHaveAnswered({ times: 2 });
   await expect(openai).not.toHaveSentSecrets();
 });
 ```
 
-- **Scripted per test:** a list of turns (text, stream chunks, tool calls, reasoning, errors), or a function of the request that runs in the test process. Each script belongs to the test's session.
-- **Unscripted calls fail the test.** The agent gets a 400 naming the missing `openai.respond(…)`, and the test fails with the same message.
-- **Timing and failures are scripted:** a slow first token, a stream that breaks halfway, OpenAI's documented errors, a rate limit with truthful headers.
-- **What the agent sent is readable:** `calls()`, `toolCalls()`, and matchers for thread history, private text and secrets.
-- **The gateways come with it:** anything with an OpenAI base URL, from the official SDKs to OpenRouter, LiteLLM, Groq, Ollama and Azure OpenAI.
+- **Scripted per test** with the `openai` fixture (Vitest and pytest; `session.openai()` in Rust): `openai.respond(turns, { when, times, timing })`. A turn is a string, or an object with `text` (a string, or a stream's chunks), `toolCalls`, `reasoning`, `refusal`, `finish`, `usage`, `timing`, `failAfter`, `pauseAfter`, or an `error`. `when` picks the calls a script answers (`text`, `prompt`, `tools`, `toolResult`, `endpoint`, `model`, `from`, `in`); scripts are tried in the order they were added. A function instead of turns (`respond_with` in Rust) answers each call from its request, in the test process. Each script belongs to the test's session.
+- **Unscripted calls fail the test.** The agent gets a 400 (`channelstack_no_script`) naming the missing `openai.respond(…)`, and the test fails with the same message, at once in a waiting matcher or when its session closes.
+- **Timing and failures are scripted:** a slow first token, a stream that breaks (an error event, a cut connection or a stall), a stream held at `pauseAfter` (until `resume()`, or until the agent hangs up), OpenAI's documented errors, and `openai.rateLimit(…)` with truthful `x-ratelimit-*` headers.
+- **What the agent sent is readable:** `calls()`, `waitForCall()`, `latestCall()`, `toolCalls()`, and the matchers `toHaveReceivedCall`, `toHaveSent` (thread history, or text it shouldn't have), `toHaveSentSecrets`, `toHaveOfferedTool`, `toHaveSentToolResult`, `toBeAborted` and `toHaveAnswered`.
+- **A call finds its test** from what it carries: an id the fake made for an earlier answer, a tag the agent sends (`user`, metadata, or the `x-channelstack-session` header), an id only that test's people and places have, or what its people wrote (`core/attribution`).
+- **The gateways come with it:** anything with an OpenAI base URL, from the official SDKs to OpenRouter (its `reasoning`), DeepSeek (`reasoning_content`), LiteLLM, Groq, Ollama and Azure OpenAI (deployment paths). The fake answers any model name. In proxy mode, `api.openai.com` goes to the fake.
+- **In the dev loop,** `channelstack openai respond|calls|undo` and MCP's `openai_respond` and `openai_calls` script and read the `dev` session's model (section 4).
 
 A framework's own fake model still works (the AI SDK's `MockLanguageModelV4`, Pi's and Flue's `fauxProvider`, LangChain's `fakeModel`), as does a real model. The matchers check *how* the agent behaved in the channel, not *what* the model said, so they hold either way.
 

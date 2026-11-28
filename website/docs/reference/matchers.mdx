@@ -602,9 +602,9 @@ expect(subject).toHaveReceivedCall(operation, options?)
 
 <dl className="facts">
   <dt>Subject</dt>
-  <dd>A channel fixture: `slack`, `github`, `linear`, `notion`</dd>
+  <dd>A channel fixture (`slack`, `github`, `linear`, `notion`, …), or `openai`, whose calls are named by their endpoint (`chat.completions`, `responses`)</dd>
   <dt>Arguments and options</dt>
-  <dd>`operation: string | RegExp` (a string must equal the [operation](/docs/reference/api/slack#slackapicall)); `error?: string` (only calls that returned this error), `times?: number` (exact), `timeout`, `quietFor`</dd>
+  <dd>`operation: string | RegExp` (a string must equal the [operation](/docs/reference/api/slack#slackapicall), or the model call's endpoint); `error?: string` (only calls that returned this error), `times?: number` (exact), `timeout`, `quietFor`</dd>
   <dt>Waits</dt>
   <dd>Polls; with `times`, quiet then once</dd>
   <dt>Fails with</dt>
@@ -614,6 +614,130 @@ expect(subject).toHaveReceivedCall(operation, options?)
 </dl>
 
 It reads `calls()`, so live it needs proxy mode, which doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)): the test is skipped (`action_requires`).
+
+## The model
+
+The [fake OpenAI](/docs/guide/the-model)'s matchers read what your agent sent the model and how each script answered. Their subjects are the `openai` fixture (every model call of the test), a script (what `openai.respond(…)` returned: the calls it answered), or one call ([`OpenAICall`](/docs/reference/api/openai#openaicall), from `openai.latestCall()` or `ai.waitForPause()`). An unscripted model call fails a waiting matcher at once, with the `openai.respond(…)` that would have answered it.
+
+### toHaveSent
+
+```ts
+expect(subject).toHaveSent(expected, options?)
+```
+
+<dl className="facts">
+  <dt>Subject</dt>
+  <dd>`openai`, a script, or a call</dd>
+  <dt>Arguments and options</dt>
+  <dd>`expected`: a `string`, a `RegExp`, something with `text` (a message, a comment, an email), or a list of them; `ordered?: boolean` (default `true` for a list: they appear in that order in one call, as thread history does), `timeout`, `quietFor`</dd>
+  <dt>Waits</dt>
+  <dd>Polls; under `.not`, quiet then once</dd>
+  <dt>Fails with</dt>
+  <dd>`Expected the agent to send the model "…", then "…" in that order. What it sent, newest first:` and each call's text, or `It made no model call.`</dd>
+  <dt>Python and Rust</dt>
+  <dd>`to_have_sent`, and `not_to_have_sent` for the negation</dd>
+</dl>
+
+`expect(openai).not.toHaveSent(privateMessage)` checks that no text from a channel the agent shouldn't read reached the model.
+
+### toHaveSentSecrets
+
+```ts
+expect(openai).not.toHaveSentSecrets(options?)
+```
+
+<dl className="facts">
+  <dt>Subject</dt>
+  <dd>`openai`</dd>
+  <dt>Arguments and options</dt>
+  <dd>`timeout`, `quietFor`. Use it under `.not`</dd>
+  <dt>Waits</dt>
+  <dd>Quiet, then once</dd>
+  <dt>Fails with</dt>
+  <dd>`Expected the agent not to send the model any secret, it sent:` and each call with the kinds it carried (`slack.botToken`), never their values</dd>
+  <dt>Python and Rust</dt>
+  <dd>`to_have_sent_secrets`, and `not_to_have_sent_secrets` for the negation</dd>
+</dl>
+
+A secret is any token, signing secret, webhook secret, private key or refresh token channelstack knows, fake or live, and the model's own API key in the body.
+
+### toHaveOfferedTool
+
+```ts
+expect(subject).toHaveOfferedTool(name, options?)
+```
+
+<dl className="facts">
+  <dt>Subject</dt>
+  <dd>`openai`, a script, or a call</dd>
+  <dt>Arguments and options</dt>
+  <dd>`name: string`, the tool's name; `schema?` (the tool's JSON Schema parameters must equal it), `timeout`</dd>
+  <dt>Waits</dt>
+  <dd>Polls</dd>
+  <dt>Fails with</dt>
+  <dd>`Expected the agent to offer the model the tool "…", it offered <names>`, or `none`</dd>
+  <dt>Python and Rust</dt>
+  <dd>`to_have_offered_tool`</dd>
+</dl>
+
+### toHaveSentToolResult
+
+```ts
+expect(subject).toHaveSentToolResult(name, options?)
+```
+
+<dl className="facts">
+  <dt>Subject</dt>
+  <dd>`openai`, or a script</dd>
+  <dt>Arguments and options</dt>
+  <dd>`name: string`, the tool the model called; `text?: string | RegExp` (the result the agent sent back must match), `timeout`</dd>
+  <dt>Waits</dt>
+  <dd>Polls</dd>
+  <dt>Fails with</dt>
+  <dd>`Expected the agent to send back a result for "…" with …. The model called it <n> times; <m> got a result:` and each result</dd>
+  <dt>Python and Rust</dt>
+  <dd>`to_have_sent_tool_result`</dd>
+</dl>
+
+### toBeAborted
+
+```ts
+expect(call).toBeAborted(options?)
+```
+
+<dl className="facts">
+  <dt>Subject</dt>
+  <dd>A model call</dd>
+  <dt>Arguments and options</dt>
+  <dd>`timeout`</dd>
+  <dt>Waits</dt>
+  <dd>Polls `call.refresh()`</dd>
+  <dt>Fails with</dt>
+  <dd>`Expected model call <id> to be aborted by the agent, it is still going`, or `it ended <how>` (`completed`, `errored`, `dropped`, `stalled`)</dd>
+  <dt>Python and Rust</dt>
+  <dd>`to_be_aborted`</dd>
+</dl>
+
+It holds when the agent hung up before the answer was complete: it cancelled the request (Stop) or timed out.
+
+### toHaveAnswered
+
+```ts
+expect(script).toHaveAnswered(options?)
+```
+
+<dl className="facts">
+  <dt>Subject</dt>
+  <dd>A script</dd>
+  <dt>Arguments and options</dt>
+  <dd>`times?: number` (exact), `timeout`, `quietFor`</dd>
+  <dt>Waits</dt>
+  <dd>Polls; with `times`, quiet then once</dd>
+  <dt>Fails with</dt>
+  <dd>`Expected script <id> to answer 2 calls, it answered <n>`, and the script's problems, if it has any</dd>
+  <dt>Python and Rust</dt>
+  <dd>`to_have_answered`, and `not_to_have_answered` for the negation</dd>
+</dl>
 
 ## Read methods
 
@@ -640,5 +764,10 @@ Every matcher is built on a plain read, so a test can read the value itself:
 | `toHavePropertyValue` | `page.property(name)` |
 | `toBeAccepted`, `toBeRejected`, `toBeRetried` | `delivery.refresh()`, then `attempts` |
 | `toHaveReceivedCall` | `fixture.calls()` |
+| `toHaveSent`, `toHaveOfferedTool` | `openai.calls()`, `script.calls()`, or the call itself |
+| `toHaveSentSecrets` | `openai.sentSecrets()` |
+| `toHaveSentToolResult` | `openai.toolCalls()`, `script.toolCalls()` |
+| `toBeAborted` | `call.refresh()` |
+| `toHaveAnswered` | `script.refresh()` |
 
 A matcher given a subject without the read it needs throws a `TypeError`, e.g. `This matcher needs a thread or a conversation`.

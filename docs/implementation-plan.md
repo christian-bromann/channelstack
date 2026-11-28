@@ -98,8 +98,9 @@ Emulate 0.14 has since closed some of these, but not streams, Stop, proxying or 
 │ core: sessions · object registry · reality rules · event log · delivery queue       │
 │       secrets vault · safety allowlist · cleanup ledger · recorder · CA + proxy     │
 │                                                                                     │
-│ drivers:  slack │ github │ linear │ notion │ (stripe, discord, …)                   │
+│ drivers:  slack │ github │ linear │ notion │ resend │ google │ discord │ (stripe, …)│
 │   each = control routes + fake backend + live backend + inbound + transcript        │
+│ providers: openai (the agent's model: control routes + fake backend, section 8.6)   │
 └─────────────┬──────────────────────────────────────────┬────────────────────────────┘
               │ fake: https://<driver>.localhost         │ live: real provider APIs
               │       (portless) or via proxy mode       │
@@ -405,6 +406,10 @@ await ana.click("Approve", { message: msg })   // live: drives app.slack.com via
 - The browser actor never signs in itself: a person signs in by hand once with `channelstack login slack --user ana`, and the saved session is reused. `channelstack doctor` says when it has expired. channelstack never handles account passwords. Details: [reality-matrix.md, "Browser sessions"](reality-matrix.md#browser-sessions).
 - **Risk:** UI selectors break. That's acceptable because it's live-only and nightly, and fake mode covers the same flow on every PR.
 
+### 8.6 Providers: the agent's model
+
+The agent's model is faked too, as a **provider**: a fake the agent calls that has no people, apps, deliveries or transcripts. The one provider is the fake OpenAI at `openai.localhost` ([decision 0029](decisions/0029-fake-openai.md), phases 13 and 14), in `server/src/providers/openai/`. It is a driver definition with `provider: true`: it reuses the driver contract above for its routes, fake backend, secrets, ids and proxy hosts (`api.openai.com`), has no live backend, and is left out of the channels. Each test scripts the model with `openai.respond(…)`, and a call no script answers fails it. How it fits in the server (attribution of a call to its session, streams, responders over a long poll) is in [architecture.md, section 3.4](architecture.md#34-providers-the-agents-model); the interface is in [the approved design](../phase-log/model-providers/interface-draft.md).
+
 ## 9. Proving the fakes against the real platforms
 
 "Verify everything by running e2e tests against the real integrations" becomes four mechanisms.
@@ -457,7 +462,7 @@ The same three steps work for every stack: create the world, give the agent its 
 |---|---|---|
 | **MDA** | Proxy mode against `mda-local up`. The Trigger Server receives real-format signed deliveries | Replaces the closed stack's `--fake-*` flags, `MDA_*_API_URL` overrides and patches 0008/0009. The tests keep LangChain's `FakeListChatModel` in `defineDeepAgent` |
 | **Chat SDK** (`chat` with `@chat-adapter/slack`, `/github`, `/linear`, `/notion`) | `channelstack env` provides `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET` and the GitHub/Linear/Notion equivalents. Endpoint is `/api/webhooks/{platform}`. Base-URL mode if the adapter accepts an API URL (verify per adapter), otherwise proxy mode | Recipe: Next.js route plus a Vitest file. Chat SDK's own matchers test adapter calls; channelstack tests the platform result |
-| **AI SDK** (agent loop) with Bolt, Octokit or the Notion SDK as the channel | Base-URL mode. The model is `MockLanguageModelV2`/V3 from `ai/test` or emulate's AI service | Example: a Bolt app that streams an AI SDK response with `chat.startStream`. That's exactly the surface no one fakes today |
+| **AI SDK** (agent loop) with Bolt, Octokit or the Notion SDK as the channel | Base-URL mode. The model is the fake OpenAI through `@ai-sdk/openai` and `OPENAI_BASE_URL` (section 8.6), or the AI SDK's own mock model from `ai/test` | Example: a Bolt app that streams an AI SDK response with `chat.startStream`. That's exactly the surface no one fakes today |
 | **Pi** (`@mariozechner/pi-coding-agent` SDK) | Socket Mode fake or base URL; deterministic model through pi-ai's provider configuration | Example: "a DM to mom gets a threaded reply and a reaction" |
 | **Bolt and Probot** (no AI) | Base URL or proxy | Shows channelstack isn't only for AI agents, and widens the audience |
 
@@ -538,9 +543,10 @@ channelstack holds real tokens and can post into real workspaces, so these are r
 channelstack/
   server/                    Bun + Hono + @hono/zod-openapi
     src/core/                sessions, registry, ids, secrets, signing, reality rules, event log, delivery, errors, redaction, safety, ledger, proxy, ca, recorder (docs/code-map.md names the module for each)
-    src/drivers/{echo,slack,github,linear,notion}/
+    src/drivers/{echo,slack,github,linear,notion,resend,google,discord}/
       routes.ts  world.ts  fake/  live/  payloads.ts  transcript.ts  capabilities.ts
-    src/cli.ts               channelstack [start] | env | doctor | mcp | ui | slack <action> --as … | deliveries | redeliver | tail | show | login | sweep | ca | secrets
+    src/providers/openai/    the fake OpenAI (section 8.6): routes, world, codecs per endpoint, scripts
+    src/cli.ts               channelstack [start] | env | doctor | mcp | ui | <channel> <action> --as … | deliveries | redeliver | openai | tail | show | login | sweep | ca | secrets
   ui/                        the functional browser UI (transcript view, inspector, chaos controls), served at channelstack.localhost
   spec/                      openapi.json, ir.json (generated, committed)
   codegen/                   ir builder + emitters/{ts,python,rust}

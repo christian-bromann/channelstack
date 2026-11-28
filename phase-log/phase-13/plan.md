@@ -37,7 +37,7 @@ Phase 13 of [docs/phases.md](../../docs/phases.md): a fake OpenAI, scripted per 
 | Durations on the wire | `duration()` (the routes' helper) and the SDKs' `Duration` |
 | Waiting and polling in the SDKs | `wait` in each runtime (the responder's long poll builds on the transport, not a new client) |
 | Matchers | `integrations/matchers-core/` (Vitest adapts it; pytest and Rust have their counterparts) |
-| JSON Schema checks of tool arguments and structured output | `ajv` (already a dependency) |
+| JSON Schema checks of tool arguments and structured output | `ajv` (already the repository's dev dependency; the server takes it at the same version) |
 | Proxy mode | the driver's `hosts` |
 | Redaction | `core/redact/` and the definition's `tokenPatterns` |
 
@@ -54,8 +54,7 @@ New:
 | `openai` (dev) | 7.64.0 | The official SDK: the conformance client and the reference agent. The platforms' official SDKs belong in tests and reference agents (AGENTS.md) | Apache-2.0 | Yes, released weekly |
 | `@ai-sdk/openai` (dev) | 4.0.124 | The AI SDK's OpenAI provider, for the second reference agent (Responses), matching `ai` 7.0.177 | Apache-2.0 | Yes |
 | `openai` (Python, test only) | the latest 2.x a day old | The official Python SDK for 13.3 | Apache-2.0 | Yes |
-
-The server takes no new runtime dependency.
+| `ajv` (server runtime) | 8.20.0 | The script's own checks validate the agent's tool arguments and structured output against the JSON Schema it sent; a JSON Schema validator is what AGENTS.md says not to hand-write. The same version the repository's tests already use; pure JavaScript, so it compiles into the binary | MIT | Yes |
 
 ## Docs to update
 
