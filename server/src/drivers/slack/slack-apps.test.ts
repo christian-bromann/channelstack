@@ -452,7 +452,7 @@ describe("exit check 12.3: Slack apps", () => {
     expect(mine.received.length).toBe(1 + LOOP_LIMIT);
     const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
     expect(quiet.loops).toEqual([
-      expect.stringMatching(/^a bot loop in slack C0[0-9A-Z]+ was stopped after 50 app messages/),
+      expect.stringMatching(/^a bot loop in slack C0[0-9A-Z]+ \(50 app messages with no person between them: /),
     ]);
     // A person writing again starts the conversation over.
     await post(`/users/${ana.id}/say`, { message: { text: "again" }, channel: channel.id });
@@ -484,7 +484,9 @@ describe("exit check 12.3: Slack apps", () => {
     const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
     expect(quiet.loops).toEqual([
       expect.stringMatching(
-        new RegExp(`^a bot loop in slack ${channel.id}/${loop.ts.replace(".", "\\.")} was stopped .*coder → Robot`),
+        new RegExp(
+          `^a bot loop in slack ${channel.id}/${loop.ts.replace(".", "\\.")} \\(50 app messages .*coder → Robot`,
+        ),
       ),
     ]);
     if (!last) throw new Error("coder said nothing");

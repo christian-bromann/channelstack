@@ -47,7 +47,7 @@ test("the plugin's timeout is every SDK wait's default", () => {
 // Exit check 12.6: a test that left a bot loop fails, though it checked nothing. Two scripted apps
 // answer each other past the loop guard, and the fixture fails the test with the fake's message.
 const STOPPED =
-  /The fake stopped a bot loop in slack \S+ was stopped after 50 app messages with no person between them \(loop-p[io]ng → loop-p[io]ng/;
+  /The fake stopped a bot loop in slack \S+ \(50 app messages with no person between them: loop-p[io]ng → loop-p[io]ng/;
 
 test("the Vitest fixture fails a test that left a bot loop", () => {
   const { status, output } = runProject("bot-loop");

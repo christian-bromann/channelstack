@@ -1113,7 +1113,8 @@ async fn to_go_quiet_counts_app_messages_since_a_person_wrote() -> Result<()> {
 #[tokio::test]
 async fn to_go_quiet_reports_the_loops_the_fake_stopped() {
     // As matchers-core does: the loop the guard stopped is named after the turns.
-    let stopped = "a bot loop in slack 1.2 was stopped after 50 app messages with no person between them (my-agent → coder …)";
+    let stopped =
+        "a bot loop in slack 1.2 (50 app messages with no person between them: my-agent → coder …)";
     let coder = || json!({ "id": "B02", "name": "coder", "kind": "app" });
     let mut said = vec![says(ana(), "fix the login page")];
     said.extend((0..3).map(|at| says(if at % 2 == 0 { agent() } else { coder() }, "turn")));

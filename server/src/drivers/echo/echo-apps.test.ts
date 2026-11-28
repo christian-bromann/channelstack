@@ -43,7 +43,7 @@ describe("exit check 12.6: echo apps", () => {
     expect(inRoom(room.id)).toBe(1 + LOOP_LIMIT);
     const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
     expect(quiet.loops).toEqual([
-      expect.stringMatching(/^a bot loop in echo \S+ was stopped after 50 app messages .*coder → reviewer/),
+      expect.stringMatching(/^a bot loop in echo \S+ \(50 app messages .*coder → reviewer/),
     ]);
     const { events } = (await h.call("GET", `/sessions/${sessionId}/events`)).body as {
       events: Array<{ kind: string; data: Record<string, unknown> }>;

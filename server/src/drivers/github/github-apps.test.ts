@@ -620,7 +620,7 @@ describe("exit check 12.3: GitHub Apps", () => {
     expect(reviews()).toBe(LOOP_LIMIT);
     const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
     expect(quiet.loops).toEqual([
-      expect.stringMatching(/^a bot loop in github \d+#\d+ was stopped after 50 app messages .*reviewer → my-agent/),
+      expect.stringMatching(/^a bot loop in github \d+#\d+ \(50 app messages .*reviewer → my-agent/),
     ]);
     // On the stopped pull request, an App's comment and edit are kept, and cause nothing.
     const before = webhooks(mine).length;

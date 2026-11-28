@@ -23,7 +23,7 @@ describe("exit check 12.6: the loop guard", () => {
     expect(slack.allows("s1", "C2")).toBe(true);
     expect(slack.allows("s2", "C1")).toBe(true);
     expect(loops.stopped("s1")).toEqual([
-      "a bot loop in slack C1 was stopped after 4 app messages with no person between them (my-agent → coder → my-agent → coder → my-agent …)",
+      "a bot loop in slack C1 (4 app messages with no person between them: my-agent → coder → my-agent → coder → my-agent …)",
     ]);
     const [stopped] = events.read("s1").events.filter((event) => event.kind === "bot_loop");
     expect(stopped).toMatchObject({

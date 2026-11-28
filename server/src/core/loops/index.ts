@@ -69,7 +69,8 @@ export class LoopGuard {
     if (count.messages <= this.#limit) return true;
     count.stopped = true;
     const turns = count.authors.slice(-6).join(" → ");
-    const text = `a bot loop in ${driver} ${conversation} was stopped after ${this.#limit} app messages with no person between them (${turns} …)`;
+    // A noun phrase: the fixtures say "The fake stopped …", the matchers "Stopped: …".
+    const text = `a bot loop in ${driver} ${conversation} (${this.#limit} app messages with no person between them: ${turns} …)`;
     this.#stopped.set(session, [...(this.#stopped.get(session) ?? []), text]);
     this.#events.append(session, driver, "bot_loop", {
       conversation,

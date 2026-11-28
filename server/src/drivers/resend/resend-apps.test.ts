@@ -341,7 +341,9 @@ describe("exit check 12.3: Resend apps", () => {
     expect(received()).toBe(1 + LOOP_LIMIT);
     expect(sent()).toBe(LOOP_LIMIT);
     const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
-    expect(quiet.loops).toEqual([expect.stringMatching(/^a bot loop in resend \S+ was stopped after 50 app messages/)]);
+    expect(quiet.loops).toEqual([
+      expect.stringMatching(/^a bot loop in resend \S+ \(50 app messages with no person between them: /),
+    ]);
     // A person writing again starts the thread over.
     const again = await post(`/users/${encodeURIComponent(ana.id)}/reply`, {
       email: asked.id,

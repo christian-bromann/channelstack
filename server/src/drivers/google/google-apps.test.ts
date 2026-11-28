@@ -316,7 +316,9 @@ describe("exit check 12.3: Google apps", () => {
     // coder heard Ana's email, then its own SENT change for each answer up to the limit, and nothing after.
     expect(await pushes(theirs)).toHaveLength(1 + LOOP_LIMIT);
     const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
-    expect(quiet.loops).toEqual([expect.stringMatching(/^a bot loop in google \S+ was stopped after 50 app messages/)]);
+    expect(quiet.loops).toEqual([
+      expect.stringMatching(/^a bot loop in google \S+ \(50 app messages with no person between them: /),
+    ]);
     // A person writing again starts the conversation over.
     h.timers.advance(1000);
     const again = await post(`/users/${encodeURIComponent(ana.id)}/reply`, { email: last.id, text: "Again" });

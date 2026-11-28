@@ -785,9 +785,7 @@ async def test_to_go_quiet_fails_on_apps_answering_each_other_and_names_them_in_
 
 async def test_to_go_quiet_reports_the_loops_the_fake_stopped(monkeypatch: pytest.MonkeyPatch) -> None:
     """As the TypeScript matcher does: the loop the guard stopped is named after the turns."""
-    stopped = (
-        "a bot loop in slack 1.2 was stopped after 50 app messages with no person between them (my-agent → coder …)"
-    )
+    stopped = "a bot loop in slack 1.2 (50 app messages with no person between them: my-agent → coder …)"
 
     async def looped(_: object) -> QuietState:
         return QuietState(busy=False, quiet_for_ms=60_000, loops=(stopped,))

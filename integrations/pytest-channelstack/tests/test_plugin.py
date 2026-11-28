@@ -33,11 +33,12 @@ class StandIn:
         return Quiet(self.loops)
 
 
-STOPPED = "a bot loop in slack C0123 was stopped after 50 app messages with no person between them (ping → pong …)"
+STOPPED = "a bot loop in slack C0123 (50 app messages with no person between them: ping → pong …)"
 
 
 async def test_a_session_with_a_stopped_loop_fails_the_test_naming_it() -> None:
-    with pytest.raises(pytest.fail.Exception, match=r"The fake stopped a bot loop in slack C0123 .*\(ping → pong"):
+    stopped = r"The fake stopped a bot loop in slack C0123 \(50 app messages .*: ping → pong"
+    with pytest.raises(pytest.fail.Exception, match=stopped):
         await _fail_on_loops(cast(Session, StandIn([STOPPED])))
 
 

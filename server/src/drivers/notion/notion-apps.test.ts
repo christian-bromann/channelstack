@@ -380,7 +380,7 @@ describe("R1.12: deliveries by integration", () => {
     expect(comments()).toBe(1 + LOOP_LIMIT);
     const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
     expect(quiet.loops).toEqual([
-      expect.stringMatching(/^a bot loop in notion [0-9a-f-]{36} was stopped after 50 app messages/),
+      expect.stringMatching(/^a bot loop in notion [0-9a-f-]{36} \(50 app messages with no person between them: /),
     ]);
     // The stopped page's writes by integrations are kept, and cause nothing: a rename, blocks, a child page.
     const before = events(mine).length;
@@ -425,7 +425,7 @@ describe("R1.12: deliveries by integration", () => {
     expect(events(mine).filter((event) => event.type === "page.properties_updated")).toHaveLength(LOOP_LIMIT);
     expect((await h.call("GET", `/sessions/${sessionId}/quiet`)).body.loops).toEqual([
       expect.stringMatching(
-        /^a bot loop in notion [0-9a-f-]{36} was stopped after 50 app messages .*\((my-agent → writer → )+my-agent/,
+        /^a bot loop in notion [0-9a-f-]{36} \(50 app messages .*: (my-agent → writer → )+my-agent/,
       ),
     ]);
   });

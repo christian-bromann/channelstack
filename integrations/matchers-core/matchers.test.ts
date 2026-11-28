@@ -217,13 +217,13 @@ describe("toGoQuiet (exit check 12.6)", () => {
         busy: true,
         quietForMs: 0,
         open: ["1 delivery in flight"],
-        loops: ["a bot loop in slack C1 was stopped"],
+        loops: ["a bot loop in slack C1 (50 app messages with no person between them: my-agent → coder …)"],
       }),
     };
     const result = await matchers.toGoQuiet(state, busy, { within: "50ms", maxReplies: 4 });
     expect(result.pass).toBe(false);
     expect(result.message()).toContain("It was still busy with 1 app message");
-    expect(result.message()).toContain("Stopped: a bot loop in slack C1 was stopped");
+    expect(result.message()).toContain("Stopped: a bot loop in slack C1 (50 app messages");
   });
 
   test("comments count the same way: a GitHub issue, a Linear issue", async () => {

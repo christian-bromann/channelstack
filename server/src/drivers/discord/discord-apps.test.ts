@@ -275,7 +275,7 @@ describe("exit check 12.3: Discord apps", () => {
     expect(inLoop()).toBe(1 + LOOP_LIMIT);
     const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
     expect(quiet.loops).toEqual([
-      expect.stringMatching(/^a bot loop in discord \d+ was stopped after 50 app messages/),
+      expect.stringMatching(/^a bot loop in discord \d+ \(50 app messages with no person between them: /),
     ]);
     // A person writing again starts the channel over.
     await post(`/users/${ana.id}/say`, { text: { content: "again" }, channel: channel.id });
@@ -492,7 +492,7 @@ describe("R1.12: faults by app", () => {
     }
     await h.app.settled();
     const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
-    expect(quiet.loops).toEqual([expect.stringMatching(/stopped after 50 app messages .*coder → Robot → coder/)]);
+    expect(quiet.loops).toEqual([expect.stringMatching(/\(50 app messages .*coder → Robot → coder/)]);
     if (!last) throw new Error("coder said nothing");
     const seen = mine.dispatches().length;
 

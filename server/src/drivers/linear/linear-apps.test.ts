@@ -361,7 +361,7 @@ describe("exit check 12.3: Linear apps", () => {
     expect(onIssue(created.id)).toBe(1 + LOOP_LIMIT);
     const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
     expect(quiet.loops).toEqual([
-      expect.stringMatching(/^a bot loop in linear [0-9a-f-]{36} was stopped after 50 app messages .*coder → reviewer/),
+      expect.stringMatching(/^a bot loop in linear [0-9a-f-]{36} \(50 app messages .*coder → reviewer/),
     ]);
     await post(`/apps/${coder.id}/comment`, { body: "elsewhere", issue: other.id });
     // A person writing again starts the issue over.
