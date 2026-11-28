@@ -204,18 +204,18 @@ describe("exit check 12.3: Linear apps", () => {
 
     // Linear's own receiver: each app's accepts its delivery and refuses the other app's.
     const receiver = (secret: string) => new LinearWebhookClient(secret);
-    const verifies = (agent: RecordingAgent, secret: string) =>
-      agent.received.every((delivery) => {
-        try {
-          return receiver(secret).verify(Buffer.from(delivery.body), String(delivery.headers["linear-signature"]));
-        } catch {
-          return false;
-        }
-      });
-    expect(verifies(mine, app.webhookSecret)).toBe(true);
-    expect(verifies(theirs, coder.webhookSecret)).toBe(true);
-    expect(verifies(theirs, app.webhookSecret)).toBe(false);
-    expect(verifies(mine, coder.webhookSecret)).toBe(false);
+    const verifies = (secret: string) => (delivery: RecordingAgent["received"][number]) => {
+      try {
+        return receiver(secret).verify(Buffer.from(delivery.body), String(delivery.headers["linear-signature"]));
+      } catch {
+        return false;
+      }
+    };
+    expect(mine.received.every(verifies(app.webhookSecret))).toBe(true);
+    expect(theirs.received.every(verifies(coder.webhookSecret))).toBe(true);
+    // Each delivery fails against the other app's secret, not only one of them.
+    expect(theirs.received.some(verifies(app.webhookSecret))).toBe(false);
+    expect(mine.received.some(verifies(coder.webhookSecret))).toBe(false);
 
     // The comment's delivery is the built-in app's; another app's is asked for by app.
     expect(comment.delivery).toMatchObject({ app: "my-agent", type: "Comment", action: "create" });
