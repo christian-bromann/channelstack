@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
-import { BUILT_IN_APP } from "../../core/apps/index.ts";
+import { BUILT_IN_APP, HANDLE_ONLY } from "../../core/apps/index.ts";
 import { iso } from "../../core/clock/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
@@ -48,12 +48,12 @@ const NotionIntegration = z
     kind: z.literal("app"),
     channel: z.literal("notion"),
     botUserId: z.string(),
-    token: z
-      .string()
-      .openapi({ description: "The internal integration token (`ntn_…`), as `channelstack env` prints it." }),
-    webhookSecret: z
-      .string()
-      .openapi({ description: "The subscription's verification token: what webhooks are signed with." }),
+    token: z.string().openapi({
+      description: `The internal integration token (\`ntn_…\`), as \`channelstack env\` prints it. ${HANDLE_ONLY}`,
+    }),
+    webhookSecret: z.string().openapi({
+      description: `The subscription's verification token: what webhooks are signed with. ${HANDLE_ONLY}`,
+    }),
   })
   .openapi("NotionIntegration", { "x-channelstack-resource": { id: "id", role: "app" } });
 
@@ -228,12 +228,22 @@ export function registerNotionRoutes(
 
   // --- Records → wire ---------------------------------------------------------------------------
 
-  const integrationWire = (app: NotionBotRecord = store.bot) => ({
+  /**
+   * An integration as an author or a page's connection: who it is, without its credentials. Only
+   * the integration a test asks for (the fixture's, `createApp`, `apps()`) carries them:
+   * `integrationHandle`.
+   */
+  const integrationWire = (app: NotionBotRecord) => ({
     id: app.id,
     name: app.name,
     kind: "app" as const,
     channel: "notion" as const,
     botUserId: app.id,
+    token: "",
+    webhookSecret: "",
+  });
+  const integrationHandle = (app: NotionBotRecord) => ({
+    ...integrationWire(app),
     // A live integration's credentials stay on the server: the control API never returns them.
     token: isLive ? "" : deps.secret("token", app.name),
     webhookSecret: isLive ? "" : deps.secret("verificationToken", app.name),
@@ -322,7 +332,7 @@ export function registerNotionRoutes(
     response: NotionFixture,
     factory: { on: "Session", name: "notion" },
     stability,
-    handler: () => ({ app: integrationWire(), apiUrl: isLive ? NOTION_API : deps.apiUrl() }),
+    handler: () => ({ app: integrationHandle(store.bot), apiUrl: isLive ? NOTION_API : deps.apiUrl() }),
   });
 
   router.route({
@@ -388,7 +398,7 @@ export function registerNotionRoutes(
     factory: { on: "NotionFixture", name: "createApp", options: ["name", "capabilities", "events"] },
     live: APPS,
     stability,
-    handler: ({ session, body }) => integrationWire(fake.createApp(session.id, body)),
+    handler: ({ session, body }) => integrationHandle(fake.createApp(session.id, body)),
   });
 
   router.route({
@@ -398,7 +408,7 @@ export function registerNotionRoutes(
     response: z.array(NotionIntegration).openapi("NotionIntegrations"),
     sdkMethod: { on: "NotionFixture", name: "apps" },
     stability,
-    handler: () => store.apps.all().map((app) => integrationWire(app)),
+    handler: () => store.apps.all().map(integrationHandle),
   });
 
   router.route({

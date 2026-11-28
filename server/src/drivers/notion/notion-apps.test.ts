@@ -9,7 +9,7 @@
 import notionClient from "@notionhq/client";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
+import { harness, type RecordingAgent, recordingAgent, refusal, watchCredentials } from "../../../test/app-harness.ts";
 
 // The package is CommonJS: Node gives it to an ES module as its default export.
 const { verifyWebhookSignature } = notionClient;
@@ -303,6 +303,26 @@ describe("exit check 12.3: Notion integrations", () => {
     expect(await refusal(post("/apps/my-agent/reply", { text: "hi", discussion: comment.discussion.id }))).toBe(
       "invalid_argument",
     );
+  });
+
+  test("an integration's token and verification token come with its handle only: no author or connection holds them", async () => {
+    const { h, base, post, get, app, writer, ana } = await twoIntegrations();
+    const watch = watchCredentials(h, "notion");
+    const page = await post("/pages", { title: "Plan", content: "## Goals", connections: [app.id, writer.id] });
+    const comment = await post(`/apps/${writer.id}/comment`, { text: "Drafted it", page: page.id });
+    await post(`/users/${ana.id}/reply`, { text: "Thanks", discussion: comment.discussion.id });
+    h.timers.advance(1000);
+    await h.app.settled();
+    const reads = [
+      ...["/discussions", "/connections", "/transcript"].map((read) => `/pages/${page.id}${read}`),
+      ...["/comments", "/transcript"].map((read) => `/discussions/${comment.discussion.id}${read}`),
+    ];
+    for (const read of reads) expect([read, (await h.call("GET", `${base}${read}`)).status]).toEqual([read, 200]);
+    expect((await get("/apps")).map((one: { token: string }) => one.token)).toEqual([app.token, writer.token]);
+
+    const secrets = [app, writer].flatMap((one) => [one.token, one.webhookSecret]);
+    expect(secrets.every((secret) => secret.length > 0)).toBe(true);
+    expect(watch.leaks(secrets)).toEqual([]);
   });
 
   test("a person and an integration of one session can't share a name", async () => {

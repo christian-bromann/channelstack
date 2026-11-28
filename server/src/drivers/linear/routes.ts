@@ -1,7 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { GraphQLError } from "graphql";
 
-import { BUILT_IN_APP } from "../../core/apps/index.ts";
+import { BUILT_IN_APP, HANDLE_ONLY } from "../../core/apps/index.ts";
 import { iso } from "../../core/clock/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
@@ -46,10 +46,12 @@ const LinearApp = z
     name: z.string(),
     kind: z.literal("app"),
     botUserId: z.string(),
-    accessToken: z.string(),
-    webhookSecret: z.string(),
-    clientId: z.string(),
-    clientSecret: z.string(),
+    accessToken: z
+      .string()
+      .openapi({ description: `Its OAuth access token, installed with \`actor=app\`. ${HANDLE_ONLY}` }),
+    webhookSecret: z.string().openapi({ description: `Its webhook signing secret. ${HANDLE_ONLY}` }),
+    clientId: z.string().openapi({ description: `Its OAuth client id. ${HANDLE_ONLY}` }),
+    clientSecret: z.string().openapi({ description: `Its OAuth client secret. ${HANDLE_ONLY}` }),
   })
   .openapi("LinearApp", { "x-channelstack-resource": { id: "id", role: "app" } });
 
@@ -205,11 +207,23 @@ export function registerLinearRoutes(
     admin: user.admin,
     guest: user.guest,
   });
-  const appWire = (app: LinearAppRecord = store.app) => ({
+  /**
+   * An app as an author, a delegate or an agent session's app: who it is, without its
+   * credentials. Only the app a test asks for (the fixture's, `createApp`, `apps()`) carries
+   * them: `appHandle`.
+   */
+  const appWire = (app: LinearAppRecord) => ({
     id: app.userId,
     name: app.name,
     kind: "app" as const,
     botUserId: app.userId,
+    accessToken: "",
+    webhookSecret: "",
+    clientId: "",
+    clientSecret: "",
+  });
+  const appHandle = (app: LinearAppRecord) => ({
+    ...appWire(app),
     // A live app's credentials stay on the server: the control API never returns them.
     accessToken: isLive ? "" : deps.secret("oauthToken", app.name),
     webhookSecret: isLive ? "" : deps.secret("webhookSecret", app.name),
@@ -249,7 +263,7 @@ export function registerLinearRoutes(
   const sessionWire = (session: string, record: LinearSessionRecord) => ({
     id: record.id,
     issue: issueWire(store.issue(record.issue)),
-    app: appWire(store.appByUser(record.appUser)),
+    app: appWire(store.appByUser(record.appUser) ?? store.app),
     startedBy: userWire(store.user(record.creator) as LinearUserRecord),
     delivery: caused(session, record.delivery),
   });
@@ -321,7 +335,10 @@ export function registerLinearRoutes(
     response: LinearFixture,
     factory: { on: "Session", name: "linear" },
     stability,
-    handler: () => ({ app: appWire(), apiUrl: isLive ? "https://api.linear.app/graphql" : `${deps.apiUrl()}/graphql` }),
+    handler: () => ({
+      app: appHandle(store.app),
+      apiUrl: isLive ? "https://api.linear.app/graphql" : `${deps.apiUrl()}/graphql`,
+    }),
   });
 
   router.route({
@@ -377,7 +394,7 @@ export function registerLinearRoutes(
     factory: { on: "LinearFixture", name: "createApp", options: ["name", "events"] },
     live: ONE_LIVE_APP,
     stability,
-    handler: ({ session, body }) => appWire(fake.createApp(session.id, body)),
+    handler: ({ session, body }) => appHandle(fake.createApp(session.id, body)),
   });
 
   router.route({
@@ -387,7 +404,7 @@ export function registerLinearRoutes(
     response: z.array(LinearApp).openapi("LinearApps"),
     sdkMethod: { on: "LinearFixture", name: "apps" },
     stability,
-    handler: () => store.apps.all().map((app) => appWire(app)),
+    handler: () => store.apps.all().map(appHandle),
   });
 
   router.route({
@@ -931,7 +948,7 @@ export function registerLinearRoutes(
     issue.assignee === null ? null : userWire(store.user(issue.assignee) as LinearUserRecord),
   );
   issueRead("/delegate", "delegatedTo", "The app the issue is delegated to, if any", LinearApp.nullable(), (issue) =>
-    issue.delegate === null ? null : appWire(store.appByUser(issue.delegate)),
+    issue.delegate === null ? null : appWire(store.appByUser(issue.delegate) ?? store.app),
   );
   issueRead("/labels", "labels", "The names of the labels on the issue", z.array(z.string()), (issue) => {
     const team = store.team(issue.team);

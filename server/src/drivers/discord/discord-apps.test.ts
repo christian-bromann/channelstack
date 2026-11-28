@@ -9,7 +9,7 @@
 import { verifyKey } from "discord-interactions";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
+import { type RecordingAgent, recordingAgent, refusal, watchCredentials } from "../../../test/app-harness.ts";
 import { discordWorkspace } from "../../../test/discord-workspace.ts";
 import { LOOP_LIMIT } from "../../core/loops/index.ts";
 import { botIdOf } from "./secrets.ts";
@@ -259,6 +259,27 @@ describe("exit check 12.3: Discord apps", () => {
     await post(`/apps/${coder.id}/say`, { text: { content: "back" }, channel: channel.id });
     await h.app.settled();
     expect(inLoop()).toBe(3 + LOOP_LIMIT);
+  });
+
+  test("an app's bot token comes with its handle only: no author, member or reactor holds it", async () => {
+    const { h, control, app, coder, both, asCoder } = await twoApps();
+    const watch = watchCredentials(h, "discord");
+    const written = (await asCoder("POST", `/channels/${both.id}/messages`, { content: "opened #12" })).body;
+    await asCoder("PUT", `/channels/${both.id}/messages/${written.id}/reactions/${encodeURIComponent("👀")}/@me`);
+    await h.app.settled();
+    const at = `/channels/${both.id}`;
+    const reads = [
+      ...["/messages", "/members", "/transcript"].map((read) => `${at}${read}`),
+      ...["", "/reactions", "/transcript"].map((read) => `${at}/messages/${written.id}${read}`),
+    ];
+    for (const read of reads) expect([read, (await control("GET", read)).status]).toEqual([read, 200]);
+    expect((await control("GET", "/apps")).body.map((one: { botToken: string }) => one.botToken)).toEqual([
+      app.botToken,
+      coder.botToken,
+    ]);
+
+    expect([app.botToken, coder.botToken].every((token) => token.length > 0)).toBe(true);
+    expect(watch.leaks([app.botToken, coder.botToken])).toEqual([]);
   });
 
   test("a person and an app of one session can't share a name", async () => {

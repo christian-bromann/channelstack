@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
-import { BUILT_IN_APP } from "../../core/apps/index.ts";
+import { BUILT_IN_APP, HANDLE_ONLY } from "../../core/apps/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { deliveryTo } from "../../core/delivery/kit.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
@@ -55,9 +55,9 @@ const SlackApp = z
     kind: z.literal("app"),
     botUserId: z.string(),
     botId: z.string(),
-    botToken: z.string(),
-    appToken: z.string(),
-    signingSecret: z.string(),
+    botToken: z.string().openapi({ description: `Its bot token (\`xoxb-\`). ${HANDLE_ONLY}` }),
+    appToken: z.string().openapi({ description: `Its app-level token (\`xapp-\`), for Socket Mode. ${HANDLE_ONLY}` }),
+    signingSecret: z.string().openapi({ description: `Its signing secret. ${HANDLE_ONLY}` }),
     scopes: z.array(z.string()),
   })
   .openapi("SlackApp", { "x-channelstack-resource": { id: "id", role: "app" } });
@@ -254,17 +254,27 @@ export function registerSlackRoutes(
   const stability = "experimental";
 
   const userWire = (user: SlackUserRecord) => ({ ...user, kind: "user" as const });
+  /**
+   * An app as an author or a member: who it is, without its credentials. Only the app a test asks
+   * for (the fixture's, `createApp`, `apps()`) carries them: `appHandle`.
+   */
   const appWire = (app: SlackAppRecord) => ({
     id: app.id,
     name: app.name,
     kind: "app" as const,
     botUserId: app.botUserId,
     botId: app.botId,
+    botToken: "",
+    appToken: "",
+    signingSecret: "",
+    scopes: [...app.scopes],
+  });
+  const appHandle = (app: SlackAppRecord) => ({
+    ...appWire(app),
     // A live app's credentials stay on the server: the control API never returns them.
     botToken: deps.reality() === "live" ? "" : deps.secret("botToken", app.name),
     appToken: deps.reality() === "live" ? "" : deps.secret("appToken", app.name),
     signingSecret: deps.reality() === "live" ? "" : deps.secret("signingSecret", app.name),
-    scopes: [...app.scopes],
   });
   const participantWire = (session: string, id: string) => {
     const app = id === world.app().botUserId ? world.app() : fake.appOf(id);
@@ -349,7 +359,7 @@ export function registerSlackRoutes(
     factory: { on: "Session", name: "slack" },
     stability,
     handler: () => ({
-      app: appWire(world.app()),
+      app: appHandle(world.app()),
       apiUrl: deps.reality() === "live" ? "https://slack.com/api/" : deps.apiUrl(),
       team: world.team(),
       socketConnections: world.socketConnections(),
@@ -430,7 +440,7 @@ export function registerSlackRoutes(
     factory: { on: "SlackFixture", name: "createApp", options: ["name", "scopes", "botEvents"] },
     live: APPS_NOT_YET,
     stability,
-    handler: ({ session, body }) => appWire(fake.createApp(session.id, body)),
+    handler: ({ session, body }) => appHandle(fake.createApp(session.id, body)),
   });
 
   router.route({
@@ -441,7 +451,7 @@ export function registerSlackRoutes(
     sdkMethod: { on: "SlackFixture", name: "apps" },
     live: APPS_NOT_YET,
     stability,
-    handler: () => fake.apps().map(appWire),
+    handler: () => fake.apps().map(appHandle),
   });
 
   router.route({

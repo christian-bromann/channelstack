@@ -15,6 +15,13 @@ export const BUILT_IN_APP = "my-agent";
 /** How many apps a channel holds beside the built-in one: they live as long as the server. */
 export const APP_LIMIT = 10;
 
+/**
+ * Where an app's credentials appear in the control API: on the handle a test asks for, never on
+ * an author, a member or a principal, and never live. Each credential's description ends with it.
+ */
+export const HANDLE_ONLY =
+  "On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live.";
+
 /** 1 to 32 lower-case letters, digits and hyphens, from a letter: one variable name per app name. */
 const APP_NAME = /^[a-z][a-z0-9-]{0,31}$/;
 

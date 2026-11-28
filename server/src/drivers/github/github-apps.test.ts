@@ -13,7 +13,7 @@ import { SignJWT } from "jose";
 import { Probot } from "probot";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
+import { harness, type RecordingAgent, recordingAgent, refusal, watchCredentials } from "../../../test/app-harness.ts";
 import { webhookProblems } from "../../../test/schemas/github.ts";
 
 const agents: RecordingAgent[] = [];
@@ -355,6 +355,48 @@ describe("exit check 12.3: GitHub Apps", () => {
     const reader = await post("/apps", { name: "reader", permissions: { issues: "read" } });
     await post(`/repos/${issueRef.repoId}/install`, { app: reader.id });
     expect(await refusal(post(`/apps/${reader.id}/comment`, { body: "hi", issue: issueRef }))).toBe("forbidden");
+  });
+
+  test("an App's private key and webhook secret come with its handle only: no author or principal holds them", async () => {
+    const { h, base, post, get, app, reviewer, ana, issueRef, api, path } = await twoApps();
+    const watch = watchCredentials(h, "github");
+    const comment = await post(`/apps/${reviewer.id}/comment`, { body: "@my-agent over to you", issue: issueRef });
+    await post(`/apps/${reviewer.id}/issues`, { issue: { title: "Follow-up" }, repo: issueRef.repoId });
+    await post(`/apps/${reviewer.id}/react`, { content: "+1", comment: comment.id });
+    await post(`/users/${ana.id}/assign`, { assignees: [app.id], issue: issueRef });
+    const pr = await post(`/users/${ana.id}/pulls`, {
+      pr: { from: "fix", title: "Fix", changes: [{ path: "a.ts", content: Buffer.from("x\n").toString("base64") }] },
+      repo: issueRef.repoId,
+    });
+    const prRef = `/repos/${issueRef.repoId}/pulls/${pr.number}`;
+    await post(`/apps/${reviewer.id}/review`, {
+      review: { pr: { repoId: issueRef.repoId, number: pr.number }, event: "COMMENT", body: "Looks fine" },
+    });
+    const sha = (await api(reviewer, "GET", `${path}/commits/fix`)).body.sha;
+    await api(reviewer, "POST", `${path}/statuses/${sha}`, { state: "success", context: "review" });
+    await api(reviewer, "POST", `${path}/check-runs`, {
+      name: "review",
+      head_sha: sha,
+      status: "completed",
+      conclusion: "success",
+    });
+    await h.app.settled();
+    const issue = `/repos/${issueRef.repoId}/issues/${issueRef.number}`;
+    const reads = [
+      ...["", "/comments", "/assignees", "/transcript"].map((read) => `${issue}${read}`),
+      ...["", "/reviews", "/check-runs", "/review-comments"].map((read) => `${prRef}${read}`),
+      `/comments/${comment.id}/reactions`,
+      `/repos/${issueRef.repoId}/commits/${sha}/statuses`,
+      `/repos/${issueRef.repoId}/commits/${sha}/check-runs`,
+      "/deliveries",
+    ];
+    for (const read of reads) expect([read, (await h.call("GET", `${base}${read}`)).status]).toEqual([read, 200]);
+    // The handle routes still carry the credentials: an agent's tests read them there.
+    expect((await get("/apps")).map((one: App) => one.privateKey)).toEqual([app.privateKey, reviewer.privateKey]);
+
+    const secrets = [app, reviewer].flatMap((one) => [one.privateKey, one.webhookSecret]);
+    expect(secrets.every((secret) => secret.length > 0)).toBe(true);
+    expect(watch.leaks([...secrets, "PRIVATE KEY-----"])).toEqual([]);
   });
 
   test("a person and an App of one session can't share a name", async () => {

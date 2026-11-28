@@ -187,6 +187,32 @@ export async function recordingAgent(): Promise<RecordingAgent> {
   return agent;
 }
 
+/**
+ * Watch every control API answer from now on for an app's credentials (decision 0027). Only the
+ * routes that hand a test an app's handle carry them: the channel's fixture (`GET …/<channel>`)
+ * and its apps (`…/<channel>/apps`). An author, a member, a delegate or a principal is who an app
+ * is, never its keys. `leaks` names each other answer that holds one of `secrets`.
+ */
+export function watchCredentials(h: Harness, channel: string): { leaks(secrets: readonly string[]): string[] } {
+  const answers: Array<{ route: string; text: string }> = [];
+  const call = h.call;
+  h.call = async (method, path, body, token) => {
+    const reply = await call(method, path, body, token);
+    answers.push({ route: `${method} ${path}`, text: JSON.stringify(reply.body ?? null) });
+    return reply;
+  };
+  const handle = new RegExp(`^(GET|POST) /sessions/[^/]+/${channel}(/apps)?$`);
+  return {
+    leaks: (secrets) =>
+      answers
+        .filter(({ route }) => !handle.test(route))
+        .filter(({ text }) =>
+          secrets.some((secret) => secret !== "" && text.includes(JSON.stringify(secret).slice(1, -1))),
+        )
+        .map(({ route }) => route),
+  };
+}
+
 /** The error code a control API call was refused with, or "no error". */
 export const refusal = (run: Promise<unknown>) =>
   run.then(

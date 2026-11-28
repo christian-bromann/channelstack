@@ -8,7 +8,7 @@ import { createHmac } from "node:crypto";
 
 import { afterEach, describe, expect, test } from "vitest";
 
-import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
+import { harness, type RecordingAgent, recordingAgent, refusal, watchCredentials } from "../../../test/app-harness.ts";
 import { LOOP_LIMIT } from "../../core/loops/index.ts";
 
 const agents: RecordingAgent[] = [];
@@ -243,6 +243,36 @@ describe("exit check 12.3: Slack apps", () => {
 
     expect(mine.received.length).toBe(before);
     expect(events(theirs).at(-1)?.event).toMatchObject({ type: "agent_session_stopped", user: ana.id });
+  });
+
+  test("an app's tokens and signing secret come with its handle only: no author, member or reactor holds them", async () => {
+    const { h, base, post, get, app, coder, web } = await twoApps();
+    const watch = watchCredentials(h, "slack");
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id] });
+    const sent = await web("chat.postMessage", { channel: channel.id, text: "opened #12" }, coder.botToken);
+    await web("reactions.add", { channel: channel.id, timestamp: sent.ts, name: "eyes" }, coder.botToken);
+    await web("chat.postMessage", { channel: channel.id, thread_ts: sent.ts, text: "on it" }, app.botToken);
+    await h.app.settled();
+    const at = `/conversations/${channel.id}`;
+    const reads = [
+      `${at}/messages`,
+      `${at}/members`,
+      `${at}/latest`,
+      `${at}/messages/${sent.ts}`,
+      `${at}/threads/${sent.ts}/replies`,
+      `${at}/messages/${sent.ts}/reactions`,
+      `${at}/transcript`,
+    ];
+    for (const read of reads) expect([read, (await h.call("GET", `${base}${read}`)).status]).toEqual([read, 200]);
+    expect((await get("/apps")).map((one: { botToken: string }) => one.botToken)).toEqual([
+      app.botToken,
+      coder.botToken,
+    ]);
+
+    const secrets = [app, coder].flatMap((one) => [one.botToken, one.appToken, one.signingSecret]);
+    expect(secrets.every((secret) => secret.length > 0)).toBe(true);
+    expect(watch.leaks(secrets)).toEqual([]);
   });
 
   test("a person and an app of one session can't share a name", async () => {

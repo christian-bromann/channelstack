@@ -568,13 +568,16 @@
             "type": "string"
           },
           "botToken": {
-            "type": "string"
+            "type": "string",
+            "description": "Its bot token (`xoxb-`). On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           },
           "appToken": {
-            "type": "string"
+            "type": "string",
+            "description": "Its app-level token (`xapp-`), for Socket Mode. On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           },
           "signingSecret": {
-            "type": "string"
+            "type": "string",
+            "description": "Its signing secret. On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           },
           "scopes": {
             "type": "array",
@@ -2353,10 +2356,12 @@
             "type": "integer"
           },
           "privateKey": {
-            "type": "string"
+            "type": "string",
+            "description": "Its private key (PEM). On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           },
           "webhookSecret": {
-            "type": "string"
+            "type": "string",
+            "description": "Its webhook secret. On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           }
         },
         "required": [
@@ -4362,16 +4367,20 @@
             "type": "string"
           },
           "accessToken": {
-            "type": "string"
+            "type": "string",
+            "description": "Its OAuth access token, installed with `actor=app`. On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           },
           "webhookSecret": {
-            "type": "string"
+            "type": "string",
+            "description": "Its webhook signing secret. On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           },
           "clientId": {
-            "type": "string"
+            "type": "string",
+            "description": "Its OAuth client id. On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           },
           "clientSecret": {
-            "type": "string"
+            "type": "string",
+            "description": "Its OAuth client secret. On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           }
         },
         "required": [
@@ -5524,11 +5533,11 @@
           },
           "token": {
             "type": "string",
-            "description": "The internal integration token (`ntn_…`), as `channelstack env` prints it."
+            "description": "The internal integration token (`ntn_…`), as `channelstack env` prints it. On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           },
           "webhookSecret": {
             "type": "string",
-            "description": "The subscription's verification token: what webhooks are signed with."
+            "description": "The subscription's verification token: what webhooks are signed with. On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           }
         },
         "required": [
@@ -8142,7 +8151,7 @@
           },
           "botToken": {
             "type": "string",
-            "description": "The bot token the agent logs in with. Empty live: it stays on the server."
+            "description": "The bot token the agent logs in with. On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live."
           },
           "publicKey": {
             "type": "string",
