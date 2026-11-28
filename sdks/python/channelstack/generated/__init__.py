@@ -2001,16 +2001,16 @@ class SlackUser:
         data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/select", body={"option": (option if isinstance(option, list) else [option]), "menu": {"label": menu} if isinstance(menu, str) else menu._to_wire(), "message": {"channel": message.channel, "ts": message.ts}}))
         return SlackDelivery(ctx, data)
 
-    async def shortcut(self, callback_id: str, *, message: SlackMessage) -> SlackDelivery:
-        """Run a message shortcut on a message. Experimental."""
+    async def shortcut(self, callback_id: str, *, message: SlackMessage, app: SlackApp | None = None) -> SlackDelivery:
+        """Run an app's message shortcut on a message: it goes to that app alone. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/shortcut", body={"callbackId": callback_id, "message": {"channel": message.channel, "ts": message.ts}})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/shortcut", body={"callbackId": callback_id, "message": {"channel": message.channel, "ts": message.ts}, "app": None if app is None else app.id})
         return SlackDelivery(ctx, data)
 
-    async def run_command(self, command: str, *, channel: SlackConversation) -> SlackDelivery:
-        """Run a slash command in a conversation, e.g. `/deploy web staging`. Experimental."""
+    async def run_command(self, command: str, *, channel: SlackConversation, app: SlackApp | None = None) -> SlackDelivery:
+        """Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/commands", body={"command": command, "channel": channel.id})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/commands", body={"command": command, "channel": channel.id, "app": None if app is None else app.id})
         return SlackDelivery(ctx, data)
 
     async def stop(self, *, thread: SlackThread | SlackMessage) -> SlackDelivery:
@@ -2019,10 +2019,10 @@ class SlackUser:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/stop", body={"thread": {"channel": thread.channel, "ts": thread.ts}})
         return SlackDelivery(ctx, data)
 
-    async def open_agent_thread(self, *, from_: SlackConversation | None = None) -> SlackThread:
-        """Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at. Experimental."""
+    async def open_agent_thread(self, *, from_: SlackConversation | None = None, app: SlackApp | None = None) -> SlackThread:
+        """Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/agent-threads", body={"from": None if from_ is None else from_.id})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/agent-threads", body={"from": None if from_ is None else from_.id, "app": None if app is None else app.id})
         return SlackThread(ctx, data)
 
     async def pick_prompt(self, title: str, *, thread: SlackThread | SlackMessage) -> SlackMessage:

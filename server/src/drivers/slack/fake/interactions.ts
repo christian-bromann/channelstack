@@ -1,3 +1,4 @@
+import { BUILT_IN_APP } from "../../../core/apps/index.ts";
 import type { DeliveryTransport } from "../../../core/delivery/index.ts";
 import type { DeliveryKit } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
@@ -56,8 +57,8 @@ export interface InteractionKit {
   ): void;
   remove(conversation: SlackConversationRecord, message: SlackMessageRecord): void;
   action(session: string, name: string, data: Record<string, unknown>): void;
-  /** The person's DM with the app, opened if there is none yet. */
-  directMessage(session: string, userId: string): SlackConversationRecord;
+  /** The person's DM with an app, opened if there is none yet. */
+  directMessage(session: string, userId: string, app: SlackAppRecord): SlackConversationRecord;
   /** A person writes in a thread. */
   replyAsUser: Immediate<SlackWorld>["replyAsUser"];
   /** An app's Socket Mode connection (the built-in app's unless named), once it has chosen that over a request URL. */
@@ -310,35 +311,38 @@ export function createInteractions(kit: InteractionKit): Interactions {
       );
     },
 
-    shortcutAsUser(session, userId, callbackId, target) {
+    shortcutAsUser(session, userId, callbackId, target, name = BUILT_IN_APP) {
       const user = store.users.get(session, userId);
+      // A message shortcut is one app's: it goes to that app alone (decision 0027).
+      const app = store.apps.get(session, name);
       const { conversation, messages } = inScope(session, user, { message: target });
       const [message] = messages as [SlackMessageRecord];
-      // A message shortcut is the built-in app's: the fake has no other app's shortcuts.
-      reachable();
+      reachable(app);
       kit.action(session, "shortcut", { user: user.id, channel: conversation.id, ts: message.ts, callbackId });
       // A shortcut has no message of the app's to replace: an answer through its response_url is a new message.
-      const payload = messageActionPayload(answerable(session, "actions", user, conversation), {
+      const payload = messageActionPayload(answerable(session, "actions", user, conversation, undefined, app), {
         callbackId,
         message: kit.messageObject(message),
         actionTs: slackTs(ids),
       });
-      return send(session, "message_action", payloadForm(payload), payload);
+      return send(session, "message_action", payloadForm(payload), payload, undefined, app);
     },
 
-    commandAsUser(session, userId, line, channel) {
+    commandAsUser(session, userId, line, channel, name = BUILT_IN_APP) {
       const conversation = store.conversations.get(session, channel);
       const user = member(session, userId, conversation);
+      // A slash command is one app's: it goes to that app alone, which answers as itself.
+      const app = store.apps.get(session, name);
       const [command = "", ...rest] = line.trim().split(/\s+/);
       if (!/^\/\S+$/.test(command)) throw new ProtocolError("invalid_argument", "A slash command starts with /");
-      reachable();
+      reachable(app);
       kit.action(session, "command", { user: user.id, channel: conversation.id, command });
-      const fields = slashCommandFields(answerable(session, "commands", user, conversation), {
+      const fields = slashCommandFields(answerable(session, "commands", user, conversation, undefined, app), {
         command,
         text: rest.join(" "),
       });
       // The app may answer in the response itself: JSON with a message, or plain text.
-      return send(session, "slash_command", new URLSearchParams(fields).toString(), fields, (answer) => {
+      const answered = (answer: { contentType: string; body: string }) => {
         if (answer.body.trim() === "") return;
         let message: Record<string, unknown> = { text: answer.body };
         if (answer.contentType.includes("application/json")) {
@@ -348,8 +352,9 @@ export function createInteractions(kit: InteractionKit): Interactions {
             return;
           }
         }
-        publish(conversation, user.id, undefined, message);
-      });
+        publish(conversation, user.id, undefined, message, app);
+      };
+      return send(session, "slash_command", new URLSearchParams(fields).toString(), fields, answered, app);
     },
 
     stopAsUser(session, userId, thread) {
@@ -402,21 +407,23 @@ export function createInteractions(kit: InteractionKit): Interactions {
       );
     },
 
-    openAgentThread(session, userId, from) {
+    openAgentThread(session, userId, from, name = BUILT_IN_APP) {
       const user = store.users.get(session, userId);
+      const app = store.apps.get(session, name);
       const context = from === undefined ? undefined : store.conversations.get(session, from);
       // The split view belongs to an app that is installed and listening. Refused before a DM or a thread exists.
-      if (!kit.hears("dm", "assistant_thread_started")) {
+      if (!kit.hears("dm", "assistant_thread_started", app)) {
         throw refuse("split_view_unavailable", "The app doesn't receive assistant_thread_started");
       }
-      const dm = kit.directMessage(session, user.id);
+      const dm = kit.directMessage(session, user.id, app);
       // The thread hangs on an anchor nobody sees; what people and the app write are its replies.
-      const anchor = kit.postAsApp(dm, { text: "" }, { ephemeralFor: NOBODY });
+      const anchor = kit.postAsApp(dm, { text: "" }, { ephemeralFor: NOBODY }, app);
       kit.action(session, "openAgentThread", { user: user.id, channel: dm.id, ts: anchor.ts });
       kit.emit(
         dm,
         "assistant_thread_started",
         assistantThreadEvent("assistant_thread_started", user, dm, anchor.ts, context),
+        app,
       );
       return anchor;
     },
@@ -440,7 +447,9 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const dm = store.conversations.get(session, thread.channel);
       const user = member(session, userId, dm);
       const context = store.conversations.get(session, channel);
-      if (!kit.hears(dm, "assistant_thread_context_changed")) {
+      // The split view is the app's whose DM it is in.
+      const app = [...dm.members].map((id) => store.appOf(id)).find((one) => one !== undefined) ?? store.app;
+      if (!kit.hears(dm, "assistant_thread_context_changed", app)) {
         throw refuse("split_view_unavailable", "The app doesn't receive assistant_thread_context_changed");
       }
       kit.action(session, "switchContext", { user: user.id, channel: context.id, ts: thread.ts });
@@ -449,6 +458,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
           dm,
           "assistant_thread_context_changed",
           assistantThreadEvent("assistant_thread_context_changed", user, dm, thread.ts, context),
+          app,
         ) ?? ""
       );
     },

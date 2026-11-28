@@ -686,7 +686,7 @@ let delivery = user.select(option).menu("…").message(&message).await?;
 
 ### shortcut()
 
-Run a message shortcut on a message.
+Run an app's message shortcut on a message: it goes to that app alone.
 
 <CodeGroup>
 
@@ -708,6 +708,7 @@ let delivery = user.shortcut("…").message(&message).await?;
 |---|---|---|---|---|
 | `callbackId` | `callback_id` | `string` | yes | positional |
 | `message` | `message` | `SlackMessage` | yes | option |
+| `app` | `app` | `SlackApp` | no | option |
 
 **Returns** [`SlackDelivery`](/docs/reference/api/slack#slackdelivery).
 
@@ -717,7 +718,7 @@ let delivery = user.shortcut("…").message(&message).await?;
 
 ### runCommand()
 
-Run a slash command in a conversation, e.g. `/deploy web staging`.
+Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone.
 
 <CodeGroup>
 
@@ -739,6 +740,7 @@ let delivery = user.run_command("…").channel(&channel).await?;
 |---|---|---|---|
 | `command` | `string` | yes | positional |
 | `channel` | `SlackConversation` | yes | option |
+| `app` | `SlackApp` | no | option |
 
 **Returns** [`SlackDelivery`](/docs/reference/api/slack#slackdelivery).
 
@@ -778,7 +780,7 @@ let delivery = user.stop().thread(&thread).await?;
 
 ### openAgentThread()
 
-Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at.
+Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at.
 
 <CodeGroup>
 
@@ -799,6 +801,7 @@ let thread = user.open_agent_thread().from(&from).await?;
 | Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `SlackConversation` | no | option |
+| `app` | `app` | `SlackApp` | no | option |
 
 **Returns** [`SlackThread`](/docs/reference/api/slack#slackthread).
 

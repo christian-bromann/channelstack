@@ -1539,6 +1539,13 @@
             "x-channelstack-ref": [
               "SlackMessage"
             ]
+          },
+          "app": {
+            "type": "string",
+            "description": "Whose shortcut: an app's id or name. Default: the built-in app's",
+            "x-channelstack-ref": [
+              "SlackApp"
+            ]
           }
         },
         "required": [
@@ -1557,6 +1564,13 @@
             "type": "string",
             "x-channelstack-ref": [
               "SlackConversation"
+            ]
+          },
+          "app": {
+            "type": "string",
+            "description": "Whose command: an app's id or name. Default: the built-in app's",
+            "x-channelstack-ref": [
+              "SlackApp"
             ]
           }
         },
@@ -1599,6 +1613,13 @@
             "type": "string",
             "x-channelstack-ref": [
               "SlackConversation"
+            ]
+          },
+          "app": {
+            "type": "string",
+            "description": "Whose split view: an app's id or name. Default: the built-in app's",
+            "x-channelstack-ref": [
+              "SlackApp"
             ]
           }
         }
@@ -11982,7 +12003,7 @@
     },
     "/sessions/{session}/slack/users/{user}/shortcut": {
       "post": {
-        "summary": "Run a message shortcut on a message",
+        "summary": "Run an app's message shortcut on a message: it goes to that app alone",
         "security": [
           {
             "bearer": []
@@ -11995,7 +12016,8 @@
             "callbackId"
           ],
           "options": [
-            "message"
+            "message",
+            "app"
           ]
         },
         "x-channelstack-error-codes": [
@@ -12073,7 +12095,7 @@
     },
     "/sessions/{session}/slack/users/{user}/commands": {
       "post": {
-        "summary": "Run a slash command in a conversation, e.g. `/deploy web staging`",
+        "summary": "Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone",
         "security": [
           {
             "bearer": []
@@ -12086,7 +12108,8 @@
             "command"
           ],
           "options": [
-            "channel"
+            "channel",
+            "app"
           ]
         },
         "x-channelstack-error-codes": [
@@ -12253,7 +12276,7 @@
     },
     "/sessions/{session}/slack/users/{user}/agent-threads": {
       "post": {
-        "summary": "Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at",
+        "summary": "Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at",
         "security": [
           {
             "bearer": []
@@ -12264,7 +12287,8 @@
           "name": "openAgentThread",
           "args": [],
           "options": [
-            "from"
+            "from",
+            "app"
           ]
         },
         "x-channelstack-error-codes": [

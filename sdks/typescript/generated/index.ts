@@ -1909,17 +1909,17 @@ export class SlackUser {
     return new SlackDelivery(ctx, data);
   }
 
-  /** Run a message shortcut on a message. Experimental. */
-  async shortcut(callbackId: string, options: { message: SlackMessage }): Promise<SlackDelivery> {
+  /** Run an app's message shortcut on a message: it goes to that app alone. Experimental. */
+  async shortcut(callbackId: string, options: { message: SlackMessage; app?: SlackApp }): Promise<SlackDelivery> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/shortcut`, { body: { callbackId, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/shortcut`, { body: { callbackId, message: { channel: options.message.channel, ts: options.message.ts }, app: options.app === undefined ? undefined : options.app.id } })) as SlackDeliveryData;
     return new SlackDelivery(ctx, data);
   }
 
-  /** Run a slash command in a conversation, e.g. `/deploy web staging`. Experimental. */
-  async runCommand(command: string, options: { channel: SlackConversation }): Promise<SlackDelivery> {
+  /** Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone. Experimental. */
+  async runCommand(command: string, options: { channel: SlackConversation; app?: SlackApp }): Promise<SlackDelivery> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id } })) as SlackDeliveryData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id, app: options.app === undefined ? undefined : options.app.id } })) as SlackDeliveryData;
     return new SlackDelivery(ctx, data);
   }
 
@@ -1930,10 +1930,10 @@ export class SlackUser {
     return new SlackDelivery(ctx, data);
   }
 
-  /** Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at. Experimental. */
-  async openAgentThread(options: { from?: SlackConversation } = {}): Promise<SlackThread> {
+  /** Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at. Experimental. */
+  async openAgentThread(options: { from?: SlackConversation; app?: SlackApp } = {}): Promise<SlackThread> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/agent-threads`, { body: { from: options.from === undefined ? undefined : options.from.id } })) as SlackThreadData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/agent-threads`, { body: { from: options.from === undefined ? undefined : options.from.id, app: options.app === undefined ? undefined : options.app.id } })) as SlackThreadData;
     return new SlackThread(ctx, data);
   }
 

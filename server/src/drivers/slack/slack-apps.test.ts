@@ -275,6 +275,72 @@ describe("exit check 12.3: Slack apps", () => {
     ]);
   });
 
+  test("a slash command, a message shortcut and a split view reach the app they are for, and it answers as itself", async () => {
+    const { h, mine, theirs, post, get, app, coder } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id] });
+    const said = await post(`/users/${ana.id}/say`, { message: { text: "the build broke" }, channel: channel.id });
+    await h.app.settled();
+    const before = mine.received.length;
+    theirs.received.length = 0;
+    const form = () => new URLSearchParams(theirs.received.at(-1)?.body);
+
+    // coder answers its command in the response itself.
+    theirs.respond = () => ({
+      status: 200,
+      body: JSON.stringify({ text: "Deploying web" }),
+      headers: { "content-type": "application/json" },
+    });
+    const command = await post(`/users/${ana.id}/commands`, {
+      command: "/deploy web",
+      channel: channel.id,
+      app: "coder",
+    });
+    await h.app.settled();
+    expect(command).toMatchObject({ type: "slash_command", app: "coder" });
+    expect(Object.fromEntries(form())).toMatchObject({
+      command: "/deploy",
+      text: "web",
+      api_app_id: coder.id,
+      token: h.secrets.forApp("slack", "coder", "verificationToken"),
+    });
+    const answer = (await get(`/users/${ana.id}/ephemeral`)).at(-1);
+    expect(answer).toMatchObject({ text: "Deploying web", author: { id: coder.id } });
+    theirs.respond = () => ({ status: 200, body: "" });
+
+    const shortcut = await post(`/users/${ana.id}/shortcut`, {
+      callbackId: "file_bug",
+      message: { channel: channel.id, ts: said.ts },
+      app: coder.id,
+    });
+    await h.app.settled();
+    expect(shortcut).toMatchObject({ type: "message_action", app: "coder" });
+    expect(JSON.parse(form().get("payload") ?? "{}")).toMatchObject({
+      type: "message_action",
+      callback_id: "file_bug",
+      api_app_id: coder.id,
+    });
+
+    const thread = await post(`/users/${ana.id}/agent-threads`, { from: channel.id, app: "coder" });
+    await h.app.settled();
+    expect(JSON.parse(theirs.received.at(-1)?.body ?? "{}").event).toMatchObject({
+      type: "assistant_thread_started",
+      assistant_thread: { user_id: ana.id, channel_id: thread.channel, context: { channel_id: channel.id } },
+    });
+    expect(await get(`/conversations/${thread.channel}/members`)).toEqual([
+      expect.objectContaining({ id: ana.id }),
+      expect.objectContaining({ id: coder.id }),
+    ]);
+    // None of it went to my-agent; without app, each is my-agent's as before.
+    expect(mine.received.length).toBe(before);
+    expect(await post(`/users/${ana.id}/commands`, { command: "/deploy", channel: channel.id })).toMatchObject({
+      app: "my-agent",
+    });
+    expect(
+      await refusal(post(`/users/${ana.id}/commands`, { command: "/x", channel: channel.id, app: "nobody" })),
+    ).toBe("not_found");
+  });
+
   test("a file is read as the app whose token asks: where its bot is a member, never where only another's is", async () => {
     const { h, theirs, post, app, coder, web } = await twoApps();
     const ana = await post("/users", { name: "Ana" });

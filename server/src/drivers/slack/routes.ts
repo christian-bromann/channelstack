@@ -193,6 +193,12 @@ const withFiles = (
     : { ...message, files: files.map((file) => ({ name: file.path, bytes: Buffer.from(file.content, "base64") })) };
 
 const participantRef = z.string().openapi(refTo("SlackUser", "SlackApp"));
+/** Which app a person's command, shortcut or split view is for: an interaction goes to its app alone (decision 0027). */
+const interactionApp = (what: string) =>
+  z
+    .string()
+    .optional()
+    .openapi({ description: `Whose ${what}: an app's id or name. Default: the built-in app's`, ...refTo("SlackApp") });
 /** One participant or several: `ana.invite(slack.app, …)` and `ana.invite([ben, slack.app], …)` both work. */
 const participants = () => z.array(participantRef).min(1).openapi({ "x-channelstack-one-or-many": true });
 const conversationRef = z.string().openapi(refTo("SlackConversation"));
@@ -770,31 +776,35 @@ export function registerSlackRoutes(
   router.route({
     method: "post",
     path: "/users/{user}/shortcut",
-    summary: "Run a message shortcut on a message",
+    summary: "Run an app's message shortcut on a message: it goes to that app alone",
     params: UserParams,
-    body: z.object({ callbackId: z.string().min(1), message: messageRef }).openapi("SlackShortcutBody"),
+    body: z
+      .object({ callbackId: z.string().min(1), message: messageRef, app: interactionApp("shortcut") })
+      .openapi("SlackShortcutBody"),
     response: SlackDelivery,
     errors: ["not_found", "not_in_channel", "dispatch_failed"],
-    sdkMethod: { on: "SlackUser", name: "shortcut", args: ["callbackId"], options: ["message"] },
+    sdkMethod: { on: "SlackUser", name: "shortcut", args: ["callbackId"], options: ["message", "app"] },
     live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      interaction(session.id, fake.shortcutAsUser(session.id, params.user, body.callbackId, body.message)),
+      interaction(session.id, fake.shortcutAsUser(session.id, params.user, body.callbackId, body.message, body.app)),
   });
 
   router.route({
     method: "post",
     path: "/users/{user}/commands",
-    summary: "Run a slash command in a conversation, e.g. `/deploy web staging`",
+    summary: "Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone",
     params: UserParams,
-    body: z.object({ command: z.string().regex(/^\/\S/), channel: conversationRef }).openapi("SlackCommandBody"),
+    body: z
+      .object({ command: z.string().regex(/^\/\S/), channel: conversationRef, app: interactionApp("command") })
+      .openapi("SlackCommandBody"),
     response: SlackDelivery,
     errors: ["not_found", "not_in_channel", "dispatch_failed"],
-    sdkMethod: { on: "SlackUser", name: "runCommand", args: ["command"], options: ["channel"] },
+    sdkMethod: { on: "SlackUser", name: "runCommand", args: ["command"], options: ["channel", "app"] },
     live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      interaction(session.id, fake.commandAsUser(session.id, params.user, body.command, body.channel)),
+      interaction(session.id, fake.commandAsUser(session.id, params.user, body.command, body.channel, body.app)),
   });
 
   router.route({
@@ -822,16 +832,18 @@ export function registerSlackRoutes(
     method: "post",
     path: "/users/{user}/agent-threads",
     summary:
-      "Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at",
+      "Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at",
     params: UserParams,
-    body: z.object({ from: conversationRef.optional() }).openapi("SlackAgentThreadOptions"),
+    body: z
+      .object({ from: conversationRef.optional(), app: interactionApp("split view") })
+      .openapi("SlackAgentThreadOptions"),
     response: SlackThread,
     errors: ["not_found", "split_view_unavailable"],
-    sdkMethod: { on: "SlackUser", name: "openAgentThread", args: [], options: ["from"] },
+    sdkMethod: { on: "SlackUser", name: "openAgentThread", args: [], options: ["from", "app"] },
     live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      threadWire(session.id, fake.openAgentThread(session.id, params.user, body.from)),
+      threadWire(session.id, fake.openAgentThread(session.id, params.user, body.from, body.app)),
   });
 
   router.route({

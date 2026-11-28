@@ -917,7 +917,7 @@ export function createFakeWorld(
     // Stop and the split view are a person's, for the one app they are about: the built-in one unless named.
     emit: (conversation, subscription, event, app = store.app) => emitTo(conversation, subscription, event, app)[0]?.id,
     transport: (app = store.app) => socket.of(app).transport(),
-    directMessage: (session, userId) => open(session, userId, [store.app.botUserId]),
+    directMessage: (session, userId, app) => open(session, userId, [app.botUserId]),
     replyAsUser: (...args) => world.replyAsUser(...args),
   };
   const { dispatch, ...interactions } = createInteractions(kit);
