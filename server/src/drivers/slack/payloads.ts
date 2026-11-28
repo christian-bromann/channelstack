@@ -42,14 +42,17 @@ function botProfile(app: SlackAppRecord, team: SlackTeam): Record<string, unknow
   };
 }
 
-/** A message as it appears in events and in `conversations.history`. */
+/**
+ * A message as it appears in events and in `conversations.history`. `apps` are the workspace's
+ * apps: a message one of them wrote carries its `bot_id`, `app_id` and `bot_profile`, whoever reads it.
+ */
 export function messageObject(
   message: SlackMessageRecord,
   author: SlackUserRecord | undefined,
   team: SlackTeam,
-  app: SlackAppRecord,
+  apps: readonly SlackAppRecord[],
 ): Record<string, unknown> {
-  const fromApp = message.user === app.botUserId;
+  const app = apps.find((candidate) => candidate.botUserId === message.user);
   return {
     type: "message",
     user: message.user,
@@ -59,7 +62,7 @@ export function messageObject(
     blocks: message.blocks,
     ...(message.threadTs === undefined ? {} : { thread_ts: message.threadTs }),
     ...(message.edited === undefined ? {} : { edited: { user: message.user, ts: message.edited } }),
-    ...(fromApp
+    ...(app
       ? { bot_id: app.botId, app_id: app.id, bot_profile: botProfile(app, team) }
       : author?.botId
         ? { bot_id: author.botId }
@@ -115,10 +118,10 @@ export function messageEvent(
   conversation: SlackConversationRecord,
   author: SlackUserRecord | undefined,
   team: SlackTeam,
-  app: SlackAppRecord,
+  apps: readonly SlackAppRecord[],
 ): Record<string, unknown> {
   return {
-    ...messageObject(message, author, team, app),
+    ...messageObject(message, author, team, apps),
     channel: conversation.id,
     channel_type: CHANNEL_TYPE[conversation.kind],
     event_ts: message.ts,
@@ -128,7 +131,8 @@ export function messageEvent(
 export function appMentionEvent(
   message: SlackMessageRecord,
   conversation: SlackConversationRecord,
-  author: SlackUserRecord | undefined,
+  /** The writer's bot id, when a bot or another app wrote it. */
+  botId: string | undefined,
   team: SlackTeam,
 ): Record<string, unknown> {
   return {
@@ -142,7 +146,7 @@ export function appMentionEvent(
     blocks: message.blocks,
     ...(message.threadTs === undefined ? {} : { thread_ts: message.threadTs }),
     // A mention written by another bot says so, which is how an agent can ignore bots.
-    ...(author?.botId === undefined ? {} : { bot_id: author.botId }),
+    ...(botId === undefined ? {} : { bot_id: botId }),
     // A mention that shares files carries them, without the message's `file_share` subtype.
     ...(message.files.length === 0 ? {} : { upload: false, files: message.files.map((file) => fileObject(file)) }),
   };

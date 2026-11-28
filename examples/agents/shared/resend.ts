@@ -23,13 +23,16 @@ export function resendAgent(resend: Resend) {
     if (error || !email) throw new Error(`Couldn't read the received email ${id}: ${error?.message}`);
     const sender = (email.from.match(/<([^>]+)>/)?.[1] ?? email.from).toLowerCase();
     if (sender === own) return;
+    // Mail another program sent on its own (RFC 3834) gets no answer: two agents would answer each other without end.
+    const auto = email.headers?.["auto-submitted"];
+    if (auto !== undefined && auto.toLowerCase() !== "no") return;
     const references = [email.headers?.references, email.message_id].filter(Boolean).join(" ");
     const { error: failed } = await resend.emails.send({
       from: FROM,
       to: [sender],
       subject: /^re:/i.test(email.subject) ? email.subject : `Re: ${email.subject}`,
       text: scriptedAnswer(email.subject, email.text ?? ""),
-      headers: { "In-Reply-To": email.message_id, References: references },
+      headers: { "In-Reply-To": email.message_id, References: references, "Auto-Submitted": "auto-replied" },
     });
     if (failed) throw new Error(`Couldn't send the answer: ${failed.message}`);
   }

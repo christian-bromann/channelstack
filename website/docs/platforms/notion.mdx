@@ -15,7 +15,7 @@ This page shows how to test an integration built on Notion's API: how to point i
 
 ## What the fake covers
 
-The fake Notion is one workspace with one internal integration in it, `my-agent`. It serves the REST API that `@notionhq/client` calls at its default version, `2025-09-03`, and sends the integration's webhooks.
+The fake Notion is one workspace with one internal integration in it, `my-agent`, and any other integration a test adds ([several integrations](#several-integrations)). It serves the REST API that `@notionhq/client` calls at its default version, `2025-09-03`, and sends the integration's webhooks.
 
 | Area                | What's there                                                                                                                                             |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -218,6 +218,26 @@ Errors have Notion's shape: `{ object: "error", status, code, message, request_i
 | 400    | `invalid_request_url` | A path the fake doesn't serve                                                                            |
 
 The [errors reference](/docs/reference/api/errors) lists every code.
+
+## Several integrations
+
+A test adds another internal integration with `notion.createApp({ name })`: its own bot user, token, capabilities, and webhook subscription with its own verification handshake and verification token. It sees only the pages connected to it: `createPage({ connections: [notion.app, writer] })`, inherited by child pages. Its webhooks go to `CHANNELSTACK_NOTION_APP_<NAME>_WEBHOOK_URL`; `channelstack env --app writer --channel notion` prints its `NOTION_TOKEN` and `NOTION_VERIFICATION_TOKEN`. See [several apps](/docs/guide/several-apps).
+
+```ts
+const coder = await notion.createApp({ name: "coder" });
+const ana = await notion.createUser({ name: "Ana" });
+const page = await notion.createPage({ title: "Roadmap", content: "# Q1\n- ship search", connections: [notion.app, coder] });
+
+const comment = await ana.comment("@coder summarize this page", { page });
+
+await expect(comment.discussion).toHaveCommentsFrom(coder, { count: 1 });
+await expect(comment.discussion).not.toHaveCommentFrom(notion.app);
+```
+
+- Another integration's comments and page changes reach every integration connected to the page, itself included, with its bot in `authors` and content updates batched as a person's. Each is its own delivery, signed for that integration alone.
+- An integration can't mention another integration's bot: the API takes mentions of people only, and the fake refuses one with `validation_error`. Integrations hand off by comment or page.
+
+A test can act as an integration it made: `writer.comment`, `reply`, `edit` and `rename` go through the fake's API with its token; acting as `my-agent` is refused.
 
 ## Live
 

@@ -4,7 +4,6 @@ import { type Context, Hono } from "hono";
 
 import { type RestAnswer, restApi } from "../../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import {
   applicationFlags,
   applicationObject,
@@ -16,8 +15,8 @@ import {
 } from "../payloads.ts";
 import { has } from "../permissions.ts";
 import { publicKeyOf } from "../signing.ts";
-import { type DiscordChannelRecord, DiscordRefusal } from "../world.ts";
-import type { Gateway } from "./gateway.ts";
+import { type DiscordAppRecord, type DiscordChannelRecord, DiscordRefusal } from "../world.ts";
+import type { Gateways } from "./gateway.ts";
 import type { FakeDiscordWorld } from "./world.ts";
 
 /** A route's rate limit: so many calls per window, per its major parameter (the channel). */
@@ -58,7 +57,10 @@ const errorAnswer = (status: number, code: number, message: string, errors?: Rec
  */
 const NO_BOT_TOKEN = /^(?:GET \/gateway$|POST \/interactions\/|[A-Z]+ \/webhooks\/)/;
 
-export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld, gateway: Gateway): Hono {
+/** Where a call's app is kept on its request, once its token said which bot it is. */
+const CALLER = "channelstackDiscordCaller";
+
+export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld, gateway: Gateways): Hono {
   const { clock } = context;
   const { store } = world;
   /** Each bucket's window, by route and channel: when it started and how many calls it had. */
@@ -70,9 +72,10 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
       if (NO_BOT_TOKEN.test(operation)) return undefined;
       const header = c.req.header("authorization") ?? "";
       const token = /^Bot (.+)$/.exec(header)?.[1] ?? "";
-      if (token === "" || !constantTimeEqual(token, context.secret("botToken"))) {
-        return errorAnswer(401, 0, "401: Unauthorized");
-      }
+      // Each app's token is its own (decision 0027): the call is answered as the bot it belongs to.
+      const caller = store.apps.withSecret(token, (app) => context.apps.secret(app, "botToken"));
+      if (!caller) return errorAnswer(401, 0, "401: Unauthorized");
+      c.set(CALLER as never, caller as never);
       return undefined;
     },
     refusal: (error) => refusalOf(error),
@@ -97,14 +100,24 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
   }
 
   const sessionOf = (channel: DiscordChannelRecord | undefined) => (channel ? [world.sessionOf(channel.id)] : []);
+  /** The app whose bot token made the call. */
+  const callerOf = (c: Context): DiscordAppRecord =>
+    (c.get(CALLER as never) as DiscordAppRecord | undefined) ?? store.app;
+  /** The app an interaction belongs to: who answers it, with its token. */
+  const appOfInteraction = (interaction: { readonly app: string } | undefined): DiscordAppRecord =>
+    (interaction === undefined ? undefined : store.apps.named(interaction.app)) ?? store.app;
 
   /**
    * Count a call against its route's bucket, or refuse it with a 429: a test's `rate_limit`
    * fault, or the route's own limit. Returns the headers every answer of the route carries.
    */
-  const limit = (route: string, major: string, bucket: Bucket): Record<string, string> => {
+  const limit = (route: string, major: string, bucket: Bucket, by: DiscordAppRecord): Record<string, string> => {
+    const bot = by.id;
     const fault = store.faults.find(
-      (candidate) => candidate.type === "rate_limit" && (candidate.route === undefined || candidate.route === route),
+      (candidate) =>
+        candidate.type === "rate_limit" &&
+        (candidate.route === undefined || candidate.route === route) &&
+        (candidate.app === undefined || candidate.app === by.name),
     );
     const hash = createHash("sha1").update(route).digest("hex").slice(0, 32);
     if (fault) {
@@ -124,7 +137,8 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
         "x-ratelimit-scope": "user",
       });
     }
-    const key = `${route} ${major}`;
+    // A bot's limits are its own: each token has its buckets.
+    const key = `${bot} ${route} ${major}`;
     const now = clock();
     let window = windows.get(key);
     if (!window || now - window.startedAt >= bucket.windowMs) {
@@ -165,7 +179,7 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
       // A refusal is the channel's session's call too: a test sees the bot's 50001s and 429s.
       const sessions = c.req.param("channel") === undefined ? [] : [world.sessionOf(major)];
       try {
-        const headers = limit(operation, major, bucket);
+        const headers = limit(operation, major, bucket, callerOf(c));
         const answer = handle(c, body);
         for (const session of answer.sessions) if (session !== undefined) context.arrived(session, operation);
         return { ...answer, headers: { ...headers, ...answer.headers } };
@@ -180,7 +194,7 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
   const channelOf = (c: Context): DiscordChannelRecord => {
     const channel = store.channels.find(c.req.param("channel") ?? "");
     if (!channel) throw new DiscordRefusal(10003);
-    world.requireBot(channel);
+    world.requireBot(callerOf(c), channel);
     return channel;
   };
 
@@ -197,8 +211,8 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
 
   const roles = () => world.guildRoles();
 
-  const botUser = () => ({
-    ...userObject({ kind: "app", app: store.app }),
+  const botUser = (app: DiscordAppRecord) => ({
+    ...userObject({ kind: "app", app }),
     verified: true,
     mfa_enabled: false,
     email: null,
@@ -206,11 +220,11 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
     premium_type: 0,
   });
 
-  const application = () =>
-    applicationObject(store.app, {
-      publicKey: publicKeyOf(context.secret("interactionsKey")),
-      flags: applicationFlags(store.app.privilegedIntents),
-      interactionsUrl: context.webhookUrl,
+  const application = (app: DiscordAppRecord) =>
+    applicationObject(app, {
+      publicKey: publicKeyOf(context.apps.secret(app.name, "interactionsKey")),
+      flags: applicationFlags(app.privilegedIntents),
+      interactionsUrl: context.apps.webhookUrl(app.name),
       guilds: 1,
     });
 
@@ -226,9 +240,9 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
     },
     sessions: [],
   }));
-  endpoint("get", "/users/@me", "GET /users/@me", () => ({ body: botUser(), sessions: [] }));
+  endpoint("get", "/users/@me", "GET /users/@me", (c) => ({ body: botUser(callerOf(c)), sessions: [] }));
   for (const path of ["/applications/@me", "/oauth2/applications/@me"]) {
-    endpoint("get", path, `GET ${path}`, () => ({ body: application(), sessions: [] }));
+    endpoint("get", path, `GET ${path}`, (c) => ({ body: application(callerOf(c)), sessions: [] }));
   }
   endpoint("get", "/users/:user", "GET /users/{user.id}", (c) => {
     const author = world.authorOf(c.req.param("user") ?? "");
@@ -238,7 +252,9 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
       sessions: author.kind === "user" ? [store.users.owner(author.user.id)] : [],
     };
   });
-  endpoint("post", "/users/@me/channels", "POST /users/@me/channels", (_c, body) => {
+  endpoint("post", "/users/@me/channels", "POST /users/@me/channels", (c, body) => {
+    // No bot opens a DM with another bot: an app's bot is refused as a bot person is.
+    if (typeof body.recipient_id === "string" && store.appOf(body.recipient_id)) throw new DiscordRefusal(50007);
     const recipient = typeof body.recipient_id === "string" ? store.users.find(body.recipient_id) : undefined;
     if (!recipient) {
       throw new DiscordRefusal(50035, {
@@ -246,20 +262,21 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
       });
     }
     if (recipient.bot) throw new DiscordRefusal(50007);
-    const channel = world.dmWith(recipient.id);
-    return { body: world.channelWire(channel), sessions: sessionOf(channel) };
+    const caller = callerOf(c);
+    const channel = world.dmWith(recipient.id, caller);
+    return { body: world.channelWire(channel, caller), sessions: sessionOf(channel) };
   });
 
   // --- Channels and messages ------------------------------------------------------------------
 
   limited("get", "/channels/:channel", "GET /channels/{channel.id}", DEFAULT, (c) => {
     const channel = channelOf(c);
-    return { body: world.channelWire(channel), sessions: sessionOf(channel) };
+    return { body: world.channelWire(channel, callerOf(c)), sessions: sessionOf(channel) };
   });
 
   limited("get", "/channels/:channel/messages", "GET /channels/{channel.id}/messages", DEFAULT, (c) => {
     const channel = channelOf(c);
-    world.requireBot(channel, "READ_MESSAGE_HISTORY");
+    world.requireBot(callerOf(c), channel, "READ_MESSAGE_HISTORY");
     // What Discord refuses here: a `limit` outside 1 to 100, a `before` or `after` that isn't a snowflake.
     const field = (name: string, code: string, message: string) =>
       new DiscordRefusal(50035, { errors: { [name]: { _errors: [{ code, message }] } } });
@@ -284,7 +301,7 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
     if (after) messages = messages.filter((message) => BigInt(message.id) > BigInt(after));
     // Newest first, as Discord lists them; `after` gives the oldest ones after it.
     const page = after ? messages.slice(0, wanted).reverse() : messages.slice(-wanted).reverse();
-    return { body: page.map((message) => world.messageWire(message)), sessions: sessionOf(channel) };
+    return { body: page.map((message) => world.messageWire(message, callerOf(c))), sessions: sessionOf(channel) };
   });
 
   limited(
@@ -294,9 +311,9 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
     DEFAULT,
     (c) => {
       const channel = channelOf(c);
-      world.requireBot(channel, "READ_MESSAGE_HISTORY");
+      world.requireBot(callerOf(c), channel, "READ_MESSAGE_HISTORY");
       return {
-        body: world.messageWire(messageIn(channel, c.req.param("message") ?? "")),
+        body: world.messageWire(messageIn(channel, c.req.param("message") ?? ""), callerOf(c)),
         sessions: sessionOf(channel),
       };
     },
@@ -304,7 +321,8 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
 
   limited("post", "/channels/:channel/messages", "POST /channels/{channel.id}/messages", MESSAGES, (c, body) => {
     const channel = channelOf(c);
-    world.requireBot(channel, channel.kind === "public_thread" ? "SEND_MESSAGES_IN_THREADS" : "SEND_MESSAGES");
+    const caller = callerOf(c);
+    world.requireBot(caller, channel, channel.kind === "public_thread" ? "SEND_MESSAGES_IN_THREADS" : "SEND_MESSAGES");
     world.checkContent(body);
     const reference = (
       typeof body.message_reference === "object" && body.message_reference !== null ? body.message_reference : {}
@@ -329,8 +347,9 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
         components: Array.isArray(body.components) ? body.components : [],
       },
       { replyTo },
+      caller,
     );
-    return { body: world.messageWire(message), sessions: sessionOf(channel) };
+    return { body: world.messageWire(message, caller), sessions: sessionOf(channel) };
   });
 
   limited(
@@ -341,14 +360,14 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
     (c, body) => {
       const channel = channelOf(c);
       const message = messageIn(channel, c.req.param("message") ?? "");
-      if (message.authorId !== store.app.botUserId) throw new DiscordRefusal(50005);
+      if (message.authorId !== callerOf(c).botUserId) throw new DiscordRefusal(50005);
       const next = {
         content: typeof body.content === "string" ? body.content : message.content,
         embeds: Array.isArray(body.embeds) ? body.embeds : message.embeds,
         components: Array.isArray(body.components) ? body.components : message.components,
       };
       world.checkContent(next);
-      return { body: world.messageWire(world.update(message, next)), sessions: sessionOf(channel) };
+      return { body: world.messageWire(world.update(message, next), callerOf(c)), sessions: sessionOf(channel) };
     },
   );
 
@@ -360,7 +379,7 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
     (c) => {
       const channel = channelOf(c);
       const message = messageIn(channel, c.req.param("message") ?? "");
-      if (message.authorId !== store.app.botUserId) world.requireBot(channel, "MANAGE_MESSAGES");
+      if (message.authorId !== callerOf(c).botUserId) world.requireBot(callerOf(c), channel, "MANAGE_MESSAGES");
       world.remove(message);
       return { body: null, sessions: sessionOf(channel), status: 204 };
     },
@@ -376,11 +395,13 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
   const REACTION = "/channels/{channel.id}/messages/{message.id}/reactions/{emoji}/@me";
   limited("put", "/channels/:channel/messages/:message/reactions/:emoji/@me", `PUT ${REACTION}`, REACTIONS, (c) => {
     const channel = channelOf(c);
-    world.requireBot(channel, "READ_MESSAGE_HISTORY");
+    const caller = callerOf(c);
+    world.requireBot(caller, channel, "READ_MESSAGE_HISTORY");
     const message = messageIn(channel, c.req.param("message") ?? "");
     const emoji = emojiOf(c);
-    if (!message.reactions.some((reaction) => reaction.emoji === emoji)) world.requireBot(channel, "ADD_REACTIONS");
-    world.reactAs(message, store.app.botUserId, emoji, "add");
+    if (!message.reactions.some((reaction) => reaction.emoji === emoji))
+      world.requireBot(caller, channel, "ADD_REACTIONS");
+    world.reactAs(message, caller.botUserId, emoji, "add");
     return { body: null, sessions: sessionOf(channel), status: 204 };
   });
 
@@ -392,7 +413,7 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
     (c) => {
       const channel = channelOf(c);
       const message = messageIn(channel, c.req.param("message") ?? "");
-      world.reactAs(message, store.app.botUserId, emojiOf(c), "remove");
+      world.reactAs(message, callerOf(c).botUserId, emojiOf(c), "remove");
       return { body: null, sessions: sessionOf(channel), status: 204 };
     },
   );
@@ -419,7 +440,7 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
 
   limited("post", "/channels/:channel/typing", "POST /channels/{channel.id}/typing", DEFAULT, (c) => {
     const channel = channelOf(c);
-    world.requireBot(channel, "SEND_MESSAGES");
+    world.requireBot(callerOf(c), channel, "SEND_MESSAGES");
     world.typing(channel);
     return { body: null, sessions: sessionOf(channel), status: 204 };
   });
@@ -440,17 +461,19 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
     DEFAULT,
     (c, body) => {
       const channel = channelOf(c);
-      world.requireBot(channel, "CREATE_PUBLIC_THREADS");
+      const caller = callerOf(c);
+      world.requireBot(caller, channel, "CREATE_PUBLIC_THREADS");
       if (channel.kind !== "text") throw new DiscordRefusal(50013);
       const message = messageIn(channel, c.req.param("message") ?? "");
-      const thread = world.threadAs(store.app.botUserId, channel, threadName(body), message);
-      return { body: world.channelWire(thread), sessions: sessionOf(channel), status: 201 };
+      const thread = world.threadAs(caller.botUserId, channel, threadName(body), message);
+      return { body: world.channelWire(thread, caller), sessions: sessionOf(channel), status: 201 };
     },
   );
 
   limited("post", "/channels/:channel/threads", "POST /channels/{channel.id}/threads", DEFAULT, (c, body) => {
     const channel = channelOf(c);
-    world.requireBot(channel, "CREATE_PUBLIC_THREADS");
+    const caller = callerOf(c);
+    world.requireBot(caller, channel, "CREATE_PUBLIC_THREADS");
     if (channel.kind !== "text") throw new DiscordRefusal(50013);
     // A public thread (11, the default). A private one (12) isn't in the fake: refused, never made public instead.
     if (body.type !== undefined && body.type !== 11) {
@@ -459,8 +482,8 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
         errors: { type: { _errors: [{ code: "BASE_TYPE_CHOICES", message: "Value must be one of {11}." }] } },
       });
     }
-    const thread = world.threadAs(store.app.botUserId, channel, threadName(body), undefined);
-    return { body: world.channelWire(thread), sessions: sessionOf(channel), status: 201 };
+    const thread = world.threadAs(caller.botUserId, channel, threadName(body), undefined);
+    return { body: world.channelWire(thread, caller), sessions: sessionOf(channel), status: 201 };
   });
 
   for (const method of ["put", "delete"] as const) {
@@ -472,8 +495,8 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
       (c) => {
         const channel = channelOf(c);
         if (channel.kind !== "public_thread") throw new DiscordRefusal(50035, { message: "Invalid Form Body" });
-        if (method === "put") channel.members.add(store.app.botUserId);
-        else channel.members.delete(store.app.botUserId);
+        if (method === "put") channel.members.add(callerOf(c).botUserId);
+        else channel.members.delete(callerOf(c).botUserId);
         return { body: null, sessions: sessionOf(channel), status: 204 };
       },
     );
@@ -491,10 +514,14 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
   });
   limited("get", "/guilds/:guild/channels", "GET /guilds/{guild.id}/channels", DEFAULT, (c) => {
     guildOf(c);
+    const caller = callerOf(c);
     const visible = store
       .allChannels()
-      .filter((channel) => channel.kind === "text" && has(world.botPermissions(channel), "VIEW_CHANNEL"));
-    return { body: visible.map(world.channelWire), sessions: visible.map((channel) => world.sessionOf(channel.id)) };
+      .filter((channel) => channel.kind === "text" && has(world.botPermissions(channel, caller), "VIEW_CHANNEL"));
+    return {
+      body: visible.map((channel) => world.channelWire(channel, caller)),
+      sessions: visible.map((channel) => world.sessionOf(channel.id)),
+    };
   });
   limited("get", "/guilds/:guild/members/:user", "GET /guilds/{guild.id}/members/{user.id}", DEFAULT, (c) => {
     guildOf(c);
@@ -509,8 +536,11 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
 
   // --- Application commands -------------------------------------------------------------------
 
-  const appOf = (c: Context) => {
-    if (c.req.param("application") !== store.app.id) throw new DiscordRefusal(50001);
+  /** The application in the path must be the caller's own: a bot manages its own commands only. */
+  const appOf = (c: Context): DiscordAppRecord => {
+    const caller = callerOf(c);
+    if (c.req.param("application") !== caller.id) throw new DiscordRefusal(50001);
+    return caller;
   };
   const scopes: ReadonlyArray<readonly [string, string, (c: Context) => string | undefined]> = [
     ["/applications/:application/commands", "/applications/{application.id}/commands", () => undefined],
@@ -522,26 +552,29 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
   ];
   for (const [path, named, guildIdOf] of scopes) {
     limited("get", path, `GET ${named}`, DEFAULT, (c) => {
-      appOf(c);
-      return { body: world.interactions.commands(guildIdOf(c)).map(world.interactions.commandWire), sessions: [] };
+      const app = appOf(c);
+      return {
+        body: world.interactions.commands(app, guildIdOf(c)).map(world.interactions.commandWire),
+        sessions: [],
+      };
     });
     limited("put", path, `PUT ${named}`, DEFAULT, (c, body) => {
-      appOf(c);
+      const app = appOf(c);
       const list: unknown = body;
       if (!Array.isArray(list)) throw new DiscordRefusal(50035, { message: "Invalid Form Body" });
-      const saved = world.interactions.saveCommands(guildIdOf(c), list as Record<string, unknown>[], true);
+      const saved = world.interactions.saveCommands(app, guildIdOf(c), list as Record<string, unknown>[], true);
       return { body: saved.map(world.interactions.commandWire), sessions: [] };
     });
     limited("post", path, `POST ${named}`, DEFAULT, (c, body) => {
-      appOf(c);
-      const [saved] = world.interactions.saveCommands(guildIdOf(c), [body], false);
+      const app = appOf(c);
+      const [saved] = world.interactions.saveCommands(app, guildIdOf(c), [body], false);
       return { body: saved ? world.interactions.commandWire(saved) : {}, sessions: [], status: 201 };
     });
     limited("delete", `${path}/:command`, `DELETE ${named}/{command.id}`, DEFAULT, (c) => {
-      appOf(c);
+      const app = appOf(c);
       const id = c.req.param("command") ?? "";
       const found = store.commands.get(id);
-      if (!found || found.guildId !== guildIdOf(c)) throw new DiscordRefusal(10063);
+      if (!found || found.app !== app.name || found.guildId !== guildIdOf(c)) throw new DiscordRefusal(10063);
       store.commands.delete(id);
       return { body: null, sessions: [], status: 204 };
     });
@@ -570,7 +603,12 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
           },
           // A resource only for a response that made or changed a message (4, 7), as Discord's description has it.
           ...(message && (body.type === 4 || body.type === 7)
-            ? { resource: { type: body.type, message: world.messageWire(message) } }
+            ? {
+                resource: {
+                  type: body.type,
+                  message: world.messageWire(message, appOfInteraction(store.interactions.get(id))),
+                },
+              }
             : {}),
         },
         sessions: [session],
@@ -582,7 +620,7 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
   endpoint("post", "/webhooks/:application/:token", `POST ${WEBHOOK}`, (c, body) => {
     const interaction = world.interactions.byToken(c.req.param("application") ?? "", c.req.param("token") ?? "");
     const message = world.interactions.followup(interaction, body);
-    return { body: world.messageWire(message), sessions: [interaction.session] };
+    return { body: world.messageWire(message, appOfInteraction(interaction)), sessions: [interaction.session] };
   });
 
   const responseOf = (c: Context) => {
@@ -599,12 +637,15 @@ export function createDiscordApi(context: DriverContext, world: FakeDiscordWorld
   const MESSAGE = `${WEBHOOK}/messages/{message.id}`;
   endpoint("get", "/webhooks/:application/:token/messages/:message", `GET ${MESSAGE}`, (c) => {
     const { interaction, message } = responseOf(c);
-    return { body: world.messageWire(message), sessions: [interaction.session] };
+    return { body: world.messageWire(message, appOfInteraction(interaction)), sessions: [interaction.session] };
   });
   endpoint("patch", "/webhooks/:application/:token/messages/:message", `PATCH ${MESSAGE}`, (c, body) => {
     const { interaction, message } = responseOf(c);
     return {
-      body: world.messageWire(world.interactions.editResponse(interaction, message, body)),
+      body: world.messageWire(
+        world.interactions.editResponse(interaction, message, body),
+        appOfInteraction(interaction),
+      ),
       sessions: [interaction.session],
     };
   });

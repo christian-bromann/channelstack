@@ -1,3 +1,4 @@
+import { AppRoster } from "../../../core/apps/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { Collection, Registry } from "../../../core/registry/index.ts";
 import type {
@@ -35,10 +36,13 @@ export class GitHubStore {
   /** A check suite per repo and commit: check runs of one commit share it. */
   readonly suites = new Map<string, number>();
   #org: GitHubOrgRecord | undefined;
-  #app: GitHubAppRecord | undefined;
-  #bot: GitHubUserRecord | undefined;
+  /** The built-in App and the ones tests made (decision 0027), all installed on the one org. */
+  readonly apps: AppRoster<GitHubAppRecord>;
+  /** The bot user of each App, by App name. Bots belong to no session. */
+  readonly #bots = new Map<string, GitHubUserRecord>();
 
   constructor(registry: Registry) {
+    this.apps = new AppRoster<GitHubAppRecord>("GitHub", registry, { noun: "App", refs: (app) => [String(app.id)] });
     this.users = registry.collection("github", "user");
     this.repos = registry.collection("github", "repo");
     this.issues = registry.collection("github", "issue");
@@ -54,21 +58,21 @@ export class GitHubStore {
     return this.#org;
   }
 
+  /** The built-in App, `my-agent`. */
   get app(): GitHubAppRecord {
-    if (!this.#app) throw new Error("The GitHub fake hasn't been seeded");
-    return this.#app;
+    return this.apps.builtIn;
   }
 
-  /** The bot user that acts for the App. It belongs to no session. */
+  /** The bot user that acts for the built-in App. It belongs to no session. */
   get bot(): GitHubUserRecord {
-    if (!this.#bot) throw new Error("The GitHub fake hasn't been seeded");
-    return this.#bot;
+    return this.botOf(this.app);
   }
 
-  seed(org: GitHubOrgRecord, app: GitHubAppRecord): void {
-    this.#org = org;
-    this.#app = app;
-    this.#bot = {
+  /** The bot user that acts for an App: `<slug>[bot]`. */
+  botOf(app: GitHubAppRecord): GitHubUserRecord {
+    const known = this.#bots.get(app.name);
+    if (known?.id === app.botId) return known;
+    const bot: GitHubUserRecord = {
       id: app.botId,
       login: `${app.slug}[bot]`,
       name: undefined,
@@ -78,6 +82,32 @@ export class GitHubStore {
       fixedId: false,
       createdAt: app.createdAt,
     };
+    this.#bots.set(app.name, bot);
+    return bot;
+  }
+
+  /** The App whose bot acts under this user id, if any. */
+  appOfBot(id: number): GitHubAppRecord | undefined {
+    return this.apps.all().find((app) => app.botId === id);
+  }
+
+  /** An App by name: the built-in one (`my-agent`, or its own name live) or one a test made. */
+  appNamed(name: string): GitHubAppRecord {
+    const app = name === this.app.name ? this.app : this.apps.named(name);
+    if (!app) throw new ProtocolError("not_found", `There is no GitHub App "${name}"`, { app: name });
+    return app;
+  }
+
+  /** The bot of an App, by its login. */
+  #botByLogin(login: string): GitHubUserRecord | undefined {
+    const app = this.apps.all().find((candidate) => `${candidate.slug}[bot]` === login);
+    return app ? this.botOf(app) : undefined;
+  }
+
+  seed(org: GitHubOrgRecord, app: GitHubAppRecord): void {
+    this.#org = org;
+    this.apps.seed(app);
+    this.#bots.delete(app.name);
     this.#created.clear();
     this.hookDeliveries.length = 0;
     this.suites.clear();
@@ -125,31 +155,36 @@ export class GitHubStore {
     collection.remove(String(id));
   }
 
-  /** Whoever acts under this id: a person, or the App's bot. */
+  /** Whoever acts under this id: a person, or an App's bot. */
   actor(id: number): GitHubUserRecord {
-    if (id === this.bot.id) return this.bot;
+    const app = this.appOfBot(id);
+    if (app) return this.botOf(app);
     const user = this.users.find(String(id));
     if (!user) throw new Error(`No GitHub user ${id}`);
     return user;
   }
 
-  /** A person or the bot by login, among the people of one session. */
+  /** A person or an App's bot by login, among the people of one session. */
   byLogin(session: string, login: string): GitHubUserRecord | undefined {
-    if (login === this.bot.login) return this.bot;
-    return this.list(this.users, session).find((user) => user.login.toLowerCase() === login.toLowerCase());
+    return (
+      this.#botByLogin(login) ??
+      this.list(this.users, session).find((user) => user.login.toLowerCase() === login.toLowerCase())
+    );
   }
 
   /** Someone by login from the platform's side, where there are no sessions: the newest person of that name. */
   anyByLogin(login: string): GitHubUserRecord | undefined {
-    if (login === this.bot.login) return this.bot;
-    return [...this.#created.keys()].flatMap((session) => this.byLogin(session, login) ?? []).at(-1);
+    return (
+      this.#botByLogin(login) ??
+      [...this.#created.keys()].flatMap((session) => this.byLogin(session, login) ?? []).at(-1)
+    );
   }
 
-  /** Every repository the App is installed on, in any session. */
-  installedRepos(): GitHubRepoRecord[] {
+  /** Every repository an App (the built-in one unless named) is installed on, in any session. */
+  installedRepos(app: GitHubAppRecord = this.app): GitHubRepoRecord[] {
     return [...this.#created.keys()]
       .flatMap((session) => this.list(this.repos, session))
-      .filter((repo) => repo.installed);
+      .filter((repo) => repo.apps.has(app.name));
   }
 
   /** A repository from the platform's side, where a path names it: `acme/web`. Names are unique in the world. */

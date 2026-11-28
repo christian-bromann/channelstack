@@ -9,6 +9,7 @@ const APP_NAME = "echo-agent";
 
 export interface EchoFake extends FakeBackend {
   readonly world: FakeEchoWorld;
+  readonly store: EchoStore;
 }
 
 /** The echo fake: a provider API over an in-memory store, wired to core's ids, event log and delivery queue. */
@@ -18,6 +19,7 @@ export function createEchoFake(context: DriverContext): EchoFake {
   const fake = {
     api: createEchoApi(context, store, world),
     world,
+    store,
     seed() {
       store.clear();
       store.app = {

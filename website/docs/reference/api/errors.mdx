@@ -135,7 +135,15 @@ The Slack fake refuses with it where the platform refuses the same request.
 
 SDK class: `AlreadyReactedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::ALREADY_REACTED`.
 
-Raised by [`SlackUser.react()`](/docs/reference/api/slack#react).
+Raised by [`SlackApp.react()`](/docs/reference/api/slack#react), [`SlackUser.react()`](/docs/reference/api/slack#react-1).
+
+### cannot_dm_bot
+
+The Slack fake refuses with it where the platform refuses the same request.
+
+SDK class: `CannotDmBotError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::CANNOT_DM_BOT`.
+
+Raised by [`SlackApp.say()`](/docs/reference/api/slack#say).
 
 ### cannot_edit_others_message
 
@@ -144,6 +152,14 @@ The Discord fake refuses with it where the platform refuses the same request.
 SDK class: `CannotEditOthersMessageError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::CANNOT_EDIT_OTHERS_MESSAGE`.
 
 Raised by [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
+
+### cannot_message_user
+
+The Discord fake refuses with it where the platform refuses the same request.
+
+SDK class: `CannotMessageUserError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::CANNOT_MESSAGE_USER`.
+
+Raised by [`DiscordApp.say()`](/docs/reference/api/discord#say).
 
 ### cant_delete_message
 
@@ -175,7 +191,7 @@ The Discord fake refuses with it where the platform refuses the same request.
 
 SDK class: `EmptyMessageError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::EMPTY_MESSAGE`.
 
-Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
+Raised by [`DiscordApp.say()`](/docs/reference/api/discord#say), [`DiscordApp.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.say()`](/docs/reference/api/discord#say-1), [`DiscordUser.reply()`](/docs/reference/api/discord#reply-1), [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
 
 ### forbidden
 
@@ -183,7 +199,7 @@ The GitHub, Linear and Notion fakes refuse with it where the platform refuses th
 
 SDK class: `ForbiddenError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::FORBIDDEN`.
 
-Raised by [`GitHubUser.push()`](/docs/reference/api/github#push), [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue), [`GitHubUser.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubUser.editIssue()`](/docs/reference/api/github#editissue), [`GitHubUser.close()`](/docs/reference/api/github#close), [`GitHubUser.reopen()`](/docs/reference/api/github#reopen), [`GitHubUser.label()`](/docs/reference/api/github#label), [`GitHubUser.unlabel()`](/docs/reference/api/github#unlabel), [`GitHubUser.assign()`](/docs/reference/api/github#assign), [`GitHubUser.comment()`](/docs/reference/api/github#comment), [`GitHubUser.edit()`](/docs/reference/api/github#edit), [`GitHubUser.delete()`](/docs/reference/api/github#delete), and 29 more.
+Raised by [`GitHubApp.push()`](/docs/reference/api/github#push), [`GitHubApp.openIssue()`](/docs/reference/api/github#openissue), [`GitHubApp.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubApp.editIssue()`](/docs/reference/api/github#editissue), [`GitHubApp.close()`](/docs/reference/api/github#close), [`GitHubApp.reopen()`](/docs/reference/api/github#reopen), [`GitHubApp.label()`](/docs/reference/api/github#label), [`GitHubApp.unlabel()`](/docs/reference/api/github#unlabel), [`GitHubApp.assign()`](/docs/reference/api/github#assign), [`GitHubApp.comment()`](/docs/reference/api/github#comment), [`GitHubApp.edit()`](/docs/reference/api/github#edit), [`GitHubApp.delete()`](/docs/reference/api/github#delete), and 51 more.
 
 ### invalid_auth
 
@@ -199,7 +215,7 @@ The Discord fake refuses with it where the platform refuses the same request.
 
 SDK class: `InvalidFormBodyError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::INVALID_FORM_BODY`.
 
-Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
+Raised by [`DiscordApp.say()`](/docs/reference/api/discord#say), [`DiscordApp.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.say()`](/docs/reference/api/discord#say-1), [`DiscordUser.reply()`](/docs/reference/api/discord#reply-1), [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
 
 ### method_not_supported_for_channel_type
 
@@ -215,7 +231,7 @@ The Discord fake refuses with it where the platform refuses the same request.
 
 SDK class: `MissingAccessError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::MISSING_ACCESS`.
 
-Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply).
+Raised by [`DiscordApp.say()`](/docs/reference/api/discord#say), [`DiscordApp.reply()`](/docs/reference/api/discord#reply), [`DiscordApp.react()`](/docs/reference/api/discord#react), [`DiscordApp.unreact()`](/docs/reference/api/discord#unreact), [`DiscordUser.say()`](/docs/reference/api/discord#say-1), [`DiscordUser.reply()`](/docs/reference/api/discord#reply-1).
 
 ### missing_permissions
 
@@ -223,7 +239,7 @@ The Discord fake refuses with it where the platform refuses the same request.
 
 SDK class: `MissingPermissionsError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::MISSING_PERMISSIONS`.
 
-Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.delete()`](/docs/reference/api/discord#delete), [`DiscordUser.react()`](/docs/reference/api/discord#react), [`DiscordUser.unreact()`](/docs/reference/api/discord#unreact), [`DiscordUser.startThread()`](/docs/reference/api/discord#startthread), [`DiscordUser.invite()`](/docs/reference/api/discord#invite), [`DiscordUser.runCommand()`](/docs/reference/api/discord#runcommand).
+Raised by [`DiscordApp.say()`](/docs/reference/api/discord#say), [`DiscordApp.reply()`](/docs/reference/api/discord#reply), [`DiscordApp.react()`](/docs/reference/api/discord#react), [`DiscordApp.unreact()`](/docs/reference/api/discord#unreact), [`DiscordUser.say()`](/docs/reference/api/discord#say-1), [`DiscordUser.reply()`](/docs/reference/api/discord#reply-1), [`DiscordUser.delete()`](/docs/reference/api/discord#delete), [`DiscordUser.react()`](/docs/reference/api/discord#react-1), [`DiscordUser.unreact()`](/docs/reference/api/discord#unreact-1), [`DiscordUser.startThread()`](/docs/reference/api/discord#startthread), [`DiscordUser.invite()`](/docs/reference/api/discord#invite), [`DiscordUser.runCommand()`](/docs/reference/api/discord#runcommand).
 
 ### msg_too_long
 
@@ -231,7 +247,7 @@ The Slack fake refuses with it where the platform refuses the same request.
 
 SDK class: `MsgTooLongError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::MSG_TOO_LONG`.
 
-Raised by [`SlackUser.say()`](/docs/reference/api/slack#say), [`SlackUser.reply()`](/docs/reference/api/slack#reply).
+Raised by [`SlackApp.say()`](/docs/reference/api/slack#say), [`SlackApp.reply()`](/docs/reference/api/slack#reply), [`SlackUser.say()`](/docs/reference/api/slack#say-1), [`SlackUser.reply()`](/docs/reference/api/slack#reply-1).
 
 ### name_taken
 
@@ -247,7 +263,7 @@ The Slack fake refuses with it where the platform refuses the same request.
 
 SDK class: `NoReactionError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NO_REACTION`.
 
-Raised by [`SlackUser.unreact()`](/docs/reference/api/slack#unreact).
+Raised by [`SlackApp.unreact()`](/docs/reference/api/slack#unreact), [`SlackUser.unreact()`](/docs/reference/api/slack#unreact-1).
 
 ### no_text
 
@@ -255,7 +271,7 @@ The Slack fake refuses with it where the platform refuses the same request.
 
 SDK class: `NoTextError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NO_TEXT`.
 
-Raised by [`SlackUser.say()`](/docs/reference/api/slack#say), [`SlackUser.reply()`](/docs/reference/api/slack#reply), [`SlackUser.edit()`](/docs/reference/api/slack#edit).
+Raised by [`SlackApp.say()`](/docs/reference/api/slack#say), [`SlackApp.reply()`](/docs/reference/api/slack#reply), [`SlackUser.say()`](/docs/reference/api/slack#say-1), [`SlackUser.reply()`](/docs/reference/api/slack#reply-1), [`SlackUser.edit()`](/docs/reference/api/slack#edit).
 
 ### not_allowed
 
@@ -263,7 +279,7 @@ The GitHub fake refuses with it where the platform refuses the same request.
 
 SDK class: `NotAllowedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NOT_ALLOWED`.
 
-Raised by [`GitHubUser.merge()`](/docs/reference/api/github#merge).
+Raised by [`GitHubApp.merge()`](/docs/reference/api/github#merge), [`GitHubUser.merge()`](/docs/reference/api/github#merge-1).
 
 ### not_in_channel
 
@@ -271,7 +287,23 @@ The Slack fake refuses with it where the platform refuses the same request.
 
 SDK class: `NotInChannelError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NOT_IN_CHANNEL`.
 
-Raised by [`SlackUser.say()`](/docs/reference/api/slack#say), [`SlackUser.reply()`](/docs/reference/api/slack#reply), [`SlackUser.edit()`](/docs/reference/api/slack#edit), [`SlackUser.delete()`](/docs/reference/api/slack#delete), [`SlackUser.click()`](/docs/reference/api/slack#click), [`SlackUser.select()`](/docs/reference/api/slack#select), [`SlackUser.shortcut()`](/docs/reference/api/slack#shortcut), [`SlackUser.runCommand()`](/docs/reference/api/slack#runcommand), [`SlackUser.stop()`](/docs/reference/api/slack#stop), [`SlackUser.pickPrompt()`](/docs/reference/api/slack#pickprompt), [`SlackUser.switchContext()`](/docs/reference/api/slack#switchcontext), [`SlackUser.react()`](/docs/reference/api/slack#react), and 3 more.
+Raised by [`SlackApp.say()`](/docs/reference/api/slack#say), [`SlackApp.reply()`](/docs/reference/api/slack#reply), [`SlackApp.react()`](/docs/reference/api/slack#react), [`SlackApp.unreact()`](/docs/reference/api/slack#unreact), [`SlackUser.say()`](/docs/reference/api/slack#say-1), [`SlackUser.reply()`](/docs/reference/api/slack#reply-1), [`SlackUser.edit()`](/docs/reference/api/slack#edit), [`SlackUser.delete()`](/docs/reference/api/slack#delete), [`SlackUser.click()`](/docs/reference/api/slack#click), [`SlackUser.select()`](/docs/reference/api/slack#select), [`SlackUser.shortcut()`](/docs/reference/api/slack#shortcut), [`SlackUser.runCommand()`](/docs/reference/api/slack#runcommand), and 7 more.
+
+### object_not_found
+
+The Notion fake refuses with it where the platform refuses the same request.
+
+SDK class: `ObjectNotFoundError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::OBJECT_NOT_FOUND`.
+
+Raised by [`NotionIntegration.comment()`](/docs/reference/api/notion#comment), [`NotionIntegration.reply()`](/docs/reference/api/notion#reply), [`NotionIntegration.edit()`](/docs/reference/api/notion#edit), [`NotionIntegration.rename()`](/docs/reference/api/notion#rename).
+
+### restricted_resource
+
+The Notion fake refuses with it where the platform refuses the same request.
+
+SDK class: `RestrictedResourceError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::RESTRICTED_RESOURCE`.
+
+Raised by [`NotionIntegration.comment()`](/docs/reference/api/notion#comment), [`NotionIntegration.reply()`](/docs/reference/api/notion#reply), [`NotionIntegration.edit()`](/docs/reference/api/notion#edit), [`NotionIntegration.rename()`](/docs/reference/api/notion#rename).
 
 ### split_view_unavailable
 
@@ -297,10 +329,18 @@ SDK class: `ThreadAlreadyCreatedError` in TypeScript and Python, a subclass of `
 
 Raised by [`DiscordUser.startThread()`](/docs/reference/api/discord#startthread).
 
+### validation_error
+
+The Notion fake refuses with it where the platform refuses the same request.
+
+SDK class: `ValidationErrorError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::VALIDATION_ERROR`.
+
+Raised by [`NotionIntegration.comment()`](/docs/reference/api/notion#comment), [`NotionIntegration.reply()`](/docs/reference/api/notion#reply), [`NotionIntegration.edit()`](/docs/reference/api/notion#edit), [`NotionIntegration.rename()`](/docs/reference/api/notion#rename).
+
 ### validation_failed
 
 The GitHub fake refuses with it where the platform refuses the same request.
 
 SDK class: `ValidationFailedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::VALIDATION_FAILED`.
 
-Raised by [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue), [`GitHubUser.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubUser.close()`](/docs/reference/api/github#close), [`GitHubUser.reopen()`](/docs/reference/api/github#reopen), [`GitHubUser.assign()`](/docs/reference/api/github#assign), [`GitHubUser.review()`](/docs/reference/api/github#review), [`GitHubUser.reviewComment()`](/docs/reference/api/github#reviewcomment), [`GitHubUser.requestReview()`](/docs/reference/api/github#requestreview), [`GitHubUser.markReady()`](/docs/reference/api/github#markready), [`GitHubRepo.installApp()`](/docs/reference/api/github#installapp), [`GitHubRepo.uninstallApp()`](/docs/reference/api/github#uninstallapp).
+Raised by [`GitHubApp.openIssue()`](/docs/reference/api/github#openissue), [`GitHubApp.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubApp.close()`](/docs/reference/api/github#close), [`GitHubApp.reopen()`](/docs/reference/api/github#reopen), [`GitHubApp.assign()`](/docs/reference/api/github#assign), [`GitHubApp.review()`](/docs/reference/api/github#review), [`GitHubApp.reviewComment()`](/docs/reference/api/github#reviewcomment), [`GitHubApp.requestReview()`](/docs/reference/api/github#requestreview), [`GitHubApp.markReady()`](/docs/reference/api/github#markready), [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue-1), [`GitHubUser.openPullRequest()`](/docs/reference/api/github#openpullrequest-1), [`GitHubUser.close()`](/docs/reference/api/github#close-1), and 8 more.

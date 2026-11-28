@@ -1,3 +1,4 @@
+import { AppRoster } from "../../../core/apps/index.ts";
 import type { Collection, Registry } from "../../../core/registry/index.ts";
 import type { CommandOption } from "../commands.ts";
 import type {
@@ -8,9 +9,11 @@ import type {
   DiscordUserRecord,
 } from "../world.ts";
 
-/** One of the app's slash commands, as it registered it: in the guild, or everywhere (global). */
+/** One of an app's slash commands, as it registered it: in the guild, or everywhere (global). */
 export interface DiscordCommandRecord {
   readonly id: string;
+  /** The app it belongs to, by name: a person's command goes to that app alone (decision 0027). */
+  readonly app: string;
   readonly name: string;
   readonly description: string;
   readonly type: number;
@@ -24,6 +27,8 @@ export interface DiscordCommandRecord {
 /** An interaction a person started, and how the app has answered it so far. */
 export interface DiscordInteractionRecord {
   readonly id: string;
+  /** The app it goes to, by name: the command's, or the one whose message the button is on. */
+  readonly app: string;
   readonly token: string;
   readonly session: string;
   /** 1 a ping, 2 a slash command, 3 a component. */
@@ -50,6 +55,8 @@ export interface DiscordFault {
   readonly type: "rate_limit" | "drop_gateway";
   /** For drop_gateway: the connection drops just before this session's next dispatch, once. For rate_limit: only this route (`POST /channels/{channel.id}/messages`); every route when left out. */
   readonly route: string | undefined;
+  /** Only this app's bot, by name (decision 0027): its calls, or its Gateway connection. Every app's when left out. */
+  readonly app: string | undefined;
   /** How many more calls it refuses; forever when left out. */
   remaining: number | undefined;
   readonly retryAfterMs: number;
@@ -64,17 +71,19 @@ export class DiscordStore {
   readonly #known: string[] = [];
   /** The DM between the bot or a person and another, by both their ids. */
   readonly dms = new Map<string, string>();
-  /** The app's commands, by id. They outlive sessions: the agent registers them when it starts. */
+  /** Every app's commands, by id. They outlive sessions: an agent registers them when it starts. */
   readonly commands = new Map<string, DiscordCommandRecord>();
   /** Interactions by id, and by token. */
   readonly interactions = new Map<string, DiscordInteractionRecord>();
   readonly faults: DiscordFault[] = [];
   #guild: DiscordGuildRecord | undefined;
-  #app: DiscordAppRecord | undefined;
+  /** The built-in app and the ones tests made (decision 0027), each a bot in the one guild. */
+  readonly apps: AppRoster<DiscordAppRecord>;
   #everyoneRole = "";
   #adminRole = "";
 
   constructor(registry: Registry) {
+    this.apps = new AppRoster<DiscordAppRecord>("Discord", registry, { refs: (app) => [app.id, app.botUserId] });
     this.users = registry.collection<DiscordUserRecord>("discord", "user");
     this.channels = registry.collection<DiscordChannelRecord>("discord", "channel");
   }
@@ -84,9 +93,14 @@ export class DiscordStore {
     return this.#guild;
   }
 
+  /** The built-in app, `my-agent`. */
   get app(): DiscordAppRecord {
-    if (!this.#app) throw new Error("The Discord fake hasn't been seeded");
-    return this.#app;
+    return this.apps.builtIn;
+  }
+
+  /** The app whose application or bot user this is (they have the same id), if any. */
+  appOf(id: string): DiscordAppRecord | undefined {
+    return this.apps.byId(id);
   }
 
   /** `@everyone`'s role, whose id is the guild's. */
@@ -106,7 +120,7 @@ export class DiscordStore {
     this.interactions.clear();
     this.faults.length = 0;
     this.#guild = guild;
-    this.#app = app;
+    this.apps.seed(app);
     this.#everyoneRole = guild.id;
     this.#adminRole = adminRole;
   }

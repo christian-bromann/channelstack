@@ -24,16 +24,20 @@ export function notionReads(
     return title?.type === "title" ? plainText(title.rich) : "";
   };
 
-  const isBot = (id: string) => id === store.bot.id;
+  /** Is this an integration's bot user: the built-in one's, or another's (decision 0027)? */
+  const isBot = (id: string) => store.integration(id) !== undefined;
 
-  /** Is the integration connected to this page or database, itself or through a parent? */
-  const accessible = (id: string): boolean => {
+  /**
+   * Is the integration whose bot this is (the built-in one unless named) connected to this page
+   * or database, itself or through a parent?
+   */
+  const accessible = (id: string, bot: string = store.bot.id): boolean => {
     const page = store.pages.find(id);
     const database = page ? undefined : store.databases.find(id);
     const record = page ?? database;
     if (!record || record.inTrash) return false;
-    if (record.connections.includes(store.bot.id)) return true;
-    return record.parent.type === "workspace" ? false : accessible(record.parent.id);
+    if (record.connections.includes(bot)) return true;
+    return record.parent.type === "workspace" ? false : accessible(record.parent.id, bot);
   };
 
   const childrenOf = (ids: readonly string[]) => ids.map((id) => store.block(id)).filter((block) => !block.inTrash);
@@ -57,10 +61,12 @@ export function notionReads(
     return render(page.children).join("\n");
   };
 
-  /** `RichText` (`"@my-agent summarize"`) → Notion rich text, with mentions of people and the bot. */
+  /** `RichText` (`"@my-agent summarize"`) → Notion rich text, with mentions of people and integrations. */
   const richText = (session: string, text: string): RichTextItem[] =>
     richTextPieces(text, (name) => {
-      if (name.toLowerCase() === store.bot.name.toLowerCase()) return store.bot.id;
+      // A name means one of the integrations the session used, or one of its people (decision 0027).
+      const app = store.apps.namedIn(session, name);
+      if (app) return app.id;
       return peopleOf(session).find((user) => user.name.toLowerCase() === name.toLowerCase())?.id;
     }).map((piece) =>
       "text" in piece

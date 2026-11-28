@@ -307,6 +307,48 @@ describe("inspecting what the agent did", () => {
   });
 });
 
+describe("several apps", () => {
+  // Decision 0027: the same agent runs a second time as the app `coder`, with its own tokens and request URL.
+  test("each app answers the mentions of its own name, in one channel", async ({ slack }) => {
+    const coder = await slack.createApp({ name: "coder" });
+    const ana = await slack.createUser({ name: "Ana" });
+    const channel = await slack.createChannel({ participants: [ana, slack.app, coder] });
+
+    const forCoder = await ana.say("@coder summarize yesterday's incidents", { channel });
+    const forAgent = await ana.say("@my-agent summarize yesterday's incidents", { channel });
+
+    await expect(forCoder.thread).toHaveRepliesFrom(coder, { count: 1 });
+    await expect(forCoder.thread).not.toHaveReplyFrom(slack.app);
+    await expect(forAgent.thread).toHaveRepliesFrom(slack.app, { count: 1 });
+    await expect(forAgent.thread).not.toHaveReplyFrom("coder");
+  });
+
+  test("an app's answer doesn't set the other app off: the thread goes quiet", async ({ slack }) => {
+    const coder = await slack.createApp({ name: "coder" });
+    const ana = await slack.createUser({ name: "Ana" });
+    const channel = await slack.createChannel({ participants: [ana, slack.app, coder] });
+
+    const msg = await ana.say("@coder what's the status of the web deploy?", { channel });
+
+    await expect(msg.thread).toHaveReplyFrom(coder);
+    await expect(msg.thread).toGoQuiet({ within: "10s", maxReplies: 1 });
+  });
+
+  test("another app's mention reaches the agent with that app's bot_id, and the agent doesn't answer a bot", async ({
+    slack,
+  }) => {
+    const deployer = await slack.createApp({ name: "deployer" });
+    const channel = await slack.createChannel({ participants: [slack.app, deployer] });
+
+    const msg = await deployer.say("@my-agent the deploy of web finished", { channel });
+
+    const delivery = await msg.deliveryFor(slack.app);
+    expect(delivery?.eventType).toBe("app_mention");
+    expect(delivery?.payload).toMatchObject({ event: { bot_id: deployer.botId } });
+    await expect(msg.thread).not.toHaveReplyFrom(slack.app);
+  });
+});
+
 describe("live mode", () => {
   // With CHANNELSTACK_SLACK_BOT_TOKEN and CHANNELSTACK_SLACK_USER_ANA_TOKEN set, Ana is a real person
   // in the sandbox workspace and the same test acts on real Slack. The agent receives the

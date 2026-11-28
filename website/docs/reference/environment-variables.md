@@ -25,8 +25,11 @@ An empty variable counts as not set everywhere.
 | `CHANNELSTACK_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` or `silent`. Any other value means `info`. `--log-level` wins |
 | `CHANNELSTACK_SERVER_FILE` | `<home>/server.json` | Where `start` writes the control API's URL and token (0600). `--server-file` wins. The attach CLI reads it too |
 | `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` | none | Where the server delivers that channel's events to the app. Read once, when the server starts |
+| `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL` | none | Where the server delivers that channel's events to another app, the one a test makes with `createApp({ name })`. Read once, when the server starts |
 
 `<CHANNEL>` is `SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND`, `GOOGLE` or `DISCORD`: `CHANNELSTACK_SLACK_WEBHOOK_URL`, `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`, `CHANNELSTACK_RESEND_WEBHOOK_URL`, `CHANNELSTACK_GOOGLE_WEBHOOK_URL`, `CHANNELSTACK_DISCORD_WEBHOOK_URL`. The value is the app's own endpoint for that platform, e.g. `http://localhost:3000/slack/events`. For Google it is the push endpoint: Pub/Sub's pushes go there, and their tokens are for it as their audience. For Discord it is the app's interactions endpoint URL, e.g. `http://localhost:3000/interactions`: slash commands and button presses go there, signed with Ed25519.
+
+`<NAME>` is the app's name in upper case with `-` as `_`: `coder` is `CODER`, `code-reviewer` is `CODE_REVIEWER`, as in `CHANNELSTACK_SLACK_APP_CODER_WEBHOOK_URL`. An app without one receives nothing, unless it opens its own Socket Mode connection. See [Several apps](/docs/guide/several-apps).
 
 An app on Slack's Socket Mode connects out and needs no webhook URL. Without one and without a socket, a Slack interaction is refused with `dispatch_failed`. A Discord bot hears everything else over the Gateway connection it opens itself; without `CHANNELSTACK_DISCORD_WEBHOOK_URL`, its interactions arrive there too, as `INTERACTION_CREATE`. See [Connecting your app](/docs/guide/connecting-your-agent).
 
@@ -127,7 +130,7 @@ Read by the **app**. `channelstack env` (and the `channelstack.env()` fixture) p
 | `GMAIL_ADDRESS` | Google | The agent's mailbox: `my-agent@acme.example` |
 | `GOOGLE_PUBSUB_TOPIC` | Google | The topic to give `users.watch`: the only one the fake publishes to |
 | `GOOGLE_PUSH_SERVICE_ACCOUNT` | Google | Who pushes: the `email` claim of every push token |
-| `GOOGLE_PUSH_AUDIENCE` | Google | The `aud` of every push token: the push endpoint, `CHANNELSTACK_GOOGLE_WEBHOOK_URL`. Printed when that is set |
+| `GOOGLE_PUSH_AUDIENCE` | Google | The `aud` of every push token: the push endpoint, `CHANNELSTACK_GOOGLE_WEBHOOK_URL` (for another app, its own variable). Printed when that is set |
 | `DISCORD_API_URL` | Discord | The REST base to give discord.js as `rest.api`, e.g. `https://discord.localhost/api`. discord.js adds `/v10` and finds the Gateway from `GET /gateway/bot` |
 | `DISCORD_TOKEN` | Discord | The bot's token, for `client.login` |
 | `DISCORD_APPLICATION_ID` | Discord | The application's id, the bot's too: for registering commands |
@@ -138,6 +141,12 @@ Read by the **app**. `channelstack env` (and the `channelstack.env()` fixture) p
 | `ECHO_API_URL`, `ECHO_APP_TOKEN`, `ECHO_SIGNING_SECRET` | Echo | channelstack's own test platform. Ignore them |
 
 The names are the ones the platforms' SDKs and examples use; map them to your app's own if they differ. `channelstack secrets rotate` changes every secret; run `channelstack env` again after a restart.
+
+### `channelstack env --app` and `--channel`
+
+`channelstack env --app coder` (and `channelstack.env({ app: "coder" })`) prints another app's lines under the same keys: `SLACK_BOT_TOKEN` is `coder`'s bot token, `GITHUB_APP_ID` its App's id, `RESEND_FROM` `coder <coder@coder.acme.example>`, `GMAIL_ADDRESS` `coder@acme.example`, and so on. A second agent process starts from an `.env` of the same shape as the first. Asking makes the app, with the channel's default settings, if no test has made it yet, so the agent can start before the tests; without `--channel`, on every channel. `--app my-agent` is the same as no `--app`. A name that isn't an app's (1 to 32 lower-case letters, digits and hyphens, starting with a letter) is refused with `invalid_argument`.
+
+`--channel slack` prints that channel's lines only, which is what a second agent on one channel needs: `channelstack env --app coder --channel slack`. A channel that doesn't exist is `not_found`.
 
 ### `channelstack env --proxy`
 

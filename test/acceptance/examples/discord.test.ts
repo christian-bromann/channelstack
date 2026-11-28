@@ -234,6 +234,48 @@ describe("inspecting what the agent did", () => {
   });
 });
 
+describe("several apps", () => {
+  // Decision 0027: the same agent runs a second time as the app `coder`, with its own bot token and interactions endpoint.
+  test("each bot answers the mentions of its own name, in one channel", async ({ discord }) => {
+    const coder = await discord.createApp({ name: "coder" });
+    const ana = await discord.createUser({ name: "Ana" });
+    const channel = await discord.createChannel({ participants: [ana, discord.app, coder] });
+
+    const forCoder = await ana.say("@coder summarize yesterday's incidents", { channel });
+    const forAgent = await ana.say("@my-agent summarize yesterday's incidents", { channel });
+
+    await expect(forCoder).toHaveRepliesFrom(coder, { count: 1 });
+    await expect(forCoder).not.toHaveReplyFrom(discord.app);
+    await expect(forAgent).toHaveRepliesFrom(discord.app, { count: 1 });
+    await expect(forAgent).not.toHaveReplyFrom("coder");
+  });
+
+  test("a bot's answer doesn't set the other bot off: the channel goes quiet", async ({ discord }) => {
+    const coder = await discord.createApp({ name: "coder" });
+    const ana = await discord.createUser({ name: "Ana" });
+    const channel = await discord.createChannel({ participants: [ana, discord.app, coder] });
+
+    const msg = await ana.say("@coder what's the status of the web deploy?", { channel });
+
+    await expect(msg).toHaveReplyFrom(coder);
+    await expect(msg).toGoQuiet({ within: "10s", maxReplies: 1 });
+  });
+
+  test("another bot's mention reaches the agent with author.bot and that bot's id, and the agent doesn't answer a bot", async ({
+    discord,
+  }) => {
+    const deployer = await discord.createApp({ name: "deployer" });
+    const channel = await discord.createChannel({ participants: [discord.app, deployer] });
+
+    const msg = await deployer.say("@my-agent the deploy of web finished", { channel });
+
+    const delivery = await msg.deliveryFor(discord.app);
+    expect(delivery?.type).toBe("MESSAGE_CREATE");
+    expect(delivery?.payload).toMatchObject({ author: { id: deployer.botUserId, bot: true } });
+    await expect(msg).not.toHaveReplyFrom(discord.app);
+  });
+});
+
 describe("live mode", () => {
   // With CHANNELSTACK_DISCORD_BOT_TOKEN set, the bot is the agent's real bot in the sandbox guild.
   // Discord has no API that acts as a person, so Ana is a second application's bot in the guild

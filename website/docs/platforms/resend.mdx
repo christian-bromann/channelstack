@@ -67,6 +67,30 @@ A person's `id` is their address: `ana@example.com` unless the test gives one. T
 
 The standard checks register the same in one line: `resendChecks({ app: "my-agent" })`.
 
+## Several apps
+
+A test adds another app with `resend.createApp({ name })`: a Resend team of its own, with its own API key, webhook secret and receiving domain (`<name>.acme.example` unless `domain` says otherwise), its address `<name>@<domain>`. Its webhooks go to `CHANNELSTACK_RESEND_APP_<NAME>_WEBHOOK_URL`; `channelstack env --app billing --channel resend` prints its `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET` and `RESEND_FROM`. See [several apps](/docs/guide/several-apps).
+
+An email one app sends another is an `email.received` on the other's webhook, threaded by `Message-ID` and `References` like a person's; the sending team gets its own `email.sent` and `email.delivered`. A person reaches an app by putting it among the recipients: `ana.send({ to: [coder], … })`.
+
+The oldest email loop is an auto-reply answering an auto-reply. The fake keeps every header a sender sets, so a test can check that an agent marks its answers (`Auto-Submitted: auto-replied`, RFC 3834) and leaves mail so marked unanswered:
+
+```ts
+const billing = await resend.createApp({ name: "billing" });
+
+const email = await billing.send({
+  to: [resend.app],
+  subject: "Invoice 1042 paid",
+  text: "Invoice 1042 was paid.",
+  headers: { "Auto-Submitted": "auto-generated" },
+});
+
+await expect(email.thread).toGoQuiet({ within: "10s", maxReplies: 1 });
+await expect(email.thread).not.toHaveReplyFrom(resend.app);
+```
+
+A test acts as an app it made with `billing.send` and `billing.reply`, through its team's API; acting as `my-agent` is refused. `email.deliveryFor(coder)` reads another app's delivery.
+
 ## Live mode
 
 With the agent's team's key set (`CHANNELSTACK_RESEND_API_KEY`), the same tests run against real Resend. Each person is a Resend team of their own, with a key in `CHANNELSTACK_RESEND_USER_<NAME>_TOKEN` and an address on that team's verified domain. Sent email can't be taken back, so live mode refuses any recipient outside `CHANNELSTACK_LIVE_RESEND_DOMAINS` before anything is sent. See [Live mode](/docs/guide/live-mode).

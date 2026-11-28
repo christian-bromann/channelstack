@@ -1,0 +1,329 @@
+import { ProtocolError } from "../errors/index.ts";
+import type { NamedIds } from "../ids/index.ts";
+import type { Collection, Registry } from "../registry/index.ts";
+import { constantTimeEqual } from "../signing/hmac.ts";
+
+/**
+ * A channel's apps (decision 0027): the built-in `my-agent` and the ones tests make by name.
+ * Apps belong to the shared world, as `my-agent` does, not to a session. A name in a session
+ * means one of the apps that session used, so what another test makes never changes it.
+ */
+
+/** The name of every channel's built-in app. */
+export const BUILT_IN_APP = "my-agent";
+
+/** How many apps a channel holds beside the built-in one: they live as long as the server. */
+export const APP_LIMIT = 10;
+
+/**
+ * Where an app's credentials appear in the control API: on the handle a test asks for, never on
+ * an author, a member or a principal, and never live. Each credential's description ends with it.
+ */
+export const HANDLE_ONLY =
+  "On the app from the fixture, `createApp` or `apps()` only: empty where the app is an author or a member, and live.";
+
+/** 1 to 32 lower-case letters, digits and hyphens, from a letter: one variable name per app name. */
+const APP_NAME = /^[a-z][a-z0-9-]{0,31}$/;
+
+/** The app's part of its variables: `code-reviewer` → `CODE_REVIEWER`. */
+export function appVariableName(name: string): string {
+  return name.toUpperCase().replaceAll("-", "_");
+}
+
+/** Where an extra app's events go: `CHANNELSTACK_SLACK_APP_CODER_WEBHOOK_URL`. */
+export function appWebhookVariable(driver: string, name: string): string {
+  return `CHANNELSTACK_${driver.toUpperCase()}_APP_${appVariableName(name)}_WEBHOOK_URL`;
+}
+
+/** What a driver needs to know of its extra apps beside their records: where their events go, their secrets, their ids. */
+export interface AppsContext {
+  /** Where this app's events go: the built-in app's from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`, another's from its own variable. */
+  webhookUrl(app: string): string | undefined;
+  /** One of this app's secrets, in the driver's formats; the built-in app's are the driver's own. */
+  secret(app: string, name: string): string;
+  /** Ids for this app, drawn from the seed and its name, so they don't depend on the order apps are made in. */
+  ids(app: string): NamedIds;
+}
+
+/** A record of an app: whatever a driver keeps, with its name. */
+interface Named {
+  readonly name: string;
+}
+
+/** How a channel speaks of its apps. */
+interface RosterOptions<App> {
+  /** The platform's word for an app in a message: GitHub's `App`, Notion's `integration`. Default `app`. */
+  readonly noun?: string;
+  /** The ids a handle or a call may name an app by, its handle's id first (`A…`, its bot user's `U…`). Default none. */
+  readonly refs?: (app: App) => readonly string[];
+}
+
+/** Who asks for an app with `createApp`: a session, and the names of its people, which the app may not take. */
+interface Asker {
+  readonly session: string;
+  readonly people: Iterable<string>;
+}
+
+/**
+ * One channel's apps, the built-in one first. `make` is what `createApp` does: the first call for
+ * a name makes the app, later calls with the same settings return it, and anything else is refused.
+ *
+ * It also keeps which apps each session used: the built-in one, and each it got from `createApp`.
+ * Those are the apps its names mean (`namedIn`, `checkPerson`). They are kept in the registry,
+ * owned by the session, so they go when it closes.
+ */
+export class AppRoster<App extends Named> {
+  readonly #apps = new Map<string, { app: App; settings: string }>();
+  #builtIn: App | undefined;
+  readonly #channel: string;
+  readonly #noun: string;
+  readonly #refs: (app: App) => readonly string[];
+  /** The apps each session used beside the built-in one, by name, in the order it first did. */
+  readonly #used: Collection<{ readonly session: string; readonly name: string }>;
+
+  constructor(channel: string, registry: Registry, options: RosterOptions<App> = {}) {
+    this.#channel = channel;
+    this.#noun = options.noun ?? "app";
+    this.#refs = options.refs ?? (() => []);
+    this.#used = registry.collection<{ session: string; name: string }>(channel, "app in use");
+  }
+
+  /** The built-in app, set when the fake is seeded (again after a reset). */
+  seed(app: App): void {
+    this.#builtIn = app;
+  }
+
+  get builtIn(): App {
+    if (!this.#builtIn) throw new Error(`The ${this.#channel} fake hasn't been seeded`);
+    return this.#builtIn;
+  }
+
+  /**
+   * Make the app named `name` with `settings`, or return the one already made with the same
+   * settings. Asked for by a session, the app is one of that session's from then on, and it can't
+   * have the name of one of its people.
+   */
+  make(name: string, settings: Readonly<Record<string, unknown>>, build: () => App, by?: Asker): App {
+    if (by) checkNameFree(name, by.people, "app");
+    const app = this.#make(name, settings, build);
+    if (by) this.#used.add(`${by.session}\u0000${app.name}`, { session: by.session, name: app.name }, by.session);
+    return app;
+  }
+
+  #make(name: string, settings: Readonly<Record<string, unknown>>, build: () => App): App {
+    checkAppName(name);
+    // The built-in app's own name is reserved too, where a channel calls it otherwise (echo's `echo-agent`).
+    if (name === this.#builtIn?.name) {
+      throw new ProtocolError("invalid_argument", `"${name}" is the built-in ${this.#noun}: use the fixture's app`, {
+        app: name,
+      });
+    }
+    const key = settingsKey(settings);
+    const known = this.#apps.get(name);
+    if (known) {
+      if (known.settings !== key) {
+        throw new ProtocolError(
+          "invalid_argument",
+          `The ${this.#channel} app "${name}" exists with other settings; an app keeps the settings it was made with`,
+          { app: name },
+        );
+      }
+      return known.app;
+    }
+    if (this.#apps.size >= APP_LIMIT) {
+      throw new ProtocolError("invalid_argument", `A channel holds at most ${APP_LIMIT} apps beside ${BUILT_IN_APP}`, {
+        limit: APP_LIMIT,
+      });
+    }
+    const app = build();
+    this.#apps.set(name, { app, settings: key });
+    return app;
+  }
+
+  /** The app with this name, the built-in one included, by `my-agent` or by the name its channel gives it. */
+  named(name: string): App | undefined {
+    return name === BUILT_IN_APP || name === this.#builtIn?.name ? this.#builtIn : this.#apps.get(name)?.app;
+  }
+
+  /** The apps a session used: the built-in one first, then each it got from `createApp`, in the order it first did. */
+  of(session: string): App[] {
+    const used = this.#used.list(session).flatMap(({ name }) => {
+      const app = this.#apps.get(name)?.app;
+      return app ? [app] : [];
+    });
+    return [this.builtIn, ...used];
+  }
+
+  /**
+   * The open sessions that used this app from `createApp`, in the order they first did. The
+   * built-in app is every session's, so it names none.
+   */
+  sessionsOf(app: App): string[] {
+    return this.#used
+      .values()
+      .filter((use) => use.name === app.name && app !== this.#builtIn)
+      .map((use) => use.session);
+  }
+
+  /** The app a name means in a session, in any case: one of the apps that session used. */
+  namedIn(session: string, name: string): App | undefined {
+    const wanted = name.toLowerCase();
+    return this.of(session).find((app) => app.name.toLowerCase() === wanted);
+  }
+
+  /** A person of this session may take none of these names: each is the name of an app the session used. */
+  checkPerson(session: string, ...names: string[]): void {
+    const apps = this.of(session).map((app) => app.name);
+    for (const name of names) checkNameFree(name, apps, "person");
+  }
+
+  /**
+   * The app one of whose ids (`refs`) this is, in the whole world: ids are the platform's, and name
+   * one app. For what the platform's side knows (an author, a token's app); a test's handle goes
+   * through `lookup` or `get`.
+   */
+  byId(id: string): App | undefined {
+    return this.all().find((app) => this.#refs(app).includes(id));
+  }
+
+  /**
+   * The app a test's handle (its id) stands for, where a person's handle may stand too (a
+   * participant, a member, an assignee, a recipient): one of the apps the session used, or
+   * undefined when it is no app's. A name is no handle, so it is undefined here too; a mention
+   * resolves a name with `namedIn`. An app only other sessions used is `not_found`, as a person of
+   * another session is, so every handle `apps()` returns is one the session's other routes take.
+   */
+  lookup(session: string, ref: string): App | undefined {
+    const app = this.byId(ref);
+    if (app !== undefined && !this.of(session).includes(app)) throw this.#notFound(ref);
+    return app;
+  }
+
+  /** The app a session's handle (its id) stands for, where only an app's handle goes: one of the apps that session used, or `not_found`. */
+  handle(session: string, ref: string): App {
+    const app = this.lookup(session, ref);
+    if (!app) throw this.#notFound(ref);
+    return app;
+  }
+
+  /** The app a session's handle (its id) or a name stands for: one of the apps that session used, or `not_found`. */
+  get(session: string, ref: string): App {
+    const app = this.lookup(session, ref) ?? this.namedIn(session, ref);
+    if (!app) throw this.#notFound(ref);
+    return app;
+  }
+
+  #notFound(ref: string): ProtocolError {
+    return new ProtocolError("not_found", `There is no ${this.#channel} ${this.#noun} "${ref}"`, { app: ref });
+  }
+
+  /**
+   * The app a test acts as (a scripted app), by its handle's id or its name: one its session got
+   * from `createApp`, never the built-in one, which the agent under test acts as. What else the
+   * platform refuses (an app that isn't installed, isn't a member) is the driver's to check.
+   */
+  scripted(session: string, ref: string): App {
+    const app = this.get(session, ref);
+    if (app === this.builtIn) {
+      throw new ProtocolError(
+        "invalid_argument",
+        `${app.name} is the built-in ${this.#noun}, which the agent under test acts as: script another ${this.#noun}`,
+        { app: this.#refs(app)[0] ?? app.name },
+      );
+    }
+    return app;
+  }
+
+  /** The app `channelstack env --app` prints: the built-in one, or the one named, made by `make` if no test has yet. */
+  forEnv(name: string | undefined, make: (name: string) => App): App {
+    return name === undefined ? this.builtIn : (this.named(name) ?? make(name));
+  }
+
+  /** How core knows an app (its secrets, its endpoint): `my-agent` for the built-in one, whatever the platform calls it. */
+  keyOf(app: App): string {
+    return app === this.#builtIn ? BUILT_IN_APP : app.name;
+  }
+
+  /** How core knows the app a session's handle or a name stands for: what a delivery records as its `app`. */
+  keyIn(session: string, ref: string): string {
+    return this.keyOf(this.get(session, ref));
+  }
+
+  /**
+   * The app a call's credential belongs to (a token, a key, a client id), compared in constant
+   * time with each app's: `secret` is that credential of the app core knows by the name it is given.
+   */
+  withSecret(given: unknown, secret: (app: string) => string): App | undefined {
+    if (typeof given !== "string" || given === "") return undefined;
+    return this.all().find((app) => constantTimeEqual(given, secret(this.keyOf(app))));
+  }
+
+  /** The built-in app first, then the others in the order they were made. */
+  all(): App[] {
+    return [this.builtIn, ...[...this.#apps.values()].map(({ app }) => app)];
+  }
+
+  /** The apps tests made, without the built-in one. */
+  extra(): App[] {
+    return [...this.#apps.values()].map(({ app }) => app);
+  }
+
+  /** Change an extra app's record in place (Slack's uninstall, for example). */
+  replace(app: App): void {
+    if (app.name === BUILT_IN_APP) {
+      this.#builtIn = app;
+      return;
+    }
+    const known = this.#apps.get(app.name);
+    if (known) known.app = app;
+  }
+}
+
+/** A name an app may have, and not the built-in app's. */
+export function checkAppName(name: string): void {
+  if (name === BUILT_IN_APP) {
+    throw new ProtocolError("invalid_argument", `"${BUILT_IN_APP}" is the built-in app: use the fixture's app`, {
+      app: name,
+    });
+  }
+  if (!APP_NAME.test(name)) {
+    throw new ProtocolError(
+      "invalid_argument",
+      `"${name}" isn't an app name: 1 to 32 lower-case letters, digits and hyphens, starting with a letter`,
+      { app: name },
+    );
+  }
+}
+
+/** Settings compared by value, whatever order their keys came in; unset ones don't count. */
+function settingsKey(settings: Readonly<Record<string, unknown>>): string {
+  const sorted = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(sorted);
+    if (typeof value === "object" && value !== null) {
+      return Object.fromEntries(
+        Object.entries(value)
+          .filter(([, inner]) => inner !== undefined)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, inner]) => [key, sorted(inner)]),
+      );
+    }
+    return value;
+  };
+  return JSON.stringify(sorted(settings));
+}
+
+/** A person may not take the name of an app their session uses, nor an app a person's: a name in a matcher means one author. */
+export function checkNameFree(name: string, taken: Iterable<string>, what: "person" | "app"): void {
+  const wanted = name.toLowerCase();
+  for (const other of taken) {
+    if (other.toLowerCase() === wanted) {
+      throw new ProtocolError(
+        "invalid_argument",
+        what === "person"
+          ? `"${name}" is the name of an app in this session: give the person another name`
+          : `"${name}" is the name of a person in this session: give the app another name`,
+        { name },
+      );
+    }
+  }
+}

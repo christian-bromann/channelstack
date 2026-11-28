@@ -245,6 +245,17 @@ async def _session_of(subject: Any) -> Any | None:
     raise TypeError("This check needs an agent session or an issue")
 
 
+async def _writers_of(subject: Any) -> list[tuple[str, bool]]:
+    """Who wrote each message of a conversation, oldest first, and whether it was an app."""
+    if hasattr(subject, "replies") or hasattr(subject, "transcript"):
+        authors = [message.author for message in await _messages_of(subject)]
+    elif hasattr(subject, "comments"):
+        authors = [comment.author for comment in await subject.comments()]
+    else:
+        raise TypeError("to_go_quiet needs a thread, a conversation, or something with comments")
+    return [(author.name, getattr(author, "kind", None) == "app") for author in authors]
+
+
 class Expectation:
     """The checks on one subject: a thread, a conversation, a message, or a channel's fixture."""
 
@@ -260,15 +271,18 @@ class Expectation:
         if problems:
             raise ModelProblemError(problems)
 
-    async def _still_open(self) -> list[str]:
-        """What the agent left open in the subject's session, in words: it only adds to a failure's message.
+    async def _leftover(self) -> str:
+        """What the agent left open and the bot loops the fake stopped in the subject's session, in words.
 
-        Its refusal goes nowhere else: live, a refused read here must not turn the failure into a skip.
+        It only adds to a failure's message. Its refusal goes nowhere else: live, a refused read here
+        must not turn the failure into a skip.
         """
         try:
-            return list((await unreported_refusals(lambda: quiet_of(self._subject._ctx))).open)
+            state = await unreported_refusals(lambda: quiet_of(self._subject._ctx))
         except (ChannelstackError, AttributeError, RuntimeError):
-            return []
+            return ""
+        open_work = f"\nStill open: {'; '.join(state.open)}" if state.open else ""
+        return f"{open_work}\nStopped: {'; '.join(state.loops)}" if state.loops else open_work
 
     async def _model_notes(self) -> list[str]:
         """What the session's model calls add to a failing check's message. Nothing for a subject outside a
@@ -346,9 +360,34 @@ class Expectation:
                     await self._fail(str(error))
                 value = last[0] if last else await read()
         if holds(value) == negate:
-            open_work = await self._still_open()
-            leftover = f"\nStill open: {'; '.join(open_work)}" if open_work else ""
-            await self._fail(f"{describe(value)}{leftover}")
+            await self._fail(f"{describe(value)}{await self._leftover()}")
+
+    async def to_go_quiet(
+        self, *, max_replies: int, within: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """The conversation goes quiet within `within`, with at most `max_replies` app messages since a person wrote.
+
+        Those written before the check began count too: apps answering each other without end fail it (decision 0027).
+        """
+        quiet = True
+        try:
+            await until_quiet(lambda: quiet_of(self._subject._ctx), timeout=within, quiet_for=quiet_for, watching=True)
+        except WaitTimeoutError:
+            quiet = False
+        writers = await _writers_of(self._subject)
+        last_person = max((at for at, (_, app) in enumerate(writers) if not app), default=-1)
+        since = writers[last_person + 1 :]
+        if quiet and len(since) <= max_replies:
+            return
+        turns = f": {' → '.join(name for name, _ in since)}" if since else ""
+        bound = f"within {within}" if within is not None else "within the timeout"
+        leftover = await self._leftover()
+        await self._fail(
+            f"Expected the conversation to go quiet {bound} with at most {max_replies} app "
+            f"{'message' if max_replies == 1 else 'messages'} since a person last wrote. "
+            f"{'It went quiet' if quiet else 'It was still busy'} with {len(since)} app "
+            f"{'message' if len(since) == 1 else 'messages'} and no person between them{turns}{leftover}"
+        )
 
     # Replies and messages
 

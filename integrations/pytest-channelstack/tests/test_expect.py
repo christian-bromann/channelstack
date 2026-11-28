@@ -884,3 +884,48 @@ async def test_a_failing_check_names_the_sessions_a_call_attributed_by_order_tie
     model_notes = matchers._model_notes  # pyright: ignore[reportPrivateUsage]
     [both] = model_notes([], [_by_order("chatcmpl-1"), _by_order("chatcmpl-3")])
     assert both.startswith("Model calls chatcmpl-1, chatcmpl-3 were attributed by order, between 2 sessions")
+
+
+@dataclass(frozen=True)
+class Writer:
+    id: str
+    name: str
+    kind: str
+
+
+def _loop(turns: int) -> Thread:
+    agent = Writer("A01", "my-agent", "app")
+    coder = Writer("A02", "coder", "app")
+    ana = Writer("U01", "Ana", "user")
+    messages = [Message(cast(Person, ana), "fix the login page")]
+    messages += [Message(cast(Person, agent if at % 2 == 0 else coder), f"turn {at}") for at in range(turns)]
+    return Thread(messages=messages)
+
+
+async def test_to_go_quiet_passes_when_the_conversation_settles_within_the_bound() -> None:
+    """Exit check 12.6: two app messages after Ana's, with a bound of four."""
+    await expect(_loop(2)).to_go_quiet(max_replies=4)
+
+
+async def test_to_go_quiet_fails_on_apps_answering_each_other_and_names_them_in_turn() -> None:
+    """What came before the check counts, and the message names the apps in turn."""
+    with pytest.raises(AssertionError) as failure:
+        await expect(_loop(5)).to_go_quiet(max_replies=4)
+    assert str(failure.value) == (
+        "Expected the conversation to go quiet within the timeout with at most 4 app messages since a person last "
+        "wrote. It went quiet with 5 app messages and no person between them: "
+        "my-agent → coder → my-agent → coder → my-agent"
+    )
+
+
+async def test_to_go_quiet_reports_the_loops_the_fake_stopped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """As the TypeScript matcher does: the loop the guard stopped is named after the turns."""
+    stopped = "a bot loop in slack 1.2 (50 app messages with no person between them: my-agent → coder …)"
+
+    async def looped(_: object) -> QuietState:
+        return QuietState(busy=False, quiet_for_ms=60_000, loops=(stopped,))
+
+    monkeypatch.setattr(matchers, "quiet_of", looped)
+    with pytest.raises(AssertionError) as failure:
+        await expect(_loop(5)).to_go_quiet(max_replies=4)
+    assert str(failure.value).endswith(f"my-agent → coder → my-agent → coder → my-agent\nStopped: {stopped}")

@@ -34,6 +34,7 @@ async def quiet_of(context: HandleContext) -> QuietState:
         quiet_for_ms=float(state["quietForMs"]),
         open=tuple(state.get("open", ())),
         problems=tuple(state.get("problems", ())),
+        loops=tuple(state.get("loops", ())),
     )
 
 

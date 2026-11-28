@@ -39,6 +39,7 @@ export interface StartOptions {
   seed: number;
   logLevel: LogLevel;
   webhooks: AppOptions["webhooks"];
+  appWebhooks?: AppOptions["appWebhooks"];
   /** The UI page (see `AppOptions.ui`). Without it the server has no UI. */
   ui?: string;
   /** The environment live mode reads: credentials, allowlists, `CHANNELSTACK_REALITY`, `CHANNELSTACK_RUN_ID`. */
@@ -138,6 +139,7 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     redactor,
     log,
     webhooks: options.webhooks,
+    ...(options.appWebhooks ? { appWebhooks: options.appWebhooks } : {}),
     ...(options.ui === undefined ? {} : { ui: options.ui }),
     // One ledger file per server, so a crash leaves what this one created for `channelstack sweep`.
     live: {

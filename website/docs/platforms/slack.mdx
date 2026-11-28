@@ -15,7 +15,7 @@ This page shows how to test an app built on Slack's APIs: how to point it at the
 
 ## What the fake covers
 
-The fake Slack is one workspace (`Acme`) with one app installed in it, named `my-agent`. It serves the Web API at `https://slack.localhost/api/` and delivers the Events API, interactivity and slash commands to your app, over HTTP or Socket Mode.
+The fake Slack is one workspace (`Acme`) with one app installed in it, named `my-agent`, and any other app a test adds ([several apps](#several-apps)). It serves the Web API at `https://slack.localhost/api/` and delivers the Events API, interactivity and slash commands to your app, over HTTP or Socket Mode.
 
 | Area                  | What's there                                                                                                                                                                                                                                                                          |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -283,6 +283,29 @@ The fake refuses what Slack refuses, with Slack's error code (`{ ok: false, erro
 | `unknown_method`                                                   | A method the fake doesn't have                                               |
 
 A test's own action can be refused too: `name_taken` for a second channel with the same name in one session, `split_view_unavailable`, `dispatch_failed` when the app has no request URL and no socket, and `not_found` when a button never appeared. The [errors reference](/docs/reference/api/errors) lists them all.
+
+## Several apps
+
+A test adds another app to the workspace with `slack.createApp({ name })`: a Slack app with its own bot user, `xoxb-` and `xapp-` tokens and signing secret, and `my-agent`'s scopes and bot events unless `scopes` and `botEvents` say otherwise. It joins channels as `my-agent` does, through `participants`, `invite` or `openDM`. Its events go to `CHANNELSTACK_SLACK_APP_<NAME>_WEBHOOK_URL`, or over its own Socket Mode connection; `channelstack env --app coder --channel slack` prints its `.env` lines under `my-agent`'s keys. See [several apps](/docs/guide/several-apps).
+
+```ts
+const coder = await slack.createApp({ name: "coder" });
+const ana = await slack.createUser({ name: "Ana" });
+const channel = await slack.createChannel({ participants: [ana, slack.app, coder] });
+
+const msg = await ana.say("@coder what's the status of the web deploy?", { channel });
+
+await expect(msg.thread).toHaveReplyFrom(coder);
+await expect(msg.thread).toGoQuiet({ within: "10s", maxReplies: 1 });
+```
+
+What one app hears of another, as Slack sends it:
+
+- Another app's message arrives as `message` with its `user`, `bot_id`, `app_id` and `bot_profile`, and no subtype. An agent that ignores only `subtype: "bot_message"` answers it. A message that mentions an app is an `app_mention` for it, with the writer's `bot_id`.
+- Each app's own messages come back to it, as Slack sends them; Bolt's `ignoreSelf` drops them.
+- A bot can't open a DM with another bot: `conversations.open` answers `cannot_dm_bot`. A click on an app's button goes to that app alone, and `auth.test` answers as the token's app.
+
+A test can act as an app it made: `coder.say`, `coder.reply`, `coder.react` and `coder.unreact` go through the fake's Web API with its token, as its own calls would; acting as `my-agent` is refused, because your agent is that app. `msg.delivery` is still the delivery to `my-agent`; `msg.deliveryFor(coder)` reads another app's, and every delivery says which app it went to (`delivery.app`). `slack.uninstallApp({ app: coder })` uninstalls one app and leaves the others working.
 
 ## Live
 

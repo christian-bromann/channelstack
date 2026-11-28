@@ -127,6 +127,21 @@ A Slack agent on Socket Mode connects out by itself and needs no URL.
 - **The app's scopes hold.** channelstack rejects calls outside the granted scopes (`missing_scope`), just as Slack does.
 - **Live, the app is your real one.** Its credentials come from environment variables (`CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTACK_SLACK_BOT_TOKEN`, `CHANNELSTACK_GITHUB_APP_ID`, …; [live-mode.md](live-mode.md)).
 
+**More apps, made by a test.** `my-agent` is still the app every fixture's `app` is (`slack.app`, `github.app`, …). A test that needs a second agent beside it, or another bot to talk to, makes one by name ([decision 0027](decisions/0027-multiple-apps.md)):
+
+```ts
+const coder = await slack.createApp({ name: "coder" });
+const channel = await slack.createChannel({ participants: [ana, slack.app, coder] });
+```
+
+- **An app is a real app of its platform**, with its own ids, tokens and signing secret: a Slack app with a bot user, a GitHub App with its installation, a Linear app user, a Notion integration, a Resend team with its own domain (`<name>.acme.example`), a Gmail mailbox (`<name>@acme.example`). Each fake sends it what the platform would, including what the other apps do.
+- **It joins where the platform puts apps:** `participants` on Slack, `createRepo({ apps })` or `repo.installApp` on GitHub, a delegation or a mention on Linear, `connections` on Notion, an email to its address on Resend and Google.
+- **Found by its name.** The first `createApp({ name })` makes it; later calls with the same settings return it, from any session, so parallel tests share it as they share `my-agent`. A name is 1 to 32 lower-case letters, digits and hyphens, starting with a letter; `my-agent` is taken, and so is another setting under a taken name (`invalid_argument`). A channel holds 10 apps besides `my-agent`. A person and an app in one session can't share a name.
+- **Its ids** come from `CHANNELSTACK_SEED` and its name, and **its secrets** are made once per install and kept in `secrets.json` with the rest, so its agent's `.env` stays valid across restarts.
+- **Its events go** to `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL` (`coder` is `CODER`, `code-reviewer` is `CODE_REVIEWER`), read once at start; without one, and without a connection of its own (Slack's Socket Mode, Discord's Gateway, where the variable is its interactions endpoint), it receives nothing. `channelstack env --app coder` (or `channelstack.env({ app: "coder" })`) prints its lines under the keys `my-agent`'s have, so a second agent process starts from an `.env` of the same shape, and makes the app if no test has yet, so its agent can start first. `--channel slack` prints one channel's lines only.
+- **A test can act as it** (`coder.say(…)`, `reviewer.comment(…)`), through the fake's API with its token, but never as `my-agent`, which the agent under test is. Every delivery says which app it went to (`delivery.app`), and `msg.deliveryFor(coder)` reads another app's.
+- **Apps that answer each other without end** are stopped by the fake after 50 app messages in one conversation with no person between them; the test fails, naming the loop. `expect(thread).toGoQuiet({ within, maxReplies })` checks for it directly. Live has no such stop.
+
 ## 4. Driving it from the outside
 
 The UI, the CLI, MCP and the test integrations all use one plain-HTTP control API at `https://channelstack.localhost/_channelstack`. So anything you can click, you can also script.
@@ -178,7 +193,7 @@ channelstack mcp                                          # these commands as MC
 
 # The server and its setup
 channelstack [start]                                      # --no-portless, --port <n>, --proxy, --proxy-port <n>, --record <dir>, --log-level <level>
-channelstack env [--proxy]                                # .env lines for the agent; --proxy for proxy mode
+channelstack env [--proxy] [--app <name>] [--channel <c>] # .env lines for the agent; --proxy for proxy mode; another app's, or one channel's
 channelstack ca rotate                                    # a new CA for proxy mode
 channelstack secrets rotate                               # new fake tokens and signing secrets
 

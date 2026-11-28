@@ -43,3 +43,27 @@ test("the plugin's timeout is every SDK wait's default", () => {
   expect(status, output).toBe(0);
   expect(output).toMatch(/1 passed/);
 }, 60_000);
+
+// Exit check 12.6: a test that left a bot loop fails, though it checked nothing. Two scripted apps
+// answer each other past the loop guard, and the fixture fails the test with the fake's message.
+const STOPPED =
+  /The fake stopped a bot loop in slack \S+ \(50 app messages with no person between them: loop-p[io]ng → loop-p[io]ng/;
+
+test("the Vitest fixture fails a test that left a bot loop", () => {
+  const { status, output } = runProject("bot-loop");
+  expect(status, output).toBe(1);
+  expect(output).toMatch(/1 failed/);
+  expect(output).toMatch(STOPPED);
+}, 60_000);
+
+test("the pytest fixture fails a test that left a bot loop", () => {
+  const run = spawnSync(
+    "uv",
+    ["run", "--project", "integrations/pytest-channelstack", "--frozen", "pytest", "test/acceptance/bot-loop"],
+    { cwd: ROOT, env: { ...process.env, CHANNELSTACK_HOME: server.home, NO_COLOR: "1" }, encoding: "utf8" },
+  );
+  const output = `${run.stdout}\n${run.stderr}`;
+  expect(run.status, output).toBe(1);
+  expect(output).toMatch(/1 (failed|error)/);
+  expect(output).toMatch(STOPPED);
+}, 60_000);

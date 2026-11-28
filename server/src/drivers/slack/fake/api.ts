@@ -4,20 +4,20 @@ import { bearerFrom } from "../../../core/auth/index.ts";
 import { delay } from "../../../core/clock/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { recordCall } from "../../../core/router/inspect.ts";
-import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { identified } from "../blocks.ts";
 import { SLACK_IDS } from "../ids.ts";
 import { handleOf } from "../interaction-payloads.ts";
 import { fileObject, messageObject } from "../payloads.ts";
 import {
   NOBODY,
+  type SlackAppRecord,
   type SlackConversationRecord,
   type SlackFileRecord,
   type SlackMessageRecord,
   SlackRefusal,
   type SlackUserRecord,
 } from "../world.ts";
-import type { SocketMode } from "./socket.ts";
+import type { SocketModes } from "./socket.ts";
 import type { SlackStore } from "./store.ts";
 import { type FakeSlackWorld, fileUrl, MAX_FILE_BYTES } from "./world.ts";
 
@@ -99,14 +99,21 @@ export function createSlackApi(
   context: DriverContext,
   store: SlackStore,
   world: FakeSlackWorld,
-  socket: SocketMode,
+  socket: SocketModes,
 ): Hono {
   const { ids, clock } = context;
-  const bot = () => store.app.botUserId;
-  /** The bot sees its own files, and those shared where it is a member. */
-  const botSees = (file: SlackFileRecord) =>
-    file.user === bot() ||
-    (file.conversation !== undefined && store.conversations.find(file.conversation)?.members.has(bot()) === true);
+  /**
+   * The app whose token made the call being answered (decision 0027). Set right before a method
+   * runs; methods are synchronous, so no other call can change it while one runs.
+   */
+  let caller: SlackAppRecord | undefined;
+  const app = (): SlackAppRecord => caller ?? store.app;
+  const bot = () => app().botUserId;
+  /** An app's bot sees its own files, and those shared where it is a member: judged as the app whose token asks. */
+  const botSees = (file: SlackFileRecord, reader: SlackAppRecord) =>
+    file.user === reader.botUserId ||
+    (file.conversation !== undefined &&
+      store.conversations.find(file.conversation)?.members.has(reader.botUserId) === true);
 
   const userObject = (user: SlackUserRecord) => ({
     id: user.id,
@@ -128,18 +135,19 @@ export function createSlackApi(
     is_app_user: false,
   });
 
-  const appUserObject = () => ({
-    id: bot(),
+  /** An app's bot user, as `users.info` and `users.list` describe it. */
+  const appUserObject = (of: SlackAppRecord) => ({
+    id: of.botUserId,
     team_id: store.team.id,
-    name: store.app.name,
+    name: of.name,
     deleted: false,
-    real_name: store.app.name,
+    real_name: of.name,
     tz: "America/Los_Angeles",
     profile: {
-      real_name: store.app.name,
-      display_name: store.app.name,
-      bot_id: store.app.botId,
-      api_app_id: store.app.id,
+      real_name: of.name,
+      display_name: of.name,
+      bot_id: of.botId,
+      api_app_id: of.id,
       team: store.team.id,
     },
     is_admin: false,
@@ -202,7 +210,7 @@ export function createSlackApi(
   };
 
   const messageOf = (message: SlackMessageRecord) =>
-    messageObject(message, store.users.find(message.user), store.team, store.app);
+    messageObject(message, store.users.find(message.user), store.team, store.apps.all());
 
   /**
    * A conversation the app may read and write: it exists, and the app is a member. An archived
@@ -214,7 +222,7 @@ export function createSlackApi(
     // Posting to a user id opens the DM with that person, as Slack does.
     const person = conversation ? undefined : store.users.find(id);
     const owner = person ? store.users.owner(person.id) : undefined;
-    if (person && owner !== undefined) conversation = world.openConversation(owner, person.id, [bot()]);
+    if (person && owner !== undefined) conversation = world.openDirect(owner, person.id, [bot()]);
     if (!conversation) throw new SlackApiError("channel_not_found");
     if (!conversation.members.has(bot())) {
       // Slack doesn't reveal a private conversation the app isn't in.
@@ -310,10 +318,10 @@ export function createSlackApi(
     "auth.test": () => ({
       url: `https://${store.team.domain}.slack.com/`,
       team: store.team.name,
-      user: store.app.name,
+      user: app().name,
       team_id: store.team.id,
       user_id: bot(),
-      bot_id: store.app.botId,
+      bot_id: app().botId,
       is_enterprise_install: false,
     }),
 
@@ -329,6 +337,7 @@ export function createSlackApi(
             (args.reply_broadcast === true || args.reply_broadcast === "true") &&
             string(args, "thread_ts") !== undefined,
         },
+        app(),
       );
       answeredIn(message);
       return { channel: conversation.id, ts: message.ts, message: messageOf(message) };
@@ -338,10 +347,12 @@ export function createSlackApi(
       const conversation = joined(required(args, "channel"));
       const recipient = required(args, "user");
       if (!conversation.members.has(recipient)) throw new SlackApiError("user_not_in_channel");
-      const message = world.postAsApp(conversation, text(args), {
-        threadTs: threadRoot(conversation, string(args, "thread_ts")),
-        ephemeralFor: recipient,
-      });
+      const message = world.postAsApp(
+        conversation,
+        text(args),
+        { threadTs: threadRoot(conversation, string(args, "thread_ts")), ephemeralFor: recipient },
+        app(),
+      );
       return { message_ts: message.ts };
     },
 
@@ -379,7 +390,7 @@ export function createSlackApi(
       const first = streamed(args);
       if (first.length > MAX_STREAM_LENGTH) throw new SlackApiError("msg_too_long");
       // A stream starts as a message with whatever text the first call carries; Slack shows it growing.
-      const message = world.postAsApp(conversation, { text: first, blocks: [] }, { threadTs });
+      const message = world.postAsApp(conversation, { text: first, blocks: [] }, { threadTs }, app());
       message.stream = { state: "open", chunks: first === "" ? [] : [first], startedAt: clock(), endedAt: undefined };
       answeredIn(message);
       return { channel: conversation.id, ts: message.ts };
@@ -453,13 +464,13 @@ export function createSlackApi(
     },
 
     // Socket Mode: where to connect, with a ticket that works once.
-    "apps.connections.open": () => ({ url: socket.ticket() }),
+    "apps.connections.open": () => ({ url: socket.of(app()).ticket() }),
 
     // Modals: opened with the trigger_id of an interaction, for the person who caused it.
-    "views.open": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), false) }),
-    "views.push": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), true) }),
+    "views.open": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), false, app()) }),
+    "views.push": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), true, app()) }),
     "views.update": (args) => ({
-      view: world.updateView(required(args, "view_id"), string(args, "hash"), json(args, "view")),
+      view: world.updateView(required(args, "view_id"), string(args, "hash"), json(args, "view"), app()),
     }),
 
     // Files upload v2: ask where to upload, send the bytes there, then share the file.
@@ -501,6 +512,7 @@ export function createSlackApi(
           conversation,
           { text: string(args, "initial_comment") ?? "" },
           { threadTs: threadRoot(conversation, string(args, "thread_ts")), files },
+          app(),
         );
         for (const file of files) file.conversation = conversation.id;
         answeredIn(message);
@@ -510,7 +522,7 @@ export function createSlackApi(
 
     "files.info": (args) => {
       const file = store.files.get(required(args, "file"));
-      if (!file || !botSees(file)) throw new SlackApiError("file_not_found");
+      if (!file || !botSees(file, app())) throw new SlackApiError("file_not_found");
       return { file: fileObject(file) };
     },
 
@@ -604,8 +616,8 @@ export function createSlackApi(
       }
       // The scope depends on the kind of channel: a public one needs `channels:manage`, a private one `groups:write`.
       const needed = conversation.kind === "channel" ? "channels:manage" : "groups:write";
-      if (!store.app.scopes.includes(needed)) {
-        throw new SlackApiError("missing_scope", { needed, provided: store.app.scopes.join(",") });
+      if (!app().scopes.includes(needed)) {
+        throw new SlackApiError("missing_scope", { needed, provided: app().scopes.join(",") });
       }
       if (conversation.isArchived) throw new SlackApiError("already_archived");
       if (!conversation.members.has(bot())) throw new SlackApiError("not_in_channel");
@@ -620,12 +632,16 @@ export function createSlackApi(
       const people = required(args, "users")
         .split(",")
         .map((id) => id.trim());
+      // A bot can't open a DM with another bot: an app's bot user, or a bot user of a person's kind.
+      if (people.some((id) => store.isAppUser(id) || store.users.find(id)?.isBot === true)) {
+        throw new SlackApiError("cannot_dm_bot");
+      }
       const [first] = people;
       const owner = first === undefined ? undefined : store.users.owner(first);
       if (first === undefined || owner === undefined || people.some((id) => store.users.owner(id) !== owner)) {
         throw new SlackApiError("user_not_found");
       }
-      return { channel: { id: world.openConversation(owner, first, [...people.slice(1), bot()]).id } };
+      return { channel: { id: world.openDirect(owner, first, [...people.slice(1), bot()]).id } };
     },
 
     "conversations.list": (args) => {
@@ -646,18 +662,23 @@ export function createSlackApi(
 
     "users.info": (args) => {
       const id = required(args, "user");
-      if (id === bot()) return { user: appUserObject() };
+      const appUser = store.apps.all().find((candidate) => candidate.botUserId === id);
+      if (appUser) return { user: appUserObject(appUser) };
       const user = store.users.find(id);
       if (!user) throw new SlackApiError("user_not_found");
       return { user: userObject(user) };
     },
 
     "users.list": () => ({
-      members: [appUserObject(), ...store.allUsers().map(userObject)],
+      members: [...store.apps.all().map(appUserObject), ...store.allUsers().map(userObject)],
       cache_ts: Math.floor(clock() / 1000),
       response_metadata: { next_cursor: "" },
     }),
   };
+
+  /** The app a token of this kind belongs to, compared in constant time. */
+  const tokenOwner = (token: string, kind: "botToken" | "appToken"): SlackAppRecord | undefined =>
+    store.apps.withSecret(token, (app) => context.apps.secret(app, kind));
 
   const api = new Hono();
 
@@ -677,26 +698,29 @@ export function createSlackApi(
 
     let body: Record<string, unknown>;
     let status: 200 | 429 = 200;
-    const headers: Record<string, string> = { "x-oauth-scopes": store.app.scopes.join(",") };
+    const headers: Record<string, string> = {};
     const method = methods[name];
+    let calling: SlackAppRecord | undefined;
     try {
       if (token === undefined) throw new SlackApiError("not_authed");
       // Socket Mode connections are opened with the app-level token; everything else takes the bot token.
       const [expected, other] =
         name === "apps.connections.open" ? (["appToken", "botToken"] as const) : (["botToken", "appToken"] as const);
-      if (!constantTimeEqual(token, context.secret(expected))) {
+      // Each app's token is its own: the call is answered as the app it belongs to.
+      calling = tokenOwner(token, expected);
+      if (calling === undefined) {
         // A real token of the wrong kind is told so; anything else is simply not a token.
-        throw new SlackApiError(
-          constantTimeEqual(token, context.secret(other)) ? "not_allowed_token_type" : "invalid_auth",
-        );
+        throw new SlackApiError(tokenOwner(token, other) ? "not_allowed_token_type" : "invalid_auth");
       }
-      if (!store.app.installed) throw new SlackApiError("account_inactive");
+      headers["x-oauth-scopes"] = calling.scopes.join(",");
+      if (!calling.installed) throw new SlackApiError("account_inactive");
       if (!method) throw new SlackApiError("unknown_method", { req_method: name });
 
-      // A fault a test injected: it applies to the next matching calls, whoever makes them.
+      // A fault a test injected: it applies to the next matching calls, of every app or of the one it names.
       const fault = store.faults.find(
         (candidate) =>
           (candidate.operation === undefined || candidate.operation === name) &&
+          (candidate.app === undefined || candidate.app === calling?.name) &&
           (candidate.remaining === undefined || candidate.remaining > 0),
       );
       if (fault?.remaining !== undefined) fault.remaining -= 1;
@@ -710,10 +734,15 @@ export function createSlackApi(
       if (fault?.type === "error") throw new SlackApiError(fault.error);
 
       const needed = SCOPES[name] ?? [];
-      if (needed.length > 0 && !needed.some((scope) => store.app.scopes.includes(scope))) {
-        throw new SlackApiError("missing_scope", { needed: needed.join(","), provided: store.app.scopes.join(",") });
+      if (needed.length > 0 && !needed.some((scope) => calling?.scopes.includes(scope))) {
+        throw new SlackApiError("missing_scope", { needed: needed.join(","), provided: calling.scopes.join(",") });
       }
-      body = { ok: true, ...method(args) };
+      caller = calling;
+      try {
+        body = { ok: true, ...method(args) };
+      } finally {
+        caller = undefined;
+      }
     } catch (error) {
       // What the fake world refuses, it refuses with Slack's own code: that is the app's answer too.
       if (error instanceof SlackRefusal) body = { ok: false, error: error.code };
@@ -797,12 +826,12 @@ export function createSlackApi(
   // A file's bytes (`url_private`, `url_private_download`), for the bot token, as `files.slack.com` serves them.
   api.get("/files-pri/:key/*", (c) => {
     const token = bearerFrom(c.req.header("authorization"));
-    // The same token checks as the Web API's: the bot token, of an installed app that may read files.
+    const reader = token === undefined ? undefined : tokenOwner(token, "botToken");
+    // The same token checks as the Web API's: an app's bot token, of an installed app that may read files.
     if (
       token === undefined ||
-      !constantTimeEqual(token, context.secret("botToken")) ||
-      !store.app.installed ||
-      !(SCOPES["files.info"] ?? []).some((scope) => store.app.scopes.includes(scope))
+      !reader?.installed ||
+      !(SCOPES["files.info"] ?? []).some((scope) => reader.scopes.includes(scope))
     ) {
       return c.text("Forbidden", 403);
     }
@@ -817,7 +846,7 @@ export function createSlackApi(
     if (!file || team !== store.team.id || (rest !== name && !download) || file.bytes === undefined) {
       return c.text("Not Found", 404);
     }
-    if (!botSees(file)) return c.text("Not Found", 404);
+    if (!botSees(file, reader)) return c.text("Not Found", 404);
     return c.body(Buffer.from(file.bytes), 200, {
       "content-type": String(fileObject(file).mimetype),
       "content-length": String(file.bytes.length),

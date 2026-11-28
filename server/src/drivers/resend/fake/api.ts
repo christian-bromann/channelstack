@@ -5,14 +5,15 @@ import type { Context, Hono } from "hono";
 import { bearerFrom } from "../../../core/auth/index.ts";
 import { type RestAnswer, restApi } from "../../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { resendPayloads } from "../payloads.ts";
-import type { ResendEmailRecord } from "../world.ts";
+import type { ResendAppRecord, ResendEmailRecord } from "../world.ts";
 import { createDownloads } from "./downloads.ts";
 import { type AttachmentFile, type FakeResendWorld, ResendApiError, type SendInput } from "./world.ts";
 
 /** Resend's default rate limit: 10 requests a second. */
 const RATE_LIMIT = 10;
+/** Where a call keeps the team its key is: each key answers as its own team. */
+const TEAM = "channelstackResendTeam";
 /** When the fake team's domain was verified: before any test. */
 const DOMAIN_CREATED_AT = "2026-01-01T00:00:00.000Z";
 /** How long Resend keeps an idempotency key: 24 hours. */
@@ -175,19 +176,23 @@ function page<Item extends { readonly id: string }>(c: Context, items: readonly 
 }
 
 /**
- * Resend's REST API as the agent's team sees it (`resend` SDK, `RESEND_BASE_URL`): sending, and
- * reading what it sent and received. Every call needs the team's API key, and is on record for the
+ * Resend's REST API as each team sees it (`resend` SDK, `RESEND_BASE_URL`): sending, and reading
+ * what it sent and received. Every call needs a team's API key, answers as that team (the agent's,
+ * or another app's: decision 0027), and is on record for the
  * sessions whose emails it touched, by the SDK's method name (`emails.send`).
  */
 export function createResendApi(context: DriverContext, world: FakeResendWorld): Hono {
   const { store } = world;
   const { clock } = context;
   const downloads = createDownloads(context, store);
-  /** Each session's calls in the last second: Resend's limit is per team; here each test is its own. */
+  /** Each team's calls in the last second, per session: Resend's limit is per team; here each test is its own too. */
   const recent = new Map<string, number[]>();
+  /** The idempotency keys each team used: a key is one team's, so another team's same key is its own. */
   const used = new Map<string, { request: string; answer: RestAnswer; at: number }>();
-  /** The keys of sends still under way: their files are being fetched. */
+  /** The keys of sends still under way, per team: their files are being fetched. */
   const sending = new Set<string>();
+  /** What a team's key or count is kept under: Resend keeps both per team. */
+  const perTeam = (c: Context, key: string) => `${teamOf(c).name}\u0000${key}`;
 
   const { api, endpoint, finish } = restApi(context, {
     driver: "resend",
@@ -200,8 +205,10 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
           "Missing API key in the authorization header. Include the following header in the request: Authorization: Bearer YOUR_API_KEY",
         );
       }
-      if (!constantTimeEqual(key, context.secret("apiKey")))
-        return errorAnswer(400, "validation_error", "API key is invalid");
+      // Each key is one team's: the call is that team's (decision 0027).
+      const team = store.apps.withSecret(key, (app) => context.apps.secret(app, "apiKey"));
+      if (!team) return errorAnswer(400, "validation_error", "API key is invalid");
+      c.set(TEAM as never, team as never);
       return undefined;
     },
     refusal: (error) =>
@@ -210,9 +217,9 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     notFound: () => errorAnswer(404, "not_found", "The requested endpoint does not exist."),
   });
 
-  /** Count a call against its session's limit; over it, Resend answers 429. */
-  const limited = (session: string | undefined): RestAnswer | undefined => {
-    const key = session ?? "";
+  /** Count a call against its team's limit, in its session; over it, Resend answers 429. */
+  const limited = (c: Context, session: string | undefined): RestAnswer | undefined => {
+    const key = perTeam(c, session ?? "");
     const now = clock();
     const calls = (recent.get(key) ?? []).filter((at) => now - at < 1000);
     calls.push(now);
@@ -239,11 +246,12 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     body: Record<string, unknown>,
     send: () => RestAnswer | Promise<RestAnswer>,
   ): Promise<RestAnswer> => {
-    const key = c.req.header("idempotency-key");
-    if (key === undefined) return send();
-    if (key.length === 0 || key.length > 256) {
+    const given = c.req.header("idempotency-key");
+    if (given === undefined) return send();
+    if (given.length === 0 || given.length > 256) {
       throw new ResendApiError(400, "invalid_idempotency_key", "The key must be between 1 and 256 characters.");
     }
+    const key = perTeam(c, given);
     const request = createHash("sha256").update(JSON.stringify(body)).digest("hex");
     const earlier = used.get(key);
     if (earlier && clock() - earlier.at < IDEMPOTENCY_MS) {
@@ -274,30 +282,32 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     }
   };
 
-  const sentEmail = (id: string) => {
+  /** The team whose key made the call. */
+  const teamOf = (c: Context) => c.get(TEAM as never) as ResendAppRecord;
+  const sentEmail = (c: Context, id: string) => {
     const email = store.emails.find(id);
-    if (email?.direction !== "sent") throw new ResendApiError(404, "not_found", "Email not found");
+    if (!email || !world.sentBy(teamOf(c), email)) throw new ResendApiError(404, "not_found", "Email not found");
     return email;
   };
-  const receivedEmail = (id: string) => {
+  const receivedEmail = (c: Context, id: string) => {
     const email = store.emails.find(id);
-    if (email?.direction !== "received") throw new ResendApiError(404, "not_found", "Email not found");
+    if (!email || !world.receivedBy(teamOf(c), email)) throw new ResendApiError(404, "not_found", "Email not found");
     return email;
   };
 
   endpoint("post", "/emails", "emails.send", async (c, body) => {
     const input = sendInput(body);
     // Over the limit, nothing is sent and the key isn't used up: the agent may send again.
-    const refused = limited(world.checkSend(input).session);
+    const refused = limited(c, world.checkSend(input, teamOf(c)).session);
     if (refused) return refused;
     // The attachments are read last, and only for a send that happens: not for a refused one, nor a repeated key.
     return once(c, body, async () => {
-      const email = world.appSends({ ...input, attachments: await attachmentsOf(body.attachments) });
+      const email = await world.appSends({ ...input, attachments: await attachmentsOf(body.attachments) }, teamOf(c));
       return { body: { id: email.id }, sessions: [world.sessionOf(email)] };
     });
   });
 
-  endpoint("post", "/emails/batch", "batch.send", (_c, body) => {
+  endpoint("post", "/emails/batch", "batch.send", async (c, body) => {
     const items: unknown = body;
     if (!Array.isArray(items))
       throw new ResendApiError(422, "validation_error", "The body must be an array of emails.");
@@ -305,15 +315,16 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     // A batch takes no attachments: Resend sends its emails without them (found against Resend).
     const inputs = items.map((item) => sendInput(item as Record<string, unknown>));
     // Every email is checked before any is sent: a batch is sent whole, or not at all.
-    const checked = inputs.map((input) => world.checkSend(input));
-    const refused = limited(checked[0]?.session);
+    const checked = inputs.map((input) => world.checkSend(input, teamOf(c)));
+    const refused = limited(c, checked[0]?.session);
     if (refused) return refused;
-    const emails = inputs.map((input) => world.appSends(input));
+    const emails: ResendEmailRecord[] = [];
+    for (const input of inputs) emails.push(await world.appSends(input, teamOf(c)));
     return { body: { data: emails.map((email) => ({ id: email.id })) }, sessions: emails.map(world.sessionOf) };
   });
 
   endpoint("get", "/emails", "emails.list", (c) => {
-    const sent = store.emails.values().filter((email) => email.direction === "sent");
+    const sent = store.emails.values().filter((email) => world.sentBy(teamOf(c), email));
     // Newest first, as Resend lists.
     return { body: page(c, sent.reverse(), resendPayloads.sentEmail), sessions: [] };
   });
@@ -323,7 +334,7 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     const wanted = c.req.queries("to")?.map((address) => address.toLowerCase());
     const received = store.emails
       .values()
-      .filter((email) => email.direction === "received")
+      .filter((email) => world.receivedBy(teamOf(c), email))
       .filter((email) => wanted === undefined || email.to.some((mailbox) => wanted.includes(mailbox.address)));
     return {
       body: page(c, [...received].reverse(), resendPayloads.receivedSummary),
@@ -332,7 +343,7 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
   });
 
   endpoint("get", "/emails/receiving/:id", "emails.receiving.get", (c) => {
-    const email = receivedEmail(c.req.param("id") ?? "");
+    const email = receivedEmail(c, c.req.param("id") ?? "");
     return {
       body: resendPayloads.receivedEmail(email, downloads.link(email, "raw")),
       sessions: [world.sessionOf(email)],
@@ -360,34 +371,35 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
   };
 
   endpoint("get", "/emails/receiving/:id/attachments", "emails.receiving.attachments.list", (c) =>
-    attachmentList(c, receivedEmail(c.req.param("id") ?? "")),
+    attachmentList(c, receivedEmail(c, c.req.param("id") ?? "")),
   );
 
   endpoint("get", "/emails/receiving/:id/attachments/:attachment", "emails.receiving.attachments.get", (c) =>
-    attachmentOne(receivedEmail(c.req.param("id") ?? ""), c.req.param("attachment") ?? ""),
+    attachmentOne(receivedEmail(c, c.req.param("id") ?? ""), c.req.param("attachment") ?? ""),
   );
 
   endpoint("get", "/emails/:id", "emails.get", (c) => {
-    const email = sentEmail(c.req.param("id") ?? "");
+    const email = sentEmail(c, c.req.param("id") ?? "");
     return { body: resendPayloads.sentEmail(email), sessions: [world.sessionOf(email)] };
   });
 
   endpoint("get", "/emails/:id/attachments", "emails.attachments.list", (c) =>
-    attachmentList(c, sentEmail(c.req.param("id") ?? "")),
+    attachmentList(c, sentEmail(c, c.req.param("id") ?? "")),
   );
 
   endpoint("get", "/emails/:id/attachments/:attachment", "emails.attachments.get", (c) =>
-    attachmentOne(sentEmail(c.req.param("id") ?? ""), c.req.param("attachment") ?? ""),
+    attachmentOne(sentEmail(c, c.req.param("id") ?? ""), c.req.param("attachment") ?? ""),
   );
 
-  endpoint("get", "/domains", "domains.list", () => ({
+  // A team sees its own domain only.
+  endpoint("get", "/domains", "domains.list", (c) => ({
     body: {
       object: "list",
       has_more: false,
       data: [
         {
-          id: store.app.domainId,
-          name: store.app.domain,
+          id: teamOf(c).domainId,
+          name: teamOf(c).domain,
           status: "verified",
           created_at: DOMAIN_CREATED_AT,
           region: "us-east-1",

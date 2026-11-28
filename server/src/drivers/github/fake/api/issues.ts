@@ -25,7 +25,8 @@ export function registerIssues(register: Register): void {
     return comment;
   };
   /** Who an issue can be assigned to. GitHub drops, without a word, anyone who can't be: an App's bot among them. */
-  const assignable = (call: Call, logins: readonly unknown[]) => people(call, logins).filter((id) => id !== call.bot);
+  const assignable = (call: Call, logins: readonly unknown[]) =>
+    people(call, logins).filter((id) => call.world.kit.store.appOfBot(id) === undefined);
   const labelNames = (body: Call["body"]): string[] =>
     (Array.isArray(body) ? body : (list(body, "labels") ?? [])).flatMap((label) =>
       typeof label === "string"

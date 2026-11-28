@@ -76,6 +76,58 @@ let users = notion.users().await?;
 
 **Returns** [`NotionUsers`](/docs/reference/api/notion#notionusers).
 
+### createApp()
+
+Make another internal integration in the workspace, with its own bot user, token and webhook subscription (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_NOTION_APP_&lt;NAME>_WEBHOOK_URL, and it sees only the pages connected to it.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const integration = await notion.createApp({ name: "…" });
+```
+
+```python title="Python"
+integration = await notion.create_app(name="…")
+```
+
+```rust title="Rust"
+let integration = notion.create_app().name("…").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `name` | `string` | yes | option |
+| `capabilities` | `NotionCapability[]` | no | option |
+| `events` | `string[]` | no | option |
+
+**Returns** [`NotionIntegration`](/docs/reference/api/notion#notionintegration).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: integrations beside the built-in one aren't built live.
+
+### apps()
+
+The integrations this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const integrations = await notion.apps();
+```
+
+```python title="Python"
+integrations = await notion.apps()
+```
+
+```rust title="Rust"
+let integrations = notion.apps().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`NotionIntegrations`](/docs/reference/api/notion#notionintegrations).
+
 ### pages()
 
 The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash.
@@ -191,23 +243,27 @@ notion.set_content_update_delay(delay).await?;
 
 ### sendVerification()
 
-Send the subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created.
+Send a subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created: the built-in integration's, or the one given's.
 
 <CodeGroup>
 
 ```ts title="TypeScript"
-const delivery = await notion.sendVerification();
+const delivery = await notion.sendVerification({ app });
 ```
 
 ```python title="Python"
-delivery = await notion.send_verification()
+delivery = await notion.send_verification(app=app)
 ```
 
 ```rust title="Rust"
-let delivery = notion.send_verification().await?;
+let delivery = notion.send_verification().app(&app).await?;
 ```
 
 </CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `app` | `NotionIntegration` | no | option |
 
 **Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
 
@@ -237,6 +293,7 @@ let deliveries = notion.deliveries().r#type("…").await?;
 |---|---|---|---|---|
 | `type` | `type` · `r#type` | `string` | no | option |
 | `resource` | `resource` | `NotionPage` | no | option |
+| `app` | `app` | `NotionIntegration` | no | option |
 
 **Returns** [`NotionDeliveries`](/docs/reference/api/notion#notiondeliveries).
 
@@ -301,6 +358,8 @@ let api_call = notion.wait_for_call().operation("…").await?;
 
 ## NotionIntegration
 
+Returned by [`NotionFixture.createApp()`](/docs/reference/api/notion#createapp).
+
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
@@ -310,6 +369,131 @@ let api_call = notion.wait_for_call().operation("…").await?;
 | `botUserId` | `bot_user_id` | `string` |
 | `token` | `token` | `string` |
 | `webhookSecret` | `webhook_secret` | `string` |
+
+### comment()
+
+An integration a test made starts a discussion on a page, or anchored to the block with `anchor` in its text, as its own `comments.create` would: on a page connected to it, mentioning people only. Sends `comment.created` to every integration that sees the page.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const comment = await integration.comment("…", { page });
+```
+
+```python title="Python"
+comment = await integration.comment("…", page=page)
+```
+
+```rust title="Rust"
+let comment = integration.comment("…").page(&page).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `text` | `string` | yes | positional |
+| `page` | `NotionPage` | yes | option |
+| `anchor` | `string \| RegExp` | no | option |
+
+**Returns** [`NotionComment`](/docs/reference/api/notion#notioncomment).
+
+**Errors** [`object_not_found`](/docs/reference/api/errors#object-not-found), [`restricted_resource`](/docs/reference/api/errors#restricted-resource), [`validation_error`](/docs/reference/api/errors#validation-error).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: integrations beside the built-in one aren't built live.
+
+### reply()
+
+An integration a test made replies in a discussion, as `comments.create` with `discussion_id` would. Sends `comment.created`.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const comment = await integration.reply("…", { discussion });
+```
+
+```python title="Python"
+comment = await integration.reply("…", discussion=discussion)
+```
+
+```rust title="Rust"
+let comment = integration.reply("…").discussion(&discussion).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `text` | `string` | yes | positional |
+| `discussion` | `NotionDiscussion` | yes | option |
+
+**Returns** [`NotionComment`](/docs/reference/api/notion#notioncomment).
+
+**Errors** [`object_not_found`](/docs/reference/api/errors#object-not-found), [`restricted_resource`](/docs/reference/api/errors#restricted-resource), [`validation_error`](/docs/reference/api/errors#validation-error).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: integrations beside the built-in one aren't built live.
+
+### edit()
+
+An integration a test made edits a page's body, as its own block calls would: append, or replace it. Sends one `page.content_updated` once Notion's batching delay is over.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await integration.edit(change, { page });
+```
+
+```python title="Python"
+delivery = await integration.edit(change, page=page)
+```
+
+```rust title="Rust"
+let delivery = integration.edit(change).page(&page).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `change` | `{ append?: string \| { path: string } \| unknown[]; replace?: string \| { path: string } \| unknown[] }` | yes | positional |
+| `page` | `NotionPage` | yes | option |
+
+**Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
+
+**Errors** [`object_not_found`](/docs/reference/api/errors#object-not-found), [`restricted_resource`](/docs/reference/api/errors#restricted-resource), [`validation_error`](/docs/reference/api/errors#validation-error).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: integrations beside the built-in one aren't built live.
+
+### rename()
+
+An integration a test made changes a page's title, as its own `pages.update` would. Sends `page.properties_updated`.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await integration.rename("…", { page });
+```
+
+```python title="Python"
+delivery = await integration.rename("…", page=page)
+```
+
+```rust title="Rust"
+let delivery = integration.rename("…").page(&page).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `title` | `string` | yes | positional |
+| `page` | `NotionPage` | yes | option |
+
+**Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
+
+**Errors** [`object_not_found`](/docs/reference/api/errors#object-not-found), [`restricted_resource`](/docs/reference/api/errors#restricted-resource), [`validation_error`](/docs/reference/api/errors#validation-error).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: integrations beside the built-in one aren't built live.
 
 ## NotionUser
 
@@ -716,6 +900,178 @@ user.disconnect(&integration).page(&page).await?;
 
 **Live:** needs the browser actor: no API connects a page to an integration; Notion's UI does (… → Connections). The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
+## NotionComment
+
+Returned by [`NotionIntegration.comment()`](/docs/reference/api/notion#comment), [`NotionIntegration.reply()`](/docs/reference/api/notion#reply), [`NotionUser.comment()`](/docs/reference/api/notion#comment-1), [`NotionUser.reply()`](/docs/reference/api/notion#reply-1).
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `id` | `id` | `string` |
+| `discussion` | `discussion` | `NotionDiscussion` |
+| `author` | `author` | `NotionUser \| NotionIntegration` |
+| `text` | `text` | `string` |
+| `createdAt` | `created_at` | `string` |
+| `delivery` | `delivery` | `NotionDelivery \| undefined` |
+
+### deliveryFor()
+
+The `comment.created` delivery this comment caused to this integration (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in integration's.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await comment.deliveryFor(app);
+```
+
+```python title="Python"
+delivery = await comment.delivery_for(app)
+```
+
+```rust title="Rust"
+let delivery = comment.delivery_for(&app).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `app` | `NotionIntegration` | yes | positional |
+
+**Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: integrations beside the built-in one aren't built live.
+
+## NotionDiscussion
+
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `page` | `NotionPage` |
+| `anchor` | `string \| undefined` |
+
+### comments()
+
+The discussion's comments, oldest first.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const comments = await discussion.comments();
+```
+
+```python title="Python"
+comments = await discussion.comments()
+```
+
+```rust title="Rust"
+let comments = discussion.comments().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`NotionComments`](/docs/reference/api/notion#notioncomments).
+
+### resolved()
+
+Whether the discussion is resolved.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const result = await discussion.resolved();
+```
+
+```python title="Python"
+result = await discussion.resolved()
+```
+
+```rust title="Rust"
+let result = discussion.resolved().await?;
+```
+
+</CodeGroup>
+
+**Returns** `boolean`.
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: Notion's API can't resolve or reopen a discussion, or say whether one is resolved.
+
+### transcript()
+
+The discussion as a person reads it.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const transcript = await discussion.transcript();
+```
+
+```python title="Python"
+transcript = await discussion.transcript()
+```
+
+```rust title="Rust"
+let transcript = discussion.transcript().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`NotionTranscript`](/docs/reference/api/notion#notiontranscript).
+
+### waitForComment()
+
+Waits for the next comment after the last one this handle returned: it polls `comments()` and never sleeps longer than it must.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const comment = await discussion.waitForComment({ from: "my-agent" });
+```
+
+```python title="Python"
+comment = await discussion.wait_for_comment(from_="my-agent")
+```
+
+```rust title="Rust"
+let comment = discussion.wait_for_comment().from("my-agent").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `from` | `from_` · `from` | `NotionUser \| NotionIntegration \| string` | no | a handle, or a name |
+| `timeout` | `timeout` | `Duration` | no | default 10s |
+
+**Returns** [`NotionComment`](/docs/reference/api/notion#notioncomment). When the time is up, it fails with what it was waiting for.
+
+### latestComment()
+
+The latest comment, once the app is quiet. Waits for at least one: it polls `comments()` and never sleeps longer than it must.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const comment = await discussion.latestComment({ from: "my-agent" });
+```
+
+```python title="Python"
+comment = await discussion.latest_comment(from_="my-agent")
+```
+
+```rust title="Rust"
+let comment = discussion.latest_comment().from("my-agent").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `from` | `from_` · `from` | `NotionUser \| NotionIntegration \| string` | no | a handle, or a name |
+| `timeout` | `timeout` | `Duration` | no | default 10s |
+| `quietFor` | `quiet_for` | `Duration` | no | default 750ms |
+
+**Returns** [`NotionComment`](/docs/reference/api/notion#notioncomment). When the time is up, it fails with what it was waiting for.
+
 ## NotionPage
 
 Returned by [`NotionFixture.createPage()`](/docs/reference/api/notion#createpage), [`NotionUser.createPage()`](/docs/reference/api/notion#createpage-1), [`NotionUser.addRow()`](/docs/reference/api/notion#addrow).
@@ -887,53 +1243,15 @@ let transcript = page.transcript().await?;
 
 **Returns** [`NotionTranscript`](/docs/reference/api/notion#notiontranscript).
 
-## NotionDatabase
-
-Returned by [`NotionFixture.createDatabase()`](/docs/reference/api/notion#createdatabase).
-
-| Field | Type |
-|---|---|
-| `id` | `string` |
-| `channel` | `"notion"` |
-| `title` | `string` |
-| `url` | `string` |
-
-### rows()
-
-The rows of a database, optionally only those whose properties have these values.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const rows = await database.rows();
-```
-
-```python title="Python"
-rows = await database.rows()
-```
-
-```rust title="Rust"
-let rows = database.rows().await?;
-```
-
-</CodeGroup>
-
-| Parameter | Type | Required |  |
-|---|---|---|---|
-| `filter` | `Record<string, NotionPropertyValue>` | no | positional |
-
-**Returns** [`NotionRows`](/docs/reference/api/notion#notionrows).
-
-**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: Notion databases, rows and properties aren't built live.
-
 ## NotionDelivery
 
-Returned by [`NotionFixture.sendVerification()`](/docs/reference/api/notion#sendverification), [`NotionUser.editComment()`](/docs/reference/api/notion#editcomment), [`NotionUser.deleteComment()`](/docs/reference/api/notion#deletecomment), [`NotionUser.resolve()`](/docs/reference/api/notion#resolve).
+Returned by [`NotionFixture.sendVerification()`](/docs/reference/api/notion#sendverification), [`NotionIntegration.edit()`](/docs/reference/api/notion#edit), [`NotionIntegration.rename()`](/docs/reference/api/notion#rename), [`NotionUser.editComment()`](/docs/reference/api/notion#editcomment).
 
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"notion"` |
+| `app` | `app` | `string` |
 | `type` | `type` · `r#type` | `string` |
 | `entity` | `entity` | `{ type: string; id: string }` |
 | `payload` | `payload` | `unknown \| undefined` |
@@ -1042,153 +1360,60 @@ let updated = delivery.settled().await?;
 
 **Returns** [`NotionDelivery`](/docs/reference/api/notion#notiondelivery). When the time is up, it fails with what it was waiting for.
 
-## NotionComment
+## NotionDatabase
 
-Returned by [`NotionUser.comment()`](/docs/reference/api/notion#comment), [`NotionUser.reply()`](/docs/reference/api/notion#reply).
-
-| Field | Python / Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `discussion` | `discussion` | `NotionDiscussion` |
-| `author` | `author` | `NotionUser \| NotionIntegration` |
-| `text` | `text` | `string` |
-| `createdAt` | `created_at` | `string` |
-| `delivery` | `delivery` | `NotionDelivery \| undefined` |
-
-## NotionDiscussion
+Returned by [`NotionFixture.createDatabase()`](/docs/reference/api/notion#createdatabase).
 
 | Field | Type |
 |---|---|
 | `id` | `string` |
-| `page` | `NotionPage` |
-| `anchor` | `string \| undefined` |
+| `channel` | `"notion"` |
+| `title` | `string` |
+| `url` | `string` |
 
-### comments()
+### rows()
 
-The discussion's comments, oldest first.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const comments = await discussion.comments();
-```
-
-```python title="Python"
-comments = await discussion.comments()
-```
-
-```rust title="Rust"
-let comments = discussion.comments().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`NotionComments`](/docs/reference/api/notion#notioncomments).
-
-### resolved()
-
-Whether the discussion is resolved.
+The rows of a database, optionally only those whose properties have these values.
 
 <CodeGroup>
 
 ```ts title="TypeScript"
-const result = await discussion.resolved();
+const rows = await database.rows();
 ```
 
 ```python title="Python"
-result = await discussion.resolved()
+rows = await database.rows()
 ```
 
 ```rust title="Rust"
-let result = discussion.resolved().await?;
+let rows = database.rows().await?;
 ```
 
 </CodeGroup>
 
-**Returns** `boolean`.
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `filter` | `Record<string, NotionPropertyValue>` | no | positional |
 
-**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: Notion's API can't resolve or reopen a discussion, or say whether one is resolved.
+**Returns** [`NotionRows`](/docs/reference/api/notion#notionrows).
 
-### transcript()
-
-The discussion as a person reads it.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const transcript = await discussion.transcript();
-```
-
-```python title="Python"
-transcript = await discussion.transcript()
-```
-
-```rust title="Rust"
-let transcript = discussion.transcript().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`NotionTranscript`](/docs/reference/api/notion#notiontranscript).
-
-### waitForComment()
-
-Waits for the next comment after the last one this handle returned: it polls `comments()` and never sleeps longer than it must.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const comment = await discussion.waitForComment({ from: "my-agent" });
-```
-
-```python title="Python"
-comment = await discussion.wait_for_comment(from_="my-agent")
-```
-
-```rust title="Rust"
-let comment = discussion.wait_for_comment().from("my-agent").await?;
-```
-
-</CodeGroup>
-
-| Parameter | Python / Rust | Type | Required |  |
-|---|---|---|---|---|
-| `from` | `from_` · `from` | `NotionUser \| NotionIntegration \| string` | no | a handle, or a name |
-| `timeout` | `timeout` | `Duration` | no | default 10s |
-
-**Returns** [`NotionComment`](/docs/reference/api/notion#notioncomment). When the time is up, it fails with what it was waiting for.
-
-### latestComment()
-
-The latest comment, once the app is quiet. Waits for at least one: it polls `comments()` and never sleeps longer than it must.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const comment = await discussion.latestComment({ from: "my-agent" });
-```
-
-```python title="Python"
-comment = await discussion.latest_comment(from_="my-agent")
-```
-
-```rust title="Rust"
-let comment = discussion.latest_comment().from("my-agent").await?;
-```
-
-</CodeGroup>
-
-| Parameter | Python / Rust | Type | Required |  |
-|---|---|---|---|---|
-| `from` | `from_` · `from` | `NotionUser \| NotionIntegration \| string` | no | a handle, or a name |
-| `timeout` | `timeout` | `Duration` | no | default 10s |
-| `quietFor` | `quiet_for` | `Duration` | no | default 750ms |
-
-**Returns** [`NotionComment`](/docs/reference/api/notion#notioncomment). When the time is up, it fails with what it was waiting for.
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: Notion databases, rows and properties aren't built live.
 
 ## Types
 
 Plain values the handles return and take.
+
+### NotionCapability
+
+```ts
+type NotionCapability = "read_content" | "update_content" | "insert_content" | "read_comments" | "insert_comments" | "read_user_info";
+```
+
+### NotionIntegrations
+
+```ts
+type NotionIntegrations = NotionIntegration[];
+```
 
 ### NotionUsers
 

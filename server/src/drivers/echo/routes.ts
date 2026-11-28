@@ -12,7 +12,9 @@ const EchoPrincipal = z
 
 const EchoUser = z.object({ id: z.string(), name: z.string(), kind: z.literal("user") }).openapi("EchoUser", resource);
 
-const EchoApp = z.object({ id: z.string(), name: z.string(), kind: z.literal("app") }).openapi("EchoApp", resource);
+const EchoApp = z
+  .object({ id: z.string(), name: z.string(), kind: z.literal("app") })
+  .openapi("EchoApp", { "x-channelstack-resource": { id: "id", role: "app" } });
 
 const EchoRoom = z
   .object({ id: z.string(), name: z.string(), members: z.array(z.string()) })
@@ -62,6 +64,7 @@ const Capabilities = z
 
 const UserParams = z.object({ user: z.string().openapi({ param: { name: "user", in: "path" } }) });
 const RoomParams = z.object({ room: z.string().openapi({ param: { name: "room", in: "path" } }) });
+const AppParams = z.object({ app: z.string().openapi({ param: { name: "app", in: "path" } }) });
 
 /** The echo driver's control API. Every route is experimental: echo exists to prove the pipeline (decision 0003). */
 export function registerEchoRoutes(
@@ -90,6 +93,43 @@ export function registerEchoRoutes(
     factory: { on: "EchoFixture", name: "createUser", options: ["name"] },
     stability,
     handler: ({ session, body }) => world.createUser(session.id, body),
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps",
+    summary:
+      "Make another app (decision 0027), or return the one with this name. Its events go to CHANNELSTACK_ECHO_APP_<NAME>_WEBHOOK_URL",
+    body: z.object({ name: z.string().min(1) }).openapi("EchoAppOptions"),
+    response: EchoApp,
+    errors: ["invalid_argument"],
+    factory: { on: "EchoFixture", name: "createApp", options: ["name"] },
+    stability,
+    handler: ({ session, body }) => world.createApp(session.id, body),
+  });
+
+  router.route({
+    method: "get",
+    path: "/apps",
+    summary:
+      "The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
+    response: z.array(EchoApp).openapi("EchoApps"),
+    sdkMethod: { on: "EchoFixture", name: "apps" },
+    stability,
+    handler: ({ session }) => world.apps(session.id),
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/say",
+    summary: "An app a test made posts in a room it is a member of, as its own call would",
+    params: AppParams,
+    body: z.object({ text: z.string().min(1), room: z.string().openapi(refTo("EchoRoom")) }).openapi("EchoAppSayBody"),
+    response: EchoMessage,
+    errors: ["not_found", "not_in_room", "invalid_argument"],
+    sdkMethod: { on: "EchoApp", name: "say", args: ["text"], options: ["room"] },
+    stability,
+    handler: ({ session, params, body }) => world.sayAsApp(session.id, params.app, body.room, body.text),
   });
 
   router.route({
