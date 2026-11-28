@@ -1,7 +1,7 @@
 ---
 title: "The model"
 order: 5.5
-description: "Script what your agent's model answers with the fake OpenAI: text, streams, tool calls and errors, a slow first token, a stream that breaks, and what your agent sent."
+description: "Script what your agent's model answers with the fake OpenAI: text, streams, tool calls and errors, a slow first token, a stream that breaks, images, audio, files, OpenAI's built-in tools, and what your agent sent."
 ---
 
 # The model
@@ -75,9 +75,75 @@ await expect(openai).not.toHaveSentSecrets();                     // no token, s
 await expect(call).toHaveOfferedTool("search_incidents");
 await expect(ai).toHaveSentToolResult("search_incidents", { text: /migration/ });
 await expect(await ai.waitForPause()).toBeAborted();             // Stop cancelled the model's request
+await expect(call).toHaveSentFile("./fixtures/error.png");        // the image a person shared, by its hash
 ```
 
 `openai.calls()`, `ai.toolCalls()` and `call.toolCalls` give you the calls and each tool call with the result your agent sent back.
+
+## Images, audio and files
+
+**What your agent sends.** Image, file and audio parts are read, not just counted: each is part of the call's request with its media type, size and SHA-256, so a test can check that the agent passed on what a person shared.
+
+```ts
+await openai.respond("The stack trace points at the migration.");
+await ana.say("@my-agent what's wrong here?", { channel, files: "./fixtures/error.png" });
+
+await expect(await openai.waitForCall()).toHaveSentFile("./fixtures/error.png"); // the same bytes
+```
+
+Data URLs, `file_id`s from `/v1/files` and URLs all work, on both endpoints. A URL on a fake host is fetched the way OpenAI fetches it, without credentials: an agent that hands the model Slack's `url_private` gets OpenAI's 400 (`invalid_image_url`), as it would for real. Download the file with the bot token and send its bytes. URLs elsewhere aren't fetched, and are recorded as given.
+
+**What the model answers.** A turn can carry media, for the endpoints that answer with it:
+
+```ts
+await openai.respond({ image: "./fixtures/chart.png" }, { when: { endpoint: "images.generations" } });
+await openai.respond({ audio: { placeholder: { seconds: 2 } } }, { when: { endpoint: "audio.speech" } });
+await openai.respond("The deploy fails at the migration step.", { when: { endpoint: "audio.transcriptions" } });
+await openai.respond({ text: "Two incidents.", audio: { placeholder: { seconds: 1 } } }); // Chat Completions' audio output
+```
+
+The Images API answers in base64 or with a URL, as the request asks; speech in the requested format, streamed with `stream_format: "sse"`; transcriptions and translations as JSON, text, SRT or VTT, and transcriptions streamed with `stream: true`. Media is a path, which your test's SDK reads and uploads, bytes, or a placeholder the fake makes: a PNG of a size, or WAV or PCM silence of a length. Other formats (JPEG, WebP, MP3, Opus) need a file. A placeholder in one of them is a problem of the script, never an answer with the wrong media type.
+
+## OpenAI's built-in tools
+
+OpenAI's built-in tools are scripted like functions, in `toolCalls`. The fake runs nothing: no search, no container, no call to an MCP server. What a hosted tool found is what the script says; what a tool the agent runs did is what the agent sends back.
+
+```ts
+await openai.respond({
+  toolCalls: [{ webSearch: { query: "web deploy outage", sources: [{ url: "https://status.example/123" }] } }],
+  text: "The status page says the deploy failed.",
+  citations: [{ quote: "the deploy failed", url: "https://status.example/123" }],
+});
+```
+
+| Scripted as | The tool | Who runs it |
+|---|---|---|
+| `{ webSearch: { query, sources } }` | `web_search` | OpenAI |
+| `{ fileSearch: { queries, results } }` | `file_search` | OpenAI |
+| `{ codeInterpreter: { code, logs, files } }` | `code_interpreter`; its files download from the container | OpenAI |
+| `{ imageGeneration: { image, revisedPrompt } }` | `image_generation` | OpenAI |
+| `{ mcp: { server, tool, arguments, output, approval } }` | a remote MCP server's tool, or an approval request | OpenAI |
+| `{ shell: { commands, output } }` | `shell`: hosted with `output`, or `local` | OpenAI, or your agent |
+| `{ computer: { actions } }`, `{ applyPatch: { operations } }` | `computer`, `apply_patch` | your agent |
+
+Built-in tools are on the Responses API only, as on the real API. A script calls only what the request offered: a tool it didn't offer, an MCP server it doesn't name, or a tool its `require_approval` says needs approval first is a problem of the script, and the test fails. `toolCalls()` lists them all, each with `hosted` saying who ran it and the result joined to it.
+
+An MCP approval is a channel test of its own: the agent turns the approval request into a button, a person's click becomes the approval, and only then does the tool run.
+
+```ts
+const deploy = { server: "deploys", tool: "deploy", arguments: { app: "web" } };
+const ai = await openai.respond([
+  { toolCalls: [{ mcp: { ...deploy, approval: true } }] },
+  { toolCalls: [{ mcp: { ...deploy, output: "started" } }], text: "Deploying web." },
+]);
+
+const msg = await ana.say("deploy web", { to: slack.app });
+const ask = await msg.thread.waitForReply({ from: "my-agent" });
+await expect(ai).toHaveAnswered({ times: 1 }); // nothing runs before the click
+await ana.click("Approve", { message: ask });
+
+await expect(msg.thread).toHaveReplyFrom("my-agent", { text: /Deploying web/ });
+```
 
 ## How a call finds its test
 

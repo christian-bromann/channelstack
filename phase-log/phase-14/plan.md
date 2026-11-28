@@ -33,7 +33,11 @@ Phase 14 of [docs/phases.md](../../docs/phases.md): the fake OpenAI's images, au
 
 ## New dependencies
 
-None.
+| Package | Version | Why a library and not our code | License | Maintained |
+|---|---|---|---|---|
+| `sha2` (Rust SDK) | 0.11.1 | SHA-256 for `to_have_sent_file`: the Rust SDK has no hash, and RustCrypto's is the standard one, pure Rust | MIT OR Apache-2.0 | Yes (RustCrypto; 0.11.2 is two days old, so 0.11.1 is pinned) |
+
+The server and the TypeScript and Python SDKs need none: `node:crypto` and `node:zlib`, and Python's `hashlib`.
 
 ## Docs to update
 
