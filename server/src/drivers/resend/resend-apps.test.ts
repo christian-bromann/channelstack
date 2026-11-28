@@ -229,6 +229,32 @@ describe("exit check 12.3: Resend apps", () => {
     expect(events(mine).find((one) => one.data.email_id === answer.body.id)?.type).toBe("email.received");
   });
 
+  test("idempotency keys and the rate limit are each team's own", async () => {
+    const { h, app, coder, ana } = await twoTeams();
+    const send = (team: { apiKey: string; address: string }, text: string, key?: string) =>
+      h.provider(
+        "POST",
+        "resend/emails",
+        { from: team.address, to: ana.address, subject: "Your refund", text },
+        team.apiKey,
+        key === undefined ? {} : { "idempotency-key": key },
+      );
+
+    // Two teams answering one email often key the send by its id: each key is its own team's.
+    const mine = await send(app, "Refunded.", "reply-1");
+    const theirs = await send(coder, "Ticket opened.", "reply-1");
+    expect([mine.status, theirs.status]).toEqual([200, 200]);
+    expect(theirs.body.id).not.toBe(mine.body.id);
+    expect((await send(app, "Refunded.", "reply-1")).body.id).toBe(mine.body.id);
+    expect((await send(app, "Something else.", "reply-1")).body.name).toBe("invalid_idempotent_request");
+    expect((await send(coder, "Ticket opened.", "reply-1")).body.id).toBe(theirs.body.id);
+
+    // 10 a second is my-agent's team's limit: coder's team still sends.
+    for (let i = 0; i < 10; i++) await send(app, `note ${i}`);
+    expect((await send(app, "one too many")).status).toBe(429);
+    expect((await send(coder, "still fine")).status).toBe(200);
+  });
+
   test("A1: an email two teams receive is two deliveries, each to its own URL and signed with its own secret, which webhooks.verify tells apart", async () => {
     const { h, mine, theirs, base, post, app, coder, ana } = await twoTeams();
     const email = await post(`/users/${encodeURIComponent(ana.id)}/send`, {

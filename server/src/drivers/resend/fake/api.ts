@@ -185,11 +185,14 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
   const { store } = world;
   const { clock } = context;
   const downloads = createDownloads(context, store);
-  /** Each session's calls in the last second: Resend's limit is per team; here each test is its own. */
+  /** Each team's calls in the last second, per session: Resend's limit is per team; here each test is its own too. */
   const recent = new Map<string, number[]>();
+  /** The idempotency keys each team used: a key is one team's, so another team's same key is its own. */
   const used = new Map<string, { request: string; answer: RestAnswer; at: number }>();
-  /** The keys of sends still under way: their files are being fetched. */
+  /** The keys of sends still under way, per team: their files are being fetched. */
   const sending = new Set<string>();
+  /** What a team's key or count is kept under: Resend keeps both per team. */
+  const perTeam = (c: Context, key: string) => `${teamOf(c).name}\u0000${key}`;
 
   const { api, endpoint, finish } = restApi(context, {
     driver: "resend",
@@ -214,9 +217,9 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     notFound: () => errorAnswer(404, "not_found", "The requested endpoint does not exist."),
   });
 
-  /** Count a call against its session's limit; over it, Resend answers 429. */
-  const limited = (session: string | undefined): RestAnswer | undefined => {
-    const key = session ?? "";
+  /** Count a call against its team's limit, in its session; over it, Resend answers 429. */
+  const limited = (c: Context, session: string | undefined): RestAnswer | undefined => {
+    const key = perTeam(c, session ?? "");
     const now = clock();
     const calls = (recent.get(key) ?? []).filter((at) => now - at < 1000);
     calls.push(now);
@@ -243,11 +246,12 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     body: Record<string, unknown>,
     send: () => RestAnswer | Promise<RestAnswer>,
   ): Promise<RestAnswer> => {
-    const key = c.req.header("idempotency-key");
-    if (key === undefined) return send();
-    if (key.length === 0 || key.length > 256) {
+    const given = c.req.header("idempotency-key");
+    if (given === undefined) return send();
+    if (given.length === 0 || given.length > 256) {
       throw new ResendApiError(400, "invalid_idempotency_key", "The key must be between 1 and 256 characters.");
     }
+    const key = perTeam(c, given);
     const request = createHash("sha256").update(JSON.stringify(body)).digest("hex");
     const earlier = used.get(key);
     if (earlier && clock() - earlier.at < IDEMPOTENCY_MS) {
@@ -294,7 +298,7 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
   endpoint("post", "/emails", "emails.send", async (c, body) => {
     const input = sendInput(body);
     // Over the limit, nothing is sent and the key isn't used up: the agent may send again.
-    const refused = limited(world.checkSend(input, teamOf(c)).session);
+    const refused = limited(c, world.checkSend(input, teamOf(c)).session);
     if (refused) return refused;
     // The attachments are read last, and only for a send that happens: not for a refused one, nor a repeated key.
     return once(c, body, async () => {
@@ -312,7 +316,7 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     const inputs = items.map((item) => sendInput(item as Record<string, unknown>));
     // Every email is checked before any is sent: a batch is sent whole, or not at all.
     const checked = inputs.map((input) => world.checkSend(input, teamOf(c)));
-    const refused = limited(checked[0]?.session);
+    const refused = limited(c, checked[0]?.session);
     if (refused) return refused;
     const emails: ResendEmailRecord[] = [];
     for (const input of inputs) emails.push(await world.appSends(input, teamOf(c)));
