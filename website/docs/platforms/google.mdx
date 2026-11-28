@@ -103,6 +103,27 @@ A person's `id` is their address: `ana@example.com` unless the test gives one. T
 
 The standard checks register the same in one line: `googleChecks({ app: "my-agent" })`.
 
+## Several apps
+
+A test adds another app with `google.createApp({ name })`: a mailbox of its own, `<name>@acme.example`, with its own OAuth client, refresh token, Pub/Sub topic and push endpoint. Its pushes go to `CHANNELSTACK_GOOGLE_APP_<NAME>_WEBHOOK_URL`, which is also its tokens' audience; `channelstack env --app billing --channel google` prints its `GMAIL_ADDRESS`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_PUBSUB_TOPIC` and the rest. One app's client can't refresh another's token. See [several apps](/docs/guide/several-apps).
+
+An app's email to another lands in the other's mailbox and pushes to its endpoint. The sender's mailbox changes too (the `SENT` label), so its own watch pushes as well: an agent that reads every history change as new mail answers its own answer.
+
+As on Resend, the fake keeps every header a sender sets, so a test can check that an agent marks its answers with `Auto-Submitted` and leaves mail so marked unanswered:
+
+```ts
+const coder = await google.createApp({ name: "coder" });
+const ana = await google.createUser({ name: "Ana" });
+
+const email = await ana.send({ to: [coder], subject: "Refund", text: "Where is my refund?" });
+
+const answer = await ana.waitForEmail({ from: coder });
+expect(answer.headers["auto-submitted"]).toBe("auto-replied");
+await expect(email.thread).not.toHaveReplyFrom(google.app);
+```
+
+A test acts as an app it made with `coder.send` and `coder.reply`, through its mailbox's API; acting as `my-agent` is refused. `email.deliveryFor(coder)` reads another app's push.
+
 ## Live mode
 
 With the agent's OAuth client and refresh token set (`CHANNELSTACK_GOOGLE_CLIENT_ID`, `CHANNELSTACK_GOOGLE_CLIENT_SECRET`, `CHANNELSTACK_GOOGLE_REFRESH_TOKEN`), the same tests run against real Gmail. Each person is a Gmail account of their own, with a refresh token from the same OAuth client in `CHANNELSTACK_GOOGLE_USER_<NAME>_TOKEN`. Gmail pushes to the agent through its own Pub/Sub topic and subscription: channelstack never pushes live.

@@ -16,6 +16,7 @@
         "test/acceptance/stand-ins/*/*.ts",
         "test/acceptance/default-timeout/*.ts",
         "test/acceptance/wait-defaults/*.ts",
+        "test/acceptance/bot-loop/*.ts",
         "conformance/*.test.ts"
       ],
       "project": [

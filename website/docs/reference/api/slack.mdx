@@ -87,6 +87,60 @@ let users = slack.users().await?;
 
 **Returns** [`SlackUsers`](/docs/reference/api/slack#slackusers).
 
+### createApp()
+
+Make another app in the workspace, with its own bot user, tokens and signing secret (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_SLACK_APP_&lt;NAME>_WEBHOOK_URL, or over its own Socket Mode connection.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const app = await slack.createApp({ name: "…" });
+```
+
+```python title="Python"
+app = await slack.create_app(name="…")
+```
+
+```rust title="Rust"
+let app = slack.create_app().name("…").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `name` | `name` | `string` | yes | option |
+| `scopes` | `scopes` | `string[]` | no | option |
+| `botEvents` | `bot_events` | `string[]` | no | option |
+
+**Returns** [`SlackApp`](/docs/reference/api/slack#slackapp).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
+
+### apps()
+
+The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const apps = await slack.apps();
+```
+
+```python title="Python"
+apps = await slack.apps()
+```
+
+```rust title="Rust"
+let apps = slack.apps().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`SlackApps`](/docs/reference/api/slack#slackapps).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
+
 ### conversations()
 
 The session's conversations, the one with the newest message last.
@@ -149,18 +203,22 @@ Every event channelstack sent the agent for this session, with every attempt.
 <CodeGroup>
 
 ```ts title="TypeScript"
-const deliveries = await slack.deliveries();
+const deliveries = await slack.deliveries({ app });
 ```
 
 ```python title="Python"
-deliveries = await slack.deliveries()
+deliveries = await slack.deliveries(app=app)
 ```
 
 ```rust title="Rust"
-let deliveries = slack.deliveries().await?;
+let deliveries = slack.deliveries().app(&app).await?;
 ```
 
 </CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `app` | `SlackApp` | no | option |
 
 **Returns** [`SlackDeliveries`](/docs/reference/api/slack#slackdeliveries).
 
@@ -197,23 +255,27 @@ let api_calls = slack.calls().operation("…").await?;
 
 ### uninstallApp()
 
-The workspace uninstalls the app. Undone when this session closes; run such tests on their own.
+The workspace uninstalls an app: the built-in one, or the one given. Undone when this session closes; run such tests on their own.
 
 <CodeGroup>
 
 ```ts title="TypeScript"
-const uninstallDeliveries = await slack.uninstallApp();
+const uninstallDeliveries = await slack.uninstallApp({ app });
 ```
 
 ```python title="Python"
-uninstall_deliveries = await slack.uninstall_app()
+uninstall_deliveries = await slack.uninstall_app(app=app)
 ```
 
 ```rust title="Rust"
-let uninstall_deliveries = slack.uninstall_app().await?;
+let uninstall_deliveries = slack.uninstall_app().app(&app).await?;
 ```
 
 </CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `app` | `SlackApp` | no | option |
 
 **Returns** [`SlackUninstallDeliveries`](/docs/reference/api/slack#slackuninstalldeliveries).
 
@@ -250,6 +312,7 @@ let fault = slack.fault().r#type(r#type).await?;
 | `after` | `after` | `Duration` | no | option |
 | `error` | `error` | `string` | no | option |
 | `times` | `times` | `number` | no | option |
+| `app` | `app` | `SlackApp` | no | option |
 
 **Returns** [`SlackFault`](/docs/reference/api/slack#slackfault).
 
@@ -285,6 +348,8 @@ let api_call = slack.wait_for_call().operation("…").await?;
 
 ## SlackApp
 
+Returned by [`SlackFixture.createApp()`](/docs/reference/api/slack#createapp).
+
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
@@ -296,6 +361,131 @@ let api_call = slack.wait_for_call().operation("…").await?;
 | `appToken` | `app_token` | `string` |
 | `signingSecret` | `signing_secret` | `string` |
 | `scopes` | `scopes` | `string[]` |
+
+### say()
+
+An app a test made writes a top-level message, as its own chat.postMessage would: in a conversation it is a member of, or in a DM with the people in `to`.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const message = await app.say("…", { channel });
+```
+
+```python title="Python"
+message = await app.say("…", channel=channel)
+```
+
+```rust title="Rust"
+let message = app.say("…").channel(&channel).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `message` | `string \| SlackMessageInput` | yes | positional |
+| `channel` | `SlackConversation` | no | option |
+| `to` | `SlackUser \| SlackApp \| Array<SlackUser \| SlackApp>` | no | option |
+
+**Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage).
+
+**Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`cannot_dm_bot`](/docs/reference/api/errors#cannot-dm-bot), [`no_text`](/docs/reference/api/errors#no-text), [`msg_too_long`](/docs/reference/api/errors#msg-too-long).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
+
+### reply()
+
+An app a test made replies in a thread: pass the message that starts it, or any reply in it.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const message = await app.reply("…", { thread });
+```
+
+```python title="Python"
+message = await app.reply("…", thread=thread)
+```
+
+```rust title="Rust"
+let message = app.reply("…").thread(&thread).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `message` | `string \| SlackMessageInput` | yes | positional |
+| `thread` | `SlackThread \| SlackMessage` | yes | option |
+
+**Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage).
+
+**Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`no_text`](/docs/reference/api/errors#no-text), [`msg_too_long`](/docs/reference/api/errors#msg-too-long).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
+
+### react()
+
+An app a test made reacts to a message.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.react("…", { message });
+```
+
+```python title="Python"
+delivery = await app.react("…", message=message)
+```
+
+```rust title="Rust"
+let delivery = app.react("…").message(&message).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `emoji` | `string` | yes | positional |
+| `message` | `SlackMessage` | yes | option |
+
+**Returns** [`SlackDelivery | undefined`](/docs/reference/api/slack#slackdelivery).
+
+**Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`already_reacted`](/docs/reference/api/errors#already-reacted).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
+
+### unreact()
+
+An app a test made takes its reaction back.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.unreact("…", { message });
+```
+
+```python title="Python"
+delivery = await app.unreact("…", message=message)
+```
+
+```rust title="Rust"
+let delivery = app.unreact("…").message(&message).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `emoji` | `string` | yes | positional |
+| `message` | `SlackMessage` | yes | option |
+
+**Returns** [`SlackDelivery | undefined`](/docs/reference/api/slack#slackdelivery).
+
+**Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`no_reaction`](/docs/reference/api/errors#no-reaction).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
 
 ## SlackUser
 
@@ -496,7 +686,7 @@ let delivery = user.select(option).menu("…").message(&message).await?;
 
 ### shortcut()
 
-Run a message shortcut on a message.
+Run an app's message shortcut on a message: it goes to that app alone.
 
 <CodeGroup>
 
@@ -518,6 +708,7 @@ let delivery = user.shortcut("…").message(&message).await?;
 |---|---|---|---|---|
 | `callbackId` | `callback_id` | `string` | yes | positional |
 | `message` | `message` | `SlackMessage` | yes | option |
+| `app` | `app` | `SlackApp` | no | option |
 
 **Returns** [`SlackDelivery`](/docs/reference/api/slack#slackdelivery).
 
@@ -527,7 +718,7 @@ let delivery = user.shortcut("…").message(&message).await?;
 
 ### runCommand()
 
-Run a slash command in a conversation, e.g. `/deploy web staging`.
+Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone.
 
 <CodeGroup>
 
@@ -549,6 +740,7 @@ let delivery = user.run_command("…").channel(&channel).await?;
 |---|---|---|---|
 | `command` | `string` | yes | positional |
 | `channel` | `SlackConversation` | yes | option |
+| `app` | `SlackApp` | no | option |
 
 **Returns** [`SlackDelivery`](/docs/reference/api/slack#slackdelivery).
 
@@ -588,7 +780,7 @@ let delivery = user.stop().thread(&thread).await?;
 
 ### openAgentThread()
 
-Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at.
+Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at.
 
 <CodeGroup>
 
@@ -609,6 +801,7 @@ let thread = user.open_agent_thread().from(&from).await?;
 | Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `SlackConversation` | no | option |
+| `app` | `app` | `SlackApp` | no | option |
 
 **Returns** [`SlackThread`](/docs/reference/api/slack#slackthread).
 
@@ -895,6 +1088,149 @@ let modal = user.wait_for_modal().await?;
 
 **Returns** [`SlackModal`](/docs/reference/api/slack#slackmodal). When the time is up, it fails with what it was waiting for.
 
+## SlackMessage
+
+Returned by [`SlackApp.say()`](/docs/reference/api/slack#say), [`SlackApp.reply()`](/docs/reference/api/slack#reply), [`SlackUser.say()`](/docs/reference/api/slack#say-1), [`SlackUser.reply()`](/docs/reference/api/slack#reply-1).
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `channel` | `channel` | `string` |
+| `ts` | `ts` | `string` |
+| `conversation` | `conversation` | `SlackConversation` |
+| `author` | `author` | `SlackUser \| SlackApp` |
+| `text` | `text` | `string` |
+| `blocks` | `blocks` | `unknown[]` |
+| `files` | `files` | `string[]` |
+| `postedAt` | `posted_at` | `string` |
+| `threadTs` | `thread_ts` | `string \| undefined` |
+| `edited` | `edited` | `boolean` |
+| `visibleTo` | `visible_to` | `SlackUser \| undefined` |
+| `thread` | `thread` | `SlackThread` |
+| `delivery` | `delivery` | `SlackDelivery \| undefined` |
+| `stream` | `stream` | `SlackStream \| undefined` |
+
+### refresh()
+
+Re-read a message: its latest text, edits and deliveries.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const updated = await message.refresh();
+```
+
+```python title="Python"
+updated = await message.refresh()
+```
+
+```rust title="Rust"
+let updated = message.refresh().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage).
+
+### reactions()
+
+The reactions on a message, and who added each.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const reactions = await message.reactions();
+```
+
+```python title="Python"
+reactions = await message.reactions()
+```
+
+```rust title="Rust"
+let reactions = message.reactions().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`SlackReactions`](/docs/reference/api/slack#slackreactions).
+
+### transcript()
+
+A message and the replies under it as a person would read them.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const transcript = await message.transcript({ as });
+```
+
+```python title="Python"
+transcript = await message.transcript(as_=as_)
+```
+
+```rust title="Rust"
+let transcript = message.transcript().r#as(&r#as).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `as` | `as_` · `r#as` | `SlackUser \| SlackApp` | no | option |
+
+**Returns** [`SlackTranscript`](/docs/reference/api/slack#slacktranscript).
+
+### deliveryFor()
+
+The first delivery this message caused to this app (decision 0027), or nothing when it wasn't told.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await message.deliveryFor(app);
+```
+
+```python title="Python"
+delivery = await message.delivery_for(app)
+```
+
+```rust title="Rust"
+let delivery = message.delivery_for(&app).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `app` | `SlackApp` | yes | positional |
+
+**Returns** [`SlackDelivery | undefined`](/docs/reference/api/slack#slackdelivery).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
+
+### deliveries()
+
+Every delivery this message caused to the agent.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const messageDeliveries = await message.deliveries();
+```
+
+```python title="Python"
+message_deliveries = await message.deliveries()
+```
+
+```rust title="Rust"
+let message_deliveries = message.deliveries().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`SlackMessageDeliveries`](/docs/reference/api/slack#slackmessagedeliveries).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
+
 ## SlackConversation
 
 Returned by [`SlackFixture.createChannel()`](/docs/reference/api/slack#createchannel), [`SlackUser.openDM()`](/docs/reference/api/slack#opendm).
@@ -1023,121 +1359,6 @@ let message = conversation.wait_for_message().from("my-agent").await?;
 | `timeout` | `timeout` | `Duration` | no | default 10s |
 
 **Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage). When the time is up, it fails with what it was waiting for.
-
-## SlackMessage
-
-Returned by [`SlackUser.say()`](/docs/reference/api/slack#say), [`SlackUser.reply()`](/docs/reference/api/slack#reply), [`SlackUser.edit()`](/docs/reference/api/slack#edit), [`SlackUser.pickPrompt()`](/docs/reference/api/slack#pickprompt).
-
-| Field | Python / Rust | Type |
-|---|---|---|
-| `channel` | `channel` | `string` |
-| `ts` | `ts` | `string` |
-| `conversation` | `conversation` | `SlackConversation` |
-| `author` | `author` | `SlackUser \| SlackApp` |
-| `text` | `text` | `string` |
-| `blocks` | `blocks` | `unknown[]` |
-| `files` | `files` | `string[]` |
-| `postedAt` | `posted_at` | `string` |
-| `threadTs` | `thread_ts` | `string \| undefined` |
-| `edited` | `edited` | `boolean` |
-| `visibleTo` | `visible_to` | `SlackUser \| undefined` |
-| `thread` | `thread` | `SlackThread` |
-| `delivery` | `delivery` | `SlackDelivery \| undefined` |
-| `stream` | `stream` | `SlackStream \| undefined` |
-
-### refresh()
-
-Re-read a message: its latest text, edits and deliveries.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const updated = await message.refresh();
-```
-
-```python title="Python"
-updated = await message.refresh()
-```
-
-```rust title="Rust"
-let updated = message.refresh().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage).
-
-### reactions()
-
-The reactions on a message, and who added each.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const reactions = await message.reactions();
-```
-
-```python title="Python"
-reactions = await message.reactions()
-```
-
-```rust title="Rust"
-let reactions = message.reactions().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`SlackReactions`](/docs/reference/api/slack#slackreactions).
-
-### transcript()
-
-A message and the replies under it as a person would read them.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const transcript = await message.transcript({ as });
-```
-
-```python title="Python"
-transcript = await message.transcript(as_=as_)
-```
-
-```rust title="Rust"
-let transcript = message.transcript().r#as(&r#as).await?;
-```
-
-</CodeGroup>
-
-| Parameter | Python / Rust | Type | Required |  |
-|---|---|---|---|---|
-| `as` | `as_` · `r#as` | `SlackUser \| SlackApp` | no | option |
-
-**Returns** [`SlackTranscript`](/docs/reference/api/slack#slacktranscript).
-
-### deliveries()
-
-Every delivery this message caused to the agent.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const messageDeliveries = await message.deliveries();
-```
-
-```python title="Python"
-message_deliveries = await message.deliveries()
-```
-
-```rust title="Rust"
-let message_deliveries = message.deliveries().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`SlackMessageDeliveries`](/docs/reference/api/slack#slackmessagedeliveries).
-
-**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
 
 ## SlackThread
 
@@ -1324,12 +1545,13 @@ let message = thread.latest_reply().from("my-agent").await?;
 
 ## SlackDelivery
 
-Returned by [`SlackUser.click()`](/docs/reference/api/slack#click), [`SlackUser.select()`](/docs/reference/api/slack#select), [`SlackUser.shortcut()`](/docs/reference/api/slack#shortcut), [`SlackUser.runCommand()`](/docs/reference/api/slack#runcommand).
+Returned by [`SlackApp.react()`](/docs/reference/api/slack#react), [`SlackApp.unreact()`](/docs/reference/api/slack#unreact), [`SlackUser.click()`](/docs/reference/api/slack#click), [`SlackUser.select()`](/docs/reference/api/slack#select).
 
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"slack"` |
+| `app` | `app` | `string` |
 | `type` | `type` · `r#type` | `string` |
 | `eventType` | `event_type` | `string \| undefined` |
 | `eventId` | `event_id` | `string \| undefined` |
@@ -1643,16 +1865,10 @@ Plain values the handles return and take.
 | `id` | `string` |
 | `name` | `string` |
 
-### SlackUsers
+### SlackApps
 
 ```ts
-type SlackUsers = SlackUser[];
-```
-
-### SlackConversations
-
-```ts
-type SlackConversations = SlackConversation[];
+type SlackApps = SlackApp[];
 ```
 
 ### SlackMessageInput
@@ -1669,6 +1885,18 @@ type SlackConversations = SlackConversation[];
 |---|---|
 | `event_type` | `string` |
 | `event_payload` | `Record<string, unknown>` |
+
+### SlackUsers
+
+```ts
+type SlackUsers = SlackUser[];
+```
+
+### SlackConversations
+
+```ts
+type SlackConversations = SlackConversation[];
+```
 
 ### SlackButtonRef
 

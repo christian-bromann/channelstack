@@ -306,7 +306,7 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
       },
       {
         "name": "shortcut",
-        "summary": "Run a message shortcut on a message",
+        "summary": "Run an app's message shortcut on a message: it goes to that app alone",
         "method": "POST",
         "path": "/users/{user}/shortcut",
         "params": [
@@ -330,12 +330,24 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
             "optional": false,
             "in": "body",
             "positional": false
+          },
+          {
+            "name": "app",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "SlackApp"
+              ]
+            },
+            "optional": true,
+            "in": "body",
+            "positional": false
           }
         ]
       },
       {
         "name": "runCommand",
-        "summary": "Run a slash command in a conversation, e.g. `/deploy web staging`",
+        "summary": "Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone",
         "method": "POST",
         "path": "/users/{user}/commands",
         "params": [
@@ -357,6 +369,18 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
               ]
             },
             "optional": false,
+            "in": "body",
+            "positional": false
+          },
+          {
+            "name": "app",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "SlackApp"
+              ]
+            },
+            "optional": true,
             "in": "body",
             "positional": false
           }
@@ -385,7 +409,7 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
       },
       {
         "name": "openAgentThread",
-        "summary": "Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at",
+        "summary": "Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at",
         "method": "POST",
         "path": "/users/{user}/agent-threads",
         "params": [
@@ -395,6 +419,18 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
               "kind": "ref",
               "resources": [
                 "SlackConversation"
+              ]
+            },
+            "optional": true,
+            "in": "body",
+            "positional": false
+          },
+          {
+            "name": "app",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "SlackApp"
               ]
             },
             "optional": true,
@@ -1826,7 +1862,7 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
       },
       {
         "name": "delegate",
-        "summary": "Delegate an issue to the app. Opens an agent session and sends `AgentSessionEvent` (`created`)",
+        "summary": "Delegate an issue to an app. Opens that app's agent session and sends it `AgentSessionEvent` (`created`); an issue delegated to another app moves",
         "method": "POST",
         "path": "/users/{user}/delegate",
         "params": [
@@ -2557,7 +2593,7 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
     "actions": [
       {
         "name": "send",
-        "summary": "The person emails someone: the agent (`resend.app`), or another person",
+        "summary": "The person emails someone: the agent (`resend.app`), another app, or another person",
         "method": "POST",
         "path": "/users/{user}/send",
         "params": [
@@ -2677,7 +2713,7 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
     "actions": [
       {
         "name": "send",
-        "summary": "The person emails someone: the agent (`google.app`), or another person",
+        "summary": "The person emails someone: the agent (`google.app`), another app, or another person",
         "method": "POST",
         "path": "/users/{user}/send",
         "params": [
@@ -3084,7 +3120,7 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
       },
       {
         "name": "runCommand",
-        "summary": "Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`",
+        "summary": "Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it",
         "method": "POST",
         "path": "/users/{user}/commands",
         "params": [
@@ -3106,6 +3142,18 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
               ]
             },
             "optional": false,
+            "in": "body",
+            "positional": false
+          },
+          {
+            "name": "app",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordApp"
+              ]
+            },
+            "optional": true,
             "in": "body",
             "positional": false
           }

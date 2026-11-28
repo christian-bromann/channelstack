@@ -201,6 +201,8 @@ pub struct QuietState {
     pub open: Vec<String>,
     /// What should fail a test at once: a model call no script answered (decision 0029).
     pub problems: Vec<String>,
+    /// The bot loops the fake stopped in the session (decision 0027), in words.
+    pub loops: Vec<String>,
 }
 
 /// The session's model problems as the error a wait stops with.
@@ -223,18 +225,20 @@ impl QuietState {
                 .get("quietForMs")
                 .and_then(Value::as_f64)
                 .unwrap_or(0.0),
-            open: strings(state.get("open")),
-            problems: strings(state.get("problems")),
+            open: words(state, "open"),
+            problems: words(state, "problems"),
+            loops: words(state, "loops"),
         }
     }
 }
 
-/// A list of strings the server answered, or none.
-fn strings(list: Option<&Value>) -> Vec<String> {
-    list.and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
+/// A list of words the server answered under `key`, or none.
+fn words(state: &Value, key: &str) -> Vec<String> {
+    state
+        .get(key)
+        .and_then(Value::as_array)
+        .map(|list| {
+            list.iter()
                 .filter_map(|item| item.as_str().map(str::to_owned))
                 .collect()
         })
@@ -501,6 +505,7 @@ mod tests {
                 quiet_for_ms: 0.0,
                 open: vec!["a stream my-agent never stopped".into()],
                 problems: vec![],
+                loops: vec![],
             })
         };
         let gave_up = super::until_quiet(busy, &json!("120ms"), &json!("50ms"), false)
@@ -521,6 +526,7 @@ mod tests {
                 quiet_for_ms: 60_000.0,
                 open: vec![],
                 problems: vec![],
+                loops: vec![],
             })
         };
         let started = std::time::Instant::now();

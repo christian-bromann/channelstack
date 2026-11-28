@@ -42,6 +42,10 @@ const PROXY = {
  * The examples against each reference agent (all, or these), then `shared.test.ts` with one agent
  * per channel (`shared`, by default only when every agent runs).
  */
+/** The examples that need a second app, and its name. */
+const SEVERAL_APPS = "several apps > ";
+const SECOND_APP = "coder";
+
 export async function runExamples(
   options: { agents?: readonly string[]; shared?: boolean; bin?: string } = {},
 ): Promise<void> {
@@ -55,7 +59,11 @@ export async function runExamples(
     const { enabled, suites } = HARNESS[channel];
     console.log(`\ntest/acceptance/examples against ${name}`);
     const agent = join(ROOT, "examples", "agents", name, "agent.ts");
-    await withStack({ bin, agent, webhook: { driver: channel, path } }, ({ env }) => {
+    // A channel's "several apps" examples run the same agent a second time, as the app `coder` (decision 0027).
+    const others = enabled.some((pattern) => pattern.startsWith(SEVERAL_APPS))
+      ? [{ agent, webhook: { driver: channel, path }, app: SECOND_APP }]
+      : [];
+    await withStack({ bin, agent, webhook: { driver: channel, path }, others }, ({ env }) => {
       const vitest = ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts"];
       run("pnpm", [...vitest, examples, "-t", `^(${enabled.join("|")})`], { cwd: ROOT, env });
       for (const suite of suites) run("pnpm", [...vitest, suite], { cwd: ROOT, env });

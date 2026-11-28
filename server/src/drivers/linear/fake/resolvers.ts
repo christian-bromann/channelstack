@@ -1,4 +1,10 @@
-import type { LinearCommentRecord, LinearIssueRecord, LinearSessionRecord, LinearTeamRecord } from "../world.ts";
+import type {
+  LinearAppRecord,
+  LinearCommentRecord,
+  LinearIssueRecord,
+  LinearSessionRecord,
+  LinearTeamRecord,
+} from "../world.ts";
 import { LinearError, notFound } from "./graphql.ts";
 import { type LinearCallContext, linearModels } from "./models.ts";
 import type { FakeLinearWorld } from "./world.ts";
@@ -6,16 +12,16 @@ import type { FakeLinearWorld } from "./world.ts";
 type Args = Record<string, any>;
 
 /**
- * The root of Linear's GraphQL API, as the agent's app sees it: the queries and mutations an agent
- * uses. The app is installed workspace-wide, so it reads every team. A root field the fake doesn't
- * serve answers with GraphQL's own error for a missing value.
+ * The root of Linear's GraphQL API, as the app whose token made the call sees it: the queries and
+ * mutations an agent uses, answered as that app (`viewer`, and the actor of what it writes). Every
+ * app is installed workspace-wide, so it reads every team. A root field the fake doesn't serve
+ * answers with GraphQL's own error for a missing value. `sync` counts the workspace's changes.
  */
-export function linearResolvers(world: FakeLinearWorld) {
+export function linearResolvers(world: FakeLinearWorld, caller: LinearAppRecord, sync: () => number) {
   const { store } = world;
-  const models = linearModels(world);
-  const app = () => store.appUser.id;
-  let syncId = 1000;
-  const sync = () => ++syncId;
+  const viewer = store.appUserOf(caller);
+  const models = linearModels(world, viewer);
+  const app = () => viewer.id;
 
   /** An issue by its UUID or its identifier (`ENG-12`), as Linear takes either. */
   const issueBy = (id: string): LinearIssueRecord => {
@@ -33,7 +39,10 @@ export function linearResolvers(world: FakeLinearWorld) {
     if (!comment) throw notFound("Comment");
     return comment;
   };
-  /** A session of the app: an app can publish to its own sessions only. */
+  /**
+   * A session of the calling app: an app can publish to and update its own sessions only, not
+   * another app's (decision 0027; Linear's error for it is to confirm, B4).
+   */
   const sessionBy = (id: string): LinearSessionRecord => {
     const session = store.sessions.find(id);
     if (!session) throw notFound("AgentSession");
@@ -50,14 +59,14 @@ export function linearResolvers(world: FakeLinearWorld) {
   };
 
   const Query = {
-    viewer: () => models.user(store.appUser),
+    viewer: () => models.user(viewer),
     organization: () => models.organization(),
     user: ({ id }: Args) => {
-      const user = id === "me" ? store.appUser : store.user(id);
+      const user = id === "me" ? viewer : store.user(id);
       if (!user) throw notFound("User");
       return models.user(user);
     },
-    users: (args: Args) => models.listOf([store.appUser, ...store.all(store.users)].map(models.user))(args),
+    users: (args: Args) => models.listOf([...store.appUsers(), ...store.all(store.users)].map(models.user))(args),
     team: ({ id }: Args) => models.team(teamBy(id)),
     teams: (args: Args) => models.listOf(store.all(store.teams).map((team) => models.team(team)))(args),
     issue: ({ id }: Args) => models.issue(issueBy(id)),

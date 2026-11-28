@@ -102,6 +102,8 @@ class QuietState:
     """What is still open, in words: a delivery in flight or about to be retried, a stream the agent never stopped."""
     problems: Sequence[str] = ()
     """What should fail a test at once: a model call no script answered (decision 0029)."""
+    loops: Sequence[str] = ()
+    """The bot loops the fake stopped in the session (decision 0027), in words."""
 
 
 class ModelProblemError(Exception):

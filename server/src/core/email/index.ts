@@ -114,15 +114,16 @@ export function replyOf(person: { readonly address: string }, to: Answerable, al
 }
 
 /**
- * Who wrote an email, as a transcript names them: the app, a person (by `person`, from the author's
- * id), or for an address no one in the world has, the address itself.
+ * Who wrote an email, as a transcript names them: one of the channel's apps, a person (by `person`,
+ * from the author's id), or for an address no one in the world has, the address itself.
  */
 export function emailAuthor(
   email: { readonly author: string | undefined; readonly from: Mailbox },
-  app: { readonly id: string; readonly name: string },
+  apps: readonly { readonly id: string; readonly name: string }[],
   person: (id: string) => { readonly id: string; readonly name: string } | undefined,
 ): TranscriptPrincipal {
-  if (email.author === app.id) return { id: app.id, name: app.name, kind: "app" };
+  const app = apps.find((each) => each.id === email.author);
+  if (app) return { id: app.id, name: app.name, kind: "app" };
   const found = email.author === undefined ? undefined : person(email.author);
   if (found) return { id: found.id, name: found.name, kind: "user" };
   return { id: email.from.address, name: email.from.name || email.from.address, kind: "user" };

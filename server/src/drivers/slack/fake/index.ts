@@ -1,7 +1,7 @@
 import type { DriverContext, FakeBackend } from "../../../core/router/index.ts";
 import { SLACK_IDS } from "../ids.ts";
 import { createSlackApi } from "./api.ts";
-import { createSocketMode } from "./socket.ts";
+import { createSocketModes } from "./socket.ts";
 import { SlackStore } from "./store.ts";
 import { createFakeWorld, type FakeSlackWorld } from "./world.ts";
 
@@ -57,8 +57,8 @@ export interface SlackFake extends FakeBackend {
 /** The Slack fake: the Web API over an in-memory store, wired to core's ids, event log and delivery queue. */
 export function createSlackFake(context: DriverContext): SlackFake {
   const store = new SlackStore(context.registry);
-  const socket = createSocketMode(context, () => store.app.id);
-  const world = createFakeWorld(context, store, socket);
+  const socket = createSocketModes(context);
+  const world = createFakeWorld(context, store, socket, DEFAULT_APP);
   const fake = {
     api: createSlackApi(context, store, world, socket),
     socket: socket.accept,

@@ -178,7 +178,8 @@ async function settle<T>(
   if (pass !== state.isNot) return { pass, message: () => options.describe(value) };
   // A failed check also says what the agent left open (a stream it never stopped): often that is the bug.
   const open = await stillOpen(subject);
-  const leftover = open.length === 0 ? "" : `\nStill open: ${open.join("; ")}`;
+  const loops = await stoppedLoops(subject);
+  const leftover = `${open.length === 0 ? "" : `\nStill open: ${open.join("; ")}`}${loops.length === 0 ? "" : `\nStopped: ${loops.join("; ")}`}`;
   return failing(subject, state, `${options.describe(value)}${leftover}`);
 }
 
@@ -300,6 +301,18 @@ async function stillOpen(subject: unknown): Promise<string[]> {
   }
 }
 
+/** The bot loops the fake stopped in the subject's session (decision 0027), in words. */
+async function stoppedLoops(subject: unknown): Promise<string[]> {
+  const handle = subject as Partial<InSession>;
+  if (typeof handle[QUIET] !== "function") return [];
+  try {
+    return (await unreportedRefusals(() => (handle as InSession)[QUIET]())).loops ?? [];
+  } catch (error) {
+    if (error instanceof ChannelstackError) return [];
+    throw error;
+  }
+}
+
 const from = (author: AuthorRef, text?: string | RegExp) => (message: Message) =>
   fromMatches(message.author, author) && textMatches(message.text, text);
 
@@ -363,7 +376,72 @@ const commentFrom = (author: AuthorRef, text?: string | RegExp) => (comment: Com
 const written = (comments: readonly Comment[]) =>
   listing(comments.map((comment) => `${comment.author.name}: ${commentText(comment)}`));
 
+/** Who wrote each message of a conversation, oldest first: its replies, its transcript, or its comments. */
+async function writersOf(subject: unknown): Promise<readonly { name: string; app: boolean }[]> {
+  const handle = subject as { replies?: unknown; transcript?: unknown; comments?: () => Promise<Comment[]> };
+  const authors =
+    typeof handle.replies === "function" || typeof handle.transcript === "function"
+      ? (await messagesOf(subject)).map((message) => message.author)
+      : typeof handle.comments === "function"
+        ? (await handle.comments()).map((comment) => comment.author)
+        : undefined;
+  if (authors === undefined)
+    throw new TypeError("toGoQuiet needs a thread, a conversation, or something with comments");
+  return authors.map((author) => ({ name: author.name, app: (author as { kind?: string }).kind === "app" }));
+}
+
+/**
+ * The app messages of a conversation since a person last wrote in it, those before a check began
+ * included, and their authors in turn (`my-agent → coder → my-agent`): what `toGoQuiet` and each
+ * `<channel>.no-reply-loop` name when apps answer each other (decision 0027).
+ */
+export async function appTurns(subject: unknown): Promise<{ count: number; turns: string }> {
+  const writers = await writersOf(subject);
+  const since = writers.slice(writers.findLastIndex((writer) => !writer.app) + 1);
+  return { count: since.length, turns: since.map((writer) => writer.name).join(" → ") };
+}
+
 export const matchers = {
+  /**
+   * The conversation goes quiet within `within`, holding at most `maxReplies` app messages since
+   * a person last wrote in it, those before the check began included: apps that answer each other
+   * without end fail it (decision 0027).
+   */
+  async toGoQuiet(
+    state: MatcherState,
+    subject: unknown,
+    options: { within?: Duration; maxReplies: number; quietFor?: Duration },
+  ) {
+    const handle = subject as Partial<InSession>;
+    if (typeof handle[QUIET] !== "function") throw new TypeError("This matcher needs a channelstack handle");
+    const within = options.within ?? state.timeout;
+    let quiet = true;
+    try {
+      await untilQuiet(() => (handle as InSession)[QUIET](), {
+        timeout: within,
+        quietFor: options.quietFor ?? state.quietFor,
+        watching: true,
+      });
+    } catch (error) {
+      if (!(error instanceof WaitTimeoutError)) throw error;
+      quiet = false;
+    }
+    const since = await appTurns(subject);
+    const pass = quiet && since.count <= options.maxReplies;
+    const turns = since.count === 0 ? "" : `: ${since.turns}`;
+    const open = pass === state.isNot ? await stillOpen(subject) : [];
+    const loops = pass === state.isNot ? await stoppedLoops(subject) : [];
+    return {
+      pass,
+      message: () =>
+        `Expected the conversation ${state.isNot ? "not " : ""}to go quiet within ${typeof within === "number" ? `${within}ms` : within} with at most ${options.maxReplies} app ${options.maxReplies === 1 ? "message" : "messages"} since a person last wrote. ${
+          quiet ? "It went quiet" : "It was still busy"
+        } with ${since.count} app ${since.count === 1 ? "message" : "messages"} and no person between them${turns}${
+          open.length === 0 ? "" : `\nStill open: ${open.join("; ")}`
+        }${loops.length === 0 ? "" : `\nStopped: ${loops.join("; ")}`}`,
+    };
+  },
+
   /** The thread (or DM) has at least one reply from this author. */
   toHaveReplyFrom(
     state: MatcherState,

@@ -1,6 +1,8 @@
 import { z } from "@hono/zod-openapi";
 
+import { BUILT_IN_APP, HANDLE_ONLY } from "../../core/apps/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
+import { deliveryTo } from "../../core/delivery/kit.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport, type Reality } from "../../core/reality/index.ts";
@@ -52,9 +54,7 @@ const DiscordApp = z
     kind: z.literal("app"),
     channel: z.literal("discord"),
     botUserId: z.string(),
-    botToken: z
-      .string()
-      .openapi({ description: "The bot token the agent logs in with. Empty live: it stays on the server." }),
+    botToken: z.string().openapi({ description: `The bot token the agent logs in with. ${HANDLE_ONLY}` }),
     publicKey: z
       .string()
       .openapi({ description: "The application's public key, which interactions are verified with." }),
@@ -79,6 +79,7 @@ const DiscordDelivery = z
   .object({
     id: z.string(),
     channel: z.literal("discord"),
+    app: z.string().openapi({ description: "The app it went to, by name: `my-agent`, or another (decision 0027)." }),
     type: z
       .string()
       .openapi({ description: "The Gateway event (`MESSAGE_CREATE`, `INTERACTION_CREATE`, …), or `PING`." }),
@@ -105,7 +106,7 @@ const DiscordMessage = z
     thread: DiscordChannel.optional(),
     /** For an ephemeral response: the only person who sees it. */
     visibleTo: DiscordUser.optional(),
-    /** The Gateway dispatch that told the bot of it (`MESSAGE_CREATE`). */
+    /** The Gateway dispatch that told the built-in app's bot of it (`MESSAGE_CREATE`); another app's is `deliveryFor(app)`. */
     delivery: DiscordDelivery.optional(),
   })
   .openapi("DiscordMessage", { "x-channelstack-resource": { id: ["channelId", "id"] } });
@@ -139,6 +140,7 @@ const channelRef = z.string().openapi(refTo("DiscordChannel"));
 const messageRef = z.object({ channelId: z.string(), id: z.string() }).openapi(refTo("DiscordMessage"));
 
 const UserParams = z.object({ user: pathParam("user") });
+const AppParams = z.object({ app: pathParam("app") });
 const ChannelParams = z.object({ channel: pathParam("channel") });
 const MessageParams = ChannelParams.extend({ message: pathParam("message") });
 const messageBinding = { channel: "channelId", message: "id" };
@@ -158,6 +160,10 @@ const FAULTS: LiveSupport = {
   unsupported:
     "a fault changes what the bot's calls and its Gateway connection get, and live nothing sits between the bot and Discord: its Gateway doesn't go through the proxy",
 };
+/** Live, the guild holds only the app channelstack has credentials for: decision 0027's live apps aren't built yet (#111). */
+const APPS_NOT_YET: LiveSupport = {
+  unsupported: "not yet: live, the guild holds only the app channelstack has credentials for",
+};
 const PORTAL: LiveSupport = {
   unsupported: "Discord checks an interactions endpoint when it is saved in the developer portal, which no API does",
 };
@@ -171,8 +177,10 @@ export function registerDiscordRoutes(
     reality: () => Reality;
     events: EventLog;
     apiUrl: () => string;
-    secret: (name: string) => string;
-    publicKey: () => string;
+    /** One of an app's secrets: the built-in app's unless another is named. */
+    secret: (name: string, app?: string) => string;
+    /** An app's public key: the built-in app's unless another is named. */
+    publicKey: (app?: string) => string;
   },
 ): void {
   const { fake } = deps;
@@ -189,19 +197,31 @@ export function registerDiscordRoutes(
     isAdmin: user.admin,
     isBot: user.bot,
   });
+  /**
+   * An app as an author or a member: who it is, without its bot token. Only the app a test asks
+   * for (the fixture's, `createApp`, `apps()`) carries it: `appHandle`.
+   */
   const appWire = (app: DiscordAppRecord) => ({
     id: app.id,
     name: app.name,
     kind: "app" as const,
     channel: "discord" as const,
     botUserId: app.botUserId,
-    // A live bot's token stays on the server: the control API never returns it.
-    botToken: isLive() ? "" : deps.secret("botToken"),
-    publicKey: isLive() ? "" : deps.publicKey(),
+    botToken: "",
+    publicKey: isLive() ? "" : deps.publicKey(app.name),
     guildId: world.guild().id,
   });
-  const participantWire = (session: string, id: string) =>
-    id === world.app().botUserId ? appWire(world.app()) : userWire(world.user(session, id));
+  // A live bot's token stays on the server: the control API never returns it.
+  const appHandle = (app: DiscordAppRecord) => ({
+    ...appWire(app),
+    botToken: isLive() ? "" : deps.secret("botToken", app.name),
+  });
+  /** The app whose bot this is: live, only the built-in one. */
+  const appOf = (id: string) => (id === world.app().botUserId ? world.app() : isLive() ? undefined : fake.appOf(id));
+  const participantWire = (session: string, id: string) => {
+    const app = appOf(id);
+    return app ? appWire(app) : userWire(world.user(session, id));
+  };
   const channelWire = (channel: DiscordChannelRecord) => ({
     id: channel.id,
     kind: channel.kind,
@@ -213,6 +233,7 @@ export function registerDiscordRoutes(
   const deliveryWire = ({ request, attempts }: DeliveryView) => ({
     id: request.id,
     channel: "discord" as const,
+    app: request.app ?? BUILT_IN_APP,
     type: request.type,
     payload: request.meta?.payload,
     attempts,
@@ -230,7 +251,7 @@ export function registerDiscordRoutes(
   };
   const principal = (session: string) => (id: string) => {
     const name = mentionName(session)(id);
-    return { id, name: name ?? id, kind: id === world.app().botUserId ? ("app" as const) : ("user" as const) };
+    return { id, name: name ?? id, kind: appOf(id) ? ("app" as const) : ("user" as const) };
   };
   const plainText = (session: string, message: DiscordMessageRecord) =>
     renderTranscript([{ message: { ...message, ephemeralFor: undefined }, depth: 0 }], {
@@ -238,7 +259,6 @@ export function registerDiscordRoutes(
       principal: principal(session),
       mentionName: mentionName(session),
       replyAuthor: () => undefined,
-      appName: world.app().name,
     }).entries[0]?.text ?? "";
 
   const messageWire = async (session: string, message: DiscordMessageRecord) => {
@@ -258,12 +278,18 @@ export function registerDiscordRoutes(
       replyTo: message.replyTo,
       thread: thread ? channelWire(thread) : undefined,
       visibleTo: message.ephemeralFor === undefined ? undefined : userWire(world.user(session, message.ephemeralFor)),
-      // Only the fake delivers: a live message never has a delivery here.
-      delivery:
-        deps.live || message.deliveries[0] === undefined
-          ? undefined
-          : deliveryWire(fake.delivery(session, message.deliveries[0])),
+      // Only the fake delivers: a live message never has a delivery here. It is the first to the
+      // built-in app; another app's are `msg.deliveryFor(app)` (decision 0027).
+      delivery: deps.live ? undefined : deliveryOf(session, message.deliveries),
     };
+  };
+  /** A message's delivery to this app (core's pick among those it caused), as a test reads it. */
+  const deliveryOf = (session: string, ids: readonly string[], app?: string) => {
+    const record = deliveryTo(
+      ids.map((id) => fake.delivery(session, id)),
+      app,
+    );
+    return record && deliveryWire(record);
   };
   const messagesWire = (session: string, messages: readonly DiscordMessageRecord[]) =>
     Promise.all(messages.map((message) => messageWire(session, message)));
@@ -288,7 +314,6 @@ export function registerDiscordRoutes(
       principal: principal(session),
       mentionName: mentionName(session),
       replyAuthor,
-      appName: world.app().name,
     });
   };
 
@@ -316,7 +341,7 @@ export function registerDiscordRoutes(
     factory: { on: "Session", name: "discord" },
     stability,
     handler: () => ({
-      app: appWire(world.app()),
+      app: appHandle(world.app()),
       apiUrl: isLive() ? "https://discord.com/api" : `${deps.apiUrl()}/api`,
       guild: { id: world.guild().id, name: world.guild().name },
       gatewayConnections: world.gatewayConnections(),
@@ -352,6 +377,119 @@ export function registerDiscordRoutes(
     stability,
     handler: async ({ session, body }) => userWire(await world.createUser(session.id, body)),
   });
+
+  router.route({
+    method: "post",
+    path: "/apps",
+    summary:
+      "Make another app in the guild, with its own application, bot user, token and Ed25519 key (decision 0027), or return the one made with this name and settings. Its bot connects to the Gateway with its own token; its interactions go to CHANNELSTACK_DISCORD_APP_<NAME>_WEBHOOK_URL, or over its Gateway connection",
+    body: z
+      .object({
+        name: z
+          .string()
+          .min(1)
+          .openapi({ description: "How people mention it: 1 to 32 lower-case letters, digits and hyphens" }),
+        privilegedIntents: z
+          .array(z.enum(["GUILD_MEMBERS", "GUILD_PRESENCES", "MESSAGE_CONTENT"]))
+          .optional()
+          .openapi({
+            description:
+              "The privileged intents switched on in its developer portal. Default: the built-in app's (`GUILD_MEMBERS`, `MESSAGE_CONTENT`)",
+          }),
+      })
+      .openapi("DiscordAppOptions"),
+    response: DiscordApp,
+    errors: ["invalid_argument"],
+    factory: { on: "DiscordFixture", name: "createApp", options: ["name", "privilegedIntents"] },
+    live: APPS_NOT_YET,
+    stability,
+    handler: ({ session, body }) => appHandle(fake.createApp(session.id, body)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/apps",
+    summary:
+      "The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
+    response: z.array(DiscordApp).openapi("DiscordApps"),
+    sdkMethod: { on: "DiscordFixture", name: "apps" },
+    live: APPS_NOT_YET,
+    stability,
+    handler: ({ session }) => fake.apps(session.id).map(appHandle),
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/say",
+    summary:
+      "An app a test made writes, as its own `POST /channels/{id}/messages` would: in a channel or thread its bot sees, or in a DM with the person in `to`. No bot writes to another bot in a DM (50007)",
+    params: AppParams,
+    body: z
+      .object({ text: MessageInput, channel: channelRef.optional(), to: participants().optional() })
+      .openapi("DiscordAppSayBody"),
+    response: DiscordMessage,
+    errors: ["not_found", "invalid_argument", ...discordErrors(50001, 50006, 50007, 50013, 50035)],
+    sdkMethod: { on: "DiscordApp", name: "say", args: ["text"], options: ["channel", "to"] },
+    live: APPS_NOT_YET,
+    stability,
+    handler: async ({ session, params, body }) => {
+      if ((body.channel === undefined) === (body.to === undefined)) {
+        throw new ProtocolError("invalid_argument", "say needs exactly one of `channel` and `to`");
+      }
+      const where = body.channel !== undefined ? { channel: body.channel } : { to: body.to ?? [] };
+      return messageWire(session.id, fake.sayAsApp(session.id, params.app, body.text, where));
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/reply",
+    summary: "An app a test made replies to a message: Discord's reply, in the message's channel, which quotes it",
+    params: AppParams,
+    body: z.object({ text: MessageInput, message: messageRef }).openapi("DiscordAppReplyBody"),
+    response: DiscordMessage,
+    errors: ["not_found", "invalid_argument", ...discordErrors(50001, 50006, 50013, 50035)],
+    sdkMethod: { on: "DiscordApp", name: "reply", args: ["text"], options: ["message"] },
+    live: APPS_NOT_YET,
+    stability,
+    handler: async ({ session, params, body }) =>
+      messageWire(
+        session.id,
+        fake.replyAsApp(session.id, params.app, body.text, { channel: body.message.channelId, id: body.message.id }),
+      ),
+  });
+
+  for (const [name, direction] of [
+    ["react", "add"],
+    ["unreact", "remove"],
+  ] as const) {
+    router.route({
+      method: "post",
+      path: `/apps/{app}/${name}`,
+      summary:
+        direction === "add" ? "An app a test made reacts to a message" : "An app a test made takes its reaction back",
+      params: AppParams,
+      body: z
+        .object({ emoji: z.string().min(1), message: messageRef })
+        .openapi(direction === "add" ? "DiscordAppReactBody" : "DiscordAppUnreactBody"),
+      response: DiscordDelivery.nullable(),
+      errors: ["not_found", "invalid_argument", ...discordErrors(50001, 50013)],
+      sdkMethod: { on: "DiscordApp", name, args: ["emoji"], options: ["message"] },
+      live: APPS_NOT_YET,
+      stability,
+      handler: ({ session, params, body }) =>
+        deliveryOrNull(
+          session.id,
+          fake.reactAsApp(
+            session.id,
+            params.app,
+            body.emoji,
+            { channel: body.message.channelId, id: body.message.id },
+            direction,
+          ),
+        ),
+    });
+  }
 
   router.route({
     method: "get",
@@ -549,9 +687,23 @@ export function registerDiscordRoutes(
   router.route({
     method: "post",
     path: "/users/{user}/commands",
-    summary: "Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`",
+    summary:
+      "Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it",
     params: UserParams,
-    body: z.object({ command: z.string().regex(/^\/\S/), channel: channelRef }).openapi("DiscordCommandBody"),
+    body: z
+      .object({
+        command: z.string().regex(/^\/\S/),
+        channel: channelRef,
+        app: z
+          .string()
+          .optional()
+          .openapi({
+            description:
+              "Whose command: an app's id or name. Default: the built-in app's when it has a command of that name, or another app's that has one (decision 0027)",
+            ...refTo("DiscordApp"),
+          }),
+      })
+      .openapi("DiscordCommandBody"),
     // The interaction's delivery; none live, where Discord tells the agent itself.
     response: DiscordDelivery.nullable(),
     errors: ["not_found", ...discordErrors(50013)],
@@ -560,13 +712,13 @@ export function registerDiscordRoutes(
       on: "DiscordUser",
       name: "runCommand",
       args: ["command"],
-      options: ["channel"],
+      options: ["channel", "app"],
       retryWhile: ["not_found"],
     },
     live: { unsupported: NO_INTERACTIONS },
     stability,
     handler: async ({ session, params, body }) =>
-      deliveryOrNull(session.id, await world.runCommand(session.id, params.user, body.command, body.channel)),
+      deliveryOrNull(session.id, await world.runCommand(session.id, params.user, body.command, body.channel, body.app)),
   });
 
   router.route({
@@ -759,8 +911,27 @@ export function registerDiscordRoutes(
 
   router.route({
     method: "get",
+    path: "/channels/{channel}/messages/{message}/delivery-for",
+    summary:
+      "The first Gateway dispatch this message caused to this app's bot (decision 0027), or nothing when it wasn't told",
+    params: MessageParams,
+    query: z.object({ app: z.string().openapi({ param: { name: "app", in: "query" }, ...refTo("DiscordApp") }) }),
+    response: DiscordDelivery.nullable(),
+    errors: ["not_found"],
+    sdkMethod: { on: "DiscordMessage", name: "deliveryFor", args: ["app"], bind: messageBinding },
+    live: DELIVERY_IS_THE_PLATFORMS,
+    stability,
+    handler: async ({ session, params, query }) => {
+      const app = fake.roster.get(session.id, query.app);
+      const message = await fake.message(session.id, params.channel, params.message);
+      return deliveryOf(session.id, message.deliveries, app.name) ?? null;
+    },
+  });
+
+  router.route({
+    method: "get",
     path: "/channels/{channel}/messages/{message}/deliveries",
-    summary: "Every Gateway dispatch this message caused to the bot",
+    summary: "Every Gateway dispatch this message caused to the apps' bots",
     params: MessageParams,
     response: z.array(DiscordDelivery).openapi("DiscordMessageDeliveries"),
     errors: ["not_found"],
@@ -797,6 +968,7 @@ export function registerDiscordRoutes(
     stability,
     deliveries: fake,
     delivery: { schema: DiscordDelivery, wire: deliveryWire },
+    apps: { handle: "DiscordApp", roster: fake.roster },
     listSummary:
       "Every Gateway dispatch and interaction channelstack sent the bot for this session, with every attempt",
     filters: {
@@ -842,10 +1014,17 @@ export function registerDiscordRoutes(
           .openapi({ description: "For rate_limit: only this route, e.g. `POST /channels/{channel.id}/messages`." }),
         retryAfter: duration("For rate_limit: what `retry_after` says.").default(1000),
         times: z.number().int().min(1).optional(),
+        app: z
+          .string()
+          .optional()
+          .openapi({
+            description: "Only this app's bot: its calls, or its Gateway connection. Every app's when left out.",
+            ...refTo("DiscordApp"),
+          }),
       })
       .openapi("DiscordFaultBody"),
     response: z.object({ id: z.string() }).openapi("DiscordFault", { "x-channelstack-resource": { id: "id" } }),
-    sdkMethod: { on: "DiscordFixture", name: "fault", options: ["type", "route", "retryAfter", "times"] },
+    sdkMethod: { on: "DiscordFixture", name: "fault", options: ["type", "route", "retryAfter", "times", "app"] },
     live: FAULTS,
     stability,
     handler: ({ session, body }) => ({
@@ -854,6 +1033,7 @@ export function registerDiscordRoutes(
         route: body.route,
         remaining: body.times,
         retryAfterMs: body.retryAfter,
+        app: body.app,
       }),
     }),
   });

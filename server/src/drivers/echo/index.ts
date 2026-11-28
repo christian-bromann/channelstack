@@ -24,11 +24,16 @@ export const echo: DriverDefinition = {
       routes: (router) => registerEchoRoutes(router, { world: fake.world, apiUrl: context.apiUrl, capabilities }),
       capabilities: () => capabilities,
       openWork: () => [],
-      env: () => ({
-        ECHO_API_URL: context.apiUrl(),
-        ECHO_APP_TOKEN: context.secret("appToken"),
-        ECHO_SIGNING_SECRET: context.secret("signingSecret"),
-      }),
+      // Another app's lines have the built-in app's keys (decision 0027).
+      env: (app) => {
+        const { apps } = fake.store;
+        const name = apps.keyOf(apps.forEnv(app, (wanted) => fake.world.createApp(undefined, { name: wanted })));
+        return {
+          ECHO_API_URL: context.apiUrl(),
+          ECHO_APP_TOKEN: context.apps.secret(name, "appToken"),
+          ECHO_SIGNING_SECRET: context.apps.secret(name, "signingSecret"),
+        };
+      },
     };
   },
 };

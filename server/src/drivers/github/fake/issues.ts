@@ -220,6 +220,7 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
         delivery: undefined,
       });
       touch(issue);
+      if (!kit.wrote(repo, issue.number, actor)) return comment;
       comment.delivery = kit.emit(repo, "issue_comment", actor, {
         action: "created",
         issue: objects.issue(issue),
@@ -234,6 +235,7 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
       const from = comment.body;
       comment.body = body;
       comment.updatedAt = clock();
+      if (!kit.wrote(repo, issue.number, actor)) return undefined;
       return kit.emit(repo, "issue_comment", actor, {
         action: "edited",
         changes: { body: { from } },
@@ -247,6 +249,7 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
       const issue = kit.requireIssue(repo, comment.issue);
       const payload = objects.comment(comment, issue);
       store.forget(store.comments, store.sessionOf(repo), comment.id);
+      if (!kit.wrote(repo, issue.number, actor)) return undefined;
       return kit.emit(repo, "issue_comment", actor, {
         action: "deleted",
         issue: objects.issue(issue),

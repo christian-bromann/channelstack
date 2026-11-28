@@ -78,6 +78,57 @@ let users = linear.users().await?;
 
 **Returns** [`LinearUsers`](/docs/reference/api/linear#linearusers).
 
+### createApp()
+
+Make another OAuth app in the workspace, installed with `actor=app`: its own app user (mentionable and assignable), access token, client and webhook secret. Or return the one made with this name and settings. Its webhooks go to CHANNELSTACK_LINEAR_APP_&lt;NAME>_WEBHOOK_URL.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const app = await linear.createApp({ name: "…" });
+```
+
+```python title="Python"
+app = await linear.create_app(name="…")
+```
+
+```rust title="Rust"
+let app = linear.create_app().name("…").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `name` | `string` | yes | option |
+| `events` | `string[]` | no | option |
+
+**Returns** [`LinearApp`](/docs/reference/api/linear#linearapp).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the Linear workspace has the built-in app only: another app needs a sandbox app of its own.
+
+### apps()
+
+The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const apps = await linear.apps();
+```
+
+```python title="Python"
+apps = await linear.apps()
+```
+
+```rust title="Rust"
+let apps = linear.apps().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`LinearApps`](/docs/reference/api/linear#linearapps).
+
 ### teams()
 
 The teams this session created.
@@ -176,6 +227,7 @@ let deliveries = linear.deliveries().r#type("…").await?;
 |---|---|---|---|---|
 | `type` | `type` · `r#type` | `string` | no | option |
 | `resource` | `resource` | `LinearIssue` | no | option |
+| `app` | `app` | `LinearApp` | no | option |
 
 **Returns** [`LinearDeliveries`](/docs/reference/api/linear#lineardeliveries).
 
@@ -240,7 +292,7 @@ let api_call = linear.wait_for_call().operation("…").await?;
 
 ## LinearApp
 
-Returned by [`LinearIssue.delegatedTo()`](/docs/reference/api/linear#delegatedto).
+Returned by [`LinearFixture.createApp()`](/docs/reference/api/linear#createapp), [`LinearIssue.delegatedTo()`](/docs/reference/api/linear#delegatedto).
 
 | Field | Python / Rust | Type |
 |---|---|---|
@@ -252,6 +304,64 @@ Returned by [`LinearIssue.delegatedTo()`](/docs/reference/api/linear#delegatedto
 | `webhookSecret` | `webhook_secret` | `string` |
 | `clientId` | `client_id` | `string` |
 | `clientSecret` | `client_secret` | `string` |
+
+### comment()
+
+An app a test made comments on an issue, as its own `commentCreate` would. Its mention of another app is refused (to confirm, B6).
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const comment = await app.comment("…", { issue });
+```
+
+```python title="Python"
+comment = await app.comment("…", issue=issue)
+```
+
+```rust title="Rust"
+let comment = app.comment("…").issue(&issue).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `body` | `string` | yes | positional |
+| `issue` | `LinearIssue` | yes | option |
+
+**Returns** [`LinearComment`](/docs/reference/api/linear#linearcomment).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the Linear workspace has the built-in app only: another app needs a sandbox app of its own.
+
+### reply()
+
+An app a test made replies in a comment's thread, as its own `commentCreate` with a `parentId` would.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const result = await app.reply("…", { comment });
+```
+
+```python title="Python"
+result = await app.reply("…", comment=comment)
+```
+
+```rust title="Rust"
+let result = app.reply("…").comment(&comment).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `body` | `string` | yes | positional |
+| `comment` | `LinearComment` | yes | option |
+
+**Returns** [`LinearComment`](/docs/reference/api/linear#linearcomment).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the Linear workspace has the built-in app only: another app needs a sandbox app of its own.
 
 ## LinearUser
 
@@ -442,7 +552,7 @@ let delivery = user.label(labels).issue(&issue).await?;
 
 ### delegate()
 
-Delegate an issue to the app. Opens an agent session and sends `AgentSessionEvent` (`created`).
+Delegate an issue to an app. Opens that app's agent session and sends it `AgentSessionEvent` (`created`); an issue delegated to another app moves.
 
 <CodeGroup>
 
@@ -701,45 +811,96 @@ let delivery = user.stop().session(&session).await?;
 
 **Live:** needs the browser actor: Linear sends the stop signal only when a person presses Stop, and it can't be published through the API. The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
-## LinearTeam
+## LinearComment
 
-Returned by [`LinearFixture.createTeam()`](/docs/reference/api/linear#createteam).
+Returned by [`LinearApp.comment()`](/docs/reference/api/linear#comment), [`LinearApp.reply()`](/docs/reference/api/linear#reply), [`LinearUser.comment()`](/docs/reference/api/linear#comment-1), [`LinearUser.reply()`](/docs/reference/api/linear#reply-1).
 
-| Field | Type |
-|---|---|
-| `id` | `string` |
-| `key` | `string` |
-| `name` | `string` |
+| Field | Python / Rust | Type |
+|---|---|---|
+| `id` | `id` | `string` |
+| `issue` | `issue` | `LinearIssue` |
+| `author` | `author` | `LinearUser \| LinearApp` |
+| `body` | `body` | `string` |
+| `createdAt` | `created_at` | `string` |
+| `url` | `url` | `string` |
+| `session` | `session` | `LinearAgentSession \| undefined` |
+| `delivery` | `delivery` | `LinearDelivery \| undefined` |
 
-### issue()
+### replies()
 
-An issue of this team by its identifier (`ENG-12`).
+The replies in a comment's thread, once the agent is quiet.
 
 <CodeGroup>
 
 ```ts title="TypeScript"
-const issue = await team.issue("…");
+const commentReplies = await comment.replies();
 ```
 
 ```python title="Python"
-issue = await team.issue("…")
+comment_replies = await comment.replies()
 ```
 
 ```rust title="Rust"
-let issue = team.issue("…").await?;
+let comment_replies = comment.replies().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`LinearCommentReplies`](/docs/reference/api/linear#linearcommentreplies). It reads once the app is quiet.
+
+### deliveryFor()
+
+The `Comment` (`create`) delivery this comment caused to this app (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in app's.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await comment.deliveryFor(app);
+```
+
+```python title="Python"
+delivery = await comment.delivery_for(app)
+```
+
+```rust title="Rust"
+let delivery = comment.delivery_for(&app).await?;
 ```
 
 </CodeGroup>
 
 | Parameter | Type | Required |  |
 |---|---|---|---|
-| `identifier` | `string` | yes | positional |
+| `app` | `LinearApp` | yes | positional |
 
-**Returns** [`LinearIssue`](/docs/reference/api/linear#linearissue).
+**Returns** [`LinearDelivery | undefined`](/docs/reference/api/linear#lineardelivery).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
+
+### transcript()
+
+A comment's thread as a person reads it.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const transcript = await comment.transcript();
+```
+
+```python title="Python"
+transcript = await comment.transcript()
+```
+
+```rust title="Rust"
+let transcript = comment.transcript().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`LinearTranscript`](/docs/reference/api/linear#lineartranscript).
 
 ## LinearIssue
 
-Returned by [`LinearUser.createIssue()`](/docs/reference/api/linear#createissue), [`LinearTeam.issue()`](/docs/reference/api/linear#issue), [`LinearIssue.refresh()`](/docs/reference/api/linear#refresh).
+Returned by [`LinearUser.createIssue()`](/docs/reference/api/linear#createissue), [`LinearIssue.refresh()`](/docs/reference/api/linear#refresh), [`LinearTeam.issue()`](/docs/reference/api/linear#issue).
 
 | Field | Type |
 |---|---|
@@ -1025,123 +1186,41 @@ let comment = issue.latest_comment().from("my-agent").await?;
 
 **Returns** [`LinearComment`](/docs/reference/api/linear#linearcomment). When the time is up, it fails with what it was waiting for.
 
-## LinearDelivery
+## LinearTeam
 
-Returned by [`LinearUser.editIssue()`](/docs/reference/api/linear#editissue), [`LinearUser.undelegate()`](/docs/reference/api/linear#undelegate), [`LinearUser.assign()`](/docs/reference/api/linear#assign), [`LinearUser.setState()`](/docs/reference/api/linear#setstate).
+Returned by [`LinearFixture.createTeam()`](/docs/reference/api/linear#createteam).
 
-| Field | Python / Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channel` | `channel` | `"linear"` |
-| `type` | `type` · `r#type` | `string` |
-| `action` | `action` | `string` |
-| `webhookId` | `webhook_id` | `string` |
-| `payload` | `payload` | `unknown \| undefined` |
-| `attempts` | `attempts` | `DeliveryAttempt[]` |
-| `status` | `status` | `"pending" \| "acknowledged" \| "failed" \| "timed_out" \| "unreachable"` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `key` | `string` |
+| `name` | `string` |
 
-### refresh()
+### issue()
 
-Re-read a delivery: its attempts and status.
+An issue of this team by its identifier (`ENG-12`).
 
 <CodeGroup>
 
 ```ts title="TypeScript"
-const updated = await delivery.refresh();
+const issue = await team.issue("…");
 ```
 
 ```python title="Python"
-updated = await delivery.refresh()
+issue = await team.issue("…")
 ```
 
 ```rust title="Rust"
-let updated = delivery.refresh().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`LinearDelivery`](/docs/reference/api/linear#lineardelivery).
-
-**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
-
-### redeliver()
-
-Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const deliveryAttempt = await delivery.redeliver();
-```
-
-```python title="Python"
-delivery_attempt = await delivery.redeliver()
-```
-
-```rust title="Rust"
-let delivery_attempt = delivery.redeliver().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`DeliveryAttempt`](/docs/reference/api/client#deliveryattempt).
-
-**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Linear has no API to redeliver a webhook.
-
-### resend()
-
-Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const deliveryAttempt = await delivery.resend({ badSignature });
-```
-
-```python title="Python"
-delivery_attempt = await delivery.resend(bad_signature=bad_signature)
-```
-
-```rust title="Rust"
-let delivery_attempt = delivery.resend().bad_signature(bad_signature).await?;
-```
-
-</CodeGroup>
-
-| Parameter | Python / Rust | Type | Required |  |
-|---|---|---|---|---|
-| `badSignature` | `bad_signature` | `boolean` | no | option |
-| `stale` | `stale` | `boolean` | no | option |
-
-**Returns** [`DeliveryAttempt`](/docs/reference/api/client#deliveryattempt).
-
-**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
-
-### settled()
-
-Waits for the delivery to settle: it polls `refresh()` and never sleeps longer than it must.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const updated = await delivery.settled();
-```
-
-```python title="Python"
-updated = await delivery.settled()
-```
-
-```rust title="Rust"
-let updated = delivery.settled().await?;
+let issue = team.issue("…").await?;
 ```
 
 </CodeGroup>
 
 | Parameter | Type | Required |  |
 |---|---|---|---|
-| `timeout` | `Duration` | no | default 10s |
+| `identifier` | `string` | yes | positional |
 
-**Returns** [`LinearDelivery`](/docs/reference/api/linear#lineardelivery). When the time is up, it fails with what it was waiting for.
+**Returns** [`LinearIssue`](/docs/reference/api/linear#linearissue).
 
 ## LinearAgentSession
 
@@ -1319,64 +1398,124 @@ let agent_activity = agent_session.wait_for_activity().await?;
 
 **Returns** [`LinearAgentActivity`](/docs/reference/api/linear#linearagentactivity). When the time is up, it fails with what it was waiting for.
 
-## LinearComment
+## LinearDelivery
 
-Returned by [`LinearUser.comment()`](/docs/reference/api/linear#comment), [`LinearUser.reply()`](/docs/reference/api/linear#reply).
+Returned by [`LinearUser.editIssue()`](/docs/reference/api/linear#editissue), [`LinearUser.undelegate()`](/docs/reference/api/linear#undelegate), [`LinearUser.assign()`](/docs/reference/api/linear#assign), [`LinearUser.setState()`](/docs/reference/api/linear#setstate).
 
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
-| `issue` | `issue` | `LinearIssue` |
-| `author` | `author` | `LinearUser \| LinearApp` |
-| `body` | `body` | `string` |
-| `createdAt` | `created_at` | `string` |
-| `url` | `url` | `string` |
-| `session` | `session` | `LinearAgentSession \| undefined` |
-| `delivery` | `delivery` | `LinearDelivery \| undefined` |
+| `channel` | `channel` | `"linear"` |
+| `app` | `app` | `string` |
+| `type` | `type` · `r#type` | `string` |
+| `action` | `action` | `string` |
+| `webhookId` | `webhook_id` | `string` |
+| `payload` | `payload` | `unknown \| undefined` |
+| `attempts` | `attempts` | `DeliveryAttempt[]` |
+| `status` | `status` | `"pending" \| "acknowledged" \| "failed" \| "timed_out" \| "unreachable"` |
 
-### replies()
+### refresh()
 
-The replies in a comment's thread, once the agent is quiet.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const commentReplies = await comment.replies();
-```
-
-```python title="Python"
-comment_replies = await comment.replies()
-```
-
-```rust title="Rust"
-let comment_replies = comment.replies().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`LinearCommentReplies`](/docs/reference/api/linear#linearcommentreplies). It reads once the app is quiet.
-
-### transcript()
-
-A comment's thread as a person reads it.
+Re-read a delivery: its attempts and status.
 
 <CodeGroup>
 
 ```ts title="TypeScript"
-const transcript = await comment.transcript();
+const updated = await delivery.refresh();
 ```
 
 ```python title="Python"
-transcript = await comment.transcript()
+updated = await delivery.refresh()
 ```
 
 ```rust title="Rust"
-let transcript = comment.transcript().await?;
+let updated = delivery.refresh().await?;
 ```
 
 </CodeGroup>
 
-**Returns** [`LinearTranscript`](/docs/reference/api/linear#lineartranscript).
+**Returns** [`LinearDelivery`](/docs/reference/api/linear#lineardelivery).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
+
+### redeliver()
+
+Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const deliveryAttempt = await delivery.redeliver();
+```
+
+```python title="Python"
+delivery_attempt = await delivery.redeliver()
+```
+
+```rust title="Rust"
+let delivery_attempt = delivery.redeliver().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`DeliveryAttempt`](/docs/reference/api/client#deliveryattempt).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Linear has no API to redeliver a webhook.
+
+### resend()
+
+Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const deliveryAttempt = await delivery.resend({ badSignature });
+```
+
+```python title="Python"
+delivery_attempt = await delivery.resend(bad_signature=bad_signature)
+```
+
+```rust title="Rust"
+let delivery_attempt = delivery.resend().bad_signature(bad_signature).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `badSignature` | `bad_signature` | `boolean` | no | option |
+| `stale` | `stale` | `boolean` | no | option |
+
+**Returns** [`DeliveryAttempt`](/docs/reference/api/client#deliveryattempt).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
+
+### settled()
+
+Waits for the delivery to settle: it polls `refresh()` and never sleeps longer than it must.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const updated = await delivery.settled();
+```
+
+```python title="Python"
+updated = await delivery.settled()
+```
+
+```rust title="Rust"
+let updated = delivery.settled().await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `timeout` | `Duration` | no | default 10s |
+
+**Returns** [`LinearDelivery`](/docs/reference/api/linear#lineardelivery). When the time is up, it fails with what it was waiting for.
 
 ## LinearAgentActivity
 
@@ -1394,6 +1533,12 @@ let transcript = comment.transcript().await?;
 ## Types
 
 Plain values the handles return and take.
+
+### LinearApps
+
+```ts
+type LinearApps = LinearApp[];
+```
 
 ### LinearUsers
 

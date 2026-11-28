@@ -50,6 +50,25 @@ describe("the id generator", () => {
     expect(draw(7)).not.toEqual(draw(8));
   });
 
+  test("exit check 12.5: an app's ids depend on the seed and its name, not on what was made before", () => {
+    const appIds = (seed: number, before: number) => {
+      const ids = generator(seed);
+      for (let i = 0; i < before; i++) ids.next(TEST.user);
+      const coder = ids.named("slack:coder");
+      return [coder.next(TEST.user), coder.next(TEST.number)];
+    };
+    expect(appIds(7, 0)).toEqual(appIds(7, 25));
+    expect(appIds(7, 0)).not.toEqual(appIds(8, 0));
+    const ids = generator(7);
+    expect(ids.named("slack:coder").next(TEST.user)).not.toBe(ids.named("slack:reviewer").next(TEST.user));
+  });
+
+  test("an app's ids are unique in the world with every other id", () => {
+    const ids = generator(7);
+    const first = ids.named("slack:coder").next(TEST.user);
+    expect(() => ids.reserve(TEST.user, first)).toThrow(/already in use/);
+  });
+
   test("CHANNELSTACK_SEED accepts a number or any text", () => {
     expect(parseSeed("42")).toBe(42);
     expect(parseSeed("release-candidate")).toBe(parseSeed("release-candidate"));

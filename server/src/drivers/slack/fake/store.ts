@@ -1,3 +1,4 @@
+import { AppRoster } from "../../../core/apps/index.ts";
 import type { Collection, Registry } from "../../../core/registry/index.ts";
 import type {
   SlackAppRecord,
@@ -17,6 +18,8 @@ export interface SlackFault {
   readonly type: "rate_limit" | "latency" | "error";
   /** Only calls to this method; every method when left out. */
   readonly operation: string | undefined;
+  /** Only this app's calls (decision 0027); every app's when left out. */
+  readonly app: string | undefined;
   /** How many more calls it applies to; forever when left out. */
   remaining: number | undefined;
   readonly retryAfterMs: number;
@@ -27,6 +30,8 @@ export interface SlackFault {
 /** A `response_url`: where the app answers one interaction, a few times, for a while. */
 export interface SlackResponseUrl {
   readonly session: string;
+  /** The app the interaction went to, which answers through this URL. */
+  readonly app: string;
   readonly conversation: string;
   /** Who acted: an answer that isn't `in_channel` is for them alone. */
   readonly user: string;
@@ -47,22 +52,27 @@ export class SlackStore {
   readonly files = new Map<string, SlackFileRecord>();
   /** What an interaction handed the app to answer with: its `response_url`s, by the key in the URL. */
   readonly responseUrls = new Map<string, SlackResponseUrl>();
-  /** `trigger_id`s the app may open a modal with, and until when. */
-  readonly triggers = new Map<string, { session: string; user: string; expiresAt: number; used: boolean }>();
+  /** `trigger_id`s an app may open a modal with, and until when: each is the app's it was handed to, by name. */
+  readonly triggers = new Map<
+    string,
+    { session: string; user: string; app: string; expiresAt: number; used: boolean }
+  >();
   /** `drop_socket` faults that haven't fired yet, by fault id. */
   readonly pendingDrops = new Map<string, { session: string; cancel(): void }>();
-  /** Every modal the app opened, by view id. A submitted or closed one stays, marked `closed`. */
+  /** Every modal an app opened, by view id. A submitted or closed one stays, marked `closed`. */
   readonly views = new Map<string, SlackViewRecord>();
   /** Conversation ids in creation order: the registry has no listing, and Slack lists conversations. */
   readonly #known: string[] = [];
-  /** The session that uninstalled the app, so closing it installs the app again. */
-  uninstalledBy: string | undefined;
+  /** The session that uninstalled each app, by app name, so closing it installs the app again. */
+  readonly uninstalledBy = new Map<string, string>();
   /** Faults sessions injected into the Web API. They apply to every caller until removed. */
   readonly faults: SlackFault[] = [];
   #team: SlackTeam | undefined;
-  #app: SlackAppRecord | undefined;
+  /** The built-in app and the ones tests made (decision 0027), installed in the one workspace. */
+  readonly apps: AppRoster<SlackAppRecord>;
 
   constructor(registry: Registry) {
+    this.apps = new AppRoster<SlackAppRecord>("Slack", registry, { refs: (app) => [app.id, app.botUserId, app.botId] });
     this.users = registry.collection<SlackUserRecord>("slack", "user");
     this.conversations = registry.collection<SlackConversationRecord>("slack", "conversation");
   }
@@ -72,9 +82,19 @@ export class SlackStore {
     return this.#team;
   }
 
+  /** The built-in app, `my-agent`. */
   get app(): SlackAppRecord {
-    if (!this.#app) throw new Error("The Slack fake hasn't been seeded");
-    return this.#app;
+    return this.apps.builtIn;
+  }
+
+  /** The app whose bot user, app id or bot id this is, if any. */
+  appOf(id: string): SlackAppRecord | undefined {
+    return this.apps.byId(id);
+  }
+
+  /** Every app's bot user id: who writes as an app. */
+  isAppUser(id: string): boolean {
+    return this.apps.all().some((app) => app.botUserId === id);
   }
 
   seed(team: SlackTeam, app: SlackAppRecord): void {
@@ -83,9 +103,10 @@ export class SlackStore {
     this.#known.length = 0;
     this.#people.clear();
     this.faults.length = 0;
-    this.uninstalledBy = undefined;
+    this.uninstalledBy.clear();
     this.#team = team;
-    this.#app = app;
+    this.apps.seed(app);
+    for (const other of this.apps.extra()) other.installed = true;
   }
 
   /** Every message of a conversation, in the order they were posted (replies included). */
@@ -160,9 +181,11 @@ export class SlackStore {
    */
   release(session: string): SlackUserRecord[] {
     // What a session changed for the whole workspace is undone with it (decision 0006).
-    if (this.uninstalledBy === session) {
-      this.app.installed = true;
-      this.uninstalledBy = undefined;
+    for (const [name, by] of [...this.uninstalledBy]) {
+      if (by !== session) continue;
+      const app = this.apps.named(name);
+      if (app) app.installed = true;
+      this.uninstalledBy.delete(name);
     }
     for (const fault of [...this.faults])
       if (fault.session === session) this.faults.splice(this.faults.indexOf(fault), 1);

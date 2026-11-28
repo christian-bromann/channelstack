@@ -41,7 +41,9 @@ webhooks.on("issue_comment.created", async ({ payload }) => {
   const key = `${repository.full_name}#${issue.number}`;
   // Bug: answers every comment, its own included (three times, then it stops, so the test ends).
   const own = broken("github.ignores-own-comments") && (answered.get(key) ?? 0) < 3;
-  if (!own && (sender.type === "Bot" || !agent.mentions(comment.body))) return;
+  // Bug: answers another App that mentions it, so two Apps answer each other without end.
+  const fromBot = sender.type === "Bot" && !(broken("github.no-reply-loop") && sender.login !== `${agent.AGENT}[bot]`);
+  if (!own && (fromBot || !agent.mentions(comment.body))) return;
   answered.set(key, (answered.get(key) ?? 0) + 1);
   await agent.triage(rest(payload), at(payload), issue.number);
   // Bug: says it twice.

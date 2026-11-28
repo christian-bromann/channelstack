@@ -70,5 +70,6 @@ pytest is the same with `pytest-channelstack`: `await expect(msg.thread).to_have
 
 - State is in memory: restarting the server starts from nothing. Run `npx channelstack env` again only after `channelstack secrets rotate`.
 - channelstack doesn't run the bot. Its model is the fake OpenAI when the bot uses `OPENAI_BASE_URL`; a framework's own fake model or a real one works too. Images, audio, files and OpenAI's built-in tools aren't in the fake yet.
+- Every fake has one built-in app, `my-agent`, which the CLI and MCP tools put in every place. A second bot (another app) is made in a test with `createApp({ name })`; its events go to `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, and `npx channelstack env --app <name> --channel <channel>` prints its `.env` lines under the same keys.
 - The tools never return the server's token. Don't paste tokens from `.env` into chat either.
 - Notion and email have no reactions: `react` says so. A Linear reaction is on a comment, not the issue.

@@ -20,8 +20,10 @@ if (!LINEAR_ACCESS_TOKEN || !LINEAR_WEBHOOK_SECRET || !PORT) {
   throw new Error("The agent needs LINEAR_ACCESS_TOKEN, LINEAR_WEBHOOK_SECRET and PORT");
 }
 
-const linear = createLinearAdapter({ mode: "agent-sessions", accessToken: LINEAR_ACCESS_TOKEN, userName: "my-agent" });
-const bot = new Chat({ userName: "my-agent", adapters: { linear }, state: createMemoryState(), logger: "warn" });
+// The app it runs as: the stack names another one in AGENT_NAME (decision 0027).
+const NAME = process.env.AGENT_NAME ?? "my-agent";
+const linear = createLinearAdapter({ mode: "agent-sessions", accessToken: LINEAR_ACCESS_TOKEN, userName: NAME });
+const bot = new Chat({ userName: NAME, adapters: { linear }, state: createMemoryState(), logger: "warn" });
 
 /** The session threads the agent answers in, by session id. */
 const threads = new Map<string, Thread>();

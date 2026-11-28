@@ -2,13 +2,16 @@ import type { MimeHeader } from "../../core/email/mime.ts";
 import type { EmailAppRecord, EmailPersonRecord, EmailRecord } from "../../core/email/store.ts";
 
 /**
- * The Google fake's records. The Gmail API shows the agent its own mailbox only: the copies of
+ * The Google fake's records. The Gmail API shows each app its own mailbox only: the copies of
  * email that reached it or that it sent, in its own threads, with its labels and its history. The
  * people's mail beyond that is the outside world's, which the fake keeps too, so a person's inbox
  * can be read.
  */
 
-/** The agent's mailbox; its id is its Google account's. */
+/**
+ * An app's mailbox: the agent's (`my-agent`), or another app's (decision 0027), each a Workspace
+ * address of its own with its own OAuth client. Its id is its Google account's.
+ */
 export type GoogleAppRecord = EmailAppRecord;
 
 /** A person: a mailbox in the outside world. */
@@ -23,9 +26,11 @@ export interface GoogleEmailRecord extends EmailRecord {
   agentCopy: string | undefined;
 }
 
-/** A message in the agent's mailbox: its copy of an email, in one of its threads, with its labels. */
+/** A message in an app's mailbox: its copy of an email, in one of its threads, with its labels. */
 export interface GmailMessageRecord {
   readonly id: string;
+  /** The mailbox it is in, by its app's name. */
+  readonly mailbox: string;
   /** The email it is a copy of. */
   readonly email: string;
   readonly threadId: string;
@@ -35,9 +40,10 @@ export interface GmailMessageRecord {
   readonly internalDate: number;
 }
 
-/** A thread in the agent's mailbox, as Gmail threads: by references and a matching subject. */
+/** A thread in an app's mailbox, as Gmail threads: by references and a matching subject. */
 export interface GmailThreadRecord {
   readonly id: string;
+  readonly mailbox: string;
   /** Its subject without `Re:` and `Fwd:`, which a message joining it must match. */
   readonly subject: string;
 }
@@ -51,9 +57,10 @@ export interface GmailLabelRecord {
   readonly labelListVisibility?: "labelShow" | "labelShowIfUnread" | "labelHide";
 }
 
-/** One change to the agent's mailbox, as `users.history.list` lists them. */
+/** One change to an app's mailbox, as `users.history.list` lists them. */
 export interface GmailHistoryRecord {
   readonly id: string;
+  readonly mailbox: string;
   readonly kind: "messageAdded" | "labelAdded" | "labelRemoved" | "messageDeleted";
   readonly message: string;
   readonly threadId: string;

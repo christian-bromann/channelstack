@@ -107,6 +107,8 @@ export interface QuietState {
   open: string[];
   /** What should fail a test at once: a model call no script answered (decision 0029). */
   problems?: string[];
+  /** The bot loops the fake stopped in the session (decision 0027), when there are any. */
+  loops?: string[];
 }
 
 /** A wait that stopped because the session's model calls went wrong: no script answered one, a script ran out. */

@@ -15,7 +15,7 @@ This page shows how to test an integration or agent built on Linear's APIs: how 
 
 ## What the fake covers
 
-The fake Linear is one workspace with one OAuth app installed in it, `my-agent`, acting as itself (`actor=app`). It serves Linear's GraphQL API and sends the app's webhooks. Queries run against Linear's own published schema, so an app on `@linear/sdk` gets the shapes it gets from Linear, including every scalar the SDK selects.
+The fake Linear is one workspace with one OAuth app installed in it, `my-agent`, acting as itself (`actor=app`), and any other app a test adds ([several apps](#several-apps)). It serves Linear's GraphQL API and sends the app's webhooks. Queries run against Linear's own published schema, so an app on `@linear/sdk` gets the shapes it gets from Linear, including every scalar the SDK selects.
 
 | Area           | What's there                                                                                                                                        |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -233,6 +233,28 @@ Errors have Linear's shape: `errors[].extensions` with `code`, `type`, `statusCo
 | `INPUT_ERROR`          | An id that names nothing (`Entity not found`), an empty comment body, a priority outside 0 to 4, a `stop` signal from the app, `continue` on anything but a response, an ephemeral activity that isn't a thought or action, an activity on a `stale` session, a plan that isn't 1 to 100 entries, an external URL that isn't HTTP(S), delegating to someone who isn't an agent |
 
 The [errors reference](/docs/reference/api/errors) lists every code.
+
+## Several apps
+
+A test adds another app to the workspace with `linear.createApp({ name })`: an OAuth app installed with `actor=app`, with its own app user (mentionable and assignable), access token, client id and secret, and webhook secret, subscribed to `AgentSessionEvent`, `Issue` and `Comment` unless `events` says otherwise. Its webhooks go to `CHANNELSTACK_LINEAR_APP_<NAME>_WEBHOOK_URL`; `channelstack env --app coder --channel linear` prints its `.env` lines under `my-agent`'s keys. See [several apps](/docs/guide/several-apps).
+
+```ts
+const coder = await linear.createApp({ name: "coder" });
+const ana = await linear.createUser({ name: "Ana" });
+const team = await linear.createTeam({ members: [ana] });
+const issue = await ana.createIssue({ title: "Checkout fails on Safari" }, { team });
+
+const session = await ana.delegate(coder, { issue });
+
+await expect(session).toHaveActivity({ type: "thought" }, { timeout: "10s" });
+await expect(issue).toBeDelegatedTo(coder);
+```
+
+- **Agent sessions are per app.** Delegating to an app, or a person's `@mention` of it, opens a session for that app, and its `AgentSessionEvent`s go to it alone. An issue has one delegate: delegating to another app moves it. Another app can't post activities into the session.
+- **`Issue` and `Comment` webhooks go to every app,** each its own delivery signed with its own secret, with the writing app's user as the actor.
+- **Between apps,** an app's mention of another app, and an app delegating to one, are refused for now: whether Linear allows them is still to be confirmed live.
+
+A test can act as an app it made: `coder.comment` and `coder.reply` write through the fake's own path, as that app; acting as `my-agent` is refused. `comment.delivery` is still the delivery to `my-agent`; `comment.deliveryFor(coder)` reads another app's.
 
 ## Live
 

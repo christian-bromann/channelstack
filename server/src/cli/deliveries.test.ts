@@ -79,6 +79,33 @@ describe("channelstack deliveries", () => {
     expect(await runDeliveries(empty, undefined)).toBe("Nothing was delivered to the agent yet.\n");
   });
 
+  test("R1.12: a delivery to another app than my-agent says which", async () => {
+    const { server } = recording({
+      "GET /sessions/ses_dev/slack/deliveries": [
+        {
+          id: "Ev01",
+          type: "event_callback",
+          eventType: "message",
+          app: "my-agent",
+          status: "acknowledged",
+          attempts: [attempt(200)],
+        },
+        {
+          id: "Ev02",
+          type: "event_callback",
+          eventType: "app_mention",
+          app: "coder",
+          status: "acknowledged",
+          attempts: [attempt(200)],
+        },
+      ],
+    });
+    expect(await runDeliveries(server, "slack")).toBe(
+      "Ev01  event_callback message  acknowledged  (attempts: 200)\n" +
+        "Ev02  event_callback app_mention to coder  acknowledged  (attempts: 200)\n",
+    );
+  });
+
   test("an unknown channel is named", async () => {
     const { server, asked } = recording();
     await expect(runDeliveries(server, "teams")).rejects.toThrow(

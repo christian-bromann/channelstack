@@ -184,6 +184,36 @@ describe("inspecting what the agent did", () => {
   });
 });
 
+describe("several apps", () => {
+  // Decision 0027: the same agent runs a second time as the App `coder`, with its own key, secret and webhook.
+  test("a mention gets an answer from the App it names, and only that one", async ({ github }) => {
+    const coder = await github.createApp({ name: "coder" });
+    const ana = await github.createUser({ login: "ana" });
+    const repo = await github.createRepo({ collaborators: [ana], apps: [github.app, coder] });
+    const issue = await ana.openIssue({ title: "Login fails on Safari" }, { repo });
+
+    await ana.comment("@coder can you triage this?", { issue });
+
+    await expect(issue).toHaveCommentFrom(coder, { text: /triage/i });
+    await expect(issue).not.toHaveCommentFrom(github.app);
+    await expect(issue).toGoQuiet({ within: "10s", maxReplies: 1 });
+  });
+
+  test("an App's comment reaches the other App, which doesn't answer a bot", async ({ github }) => {
+    const reviewer = await github.createApp({ name: "reviewer" });
+    const ana = await github.createUser({ login: "ana" });
+    const repo = await github.createRepo({ collaborators: [ana], apps: [github.app, reviewer] });
+    const issue = await ana.openIssue({ title: "Login fails on Safari" }, { repo });
+
+    await reviewer.comment("@my-agent can you triage this?", { issue });
+
+    await expect(issue).not.toHaveCommentFrom(github.app);
+    const deliveries = await github.deliveries({ type: "issue_comment" });
+    const heard = deliveries.find((delivery) => delivery.app === "my-agent");
+    expect(heard?.payload).toMatchObject({ sender: { login: "reviewer[bot]", type: "Bot" } });
+  });
+});
+
 describe("live mode", () => {
   // With the App's credentials and CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN (a machine account's
   // fine-grained PAT) set, this runs in the real test org. GitHub delivers to the agent itself;

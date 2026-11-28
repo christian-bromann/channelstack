@@ -137,6 +137,8 @@ export interface SlackViewRecord {
   readonly session: string;
   /** Who sees it. */
   readonly user: string;
+  /** The app that opened it, by name: its submission, its close and its updates are that app's alone. */
+  readonly app: string;
   /** The view as the app defined it, with every `block_id` and `action_id` filled in. */
   definition: Record<string, unknown> & { blocks: unknown[] };
   /** What is filled in: `values[block_id][action_id]`. */
@@ -267,19 +269,25 @@ export interface SlackWorld {
     menu: SlackControlRef,
     message: { channel: string; ts: string },
   ): string;
-  /** Run a message shortcut on a message. Returns the `message_action` delivery. */
-  shortcutAsUser(session: string, user: string, callbackId: string, message: { channel: string; ts: string }): string;
-  /** Run a slash command in a conversation: `/deploy web staging`. Returns the command's delivery. */
-  commandAsUser(session: string, user: string, command: string, channel: string): string;
+  /** Run a message shortcut of an app (the built-in one unless named) on a message. Returns the `message_action` delivery. */
+  shortcutAsUser(
+    session: string,
+    user: string,
+    callbackId: string,
+    message: { channel: string; ts: string },
+    app?: string,
+  ): string;
+  /** Run an app's slash command (the built-in one's unless named) in a conversation: `/deploy web staging`. Returns the command's delivery. */
+  commandAsUser(session: string, user: string, command: string, channel: string, app?: string): string;
 
   /** Press Stop on the app's work in a thread: open streams end, and the app is told. Returns the delivery. */
   stopAsUser(session: string, user: string, thread: { channel: string; ts: string }): string;
 
   /**
-   * Open the app's split view: a new thread in the person's DM with the app, started from the
-   * channel they are looking at (if any). Returns the thread's anchor.
+   * Open an app's split view (the built-in one's unless named): a new thread in the person's DM
+   * with that app, started from the channel they are looking at (if any). Returns the thread's anchor.
    */
-  openAgentThread(session: string, user: string, from: string | undefined): SlackMessageRecord;
+  openAgentThread(session: string, user: string, from: string | undefined, app?: string): SlackMessageRecord;
   /** Pick one of the prompts the app suggested in a thread: the person says its message there. */
   pickPrompt(session: string, user: string, title: string, thread: { channel: string; ts: string }): SlackMessageRecord;
   /** Look at another channel while the split view stays open. Returns the delivery that tells the app. */

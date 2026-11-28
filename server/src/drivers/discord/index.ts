@@ -1,3 +1,4 @@
+import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { discordDev } from "./dev.ts";
 import { createDiscordFake } from "./fake/index.ts";
@@ -37,7 +38,8 @@ export const discord: DriverDefinition = {
   },
   create(context): Driver {
     const fake = createDiscordFake(context);
-    const publicKey = () => publicKeyOf(context.secret("interactionsKey"));
+    /** An app's public key: the other half of its own signing key. */
+    const publicKey = (app = BUILT_IN_APP) => publicKeyOf(context.apps.secret(app, "interactionsKey"));
     const client = new DiscordRestClient({
       base: context.live.apiBase,
       fetch: context.live.fetch,
@@ -68,20 +70,24 @@ export const discord: DriverDefinition = {
           reality: () => (live ? "live" : "fake"),
           events: context.events,
           apiUrl: context.apiUrl,
-          secret: context.secret,
+          secret: (name, app) => context.apps.secret(app ?? BUILT_IN_APP, name),
           publicKey,
         }),
       capabilities: () => ({}),
       openWork: (session) => fake.world.openWork(session),
       // What the agent needs: discord.js's `rest.api`, its token, and what it registers commands in and checks interactions with.
       // Live, `channelstack env` prints nothing for Discord (app.ts): the agent talks to it with its own configuration.
-      env: () => ({
-        DISCORD_API_URL: `${context.apiUrl()}/api`,
-        DISCORD_TOKEN: context.secret("botToken"),
-        DISCORD_APPLICATION_ID: fake.store.app.id,
-        DISCORD_PUBLIC_KEY: publicKey(),
-        DISCORD_GUILD_ID: fake.store.guild.id,
-      }),
+      env: (name) => {
+        // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same shape.
+        const app = fake.store.apps.forEnv(name, (wanted) => fake.world.createApp(undefined, { name: wanted }));
+        return {
+          DISCORD_API_URL: `${context.apiUrl()}/api`,
+          DISCORD_TOKEN: context.apps.secret(app.name, "botToken"),
+          DISCORD_APPLICATION_ID: app.id,
+          DISCORD_PUBLIC_KEY: publicKey(app.name),
+          DISCORD_GUILD_ID: fake.store.guild.id,
+        };
+      },
     };
   },
 };

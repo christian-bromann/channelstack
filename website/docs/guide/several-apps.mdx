@@ -1,0 +1,111 @@
+---
+title: "Several apps"
+order: 7
+description: "Test agents that work together, or beside another bot: add apps by name, run a second agent as one, script an app that talks back, and catch two agents answering each other without end."
+---
+
+# Several apps
+
+This page shows how to test an agent that shares a channel, a repository, an issue, a page or a mailbox with other agents: a triage agent that hands off to a coding agent, a review App that comments on a coding App's pull request, two vendors' bots in one support channel. It assumes you know how a test is written, as in [writing tests](/docs/guide/writing-tests).
+
+## The built-in app, and the others
+
+Every fake comes with one app, `my-agent`, which each fixture's `app` is (`slack.app`, `github.app`, …), and which your agent acts as. Nothing about it changes when a test adds more.
+
+A test adds another app with `createApp({ name })` on the platform's fixture, and puts it where the platform puts apps:
+
+```ts
+test("the triage agent hands off to the coder", async ({ slack }) => {
+  const coder = await slack.createApp({ name: "coder" });
+  const ana = await slack.createUser({ name: "Ana" });
+  const channel = await slack.createChannel({ participants: [ana, slack.app, coder] });
+
+  const msg = await ana.say("@coder summarize yesterday's incidents", { channel });
+
+  await expect(msg.thread).toHaveRepliesFrom(coder, { count: 1 });
+  await expect(msg.thread).not.toHaveReplyFrom(slack.app);
+});
+```
+
+Each app is a real app of its platform, with its own ids, credentials and endpoint, and it hears what the real platform would send it, including what the other apps do:
+
+| Platform | An app is | It joins with |
+|---|---|---|
+| [Slack](/docs/platforms/slack#several-apps) | An app with its own bot user, tokens and signing secret | `participants`, `invite`, `openDM` |
+| [GitHub](/docs/platforms/github#several-apps) | A GitHub App with its own App id, `<name>[bot]`, key, webhook secret and installation | `createRepo({ apps })`, `repo.installApp(app)` |
+| [Linear](/docs/platforms/linear#several-apps) | An OAuth app with its own app user, token and webhook secret | A delegation, or a person's mention |
+| [Notion](/docs/platforms/notion#several-integrations) | An internal integration with its own bot user, token and verification token | `connections` on a page |
+| [Resend](/docs/platforms/resend#several-apps) | A team of its own, with its key, webhook secret and domain (`<name>.acme.example`) | An email to its address |
+| [Google](/docs/platforms/google#several-apps) | A mailbox of its own, `<name>@acme.example`, with its OAuth client, refresh token and Pub/Sub topic | An email to its address |
+| [Discord](/docs/platforms/discord#several-apps) | An application with its own bot user, bot token, Ed25519 key and interactions endpoint, on its own Gateway connection | `participants`, `invite` |
+
+`apps()` lists the apps your test used, `my-agent` first, then each it got from `createApp`. An app another test made isn't among them, and its handle is `not_found` in yours until your test asks for it with `createApp` too, which returns the same app. Matchers take an app's handle or its name as the author: `toHaveReplyFrom(coder)` and `toHaveReplyFrom("coder")` mean the same.
+
+## Names, and what an app keeps
+
+- **An app is found by its name.** The first `createApp({ name: "coder" })` makes it; later calls with the same settings return the same app, from any test, so parallel tests share it as they share `my-agent`. The same name with other settings is refused with `invalid_argument`.
+- **A name** is 1 to 32 lower-case letters, digits and hyphens, starting with a letter (`coder`, `code-reviewer`). `my-agent` is taken. A person and an app in one test can't share a name, so a name in a matcher always means one author.
+- **A channel holds 10 apps** besides `my-agent`. Apps live as long as the server, so a run can't make them without end.
+- **Its ids** come from `CHANNELSTACK_SEED` and its name, whatever order tests make apps in. **Its secrets** are made once per install and kept in `~/.channelstack/secrets.json` with the rest, so its agent's `.env` stays valid across restarts, and `channelstack secrets rotate` replaces them too.
+
+## Running a second agent
+
+channelstack never starts an agent, so each app is driven by an agent process you start, or one process holds several apps. Tell the server where each app takes its events, one variable per app, and start each agent with its own `.env`:
+
+```bash
+CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events \
+CHANNELSTACK_SLACK_APP_CODER_WEBHOOK_URL=http://localhost:3001/slack/events \
+npx channelstack
+
+npx channelstack env --channel slack > .env.agent
+npx channelstack env --app coder --channel slack > .env.coder
+```
+
+The variable is `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, with the name in upper case and `-` as `_` (`code-reviewer` is `CODE_REVIEWER`), read once when the server starts. An app without one receives nothing, unless it opens its own connection: Slack's Socket Mode with its app token, or Discord's Gateway with its bot token (on Discord, the variable is its interactions endpoint).
+
+`channelstack env --app coder` prints the app's lines under the same keys `my-agent`'s have (`SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, …), so the same agent code starts as `coder` from a different `.env`. Asking makes the app if no test has yet, so the agent can start first; without `--channel` it makes it on every channel, so name the one the agent is on. In a test, `channelstack.env({ app: "coder" })` gives the same. The agent also needs to know its own name, to tell a mention of itself from one of the other app's.
+
+Every delivery says which app it went to (`delivery.app`). A message's or an email's `delivery` is still the one to `my-agent`; `deliveryFor(coder)` reads another app's, where the platform has one per message: Slack and Discord messages, Linear comments, Resend and Google emails.
+
+## An app the test acts as
+
+An app that no agent drives can be played by the test. Its handle has the acting methods a person has on that platform (`say`, `reply`, `react` on Slack and Discord; `comment`, `openIssue`, `review` on GitHub; `send`, `reply` on email), and they go through the fake's own API with the app's token, so what the others receive is exactly what that app's own call would send: `bot_id`, `app_id` and `bot_profile` on Slack, `author.bot` and the bot's id on Discord, `sender.type: "Bot"` on GitHub.
+
+```ts
+test("another app's mention doesn't set the agent off", async ({ slack }) => {
+  const deployer = await slack.createApp({ name: "deployer" });
+  const channel = await slack.createChannel({ participants: [slack.app, deployer] });
+
+  const msg = await deployer.say("@my-agent the deploy of web finished", { channel });
+
+  const delivery = await msg.deliveryFor(slack.app);
+  expect(delivery?.eventType).toBe("app_mention");
+  await expect(msg.thread).not.toHaveReplyFrom(slack.app);
+});
+```
+
+Acting as `my-agent` is refused with `invalid_argument`: your agent is that app. Script an app only when no agent drives it; two writers in one app confuse the transcript.
+
+Slack's `createUser({ bot: true })` stays the cheapest way to say "a bot wrote this": a user with a `bot_id`, but no app, no credentials and no events.
+
+## Agents that answer each other
+
+The bug that only shows with two real apps in one place is the reply loop: two agents that answer each other without end. Bolt's `ignoreSelf` drops only an app's own messages, a discord.js bot that checks only `message.author.id === client.user.id` answers every other bot, and GitHub sends an App the other Apps' comments with nothing to stop them.
+
+`toGoQuiet` checks for it. It waits until the conversation is quiet, as the negative matchers do, and fails when that takes longer than `within`, or when the conversation holds more than `maxReplies` app messages since a person last wrote, those before the check included. Its message names the authors in turn:
+
+```ts
+await expect(msg.thread).toGoQuiet({ within: "10s", maxReplies: 4 });
+// Expected the conversation to go quiet within 10s with at most 4 app messages since a person last wrote.
+// It was still busy with 14 app messages and no person between them: my-agent → coder → my-agent → …
+```
+
+In pytest it is `await expect(msg.thread).to_go_quiet(max_replies=4, within="10s")`; in Rust, `expect(&thread).to_go_quiet(4).within("10s").await?`.
+
+A test that forgets to check still can't spin until its timeout. The fake counts the app messages in each conversation since a person last wrote there, and after 50 it stops delivering the events of the app messages it counts there, records a `bot_loop` event (in `channelstack tail` and the UI's inspector), and fails the test at teardown, naming the loop. That stop is the fake's, not the platform's: real platforms throttle and never stop, and in live mode nothing stands between the agents.
+
+The [standard checks](/docs/guide/standard-checks) cover it for every platform: `<platform>.no-reply-loop` scripts a peer app that answers everything your agent says, and expects the agent to stop within `loopTurns` turns (default 3). On email, the peer marks its mail `Auto-Submitted`, and the agent should leave such mail unanswered. Pass `app: "coder"` to run every check against the agent driving `coder` instead of `my-agent`.
+
+## Live mode
+
+Extra apps are fake only for now: live, `createApp` and an app's acting aren't built yet. Each extra app will be a real sandbox app, made by hand once, with its own agent deployed at its own public URL, and its credentials in `CHANNELSTACK_<CHANNEL>_APP_<NAME>_…` variables. See [live mode](/docs/guide/live-mode).

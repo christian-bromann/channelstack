@@ -119,6 +119,15 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
   const announce = (pull: Pull, review: GitHubReviewRecord, comments: readonly GitHubReviewCommentRecord[]): void => {
     pull.pull.requestedReviewers = pull.pull.requestedReviewers.filter((reviewer) => reviewer !== review.author);
     touch(pull);
+    posted(pull, review, comments);
+  };
+
+  /**
+   * Tell the Apps about a submitted review and its comments on the diff: one write on the pull
+   * request for the loop guard (decision 0027), and nothing delivered once it stopped there.
+   */
+  const posted = (pull: Pull, review: GitHubReviewRecord, comments: readonly GitHubReviewCommentRecord[]): void => {
+    if (!kit.wrote(store.repo(pull.repo), pull.number, review.author)) return;
     for (const comment of comments) comment.delivery = commentEvent(pull, comment, "created");
     submitted(pull, review);
   };
@@ -332,8 +341,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
         throw error;
       }
       touch(pull);
-      comment.delivery = commentEvent(pull, comment, "created");
-      submitted(pull, review);
+      posted(pull, review, [comment]);
       return comment;
     },
 
@@ -356,8 +364,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
         delivery: undefined,
       });
       touch(pull);
-      comment.delivery = commentEvent(pull, comment, "created");
-      submitted(pull, review);
+      posted(pull, review, [comment]);
       return comment;
     },
 
@@ -365,11 +372,13 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       const from = comment.body;
       comment.body = body;
       comment.updatedAt = clock();
+      if (!kit.wrote(store.repo(pull.repo), pull.number, comment.author)) return undefined;
       return commentEvent(pull, comment, "edited", { changes: { body: { from } } });
     },
 
     deleteReviewComment(pull: Pull, comment: GitHubReviewCommentRecord): string | undefined {
       store.forgetReviewComment(store.sessionOf(store.repo(pull.repo)), comment);
+      if (!kit.wrote(store.repo(pull.repo), pull.number, comment.author)) return undefined;
       return commentEvent(pull, comment, "deleted");
     },
 
@@ -379,6 +388,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       if (resolved) store.resolvedThreads.add(comment.thread);
       else store.resolvedThreads.delete(comment.thread);
       const thread = threadOf(comment);
+      if (!kit.wrote(repo, pull.number, actor)) return undefined;
       return kit.emit(repo, "pull_request_review_thread", actor, {
         action: resolved ? "resolved" : "unresolved",
         thread: {

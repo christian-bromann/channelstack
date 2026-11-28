@@ -20,7 +20,7 @@ export interface DiscordUserRecord {
   readonly fixedId: boolean;
 }
 
-/** The agent's app: its application and its bot user, who have the same id. */
+/** An app: its application and its bot user, who have the same id. The built-in one is the agent's. */
 export interface DiscordAppRecord {
   readonly id: string;
   readonly name: string;
@@ -202,8 +202,17 @@ export interface DiscordWorld {
   openDM(session: string, user: string, other: string): Awaitable<DiscordChannelRecord>;
   /** Let people or the app see a channel. */
   invite(session: string, user: string, participants: readonly string[], channel: string): Awaitable<void>;
-  /** Run one of the app's slash commands. Returns the interaction's delivery; none live, where Discord tells the agent. */
-  runCommand(session: string, user: string, command: string, channel: string): Awaitable<string | undefined>;
+  /**
+   * Run one of an app's slash commands: `app`'s, or the built-in app's when it has one of that name.
+   * Returns the interaction's delivery; none live, where Discord tells the agent.
+   */
+  runCommand(
+    session: string,
+    user: string,
+    command: string,
+    channel: string,
+    app?: string,
+  ): Awaitable<string | undefined>;
   click(
     session: string,
     user: string,

@@ -152,6 +152,7 @@ export function createLiveResendWorld(deps: {
       {
         id,
         direction: "outside",
+        team: undefined,
         author: person.id,
         from: { address: person.address, name: person.name },
         to: input.to,
@@ -248,6 +249,7 @@ export function createLiveResendWorld(deps: {
             {
               id,
               direction: "outside",
+              team: undefined,
               author: from.address === store.app.address ? store.app.id : store.personAt(from.address)?.id,
               from,
               to: parseAddresses(email.to),
@@ -282,7 +284,7 @@ export function createLiveResendWorld(deps: {
       }
     },
 
-    principalOf: (email) => emailAuthor(email, store.app, (id) => store.users.find(id)),
+    principalOf: (email) => emailAuthor(email, store.apps.all(), (id) => store.users.find(id)),
 
     release(session) {
       people.leave(session);

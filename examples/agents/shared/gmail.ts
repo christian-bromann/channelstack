@@ -44,6 +44,9 @@ export function gmailAgent(gmail: gmail_v1.Gmail, options: { address: string; na
     const from = header(message, "From");
     const sender = (from.match(/<([^>]+)>/)?.[1] ?? from).toLowerCase();
     if (sender === own || !message.labelIds?.includes("INBOX")) return;
+    // Mail another program sent on its own (RFC 3834) gets no answer: two agents would answer each other without end.
+    const auto = header(message, "Auto-Submitted");
+    if (auto !== "" && auto.toLowerCase() !== "no") return;
     const subject = header(message, "Subject");
     const messageId = header(message, "Message-ID");
     const references = [header(message, "References"), messageId].filter(Boolean).join(" ");
@@ -53,6 +56,7 @@ export function gmailAgent(gmail: gmail_v1.Gmail, options: { address: string; na
       `Subject: ${encoded(/^re:/i.test(subject) ? subject : `Re: ${subject}`)}`,
       `In-Reply-To: ${messageId}`,
       `References: ${references}`,
+      "Auto-Submitted: auto-replied",
       "MIME-Version: 1.0",
       'Content-Type: text/plain; charset="UTF-8"',
       "Content-Transfer-Encoding: base64",

@@ -78,6 +78,59 @@ let users = discord.users().await?;
 
 **Returns** [`DiscordUsers`](/docs/reference/api/discord#discordusers).
 
+### createApp()
+
+Make another app in the guild, with its own application, bot user, token and Ed25519 key (decision 0027), or return the one made with this name and settings. Its bot connects to the Gateway with its own token; its interactions go to CHANNELSTACK_DISCORD_APP_&lt;NAME>_WEBHOOK_URL, or over its Gateway connection.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const app = await discord.createApp({ name: "…" });
+```
+
+```python title="Python"
+app = await discord.create_app(name="…")
+```
+
+```rust title="Rust"
+let app = discord.create_app().name("…").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `name` | `name` | `string` | yes | option |
+| `privilegedIntents` | `privileged_intents` | `Array<"GUILD_MEMBERS" \| "GUILD_PRESENCES" \| "MESSAGE_CONTENT">` | no | option |
+
+**Returns** [`DiscordApp`](/docs/reference/api/discord#discordapp).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the guild holds only the app channelstack has credentials for.
+
+### apps()
+
+The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const apps = await discord.apps();
+```
+
+```python title="Python"
+apps = await discord.apps()
+```
+
+```rust title="Rust"
+let apps = discord.apps().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`DiscordApps`](/docs/reference/api/discord#discordapps).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the guild holds only the app channelstack has credentials for.
+
 ### createChannel()
 
 Create a text channel. Only the listed participants see it (a private channel); include the app for the bot to hear it.
@@ -177,6 +230,7 @@ let deliveries = discord.deliveries().r#type("…").await?;
 |---|---|---|---|---|
 | `type` | `type` · `r#type` | `string` | no | option |
 | `resource` | `resource` | `DiscordChannel` | no | option |
+| `app` | `app` | `DiscordApp` | no | option |
 
 **Returns** [`DiscordDeliveries`](/docs/reference/api/discord#discorddeliveries).
 
@@ -237,6 +291,7 @@ let fault = discord.fault().r#type(r#type).await?;
 | `route` | `route` | `string` | no | option |
 | `retryAfter` | `retry_after` | `Duration` | no | option |
 | `times` | `times` | `number` | no | option |
+| `app` | `app` | `DiscordApp` | no | option |
 
 **Returns** [`DiscordFault`](/docs/reference/api/discord#discordfault).
 
@@ -272,6 +327,8 @@ let api_call = discord.wait_for_call().operation("…").await?;
 
 ## DiscordApp
 
+Returned by [`DiscordFixture.createApp()`](/docs/reference/api/discord#createapp).
+
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
@@ -282,6 +339,131 @@ let api_call = discord.wait_for_call().operation("…").await?;
 | `botToken` | `bot_token` | `string` |
 | `publicKey` | `public_key` | `string` |
 | `guildId` | `guild_id` | `string` |
+
+### say()
+
+An app a test made writes, as its own `POST /channels/{id}/messages` would: in a channel or thread its bot sees, or in a DM with the person in `to`. No bot writes to another bot in a DM (50007).
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const message = await app.say("…", { channel });
+```
+
+```python title="Python"
+message = await app.say("…", channel=channel)
+```
+
+```rust title="Rust"
+let message = app.say("…").channel(&channel).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `text` | `string \| DiscordMessageInput` | yes | positional |
+| `channel` | `DiscordChannel` | no | option |
+| `to` | `DiscordUser \| DiscordApp \| Array<DiscordUser \| DiscordApp>` | no | option |
+
+**Returns** [`DiscordMessage`](/docs/reference/api/discord#discordmessage).
+
+**Errors** [`missing_access`](/docs/reference/api/errors#missing-access), [`empty_message`](/docs/reference/api/errors#empty-message), [`cannot_message_user`](/docs/reference/api/errors#cannot-message-user), [`missing_permissions`](/docs/reference/api/errors#missing-permissions), [`invalid_form_body`](/docs/reference/api/errors#invalid-form-body).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the guild holds only the app channelstack has credentials for.
+
+### reply()
+
+An app a test made replies to a message: Discord's reply, in the message's channel, which quotes it.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const result = await app.reply("…", { message });
+```
+
+```python title="Python"
+result = await app.reply("…", message=message)
+```
+
+```rust title="Rust"
+let result = app.reply("…").message(&message).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `text` | `string \| DiscordMessageInput` | yes | positional |
+| `message` | `DiscordMessage` | yes | option |
+
+**Returns** [`DiscordMessage`](/docs/reference/api/discord#discordmessage).
+
+**Errors** [`missing_access`](/docs/reference/api/errors#missing-access), [`empty_message`](/docs/reference/api/errors#empty-message), [`missing_permissions`](/docs/reference/api/errors#missing-permissions), [`invalid_form_body`](/docs/reference/api/errors#invalid-form-body).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the guild holds only the app channelstack has credentials for.
+
+### react()
+
+An app a test made reacts to a message.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.react("…", { message });
+```
+
+```python title="Python"
+delivery = await app.react("…", message=message)
+```
+
+```rust title="Rust"
+let delivery = app.react("…").message(&message).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `emoji` | `string` | yes | positional |
+| `message` | `DiscordMessage` | yes | option |
+
+**Returns** [`DiscordDelivery | undefined`](/docs/reference/api/discord#discorddelivery).
+
+**Errors** [`missing_access`](/docs/reference/api/errors#missing-access), [`missing_permissions`](/docs/reference/api/errors#missing-permissions).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the guild holds only the app channelstack has credentials for.
+
+### unreact()
+
+An app a test made takes its reaction back.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.unreact("…", { message });
+```
+
+```python title="Python"
+delivery = await app.unreact("…", message=message)
+```
+
+```rust title="Rust"
+let delivery = app.unreact("…").message(&message).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `emoji` | `string` | yes | positional |
+| `message` | `DiscordMessage` | yes | option |
+
+**Returns** [`DiscordDelivery | undefined`](/docs/reference/api/discord#discorddelivery).
+
+**Errors** [`missing_access`](/docs/reference/api/errors#missing-access), [`missing_permissions`](/docs/reference/api/errors#missing-permissions).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the guild holds only the app channelstack has credentials for.
 
 ## DiscordUser
 
@@ -560,7 +742,7 @@ user.invite(participants).channel(&channel).await?;
 
 ### runCommand()
 
-Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`.
+Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it.
 
 <CodeGroup>
 
@@ -582,6 +764,7 @@ let delivery = user.run_command("…").channel(&channel).await?;
 |---|---|---|---|
 | `command` | `string` | yes | positional |
 | `channel` | `DiscordChannel` | yes | option |
+| `app` | `DiscordApp` | no | option |
 
 **Returns** [`DiscordDelivery | undefined`](/docs/reference/api/discord#discorddelivery). While refused with [`not_found`](/docs/reference/api/errors#not-found), it tries again until the wait's timeout.
 
@@ -642,6 +825,226 @@ let ephemeral_messages = user.ephemeral().await?;
 **Returns** [`DiscordEphemeralMessages`](/docs/reference/api/discord#discordephemeralmessages). It reads once the app is quiet.
 
 **Live:** needs proxy mode: Discord shows an ephemeral message to its person alone, and no bot API reads it back; proxy mode sees the agent's own calls. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+
+## DiscordMessage
+
+Returned by [`DiscordApp.say()`](/docs/reference/api/discord#say), [`DiscordApp.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.say()`](/docs/reference/api/discord#say-1), [`DiscordUser.reply()`](/docs/reference/api/discord#reply-1).
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `id` | `id` | `string` |
+| `channelId` | `channel_id` | `string` |
+| `channel` | `channel` | `DiscordChannel` |
+| `author` | `author` | `DiscordUser \| DiscordApp` |
+| `text` | `text` | `string` |
+| `content` | `content` | `string` |
+| `embeds` | `embeds` | `unknown[]` |
+| `components` | `components` | `unknown[]` |
+| `postedAt` | `posted_at` | `string` |
+| `edited` | `edited` | `boolean` |
+| `replyTo` | `reply_to` | `string \| undefined` |
+| `thread` | `thread` | `DiscordChannel \| undefined` |
+| `visibleTo` | `visible_to` | `DiscordUser \| undefined` |
+| `delivery` | `delivery` | `DiscordDelivery \| undefined` |
+
+### refresh()
+
+Re-read a message: its latest text, edits and thread.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const updated = await message.refresh();
+```
+
+```python title="Python"
+updated = await message.refresh()
+```
+
+```rust title="Rust"
+let updated = message.refresh().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`DiscordMessage`](/docs/reference/api/discord#discordmessage).
+
+### replies()
+
+What answers a message, oldest first: Discord's replies to it, and the messages of the thread started from it.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const replies = await message.replies();
+```
+
+```python title="Python"
+replies = await message.replies()
+```
+
+```rust title="Rust"
+let replies = message.replies().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`DiscordReplies`](/docs/reference/api/discord#discordreplies).
+
+### transcript()
+
+A message and what answers it, as a person reads them.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const transcript = await message.transcript({ as });
+```
+
+```python title="Python"
+transcript = await message.transcript(as_=as_)
+```
+
+```rust title="Rust"
+let transcript = message.transcript().r#as(&r#as).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `as` | `as_` · `r#as` | `DiscordUser \| DiscordApp` | no | option |
+
+**Returns** [`DiscordTranscript`](/docs/reference/api/discord#discordtranscript).
+
+### reactions()
+
+The reactions on a message, and who added each.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const reactions = await message.reactions();
+```
+
+```python title="Python"
+reactions = await message.reactions()
+```
+
+```rust title="Rust"
+let reactions = message.reactions().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`DiscordReactions`](/docs/reference/api/discord#discordreactions).
+
+### deliveryFor()
+
+The first Gateway dispatch this message caused to this app's bot (decision 0027), or nothing when it wasn't told.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await message.deliveryFor(app);
+```
+
+```python title="Python"
+delivery = await message.delivery_for(app)
+```
+
+```rust title="Rust"
+let delivery = message.delivery_for(&app).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `app` | `DiscordApp` | yes | positional |
+
+**Returns** [`DiscordDelivery | undefined`](/docs/reference/api/discord#discorddelivery).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
+
+### deliveries()
+
+Every Gateway dispatch this message caused to the apps' bots.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const messageDeliveries = await message.deliveries();
+```
+
+```python title="Python"
+message_deliveries = await message.deliveries()
+```
+
+```rust title="Rust"
+let message_deliveries = message.deliveries().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`DiscordMessageDeliveries`](/docs/reference/api/discord#discordmessagedeliveries).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
+
+### waitForReply()
+
+Waits for the next reply after the last one this handle returned: it polls `replies()` and never sleeps longer than it must.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const updated = await message.waitForReply({ from: "my-agent" });
+```
+
+```python title="Python"
+updated = await message.wait_for_reply(from_="my-agent")
+```
+
+```rust title="Rust"
+let updated = message.wait_for_reply().from("my-agent").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `from` | `from_` · `from` | `DiscordUser \| DiscordApp \| string` | no | a handle, or a name |
+| `timeout` | `timeout` | `Duration` | no | default 10s |
+
+**Returns** [`DiscordMessage`](/docs/reference/api/discord#discordmessage). When the time is up, it fails with what it was waiting for.
+
+### latestReply()
+
+The latest reply, once the app is quiet. Waits for at least one: it polls `replies()` and never sleeps longer than it must.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const updated = await message.latestReply({ from: "my-agent" });
+```
+
+```python title="Python"
+updated = await message.latest_reply(from_="my-agent")
+```
+
+```rust title="Rust"
+let updated = message.latest_reply().from("my-agent").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `from` | `from_` · `from` | `DiscordUser \| DiscordApp \| string` | no | a handle, or a name |
+| `timeout` | `timeout` | `Duration` | no | default 10s |
+| `quietFor` | `quiet_for` | `Duration` | no | default 750ms |
+
+**Returns** [`DiscordMessage`](/docs/reference/api/discord#discordmessage). When the time is up, it fails with what it was waiting for.
 
 ## DiscordChannel
 
@@ -775,206 +1178,15 @@ let message = channel.wait_for_message().from("my-agent").await?;
 
 **Returns** [`DiscordMessage`](/docs/reference/api/discord#discordmessage). When the time is up, it fails with what it was waiting for.
 
-## DiscordMessage
-
-Returned by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.edit()`](/docs/reference/api/discord#edit), [`DiscordMessage.refresh()`](/docs/reference/api/discord#refresh).
-
-| Field | Python / Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channelId` | `channel_id` | `string` |
-| `channel` | `channel` | `DiscordChannel` |
-| `author` | `author` | `DiscordUser \| DiscordApp` |
-| `text` | `text` | `string` |
-| `content` | `content` | `string` |
-| `embeds` | `embeds` | `unknown[]` |
-| `components` | `components` | `unknown[]` |
-| `postedAt` | `posted_at` | `string` |
-| `edited` | `edited` | `boolean` |
-| `replyTo` | `reply_to` | `string \| undefined` |
-| `thread` | `thread` | `DiscordChannel \| undefined` |
-| `visibleTo` | `visible_to` | `DiscordUser \| undefined` |
-| `delivery` | `delivery` | `DiscordDelivery \| undefined` |
-
-### refresh()
-
-Re-read a message: its latest text, edits and thread.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const updated = await message.refresh();
-```
-
-```python title="Python"
-updated = await message.refresh()
-```
-
-```rust title="Rust"
-let updated = message.refresh().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`DiscordMessage`](/docs/reference/api/discord#discordmessage).
-
-### replies()
-
-What answers a message, oldest first: Discord's replies to it, and the messages of the thread started from it.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const replies = await message.replies();
-```
-
-```python title="Python"
-replies = await message.replies()
-```
-
-```rust title="Rust"
-let replies = message.replies().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`DiscordReplies`](/docs/reference/api/discord#discordreplies).
-
-### transcript()
-
-A message and what answers it, as a person reads them.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const transcript = await message.transcript({ as });
-```
-
-```python title="Python"
-transcript = await message.transcript(as_=as_)
-```
-
-```rust title="Rust"
-let transcript = message.transcript().r#as(&r#as).await?;
-```
-
-</CodeGroup>
-
-| Parameter | Python / Rust | Type | Required |  |
-|---|---|---|---|---|
-| `as` | `as_` · `r#as` | `DiscordUser \| DiscordApp` | no | option |
-
-**Returns** [`DiscordTranscript`](/docs/reference/api/discord#discordtranscript).
-
-### reactions()
-
-The reactions on a message, and who added each.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const reactions = await message.reactions();
-```
-
-```python title="Python"
-reactions = await message.reactions()
-```
-
-```rust title="Rust"
-let reactions = message.reactions().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`DiscordReactions`](/docs/reference/api/discord#discordreactions).
-
-### deliveries()
-
-Every Gateway dispatch this message caused to the bot.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const messageDeliveries = await message.deliveries();
-```
-
-```python title="Python"
-message_deliveries = await message.deliveries()
-```
-
-```rust title="Rust"
-let message_deliveries = message.deliveries().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`DiscordMessageDeliveries`](/docs/reference/api/discord#discordmessagedeliveries).
-
-**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
-
-### waitForReply()
-
-Waits for the next reply after the last one this handle returned: it polls `replies()` and never sleeps longer than it must.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const updated = await message.waitForReply({ from: "my-agent" });
-```
-
-```python title="Python"
-updated = await message.wait_for_reply(from_="my-agent")
-```
-
-```rust title="Rust"
-let updated = message.wait_for_reply().from("my-agent").await?;
-```
-
-</CodeGroup>
-
-| Parameter | Python / Rust | Type | Required |  |
-|---|---|---|---|---|
-| `from` | `from_` · `from` | `DiscordUser \| DiscordApp \| string` | no | a handle, or a name |
-| `timeout` | `timeout` | `Duration` | no | default 10s |
-
-**Returns** [`DiscordMessage`](/docs/reference/api/discord#discordmessage). When the time is up, it fails with what it was waiting for.
-
-### latestReply()
-
-The latest reply, once the app is quiet. Waits for at least one: it polls `replies()` and never sleeps longer than it must.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const updated = await message.latestReply({ from: "my-agent" });
-```
-
-```python title="Python"
-updated = await message.latest_reply(from_="my-agent")
-```
-
-```rust title="Rust"
-let updated = message.latest_reply().from("my-agent").await?;
-```
-
-</CodeGroup>
-
-| Parameter | Python / Rust | Type | Required |  |
-|---|---|---|---|---|
-| `from` | `from_` · `from` | `DiscordUser \| DiscordApp \| string` | no | a handle, or a name |
-| `timeout` | `timeout` | `Duration` | no | default 10s |
-| `quietFor` | `quiet_for` | `Duration` | no | default 750ms |
-
-**Returns** [`DiscordMessage`](/docs/reference/api/discord#discordmessage). When the time is up, it fails with what it was waiting for.
-
 ## DiscordDelivery
 
-Returned by [`DiscordUser.react()`](/docs/reference/api/discord#react), [`DiscordUser.unreact()`](/docs/reference/api/discord#unreact), [`DiscordUser.runCommand()`](/docs/reference/api/discord#runcommand), [`DiscordUser.click()`](/docs/reference/api/discord#click).
+Returned by [`DiscordApp.react()`](/docs/reference/api/discord#react), [`DiscordApp.unreact()`](/docs/reference/api/discord#unreact), [`DiscordUser.react()`](/docs/reference/api/discord#react-1), [`DiscordUser.unreact()`](/docs/reference/api/discord#unreact-1).
 
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"discord"` |
+| `app` | `app` | `string` |
 | `type` | `type` · `r#type` | `string` |
 | `payload` | `payload` | `unknown \| undefined` |
 | `attempts` | `attempts` | `DeliveryAttempt[]` |
@@ -1125,6 +1337,19 @@ Plain values the handles return and take.
 | `id` | `string` |
 | `name` | `string` |
 
+### DiscordApps
+
+```ts
+type DiscordApps = DiscordApp[];
+```
+
+### DiscordMessageInput
+
+| Field | Type |
+|---|---|
+| `content` | `string \| undefined` |
+| `embeds` | `unknown[] \| undefined` |
+
 ### DiscordUsers
 
 ```ts
@@ -1136,13 +1361,6 @@ type DiscordUsers = DiscordUser[];
 ```ts
 type DiscordChannels = DiscordChannel[];
 ```
-
-### DiscordMessageInput
-
-| Field | Type |
-|---|---|
-| `content` | `string \| undefined` |
-| `embeds` | `unknown[] \| undefined` |
 
 ### DiscordButtonRef
 

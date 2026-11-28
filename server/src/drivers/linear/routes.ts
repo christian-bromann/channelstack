@@ -1,11 +1,12 @@
 import { z } from "@hono/zod-openapi";
 import { GraphQLError } from "graphql";
 
+import { BUILT_IN_APP, HANDLE_ONLY } from "../../core/apps/index.ts";
 import { iso } from "../../core/clock/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
-import type { LiveSupport } from "../../core/reality/index.ts";
+import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
 import { type DriverRouter, pathParam, refTo, registerInspectionRoutes } from "../../core/router/index.ts";
 import {
   apiCallSchema,
@@ -19,6 +20,7 @@ import type { FakeLinearWorld } from "./fake/world.ts";
 import { renderTranscript } from "./transcript.ts";
 import type {
   LinearActivityRecord,
+  LinearAppRecord,
   LinearCommentRecord,
   LinearIssueRecord,
   LinearSessionRecord,
@@ -44,10 +46,12 @@ const LinearApp = z
     name: z.string(),
     kind: z.literal("app"),
     botUserId: z.string(),
-    accessToken: z.string(),
-    webhookSecret: z.string(),
-    clientId: z.string(),
-    clientSecret: z.string(),
+    accessToken: z
+      .string()
+      .openapi({ description: `Its OAuth access token, installed with \`actor=app\`. ${HANDLE_ONLY}` }),
+    webhookSecret: z.string().openapi({ description: `Its webhook signing secret. ${HANDLE_ONLY}` }),
+    clientId: z.string().openapi({ description: `Its OAuth client id. ${HANDLE_ONLY}` }),
+    clientSecret: z.string().openapi({ description: `Its OAuth client secret. ${HANDLE_ONLY}` }),
   })
   .openapi("LinearApp", { "x-channelstack-resource": { id: "id", role: "app" } });
 
@@ -61,6 +65,8 @@ const LinearDelivery = z
   .object({
     id: z.string(),
     channel: z.literal("linear"),
+    /** The app it went to, by name: `my-agent`, or one a test made. */
+    app: z.string(),
     type: z
       .string()
       .openapi({ description: "`Linear-Event`, the resource type: `AgentSessionEvent`, `Issue`, `Comment`." }),
@@ -137,6 +143,7 @@ const activityRef = z.string().openapi(refTo("LinearAgentActivity"));
 const Priority = z.number().int().min(0).max(4);
 
 const UserParams = z.object({ user: pathParam("user") });
+const AppParams = z.object({ app: pathParam("app") });
 const IssueParams = z.object({ issue: pathParam("issue") });
 const SessionParams = z.object({ agentSession: pathParam("agentSession") });
 const CommentParams = z.object({ comment: pathParam("comment") });
@@ -148,6 +155,10 @@ const IN_THE_UI: LiveSupport = {
 };
 /** Linear has no redelivery mutation. */
 const NO_REDELIVERY: LiveSupport = { unsupported: "Linear has no API to redeliver a webhook" };
+/** Only the built-in app is wired to the live workspace: a second sandbox app is set up by hand (decision 0027, question 8). */
+const ONE_LIVE_APP: LiveSupport = {
+  unsupported: "Live, the Linear workspace has the built-in app only: another app needs a sandbox app of its own",
+};
 /** What only the app's own calls show: live, proxy mode sees them. */
 const AGENT_SIDE: LiveSupport = {
   requires: "proxy",
@@ -164,7 +175,8 @@ export function registerLinearRoutes(
     live: LinearWorld | undefined;
     events: EventLog;
     apiUrl: () => string;
-    secret: (name: string) => string;
+    /** One of an app's secrets: the built-in app's unless another is named. */
+    secret: (name: string, app?: string) => string;
   },
 ): void {
   const { fake } = deps;
@@ -195,19 +207,33 @@ export function registerLinearRoutes(
     admin: user.admin,
     guest: user.guest,
   });
-  const appWire = () => ({
-    id: store.appUser.id,
-    name: store.appUser.name,
+  /**
+   * An app as an author, a delegate or an agent session's app: who it is, without its
+   * credentials. Only the app a test asks for (the fixture's, `createApp`, `apps()`) carries
+   * them: `appHandle`.
+   */
+  const appWire = (app: LinearAppRecord) => ({
+    id: app.userId,
+    name: app.name,
     kind: "app" as const,
-    botUserId: store.appUser.id,
-    // A live app's credentials stay on the server: the control API never returns them.
-    accessToken: isLive ? "" : deps.secret("oauthToken"),
-    webhookSecret: isLive ? "" : deps.secret("webhookSecret"),
-    clientId: isLive ? "" : deps.secret("clientId"),
-    clientSecret: isLive ? "" : deps.secret("clientSecret"),
+    botUserId: app.userId,
+    accessToken: "",
+    webhookSecret: "",
+    clientId: "",
+    clientSecret: "",
   });
-  const authorWire = (id: string) =>
-    id === store.appUser.id ? appWire() : userWire(store.user(id) as LinearUserRecord);
+  const appHandle = (app: LinearAppRecord) => ({
+    ...appWire(app),
+    // A live app's credentials stay on the server: the control API never returns them.
+    accessToken: isLive ? "" : deps.secret("oauthToken", app.name),
+    webhookSecret: isLive ? "" : deps.secret("webhookSecret", app.name),
+    clientId: isLive ? "" : deps.secret("clientId", app.name),
+    clientSecret: isLive ? "" : deps.secret("clientSecret", app.name),
+  });
+  const authorWire = (id: string) => {
+    const app = store.appByUser(id);
+    return app ? appWire(app) : userWire(store.user(id) as LinearUserRecord);
+  };
   const principal = (id: string) => {
     const { id: principalId, name, kind } = authorWire(id);
     return { id: principalId, name, kind };
@@ -223,6 +249,7 @@ export function registerLinearRoutes(
   const deliveryWire = ({ request, attempts }: DeliveryRecord) => ({
     id: request.id,
     channel: "linear" as const,
+    app: request.app ?? BUILT_IN_APP,
     type: request.type,
     action: String(request.meta?.action ?? ""),
     webhookId: String((request.meta?.payload as { webhookId?: string } | undefined)?.webhookId ?? ""),
@@ -236,7 +263,7 @@ export function registerLinearRoutes(
   const sessionWire = (session: string, record: LinearSessionRecord) => ({
     id: record.id,
     issue: issueWire(store.issue(record.issue)),
-    app: appWire(),
+    app: appWire(store.appByUser(record.appUser) ?? store.app),
     startedBy: userWire(store.user(record.creator) as LinearUserRecord),
     delivery: caused(session, record.delivery),
   });
@@ -303,7 +330,10 @@ export function registerLinearRoutes(
     response: LinearFixture,
     factory: { on: "Session", name: "linear" },
     stability,
-    handler: () => ({ app: appWire(), apiUrl: isLive ? "https://api.linear.app/graphql" : `${deps.apiUrl()}/graphql` }),
+    handler: () => ({
+      app: appHandle(store.app),
+      apiUrl: isLive ? "https://api.linear.app/graphql" : `${deps.apiUrl()}/graphql`,
+    }),
   });
 
   router.route({
@@ -333,6 +363,88 @@ export function registerLinearRoutes(
     },
     stability,
     handler: async ({ session, body }) => userWire(await world.createUser(session.id, body)),
+  });
+
+  // --- Apps (decision 0027) ---------------------------------------------------------------------
+
+  router.route({
+    method: "post",
+    path: "/apps",
+    summary:
+      "Make another OAuth app in the workspace, installed with `actor=app`: its own app user (mentionable and assignable), access token, client and webhook secret. Or return the one made with this name and settings. Its webhooks go to CHANNELSTACK_LINEAR_APP_<NAME>_WEBHOOK_URL",
+    body: z
+      .object({
+        name: z
+          .string()
+          .min(1)
+          .openapi({ description: "How people mention it: 1 to 32 lower-case letters, digits and hyphens" }),
+        events: z.array(z.string().min(1)).optional().openapi({
+          description:
+            "The webhook resource types it subscribes to. Default: the built-in app's, `AgentSessionEvent`, `Issue` and `Comment`",
+        }),
+      })
+      .openapi("LinearAppOptions"),
+    response: LinearApp,
+    errors: ["invalid_argument"],
+    factory: { on: "LinearFixture", name: "createApp", options: ["name", "events"] },
+    live: ONE_LIVE_APP,
+    stability,
+    handler: ({ session, body }) => appHandle(fake.createApp(session.id, body)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/apps",
+    summary:
+      "The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here",
+    response: z.array(LinearApp).openapi("LinearApps"),
+    sdkMethod: { on: "LinearFixture", name: "apps" },
+    stability,
+    handler: ({ session }) => store.apps.of(session.id).map(appHandle),
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/comment",
+    summary:
+      "An app a test made comments on an issue, as its own `commentCreate` would. Its mention of another app is refused (to confirm, B6)",
+    params: AppParams,
+    body: z.object({ body: z.string().min(1), issue: issueRef }).openapi("LinearAppCommentBody"),
+    response: LinearComment,
+    errors: ["not_found", "invalid_argument"],
+    sdkMethod: { on: "LinearApp", name: "comment", args: ["body"], options: ["issue"] },
+    live: ONE_LIVE_APP,
+    stability,
+    handler: async ({ session, params, body }) => {
+      const app = store.apps.scripted(session.id, params.app);
+      const issue = issueOf(session.id, body.issue);
+      return commentWire(
+        session.id,
+        await asProtocol(() => fake.comment(issue, app.userId, fake.markdown(session.id, body.body))),
+      );
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/reply",
+    summary: "An app a test made replies in a comment's thread, as its own `commentCreate` with a `parentId` would",
+    params: AppParams,
+    body: z.object({ body: z.string().min(1), comment: commentRef }).openapi("LinearAppReplyBody"),
+    response: LinearComment,
+    errors: ["not_found", "invalid_argument"],
+    sdkMethod: { on: "LinearApp", name: "reply", args: ["body"], options: ["comment"] },
+    live: ONE_LIVE_APP,
+    stability,
+    handler: async ({ session, params, body }) => {
+      const app = store.apps.scripted(session.id, params.app);
+      const parent = commentOf(session.id, body.comment);
+      const issue = store.issue(parent.issue);
+      return commentWire(
+        session.id,
+        await asProtocol(() => fake.comment(issue, app.userId, fake.markdown(session.id, body.body), parent)),
+      );
+    },
   });
 
   router.route({
@@ -462,7 +574,7 @@ export function registerLinearRoutes(
           world.createIssue(team, user.id, {
             ...issue,
             description: issue.description === undefined ? undefined : world.markdown(session.id, issue.description),
-            delegate: issue.delegate === undefined ? undefined : store.appUser.id,
+            delegate: issue.delegate === undefined ? undefined : store.apps.handle(session.id, issue.delegate).userId,
           }),
         ),
       );
@@ -570,7 +682,8 @@ export function registerLinearRoutes(
   router.route({
     method: "post",
     path: "/users/{user}/delegate",
-    summary: "Delegate an issue to the app. Opens an agent session and sends `AgentSessionEvent` (`created`)",
+    summary:
+      "Delegate an issue to an app. Opens that app's agent session and sends it `AgentSessionEvent` (`created`); an issue delegated to another app moves",
     params: UserParams,
     body: z.object({ app: appRef, issue: issueRef }).openapi("LinearDelegateBody"),
     response: LinearAgentSession,
@@ -580,9 +693,10 @@ export function registerLinearRoutes(
     handler: async ({ session, params, body }) => {
       const issue = issueOf(session.id, body.issue);
       const user = actor(session.id, params.user, issue);
-      if (issue.delegate === store.appUser.id)
-        throw new ProtocolError("invalid_argument", `${issue.identifier} is already delegated to the app`);
-      await asProtocol(() => world.updateIssue(issue, user.id, { delegateId: store.appUser.id }));
+      const app = store.apps.handle(session.id, body.app);
+      if (issue.delegate === app.userId)
+        throw new ProtocolError("invalid_argument", `${issue.identifier} is already delegated to ${app.name}`);
+      await asProtocol(() => world.updateIssue(issue, user.id, { delegateId: app.userId }));
       const opened = store.sessionsOn(issue).at(-1) as LinearSessionRecord;
       return sessionWire(session.id, opened);
     },
@@ -830,7 +944,7 @@ export function registerLinearRoutes(
     issue.assignee === null ? null : userWire(store.user(issue.assignee) as LinearUserRecord),
   );
   issueRead("/delegate", "delegatedTo", "The app the issue is delegated to, if any", LinearApp.nullable(), (issue) =>
-    issue.delegate === null ? null : appWire(),
+    issue.delegate === null ? null : appWire(store.appByUser(issue.delegate) ?? store.app),
   );
   issueRead("/labels", "labels", "The names of the labels on the issue", z.array(z.string()), (issue) => {
     const team = store.team(issue.team);
@@ -907,6 +1021,34 @@ export function registerLinearRoutes(
         .commentsOn(store.issue(root.issue))
         .filter((comment) => comment.parent === root.id)
         .map((comment) => commentWire(session.id, comment));
+    },
+  });
+
+  router.route({
+    method: "get",
+    path: "/comments/{comment}/delivery-for",
+    summary:
+      "The `Comment` (`create`) delivery this comment caused to this app (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in app's",
+    params: CommentParams,
+    query: z.object({ app: z.string().openapi({ param: { name: "app", in: "query" }, ...refTo("LinearApp") }) }),
+    response: LinearDelivery.nullable(),
+    errors: ["not_found"],
+    sdkMethod: { on: "LinearComment", name: "deliveryFor", args: ["app"] },
+    live: DELIVERY_IS_THE_PLATFORMS,
+    stability,
+    handler: ({ session, params, query }) => {
+      const comment = commentOf(session.id, params.comment);
+      const app = store.apps.get(session.id, query.app);
+      const found = fake.deliveries(session.id).find(({ request }) => {
+        const payload = request.meta?.payload as { action?: string; data?: { id?: string } } | undefined;
+        return (
+          (request.app ?? BUILT_IN_APP) === app.name &&
+          request.type === "Comment" &&
+          payload?.action === "create" &&
+          payload.data?.id === comment.id
+        );
+      });
+      return found ? deliveryWire(found) : null;
     },
   });
 
@@ -1013,6 +1155,7 @@ export function registerLinearRoutes(
     stability,
     deliveries: fake,
     delivery: { schema: LinearDelivery, wire: deliveryWire },
+    apps: { handle: "LinearApp", roster: store.apps },
     listSummary: "Every webhook channelstack sent the agent for this session, with every attempt",
     filters: {
       type: "Only this resource type, e.g. `AgentSessionEvent`.",

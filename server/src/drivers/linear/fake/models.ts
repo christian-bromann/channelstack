@@ -34,8 +34,9 @@ export interface LinearCallContext {
  * Records → the objects GraphQL reads, one builder per Linear type. A relation is a function, so
  * it is only built when an operation asks for it; a field left out gets Linear's empty value.
  * An object carries its test session (`OWNER`): resolving it puts that session on the call's record.
+ * `viewer` is the app user whose token made the call.
  */
-export function linearModels(world: FakeLinearWorld) {
+export function linearModels(world: FakeLinearWorld, viewer: LinearUserRecord) {
   const { store, links } = world;
   /** A list as a filtered, paged connection. */
   const listOf =
@@ -56,8 +57,8 @@ export function linearModels(world: FakeLinearWorld) {
     admin: record.admin,
     guest: record.guest,
     app: record.app,
-    // The fake takes the app's token only, so "me" is always the app's user, in answers and filters alike.
-    isMe: record.id === store.appUser.id,
+    // The fake takes apps' tokens only, so "me" is the calling app's user, in answers and filters alike.
+    isMe: record.id === viewer.id,
     active: true,
     url: links.profile(record),
     createdAt: iso(record.createdAt),
@@ -96,14 +97,14 @@ export function linearModels(world: FakeLinearWorld) {
     urlKey: store.org.urlKey,
     createdAt: iso(store.app.createdAt),
     updatedAt: iso(store.app.createdAt),
-    userCount: store.all(store.users).length + 1,
+    userCount: store.all(store.users).length + store.apps.all().length,
     // A new workspace's settings, as Linear sets them up.
     releaseChannel: "public",
     slaDayCount: "all",
     projectUpdatesReminderFrequency: "week",
     projectUpdateRemindersDay: "Friday",
     initiativeUpdateRemindersDay: "Friday",
-    users: (args: Args) => listOf([store.appUser, ...store.all(store.users)].map(user))(args),
+    users: (args: Args) => listOf([...store.appUsers(), ...store.all(store.users)].map(user))(args),
     teams: (args: Args) => listOf(store.all(store.teams).map(team))(args),
   });
 
@@ -315,7 +316,7 @@ export function linearModels(world: FakeLinearWorld) {
       externalUrls: JSON.stringify(record.externalUrls),
       externalLinks: record.externalUrls.map((link) => ({ __typename: "AgentSessionExternalLink", ...link })),
       externalLink: record.externalUrls[0]?.url ?? null,
-      appUser: () => user(store.appUser),
+      appUser: () => user(store.user(record.appUser) as LinearUserRecord),
       creator: () => user(store.user(record.creator) as LinearUserRecord),
       issue: () => issue(issueRecord),
       comment:

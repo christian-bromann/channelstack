@@ -8,7 +8,10 @@ export interface GitHubOrgRecord {
   login: string;
 }
 
-/** The agent's GitHub App, installed on the org with access to selected repos. */
+/**
+ * A GitHub App installed on the org with access to selected repos: the agent's own (`my-agent`),
+ * or one a test made (decision 0027). Each has its own ids, bot user, key and webhook secret.
+ */
 export interface GitHubAppRecord {
   /** The App id the agent puts in its JWT. */
   id: number;
@@ -62,8 +65,8 @@ export interface GitHubRepoRecord {
   defaultBranch: string;
   /** Login → permission. Org admins have admin on every repo without being listed. */
   collaborators: Map<string, GitHubPermission>;
-  /** Is the agent's App installed on this repo? It hears about a repo only then. */
-  installed: boolean;
+  /** The Apps installed on this repo, by name. An App hears about a repo, and reaches it, only then. */
+  apps: Set<string>;
   labels: Map<string, GitHubLabelRecord>;
   createdAt: number;
   pushedAt: number;
@@ -197,6 +200,8 @@ export type GitHubCheckConclusion =
 
 export interface GitHubCheckRunRecord {
   id: number;
+  /** The App that made it, by name: a person's Re-run and a click on its buttons go to that App alone. */
+  app: string;
   repo: number;
   suite: number;
   headSha: string;
@@ -226,9 +231,11 @@ export interface GitHubStatusRecord {
   createdAt: number;
 }
 
-/** One entry of the App's delivery log (`GET /app/hook/deliveries`). */
+/** One entry of an App's delivery log (`GET /app/hook/deliveries`). */
 export interface GitHubHookDeliveryRecord {
   id: number;
+  /** The App whose log it is in, by name: each App has its own. */
+  app: string;
   guid: string;
   session: string;
   event: string;

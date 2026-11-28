@@ -37,7 +37,9 @@ pub mod codes {
     pub const ACTION_REQUIRES: &str = "action_requires";
     pub const ALREADY_IN_CHANNEL: &str = "already_in_channel";
     pub const ALREADY_REACTED: &str = "already_reacted";
+    pub const CANNOT_DM_BOT: &str = "cannot_dm_bot";
     pub const CANNOT_EDIT_OTHERS_MESSAGE: &str = "cannot_edit_others_message";
+    pub const CANNOT_MESSAGE_USER: &str = "cannot_message_user";
     pub const CANT_DELETE_MESSAGE: &str = "cant_delete_message";
     pub const CANT_UPDATE_MESSAGE: &str = "cant_update_message";
     pub const CROSS_WORKSPACE_CREDENTIAL: &str = "cross_workspace_credential";
@@ -62,6 +64,8 @@ pub mod codes {
     pub const NOT_FOUND: &str = "not_found";
     pub const NOT_IN_CHANNEL: &str = "not_in_channel";
     pub const NOT_IN_ROOM: &str = "not_in_room";
+    pub const OBJECT_NOT_FOUND: &str = "object_not_found";
+    pub const RESTRICTED_RESOURCE: &str = "restricted_resource";
     pub const SESSION_NOT_FOUND: &str = "session_not_found";
     pub const SPLIT_VIEW_UNAVAILABLE: &str = "split_view_unavailable";
     pub const STOP_UNAVAILABLE: &str = "stop_unavailable";
@@ -69,6 +73,7 @@ pub mod codes {
     pub const UNAUTHORIZED: &str = "unauthorized";
     pub const UNSUPPORTED_IN_FAKE: &str = "unsupported_in_fake";
     pub const UNSUPPORTED_IN_LIVE: &str = "unsupported_in_live";
+    pub const VALIDATION_ERROR: &str = "validation_error";
     pub const VALIDATION_FAILED: &str = "validation_failed";
 }
 
@@ -138,6 +143,8 @@ fn run_channelstack_env<'a>(
         let _ = (&me, &options);
         let mut args = args.into_iter();
         let p_proxy = options.get("proxy").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
+        let p_channel = options.get("channel").cloned().unwrap_or(Value::Null);
         let path = format!("/env");
         send(
             ctx,
@@ -147,6 +154,8 @@ fn run_channelstack_env<'a>(
             Some({
                 let mut wire = Map::new();
                 wire.insert("proxy".into(), p_proxy.clone());
+                wire.insert("app".into(), p_app.clone());
+                wire.insert("channel".into(), p_channel.clone());
                 wire
             }),
             false,
@@ -404,6 +413,48 @@ fn run_echo_fixture_create_user<'a>(
     })
 }
 
+fn run_echo_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/echo/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_echo_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/echo/apps", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_echo_fixture_create_room<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -453,6 +504,43 @@ fn run_echo_fixture_capabilities<'a>(
             encode_segment(ctx.session()?)
         );
         send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_echo_app_say<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_text = args.next().unwrap_or(Value::Null);
+        let p_room = options.get("room").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/echo/apps/{}/say",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("text".into(), p_text.clone());
+                wire.insert(
+                    "room".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_room)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -630,6 +718,52 @@ fn run_slack_fixture_users<'a>(
     })
 }
 
+fn run_slack_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_scopes = options.get("scopes").cloned().unwrap_or(Value::Null);
+        let p_bot_events = options.get("botEvents").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/slack/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("scopes".into(), p_scopes.clone());
+                wire.insert("botEvents".into(), p_bot_events.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/slack/apps", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_slack_fixture_conversations<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -702,11 +836,28 @@ fn run_slack_fixture_deliveries<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/deliveries",
             encode_segment(ctx.session()?)
         );
-        send(ctx, "GET", path, None, None, false, &[]).await
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -749,11 +900,28 @@ fn run_slack_fixture_uninstall_app<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/uninstall",
             encode_segment(ctx.session()?)
         );
-        send(ctx, "POST", path, None, None, false, &[]).await
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -773,6 +941,7 @@ fn run_slack_fixture_fault<'a>(
         let p_after = options.get("after").cloned().unwrap_or(Value::Null);
         let p_error = options.get("error").cloned().unwrap_or(Value::Null);
         let p_times = options.get("times").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!("/sessions/{}/slack/faults", encode_segment(ctx.session()?));
         send(
             ctx,
@@ -790,6 +959,171 @@ fn run_slack_fixture_fault<'a>(
                 wire.insert("after".into(), (&|v: &Value| enc::duration(v))(&p_after)?);
                 wire.insert("error".into(), p_error.clone());
                 wire.insert("times".into(), p_times.clone());
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_app_say<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_message = args.next().unwrap_or(Value::Null);
+        let p_channel = options.get("channel").cloned().unwrap_or(Value::Null);
+        let p_to = options.get("to").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/apps/{}/say",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "message".into(),
+                    enc::shorthand(&p_message, "text", &|v: &Value| enc::plain(v))?,
+                );
+                wire.insert(
+                    "channel".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_channel)?,
+                );
+                wire.insert(
+                    "to".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_to,
+                    )?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_app_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_message = args.next().unwrap_or(Value::Null);
+        let p_thread = options.get("thread").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "message".into(),
+                    enc::shorthand(&p_message, "text", &|v: &Value| enc::plain(v))?,
+                );
+                wire.insert(
+                    "thread".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channel", "ts"]))(&p_thread)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_app_react<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_emoji = args.next().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/apps/{}/react",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("emoji".into(), p_emoji.clone());
+                wire.insert(
+                    "message".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channel", "ts"]))(&p_message)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_app_unreact<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_emoji = args.next().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/apps/{}/unreact",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("emoji".into(), p_emoji.clone());
+                wire.insert(
+                    "message".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channel", "ts"]))(&p_message)?,
+                );
                 wire
             }),
             None,
@@ -1083,6 +1417,7 @@ fn run_slack_user_shortcut<'a>(
         let mut args = args.into_iter();
         let p_callback_id = args.next().unwrap_or(Value::Null);
         let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/users/{}/shortcut",
             encode_segment(ctx.session()?),
@@ -1098,6 +1433,10 @@ fn run_slack_user_shortcut<'a>(
                 wire.insert(
                     "message".into(),
                     (&|v: &Value| enc::ref_ids(v, &["channel", "ts"]))(&p_message)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -1120,6 +1459,7 @@ fn run_slack_user_run_command<'a>(
         let mut args = args.into_iter();
         let p_command = args.next().unwrap_or(Value::Null);
         let p_channel = options.get("channel").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/users/{}/commands",
             encode_segment(ctx.session()?),
@@ -1135,6 +1475,10 @@ fn run_slack_user_run_command<'a>(
                 wire.insert(
                     "channel".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_channel)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -1191,6 +1535,7 @@ fn run_slack_user_open_agent_thread<'a>(
         let _ = (&me, &options);
         let mut args = args.into_iter();
         let p_from = options.get("from").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/users/{}/agent-threads",
             encode_segment(ctx.session()?),
@@ -1205,6 +1550,10 @@ fn run_slack_user_open_agent_thread<'a>(
                 wire.insert(
                     "from".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_from)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -1522,6 +1871,132 @@ fn run_slack_user_ephemeral<'a>(
     })
 }
 
+fn run_slack_message_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/slack/conversations/{}/messages/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["ts"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_slack_message_reactions<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/slack/conversations/{}/messages/{}/reactions",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["ts"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_slack_message_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_as = options.get("as").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/conversations/{}/messages/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["ts"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("as".into(), (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_as)?);
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_message_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/conversations/{}/messages/{}/delivery-for",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["ts"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_message_deliveries<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/slack/conversations/{}/messages/{}/deliveries",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["ts"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_slack_conversation_latest_message<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -1605,96 +2080,6 @@ fn run_slack_conversation_transcript<'a>(
             &[],
         )
         .await
-    })
-}
-
-fn run_slack_message_refresh<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/slack/conversations/{}/messages/{}",
-            encode_segment(ctx.session()?),
-            path_value(&me["channel"])?,
-            path_value(&me["ts"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_slack_message_reactions<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/slack/conversations/{}/messages/{}/reactions",
-            encode_segment(ctx.session()?),
-            path_value(&me["channel"])?,
-            path_value(&me["ts"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_slack_message_transcript<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_as = options.get("as").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/slack/conversations/{}/messages/{}/transcript",
-            encode_segment(ctx.session()?),
-            path_value(&me["channel"])?,
-            path_value(&me["ts"])?
-        );
-        send(
-            ctx,
-            "GET",
-            path,
-            None,
-            Some({
-                let mut wire = Map::new();
-                wire.insert("as".into(), (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_as)?);
-                wire
-            }),
-            false,
-            &[],
-        )
-        .await
-    })
-}
-
-fn run_slack_message_deliveries<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/slack/conversations/{}/messages/{}/deliveries",
-            encode_segment(ctx.session()?),
-            path_value(&me["channel"])?,
-            path_value(&me["ts"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
     })
 }
 
@@ -2163,6 +2548,86 @@ fn run_git_hub_fixture_issues<'a>(
     })
 }
 
+fn run_git_hub_fixture_installation_id<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_repo = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/installation-id",
+            encode_segment(ctx.session()?)
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "repo".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_repo)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_permissions = options.get("permissions").cloned().unwrap_or(Value::Null);
+        let p_events = options.get("events").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/github/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("permissions".into(), p_permissions.clone());
+                wire.insert("events".into(), p_events.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/github/apps", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_git_hub_fixture_deliveries<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -2174,6 +2639,7 @@ fn run_git_hub_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/github/deliveries",
             encode_segment(ctx.session()?)
@@ -2189,6 +2655,10 @@ fn run_git_hub_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -2273,8 +2743,9 @@ fn run_git_hub_app_installation_id<'a>(
         let mut args = args.into_iter();
         let p_repo = args.next().unwrap_or(Value::Null);
         let path = format!(
-            "/sessions/{}/github/installation-id",
-            encode_segment(ctx.session()?)
+            "/sessions/{}/github/apps/{}/installation-id",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
         );
         send(
             ctx,
@@ -2286,6 +2757,871 @@ fn run_git_hub_app_installation_id<'a>(
                     "repo".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_repo)?,
                 );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_push<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_changes = args.next().unwrap_or(Value::Null);
+        let p_repo = options.get("repo").cloned().unwrap_or(Value::Null);
+        let p_branch = options.get("branch").cloned().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/push",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "changes".into(),
+                    (&|v: &Value| files::read_changes(v))(&p_changes)?,
+                );
+                wire.insert(
+                    "repo".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_repo)?,
+                );
+                wire.insert("branch".into(), p_branch.clone());
+                wire.insert("message".into(), p_message.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_open_issue<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_issue = args.next().unwrap_or(Value::Null);
+        let p_repo = options.get("repo").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/issues",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| {
+                        enc::object(
+                            v,
+                            None,
+                            &[("assignees", &|v: &Value| {
+                                enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"]))
+                            })],
+                        )
+                    })(&p_issue)?,
+                );
+                wire.insert(
+                    "repo".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_repo)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_open_pull_request<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_pr = args.next().unwrap_or(Value::Null);
+        let p_repo = options.get("repo").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/pulls",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "pr".into(),
+                    (&|v: &Value| {
+                        enc::object(
+                            v,
+                            None,
+                            &[
+                                ("changes", &|v: &Value| files::read_changes(v)),
+                                ("reviewers", &|v: &Value| {
+                                    enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"]))
+                                }),
+                            ],
+                        )
+                    })(&p_pr)?,
+                );
+                wire.insert(
+                    "repo".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_repo)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_edit_issue<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_changes = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/edit-issue",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("changes".into(), p_changes.clone());
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_close<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/close",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_reopen<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/reopen",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_label<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_labels = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/label",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "labels".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::plain(v)))(&p_labels)?,
+                );
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_unlabel<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_labels = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/unlabel",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "labels".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::plain(v)))(&p_labels)?,
+                );
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_assign<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_assignees = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/assign",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "assignees".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_assignees,
+                    )?,
+                );
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_comment<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/comment",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_edit<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/edit",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_delete<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/delete",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_react<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_content = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/react",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("content".into(), p_content.clone());
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_minimize<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let p_reason = options.get("reason").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/minimize",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire.insert("reason".into(), p_reason.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_review<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_review = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/review",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "review".into(),
+                    (&|v: &Value| {
+                        enc::object(
+                            v,
+                            None,
+                            &[("pr", &|v: &Value| enc::ref_ids(v, &["repoId", "number"]))],
+                        )
+                    })(&p_review)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_review_comment<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_pr = options.get("pr").cloned().unwrap_or(Value::Null);
+        let p_path = options.get("path").cloned().unwrap_or(Value::Null);
+        let p_line = options.get("line").cloned().unwrap_or(Value::Null);
+        let p_side = options.get("side").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/review-comment",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "pr".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_pr)?,
+                );
+                wire.insert("path".into(), p_path.clone());
+                wire.insert("line".into(), p_line.clone());
+                wire.insert("side".into(), p_side.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_resolve<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/resolve",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_unresolve<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/unresolve",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_request_review<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_reviewers = args.next().unwrap_or(Value::Null);
+        let p_pr = options.get("pr").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/request-review",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "reviewers".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_reviewers,
+                    )?,
+                );
+                wire.insert(
+                    "pr".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_pr)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_mark_ready<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_pr = options.get("pr").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/mark-ready",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "pr".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_pr)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_merge<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_pr = options.get("pr").cloned().unwrap_or(Value::Null);
+        let p_method = options.get("method").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/merge",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "pr".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_pr)?,
+                );
+                wire.insert("method".into(), p_method.clone());
                 wire
             }),
             None,
@@ -3708,6 +5044,41 @@ fn run_git_hub_comment_reactions<'a>(
     })
 }
 
+fn run_git_hub_comment_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/comments/{}/delivery-for",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
 fn run_git_hub_review_comment_replies<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -3834,6 +5205,50 @@ fn run_linear_fixture_users<'a>(
     })
 }
 
+fn run_linear_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_events = options.get("events").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/linear/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("events".into(), p_events.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_linear_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/linear/apps", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_linear_fixture_teams<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -3914,6 +5329,7 @@ fn run_linear_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/linear/deliveries",
             encode_segment(ctx.session()?)
@@ -3929,6 +5345,10 @@ fn run_linear_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -3962,6 +5382,80 @@ fn run_linear_fixture_calls<'a>(
                 wire.insert("error".into(), p_error.clone());
                 wire
             }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_linear_app_comment<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/linear/apps/{}/comment",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_linear_app_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/linear/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
             false,
             &[],
         )
@@ -4540,7 +6034,7 @@ fn run_linear_user_stop<'a>(
     })
 }
 
-fn run_linear_team_issue<'a>(
+fn run_linear_comment_replies<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4549,9 +6043,27 @@ fn run_linear_team_issue<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
-        let p_identifier = args.next().unwrap_or(Value::Null);
         let path = format!(
-            "/sessions/{}/linear/teams/{}/issue",
+            "/sessions/{}/linear/comments/{}/replies",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, true, &[]).await
+    })
+}
+
+fn run_linear_comment_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/linear/comments/{}/delivery-for",
             encode_segment(ctx.session()?),
             path_value(&me["id"])?
         );
@@ -4562,13 +6074,34 @@ fn run_linear_team_issue<'a>(
             None,
             Some({
                 let mut wire = Map::new();
-                wire.insert("identifier".into(), p_identifier.clone());
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
                 wire
             }),
             false,
             &[],
         )
         .await
+    })
+}
+
+fn run_linear_comment_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/linear/comments/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
     })
 }
 
@@ -4752,7 +6285,7 @@ fn run_linear_issue_transcript<'a>(
     })
 }
 
-fn run_linear_delivery_refresh<'a>(
+fn run_linear_team_issue<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4761,60 +6294,22 @@ fn run_linear_delivery_refresh<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_identifier = args.next().unwrap_or(Value::Null);
         let path = format!(
-            "/sessions/{}/linear/deliveries/{}",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_linear_delivery_redeliver<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/linear/deliveries/{}/redeliver",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "POST", path, None, None, false, &[]).await
-    })
-}
-
-fn run_linear_delivery_resend<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_bad_signature = options.get("badSignature").cloned().unwrap_or(Value::Null);
-        let p_stale = options.get("stale").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/linear/deliveries/{}/resend",
+            "/sessions/{}/linear/teams/{}/issue",
             encode_segment(ctx.session()?),
             path_value(&me["id"])?
         );
         send(
             ctx,
-            "POST",
+            "GET",
             path,
+            None,
             Some({
                 let mut wire = Map::new();
-                wire.insert("badSignature".into(), p_bad_signature.clone());
-                wire.insert("stale".into(), p_stale.clone());
+                wire.insert("identifier".into(), p_identifier.clone());
                 wire
             }),
-            None,
             false,
             &[],
         )
@@ -4912,7 +6407,7 @@ fn run_linear_agent_session_transcript<'a>(
     })
 }
 
-fn run_linear_comment_replies<'a>(
+fn run_linear_delivery_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4922,29 +6417,63 @@ fn run_linear_comment_replies<'a>(
         let _ = (&me, &options);
         let mut args = args.into_iter();
         let path = format!(
-            "/sessions/{}/linear/comments/{}/replies",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, true, &[]).await
-    })
-}
-
-fn run_linear_comment_transcript<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/linear/comments/{}/transcript",
+            "/sessions/{}/linear/deliveries/{}",
             encode_segment(ctx.session()?),
             path_value(&me["id"])?
         );
         send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_linear_delivery_redeliver<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/linear/deliveries/{}/redeliver",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "POST", path, None, None, false, &[]).await
+    })
+}
+
+fn run_linear_delivery_resend<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_bad_signature = options.get("badSignature").cloned().unwrap_or(Value::Null);
+        let p_stale = options.get("stale").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/linear/deliveries/{}/resend",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("badSignature".into(), p_bad_signature.clone());
+                wire.insert("stale".into(), p_stale.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -5010,6 +6539,52 @@ fn run_notion_fixture_users<'a>(
         let _ = (&me, &options);
         let mut args = args.into_iter();
         let path = format!("/sessions/{}/notion/users", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_notion_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_capabilities = options.get("capabilities").cloned().unwrap_or(Value::Null);
+        let p_events = options.get("events").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/notion/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("capabilities".into(), p_capabilities.clone());
+                wire.insert("events".into(), p_events.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/notion/apps", encode_segment(ctx.session()?));
         send(ctx, "GET", path, None, None, false, &[]).await
     })
 }
@@ -5167,11 +6742,28 @@ fn run_notion_fixture_send_verification<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/notion/verification",
             encode_segment(ctx.session()?)
         );
-        send(ctx, "POST", path, None, None, false, &[]).await
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -5186,6 +6778,7 @@ fn run_notion_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/notion/deliveries",
             encode_segment(ctx.session()?)
@@ -5201,6 +6794,10 @@ fn run_notion_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -5234,6 +6831,168 @@ fn run_notion_fixture_calls<'a>(
                 wire.insert("error".into(), p_error.clone());
                 wire
             }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_integration_comment<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_text = args.next().unwrap_or(Value::Null);
+        let p_page = options.get("page").cloned().unwrap_or(Value::Null);
+        let p_anchor = options.get("anchor").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/notion/apps/{}/comment",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("text".into(), p_text.clone());
+                wire.insert(
+                    "page".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_page)?,
+                );
+                wire.insert("anchor".into(), p_anchor.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_integration_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_text = args.next().unwrap_or(Value::Null);
+        let p_discussion = options.get("discussion").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/notion/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("text".into(), p_text.clone());
+                wire.insert(
+                    "discussion".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_discussion)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_integration_edit<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_change = args.next().unwrap_or(Value::Null);
+        let p_page = options.get("page").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/notion/apps/{}/edit",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "change".into(),
+                    (&|v: &Value| {
+                        enc::object(
+                            v,
+                            None,
+                            &[
+                                ("append", &|v: &Value| files::read_document(v)),
+                                ("replace", &|v: &Value| files::read_document(v)),
+                            ],
+                        )
+                    })(&p_change)?,
+                );
+                wire.insert(
+                    "page".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_page)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_integration_rename<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_title = args.next().unwrap_or(Value::Null);
+        let p_page = options.get("page").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/notion/apps/{}/rename",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("title".into(), p_title.clone());
+                wire.insert(
+                    "page".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_page)?,
+                );
+                wire
+            }),
+            None,
             false,
             &[],
         )
@@ -5790,6 +7549,95 @@ fn run_notion_user_disconnect<'a>(
     })
 }
 
+fn run_notion_comment_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/notion/comments/{}/delivery-for",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_discussion_comments<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/notion/discussions/{}/comments",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_notion_discussion_resolved<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/notion/discussions/{}/resolved",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_notion_discussion_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/notion/discussions/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_notion_page_discussions<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -5930,38 +7778,6 @@ fn run_notion_page_transcript<'a>(
     })
 }
 
-fn run_notion_database_rows<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_filter = args.next().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/notion/databases/{}/rows",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(
-            ctx,
-            "POST",
-            path,
-            Some({
-                let mut wire = Map::new();
-                wire.insert("filter".into(), p_filter.clone());
-                wire
-            }),
-            None,
-            false,
-            &[],
-        )
-        .await
-    })
-}
-
 fn run_notion_delivery_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -6030,7 +7846,7 @@ fn run_notion_delivery_resend<'a>(
     })
 }
 
-fn run_notion_discussion_comments<'a>(
+fn run_notion_database_rows<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -6039,16 +7855,30 @@ fn run_notion_discussion_comments<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_filter = args.next().unwrap_or(Value::Null);
         let path = format!(
-            "/sessions/{}/notion/discussions/{}/comments",
+            "/sessions/{}/notion/databases/{}/rows",
             encode_segment(ctx.session()?),
             path_value(&me["id"])?
         );
-        send(ctx, "GET", path, None, None, false, &[]).await
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("filter".into(), p_filter.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
     })
 }
 
-fn run_notion_discussion_resolved<'a>(
+fn run_resend_fixture_create_app<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -6057,16 +7887,28 @@ fn run_notion_discussion_resolved<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/notion/discussions/{}/resolved",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_domain = options.get("domain").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/resend/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("domain".into(), p_domain.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
     })
 }
 
-fn run_notion_discussion_transcript<'a>(
+fn run_resend_fixture_apps<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -6075,11 +7917,7 @@ fn run_notion_discussion_transcript<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/notion/discussions/{}/transcript",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
+        let path = format!("/sessions/{}/resend/apps", encode_segment(ctx.session()?));
         send(ctx, "GET", path, None, None, false, &[]).await
     })
 }
@@ -6172,6 +8010,7 @@ fn run_resend_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/resend/deliveries",
             encode_segment(ctx.session()?)
@@ -6187,6 +8026,10 @@ fn run_resend_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -6220,6 +8063,278 @@ fn run_resend_fixture_calls<'a>(
                 wire.insert("error".into(), p_error.clone());
                 wire
             }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_resend_app_send<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_to = options.get("to").cloned().unwrap_or(Value::Null);
+        let p_cc = options.get("cc").cloned().unwrap_or(Value::Null);
+        let p_subject = options.get("subject").cloned().unwrap_or(Value::Null);
+        let p_text = options.get("text").cloned().unwrap_or(Value::Null);
+        let p_html = options.get("html").cloned().unwrap_or(Value::Null);
+        let p_headers = options.get("headers").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/resend/apps/{}/send",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "to".into(),
+                    (&|v: &Value| enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_to,
+                    )?,
+                );
+                wire.insert(
+                    "cc".into(),
+                    (&|v: &Value| enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_cc,
+                    )?,
+                );
+                wire.insert("subject".into(), p_subject.clone());
+                wire.insert("text".into(), p_text.clone());
+                wire.insert("html".into(), p_html.clone());
+                wire.insert("headers".into(), p_headers.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_resend_app_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_email = args.next().unwrap_or(Value::Null);
+        let p_text = options.get("text").cloned().unwrap_or(Value::Null);
+        let p_html = options.get("html").cloned().unwrap_or(Value::Null);
+        let p_all = options.get("all").cloned().unwrap_or(Value::Null);
+        let p_headers = options.get("headers").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/resend/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "email".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_email)?,
+                );
+                wire.insert("text".into(), p_text.clone());
+                wire.insert("html".into(), p_html.clone());
+                wire.insert("all".into(), p_all.clone());
+                wire.insert("headers".into(), p_headers.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_resend_email_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/emails/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_email_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/resend/emails/{}/delivery-for",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_resend_thread_messages<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/threads/{}/messages",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_thread_replies<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/threads/{}/replies",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_thread_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/threads/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_delivery_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/deliveries/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_delivery_redeliver<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/deliveries/{}/redeliver",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "POST", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_delivery_resend<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_bad_signature = options.get("badSignature").cloned().unwrap_or(Value::Null);
+        let p_stale = options.get("stale").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/resend/deliveries/{}/resend",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("badSignature".into(), p_bad_signature.clone());
+                wire.insert("stale".into(), p_stale.clone());
+                wire
+            }),
+            None,
             false,
             &[],
         )
@@ -6336,7 +8451,7 @@ fn run_resend_user_inbox<'a>(
     })
 }
 
-fn run_resend_thread_messages<'a>(
+fn run_google_fixture_create_app<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -6345,129 +8460,15 @@ fn run_resend_thread_messages<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/resend/threads/{}/messages",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_resend_thread_replies<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/resend/threads/{}/replies",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_resend_thread_transcript<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/resend/threads/{}/transcript",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_resend_email_refresh<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/resend/emails/{}",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_resend_delivery_refresh<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/resend/deliveries/{}",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_resend_delivery_redeliver<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/resend/deliveries/{}/redeliver",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "POST", path, None, None, false, &[]).await
-    })
-}
-
-fn run_resend_delivery_resend<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_bad_signature = options.get("badSignature").cloned().unwrap_or(Value::Null);
-        let p_stale = options.get("stale").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/resend/deliveries/{}/resend",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/google/apps", encode_segment(ctx.session()?));
         send(
             ctx,
             "POST",
             path,
             Some({
                 let mut wire = Map::new();
-                wire.insert("badSignature".into(), p_bad_signature.clone());
-                wire.insert("stale".into(), p_stale.clone());
+                wire.insert("name".into(), p_name.clone());
                 wire
             }),
             None,
@@ -6475,6 +8476,20 @@ fn run_resend_delivery_resend<'a>(
             &[],
         )
         .await
+    })
+}
+
+fn run_google_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/google/apps", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
     })
 }
 
@@ -6566,6 +8581,7 @@ fn run_google_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/google/deliveries",
             encode_segment(ctx.session()?)
@@ -6581,6 +8597,10 @@ fn run_google_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -6614,6 +8634,280 @@ fn run_google_fixture_calls<'a>(
                 wire.insert("error".into(), p_error.clone());
                 wire
             }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_google_app_send<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_to = options.get("to").cloned().unwrap_or(Value::Null);
+        let p_cc = options.get("cc").cloned().unwrap_or(Value::Null);
+        let p_subject = options.get("subject").cloned().unwrap_or(Value::Null);
+        let p_text = options.get("text").cloned().unwrap_or(Value::Null);
+        let p_html = options.get("html").cloned().unwrap_or(Value::Null);
+        let p_headers = options.get("headers").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/google/apps/{}/send",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "to".into(),
+                    (&|v: &Value| enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_to,
+                    )?,
+                );
+                wire.insert(
+                    "cc".into(),
+                    (&|v: &Value| enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_cc,
+                    )?,
+                );
+                wire.insert("subject".into(), p_subject.clone());
+                wire.insert("text".into(), p_text.clone());
+                wire.insert("html".into(), p_html.clone());
+                wire.insert("headers".into(), p_headers.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_google_app_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_email = args.next().unwrap_or(Value::Null);
+        let p_text = options.get("text").cloned().unwrap_or(Value::Null);
+        let p_html = options.get("html").cloned().unwrap_or(Value::Null);
+        let p_all = options.get("all").cloned().unwrap_or(Value::Null);
+        let p_headers = options.get("headers").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/google/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "email".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_email)?,
+                );
+                wire.insert("text".into(), p_text.clone());
+                wire.insert("html".into(), p_html.clone());
+                wire.insert("all".into(), p_all.clone());
+                wire.insert("headers".into(), p_headers.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_google_email_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/google/emails/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_google_email_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/google/emails/{}/delivery-for",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_google_thread_messages<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/google/threads/{}/messages",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_google_thread_replies<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/google/threads/{}/replies",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_google_thread_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/google/threads/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_google_delivery_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/google/deliveries/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_google_delivery_redeliver<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/google/deliveries/{}/redeliver",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "POST", path, None, None, false, &[]).await
+    })
+}
+
+fn run_google_delivery_resend<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_bad_signature = options.get("badSignature").cloned().unwrap_or(Value::Null);
+        let p_stale = options.get("stale").cloned().unwrap_or(Value::Null);
+        let p_wrong_audience = options.get("wrongAudience").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/google/deliveries/{}/resend",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("badSignature".into(), p_bad_signature.clone());
+                wire.insert("stale".into(), p_stale.clone());
+                wire.insert("wrongAudience".into(), p_wrong_audience.clone());
+                wire
+            }),
+            None,
             false,
             &[],
         )
@@ -6730,150 +9024,6 @@ fn run_google_user_inbox<'a>(
     })
 }
 
-fn run_google_thread_messages<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/google/threads/{}/messages",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_google_thread_replies<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/google/threads/{}/replies",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_google_thread_transcript<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/google/threads/{}/transcript",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_google_email_refresh<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/google/emails/{}",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_google_delivery_refresh<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/google/deliveries/{}",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_google_delivery_redeliver<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/google/deliveries/{}/redeliver",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "POST", path, None, None, false, &[]).await
-    })
-}
-
-fn run_google_delivery_resend<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_bad_signature = options.get("badSignature").cloned().unwrap_or(Value::Null);
-        let p_stale = options.get("stale").cloned().unwrap_or(Value::Null);
-        let p_wrong_audience = options.get("wrongAudience").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/google/deliveries/{}/resend",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(
-            ctx,
-            "POST",
-            path,
-            Some({
-                let mut wire = Map::new();
-                wire.insert("badSignature".into(), p_bad_signature.clone());
-                wire.insert("stale".into(), p_stale.clone());
-                wire.insert("wrongAudience".into(), p_wrong_audience.clone());
-                wire
-            }),
-            None,
-            false,
-            &[],
-        )
-        .await
-    })
-}
-
 fn run_discord_fixture_create_user<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -6936,6 +9086,53 @@ fn run_discord_fixture_users<'a>(
         let _ = (&me, &options);
         let mut args = args.into_iter();
         let path = format!("/sessions/{}/discord/users", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_discord_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_privileged_intents = options
+            .get("privilegedIntents")
+            .cloned()
+            .unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/discord/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("privilegedIntents".into(), p_privileged_intents.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_discord_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/discord/apps", encode_segment(ctx.session()?));
         send(ctx, "GET", path, None, None, false, &[]).await
     })
 }
@@ -7027,6 +9224,7 @@ fn run_discord_fixture_deliveries<'a>(
         let mut args = args.into_iter();
         let p_type = options.get("type").cloned().unwrap_or(Value::Null);
         let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/discord/deliveries",
             encode_segment(ctx.session()?)
@@ -7042,6 +9240,10 @@ fn run_discord_fixture_deliveries<'a>(
                 wire.insert(
                     "resource".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -7095,6 +9297,7 @@ fn run_discord_fixture_fault<'a>(
         let p_route = options.get("route").cloned().unwrap_or(Value::Null);
         let p_retry_after = options.get("retryAfter").cloned().unwrap_or(Value::Null);
         let p_times = options.get("times").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/discord/faults",
             encode_segment(ctx.session()?)
@@ -7112,6 +9315,171 @@ fn run_discord_fixture_fault<'a>(
                     (&|v: &Value| enc::duration(v))(&p_retry_after)?,
                 );
                 wire.insert("times".into(), p_times.clone());
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_discord_app_say<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_text = args.next().unwrap_or(Value::Null);
+        let p_channel = options.get("channel").cloned().unwrap_or(Value::Null);
+        let p_to = options.get("to").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/apps/{}/say",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "text".into(),
+                    enc::shorthand(&p_text, "content", &|v: &Value| enc::plain(v))?,
+                );
+                wire.insert(
+                    "channel".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_channel)?,
+                );
+                wire.insert(
+                    "to".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_to,
+                    )?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_discord_app_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_text = args.next().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "text".into(),
+                    enc::shorthand(&p_text, "content", &|v: &Value| enc::plain(v))?,
+                );
+                wire.insert(
+                    "message".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channelId", "id"]))(&p_message)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_discord_app_react<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_emoji = args.next().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/apps/{}/react",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("emoji".into(), p_emoji.clone());
+                wire.insert(
+                    "message".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channelId", "id"]))(&p_message)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_discord_app_unreact<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_emoji = args.next().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/apps/{}/unreact",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("emoji".into(), p_emoji.clone());
+                wire.insert(
+                    "message".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channelId", "id"]))(&p_message)?,
+                );
                 wire
             }),
             None,
@@ -7488,6 +9856,7 @@ fn run_discord_user_run_command<'a>(
         let mut args = args.into_iter();
         let p_command = args.next().unwrap_or(Value::Null);
         let p_channel = options.get("channel").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/discord/users/{}/commands",
             encode_segment(ctx.session()?),
@@ -7503,6 +9872,10 @@ fn run_discord_user_run_command<'a>(
                 wire.insert(
                     "channel".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_channel)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -7574,92 +9947,6 @@ fn run_discord_user_ephemeral<'a>(
             path_value(&me["id"])?
         );
         send(ctx, "GET", path, None, None, true, &[]).await
-    })
-}
-
-fn run_discord_channel_messages<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/discord/channels/{}/messages",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_discord_channel_members<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/discord/channels/{}/members",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_discord_channel_threads<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/discord/channels/{}/threads",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_discord_channel_transcript<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_as = options.get("as").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/discord/channels/{}/transcript",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(
-            ctx,
-            "GET",
-            path,
-            None,
-            Some({
-                let mut wire = Map::new();
-                wire.insert("as".into(), (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_as)?);
-                wire
-            }),
-            false,
-            &[],
-        )
-        .await
     })
 }
 
@@ -7753,6 +10040,42 @@ fn run_discord_message_reactions<'a>(
     })
 }
 
+fn run_discord_message_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/channels/{}/messages/{}/delivery-for",
+            encode_segment(ctx.session()?),
+            path_value(&me["channelId"])?,
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
 fn run_discord_message_deliveries<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -7769,6 +10092,92 @@ fn run_discord_message_deliveries<'a>(
             path_value(&me["id"])?
         );
         send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_discord_channel_messages<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/discord/channels/{}/messages",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_discord_channel_members<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/discord/channels/{}/members",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_discord_channel_threads<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/discord/channels/{}/threads",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_discord_channel_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_as = options.get("as").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/channels/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("as".into(), (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_as)?);
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -8710,6 +11119,14 @@ impl ChannelstackEnv {
     pub fn proxy(self, value: impl IntoArg) -> Self {
         Self(self.0.option("proxy", value))
     }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
+    /// `channel`.
+    pub fn channel(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("channel", value))
+    }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
         self.0.send().await
@@ -9011,6 +11428,28 @@ impl EchoFixture {
         ))
     }
 
+    /// Make another app (decision 0027), or return the one with this name. Its events go to CHANNELSTACK_ECHO_APP_<NAME>_WEBHOOK_URL. Experimental.
+    pub fn create_app(&self) -> EchoFixtureCreateApp {
+        EchoFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_echo_fixture_create_app,
+            EchoApp::wrap,
+        ))
+    }
+
+    /// The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_echo_fixture_apps,
+            as_value,
+        )
+    }
+
     /// Create a room. Only the listed participants are members; include the app for it to receive events. Experimental.
     pub fn create_room(&self) -> EchoFixtureCreateRoom {
         EchoFixtureCreateRoom(Call::new(
@@ -9051,6 +11490,28 @@ impl EchoFixtureCreateUser {
 impl IntoFuture for EchoFixtureCreateUser {
     type Output = Result<EchoUser>;
     type IntoFuture = BoxFuture<'static, Result<EchoUser>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`EchoFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct EchoFixtureCreateApp(Call<EchoApp>);
+
+impl EchoFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<EchoApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for EchoFixtureCreateApp {
+    type Output = Result<EchoApp>;
+    type IntoFuture = BoxFuture<'static, Result<EchoApp>>;
     fn into_future(self) -> Self::IntoFuture {
         self.0.into_future()
     }
@@ -9150,6 +11611,39 @@ impl EchoApp {
             .get("kind")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
+    }
+
+    /// An app a test made posts in a room it is a member of, as its own call would. Experimental.
+    pub fn say(&self, text: impl IntoArg) -> EchoAppSay {
+        EchoAppSay(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![text.into_arg()],
+            run_echo_app_say,
+            as_value,
+        ))
+    }
+}
+
+/// The options of [`EchoApp::say`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct EchoAppSay(Call<Value>);
+
+impl EchoAppSay {
+    /// `room`.
+    pub fn room(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("room", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for EchoAppSay {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
     }
 }
 
@@ -9466,6 +11960,28 @@ impl SlackFixture {
         )
     }
 
+    /// Make another app in the workspace, with its own bot user, tokens and signing secret (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_SLACK_APP_<NAME>_WEBHOOK_URL, or over its own Socket Mode connection. Experimental.
+    pub fn create_app(&self) -> SlackFixtureCreateApp {
+        SlackFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_fixture_create_app,
+            SlackApp::wrap,
+        ))
+    }
+
+    /// The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_fixture_apps,
+            as_value,
+        )
+    }
+
     /// The session's conversations, the one with the newest message last. Experimental.
     pub fn conversations(&self) -> Call<Value> {
         Call::new(
@@ -9489,14 +12005,14 @@ impl SlackFixture {
     }
 
     /// Every event channelstack sent the agent for this session, with every attempt. Experimental.
-    pub fn deliveries(&self) -> Call<Value> {
-        Call::new(
+    pub fn deliveries(&self) -> SlackFixtureDeliveries {
+        SlackFixtureDeliveries(Call::new(
             &self.ctx,
             &self.data,
             vec![],
             run_slack_fixture_deliveries,
             as_value,
-        )
+        ))
     }
 
     /// The Web API calls the agent made about this session's conversations, people and files. Calls about nothing a session owns (auth.test, users.list) are in no session. Experimental.
@@ -9510,15 +12026,15 @@ impl SlackFixture {
         ))
     }
 
-    /// The workspace uninstalls the app. Undone when this session closes; run such tests on their own. Experimental.
-    pub fn uninstall_app(&self) -> Call<Value> {
-        Call::new(
+    /// The workspace uninstalls an app: the built-in one, or the one given. Undone when this session closes; run such tests on their own. Experimental.
+    pub fn uninstall_app(&self) -> SlackFixtureUninstallApp {
+        SlackFixtureUninstallApp(Call::new(
             &self.ctx,
             &self.data,
             vec![],
             run_slack_fixture_uninstall_app,
             as_value,
-        )
+        ))
     }
 
     /// Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once. Experimental.
@@ -9609,6 +12125,36 @@ impl IntoFuture for SlackFixtureCreateUser {
     }
 }
 
+/// The options of [`SlackFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackFixtureCreateApp(Call<SlackApp>);
+
+impl SlackFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `scopes`.
+    pub fn scopes(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("scopes", value))
+    }
+    /// `botEvents`.
+    pub fn bot_events(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("botEvents", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<SlackApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackFixtureCreateApp {
+    type Output = Result<SlackApp>;
+    type IntoFuture = BoxFuture<'static, Result<SlackApp>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
 /// The options of [`SlackFixture::create_channel`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct SlackFixtureCreateChannel(Call<SlackConversation>);
 
@@ -9651,6 +12197,28 @@ impl IntoFuture for SlackFixtureCreateChannel {
     }
 }
 
+/// The options of [`SlackFixture::deliveries`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackFixtureDeliveries(Call<Value>);
+
+impl SlackFixtureDeliveries {
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackFixtureDeliveries {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
 /// The options of [`SlackFixture::calls`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct SlackFixtureCalls(Call<Value>);
 
@@ -9670,6 +12238,28 @@ impl SlackFixtureCalls {
 }
 
 impl IntoFuture for SlackFixtureCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`SlackFixture::uninstall_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackFixtureUninstallApp(Call<Value>);
+
+impl SlackFixtureUninstallApp {
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackFixtureUninstallApp {
     type Output = Result<Value>;
     type IntoFuture = BoxFuture<'static, Result<Value>>;
     fn into_future(self) -> Self::IntoFuture {
@@ -9708,6 +12298,10 @@ impl SlackFixtureFault {
     /// `times`.
     pub fn times(self, value: impl IntoArg) -> Self {
         Self(self.0.option("times", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<SlackFault> {
@@ -9898,6 +12492,142 @@ impl SlackApp {
     pub fn scopes(&self) -> &Value {
         self.data.get("scopes").unwrap_or(&Value::Null)
     }
+
+    /// An app a test made writes a top-level message, as its own chat.postMessage would: in a conversation it is a member of, or in a DM with the people in `to`. Experimental.
+    pub fn say(&self, message: impl IntoArg) -> SlackAppSay {
+        SlackAppSay(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![message.into_arg()],
+            run_slack_app_say,
+            SlackMessage::wrap,
+        ))
+    }
+
+    /// An app a test made replies in a thread: pass the message that starts it, or any reply in it. Experimental.
+    pub fn reply(&self, message: impl IntoArg) -> SlackAppReply {
+        SlackAppReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![message.into_arg()],
+            run_slack_app_reply,
+            SlackMessage::wrap,
+        ))
+    }
+
+    /// An app a test made reacts to a message. Experimental.
+    pub fn react(&self, emoji: impl IntoArg) -> SlackAppReact {
+        SlackAppReact(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![emoji.into_arg()],
+            run_slack_app_react,
+            SlackDelivery::wrap_opt,
+        ))
+    }
+
+    /// An app a test made takes its reaction back. Experimental.
+    pub fn unreact(&self, emoji: impl IntoArg) -> SlackAppUnreact {
+        SlackAppUnreact(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![emoji.into_arg()],
+            run_slack_app_unreact,
+            SlackDelivery::wrap_opt,
+        ))
+    }
+}
+
+/// The options of [`SlackApp::say`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackAppSay(Call<SlackMessage>);
+
+impl SlackAppSay {
+    /// `channel`.
+    pub fn channel(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("channel", value))
+    }
+    /// `to`.
+    pub fn to(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("to", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<SlackMessage> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackAppSay {
+    type Output = Result<SlackMessage>;
+    type IntoFuture = BoxFuture<'static, Result<SlackMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`SlackApp::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackAppReply(Call<SlackMessage>);
+
+impl SlackAppReply {
+    /// `thread`.
+    pub fn thread(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("thread", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<SlackMessage> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackAppReply {
+    type Output = Result<SlackMessage>;
+    type IntoFuture = BoxFuture<'static, Result<SlackMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`SlackApp::react`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackAppReact(Call<Option<SlackDelivery>>);
+
+impl SlackAppReact {
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<SlackDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackAppReact {
+    type Output = Result<Option<SlackDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<SlackDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`SlackApp::unreact`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackAppUnreact(Call<Option<SlackDelivery>>);
+
+impl SlackAppUnreact {
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<SlackDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackAppUnreact {
+    type Output = Result<Option<SlackDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<SlackDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
 }
 
 /// A handle: `SlackUser`.
@@ -10070,7 +12800,7 @@ impl SlackUser {
         ))
     }
 
-    /// Run a message shortcut on a message. Experimental.
+    /// Run an app's message shortcut on a message: it goes to that app alone. Experimental.
     pub fn shortcut(&self, callback_id: impl IntoArg) -> SlackUserShortcut {
         SlackUserShortcut(Call::new(
             &self.ctx,
@@ -10081,7 +12811,7 @@ impl SlackUser {
         ))
     }
 
-    /// Run a slash command in a conversation, e.g. `/deploy web staging`. Experimental.
+    /// Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone. Experimental.
     pub fn run_command(&self, command: impl IntoArg) -> SlackUserRunCommand {
         SlackUserRunCommand(Call::new(
             &self.ctx,
@@ -10103,7 +12833,7 @@ impl SlackUser {
         ))
     }
 
-    /// Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at. Experimental.
+    /// Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at. Experimental.
     pub fn open_agent_thread(&self) -> SlackUserOpenAgentThread {
         SlackUserOpenAgentThread(Call::new(
             &self.ctx,
@@ -10392,6 +13122,10 @@ impl SlackUserShortcut {
     pub fn message(self, value: impl IntoArg) -> Self {
         Self(self.0.option("message", value))
     }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
     /// Send the request.
     pub async fn send(self) -> Result<SlackDelivery> {
         self.0.send().await
@@ -10413,6 +13147,10 @@ impl SlackUserRunCommand {
     /// `channel`.
     pub fn channel(self, value: impl IntoArg) -> Self {
         Self(self.0.option("channel", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<SlackDelivery> {
@@ -10457,6 +13195,10 @@ impl SlackUserOpenAgentThread {
     /// `from`.
     pub fn from(self, value: impl IntoArg) -> Self {
         Self(self.0.option("from", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<SlackThread> {
@@ -10667,6 +13409,226 @@ impl IntoFuture for SlackUserWaitForModal {
     type IntoFuture = BoxFuture<'static, Result<SlackModal>>;
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(self.send())
+    }
+}
+
+/// A handle: `SlackMessage`.
+#[derive(Clone)]
+pub struct SlackMessage {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for SlackMessage {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl SlackMessage {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `ts`.
+    pub fn ts(&self) -> String {
+        self.data
+            .get("ts")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `conversation`.
+    pub fn conversation(&self) -> SlackConversation {
+        SlackConversation::from_wire_in(
+            &self.ctx,
+            self.data
+                .get("conversation")
+                .cloned()
+                .unwrap_or(Value::Null),
+            self.seen.field("conversation"),
+        )
+    }
+    /// `author`.
+    pub fn author(&self) -> &Value {
+        self.data.get("author").unwrap_or(&Value::Null)
+    }
+    /// `text`.
+    pub fn text(&self) -> String {
+        self.data
+            .get("text")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `blocks`.
+    pub fn blocks(&self) -> &Value {
+        self.data.get("blocks").unwrap_or(&Value::Null)
+    }
+    /// `files`.
+    pub fn files(&self) -> &Value {
+        self.data.get("files").unwrap_or(&Value::Null)
+    }
+    /// `postedAt`.
+    pub fn posted_at(&self) -> String {
+        self.data
+            .get("postedAt")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `threadTs`.
+    pub fn thread_ts(&self) -> Option<String> {
+        self.data
+            .get("threadTs")
+            .and_then(|v| v.as_str().map(str::to_owned))
+    }
+    /// `edited`.
+    pub fn edited(&self) -> bool {
+        self.data
+            .get("edited")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+    /// `visibleTo`.
+    pub fn visible_to(&self) -> Option<SlackUser> {
+        self.data
+            .get("visibleTo")
+            .filter(|v| !v.is_null())
+            .map(|v| SlackUser::from_wire_in(&self.ctx, v.clone(), self.seen.field("visibleTo")))
+    }
+    /// `thread`.
+    pub fn thread(&self) -> SlackThread {
+        SlackThread::from_wire_in(
+            &self.ctx,
+            self.data.get("thread").cloned().unwrap_or(Value::Null),
+            self.seen.field("thread"),
+        )
+    }
+    /// `delivery`.
+    pub fn delivery(&self) -> Option<SlackDelivery> {
+        self.data
+            .get("delivery")
+            .filter(|v| !v.is_null())
+            .map(|v| SlackDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery")))
+    }
+    /// `stream`.
+    pub fn stream(&self) -> Option<SlackStream> {
+        self.data
+            .get("stream")
+            .filter(|v| !v.is_null())
+            .map(|v| SlackStream::from_wire_in(&self.ctx, v.clone(), self.seen.field("stream")))
+    }
+
+    /// Re-read a message: its latest text, edits and deliveries. Experimental.
+    pub fn refresh(&self) -> Call<SlackMessage> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_message_refresh,
+            SlackMessage::wrap,
+        )
+    }
+
+    /// The reactions on a message, and who added each. Experimental.
+    pub fn reactions(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_message_reactions,
+            as_value,
+        )
+    }
+
+    /// A message and the replies under it as a person would read them. Experimental.
+    pub fn transcript(&self) -> SlackMessageTranscript {
+        SlackMessageTranscript(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_message_transcript,
+            as_value,
+        ))
+    }
+
+    /// The first delivery this message caused to this app (decision 0027), or nothing when it wasn't told. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<SlackDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_slack_message_delivery_for,
+            SlackDelivery::wrap_opt,
+        )
+    }
+
+    /// Every delivery this message caused to the agent. Experimental.
+    pub fn deliveries(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_message_deliveries,
+            as_value,
+        )
+    }
+}
+
+/// The options of [`SlackMessage::transcript`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackMessageTranscript(Call<Value>);
+
+impl SlackMessageTranscript {
+    /// `as`.
+    pub fn r#as(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("as", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackMessageTranscript {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
     }
 }
 
@@ -10881,215 +13843,6 @@ impl IntoFuture for SlackConversationWaitForMessage {
     type IntoFuture = BoxFuture<'static, Result<SlackMessage>>;
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(self.send())
-    }
-}
-
-/// A handle: `SlackMessage`.
-#[derive(Clone)]
-pub struct SlackMessage {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for SlackMessage {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl SlackMessage {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> String {
-        self.data
-            .get("channel")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `ts`.
-    pub fn ts(&self) -> String {
-        self.data
-            .get("ts")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `conversation`.
-    pub fn conversation(&self) -> SlackConversation {
-        SlackConversation::from_wire_in(
-            &self.ctx,
-            self.data
-                .get("conversation")
-                .cloned()
-                .unwrap_or(Value::Null),
-            self.seen.field("conversation"),
-        )
-    }
-    /// `author`.
-    pub fn author(&self) -> &Value {
-        self.data.get("author").unwrap_or(&Value::Null)
-    }
-    /// `text`.
-    pub fn text(&self) -> String {
-        self.data
-            .get("text")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `blocks`.
-    pub fn blocks(&self) -> &Value {
-        self.data.get("blocks").unwrap_or(&Value::Null)
-    }
-    /// `files`.
-    pub fn files(&self) -> &Value {
-        self.data.get("files").unwrap_or(&Value::Null)
-    }
-    /// `postedAt`.
-    pub fn posted_at(&self) -> String {
-        self.data
-            .get("postedAt")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `threadTs`.
-    pub fn thread_ts(&self) -> Option<String> {
-        self.data
-            .get("threadTs")
-            .and_then(|v| v.as_str().map(str::to_owned))
-    }
-    /// `edited`.
-    pub fn edited(&self) -> bool {
-        self.data
-            .get("edited")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-    }
-    /// `visibleTo`.
-    pub fn visible_to(&self) -> Option<SlackUser> {
-        self.data
-            .get("visibleTo")
-            .filter(|v| !v.is_null())
-            .map(|v| SlackUser::from_wire_in(&self.ctx, v.clone(), self.seen.field("visibleTo")))
-    }
-    /// `thread`.
-    pub fn thread(&self) -> SlackThread {
-        SlackThread::from_wire_in(
-            &self.ctx,
-            self.data.get("thread").cloned().unwrap_or(Value::Null),
-            self.seen.field("thread"),
-        )
-    }
-    /// `delivery`.
-    pub fn delivery(&self) -> Option<SlackDelivery> {
-        self.data
-            .get("delivery")
-            .filter(|v| !v.is_null())
-            .map(|v| SlackDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery")))
-    }
-    /// `stream`.
-    pub fn stream(&self) -> Option<SlackStream> {
-        self.data
-            .get("stream")
-            .filter(|v| !v.is_null())
-            .map(|v| SlackStream::from_wire_in(&self.ctx, v.clone(), self.seen.field("stream")))
-    }
-
-    /// Re-read a message: its latest text, edits and deliveries. Experimental.
-    pub fn refresh(&self) -> Call<SlackMessage> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_slack_message_refresh,
-            SlackMessage::wrap,
-        )
-    }
-
-    /// The reactions on a message, and who added each. Experimental.
-    pub fn reactions(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_slack_message_reactions,
-            as_value,
-        )
-    }
-
-    /// A message and the replies under it as a person would read them. Experimental.
-    pub fn transcript(&self) -> SlackMessageTranscript {
-        SlackMessageTranscript(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_slack_message_transcript,
-            as_value,
-        ))
-    }
-
-    /// Every delivery this message caused to the agent. Experimental.
-    pub fn deliveries(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_slack_message_deliveries,
-            as_value,
-        )
-    }
-}
-
-/// The options of [`SlackMessage::transcript`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct SlackMessageTranscript(Call<Value>);
-
-impl SlackMessageTranscript {
-    /// `as`.
-    pub fn r#as(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("as", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for SlackMessageTranscript {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
     }
 }
 
@@ -11468,6 +14221,13 @@ impl SlackDelivery {
     pub fn channel(&self) -> String {
         self.data
             .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `app`.
+    pub fn app(&self) -> String {
+        self.data
+            .get("app")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
@@ -12132,6 +14892,39 @@ impl GitHubFixture {
         )
     }
 
+    /// The id of the built-in App's installation, for a repository it is installed on. The same as `github.app.installationId(repo)`. Experimental.
+    pub fn installation_id(&self, repo: impl IntoArg) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![repo.into_arg()],
+            run_git_hub_fixture_installation_id,
+            as_value,
+        )
+    }
+
+    /// Make another GitHub App on the org, with its own App id, bot user, installation, private key and webhook secret (decision 0027), or return the one made with this name and settings. It reaches no repository until it is installed on one; its webhooks go to CHANNELSTACK_GITHUB_APP_<NAME>_WEBHOOK_URL. Experimental.
+    pub fn create_app(&self) -> GitHubFixtureCreateApp {
+        GitHubFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_fixture_create_app,
+            GitHubApp::wrap,
+        ))
+    }
+
+    /// The Apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_fixture_apps,
+            as_value,
+        )
+    }
+
     /// Every webhook channelstack sent the agent for this session, with every attempt. Experimental.
     pub fn deliveries(&self) -> GitHubFixtureDeliveries {
         GitHubFixtureDeliveries(Call::new(
@@ -12264,6 +15057,36 @@ impl IntoFuture for GitHubFixtureCreateRepo {
     }
 }
 
+/// The options of [`GitHubFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubFixtureCreateApp(Call<GitHubApp>);
+
+impl GitHubFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `permissions`.
+    pub fn permissions(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("permissions", value))
+    }
+    /// `events`.
+    pub fn events(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("events", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubFixtureCreateApp {
+    type Output = Result<GitHubApp>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubApp>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
 /// The options of [`GitHubFixture::deliveries`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct GitHubFixtureDeliveries(Call<Value>);
 
@@ -12275,6 +15098,10 @@ impl GitHubFixtureDeliveries {
     /// `resource`.
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
@@ -12518,7 +15345,7 @@ impl GitHubApp {
             .unwrap_or(String::new())
     }
 
-    /// The id of the App's installation, for a repository it is installed on. Experimental.
+    /// The id of this App's installation, for a repository it is installed on. Experimental.
     pub fn installation_id(&self, repo: impl IntoArg) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -12527,6 +15354,742 @@ impl GitHubApp {
             run_git_hub_app_installation_id,
             as_value,
         )
+    }
+
+    /// Push a commit to a branch (created from the default branch if it isn't there). Sends `push`, and `pull_request` `synchronize` for open pull requests from it. Experimental.
+    pub fn push(&self, changes: impl IntoArg) -> GitHubAppPush {
+        GitHubAppPush(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![changes.into_arg()],
+            run_git_hub_app_push,
+            GitHubCommit::wrap,
+        ))
+    }
+
+    /// Open an issue. Sends `issues` (action `opened`). Experimental.
+    pub fn open_issue(&self, issue: impl IntoArg) -> GitHubAppOpenIssue {
+        GitHubAppOpenIssue(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![issue.into_arg()],
+            run_git_hub_app_open_issue,
+            GitHubIssue::wrap,
+        ))
+    }
+
+    /// Open a pull request. With `changes`, they are pushed to `from` first; without, `from` is an existing branch. Sends `pull_request` (action `opened`). Experimental.
+    pub fn open_pull_request(&self, pr: impl IntoArg) -> GitHubAppOpenPullRequest {
+        GitHubAppOpenPullRequest(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![pr.into_arg()],
+            run_git_hub_app_open_pull_request,
+            GitHubPullRequest::wrap,
+        ))
+    }
+
+    /// Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`). Experimental.
+    pub fn edit_issue(&self, changes: impl IntoArg) -> GitHubAppEditIssue {
+        GitHubAppEditIssue(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![changes.into_arg()],
+            run_git_hub_app_edit_issue,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`). Experimental.
+    pub fn close(&self) -> GitHubAppClose {
+        GitHubAppClose(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_close,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`). Experimental.
+    pub fn reopen(&self) -> GitHubAppReopen {
+        GitHubAppReopen(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_reopen,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Put labels on an issue or a pull request. Sends one `labeled` event per label. Experimental.
+    pub fn label(&self, labels: impl IntoArg) -> GitHubAppLabel {
+        GitHubAppLabel(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![labels.into_arg()],
+            run_git_hub_app_label,
+            as_value,
+        ))
+    }
+
+    /// Take labels off an issue or a pull request. Sends one `unlabeled` event per label. Experimental.
+    pub fn unlabel(&self, labels: impl IntoArg) -> GitHubAppUnlabel {
+        GitHubAppUnlabel(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![labels.into_arg()],
+            run_git_hub_app_unlabel,
+            as_value,
+        ))
+    }
+
+    /// Assign people or the App's bot. Sends one `assigned` event per assignee. Experimental.
+    pub fn assign(&self, assignees: impl IntoArg) -> GitHubAppAssign {
+        GitHubAppAssign(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![assignees.into_arg()],
+            run_git_hub_app_assign,
+            as_value,
+        ))
+    }
+
+    /// Comment on an issue or a pull request's conversation. Sends `issue_comment` (action `created`). Experimental.
+    pub fn comment(&self, body: impl IntoArg) -> GitHubAppComment {
+        GitHubAppComment(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_git_hub_app_comment,
+            GitHubComment::wrap,
+        ))
+    }
+
+    /// Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`. Experimental.
+    pub fn edit(&self, body: impl IntoArg) -> GitHubAppEdit {
+        GitHubAppEdit(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_git_hub_app_edit,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`. Experimental.
+    pub fn delete(&self) -> GitHubAppDelete {
+        GitHubAppDelete(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_delete,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction. Experimental.
+    pub fn react(&self, content: impl IntoArg) -> GitHubAppReact {
+        GitHubAppReact(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![content.into_arg()],
+            run_git_hub_app_react,
+            as_unit,
+        ))
+    }
+
+    /// Hide a comment as outdated, spam, off-topic or resolved. GitHub sends no webhook for it. Experimental.
+    pub fn minimize(&self) -> GitHubAppMinimize {
+        GitHubAppMinimize(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_minimize,
+            as_unit,
+        ))
+    }
+
+    /// Submit a review, with comments on the diff if any. Sends `pull_request_review`, and one `pull_request_review_comment` per comment. Experimental.
+    pub fn review(&self, review: impl IntoArg) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![review.into_arg()],
+            run_git_hub_app_review,
+            as_value,
+        )
+    }
+
+    /// One comment on the diff, outside a review. Sends `pull_request_review_comment`. Experimental.
+    pub fn review_comment(&self, body: impl IntoArg) -> GitHubAppReviewComment {
+        GitHubAppReviewComment(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_git_hub_app_review_comment,
+            GitHubReviewComment::wrap,
+        ))
+    }
+
+    /// Reply in a thread on the diff. Sends `pull_request_review_comment`. Experimental.
+    pub fn reply(&self, body: impl IntoArg) -> GitHubAppReply {
+        GitHubAppReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_git_hub_app_reply,
+            GitHubReviewComment::wrap,
+        ))
+    }
+
+    /// Resolve a thread on the diff. Sends `pull_request_review_thread`. Experimental.
+    pub fn resolve(&self) -> GitHubAppResolve {
+        GitHubAppResolve(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_resolve,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Reopen a thread on the diff. Sends `pull_request_review_thread`. Experimental.
+    pub fn unresolve(&self) -> GitHubAppUnresolve {
+        GitHubAppUnresolve(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_unresolve,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer. Experimental.
+    pub fn request_review(&self, reviewers: impl IntoArg) -> GitHubAppRequestReview {
+        GitHubAppRequestReview(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![reviewers.into_arg()],
+            run_git_hub_app_request_review,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`). Experimental.
+    pub fn mark_ready(&self) -> GitHubAppMarkReady {
+        GitHubAppMarkReady(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_mark_ready,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged). Experimental.
+    pub fn merge(&self) -> GitHubAppMerge {
+        GitHubAppMerge(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_merge,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+}
+
+/// The options of [`GitHubApp::push`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppPush(Call<GitHubCommit>);
+
+impl GitHubAppPush {
+    /// `repo`.
+    pub fn repo(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("repo", value))
+    }
+    /// `branch`.
+    pub fn branch(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("branch", value))
+    }
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubCommit> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppPush {
+    type Output = Result<GitHubCommit>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubCommit>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::open_issue`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppOpenIssue(Call<GitHubIssue>);
+
+impl GitHubAppOpenIssue {
+    /// `repo`.
+    pub fn repo(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("repo", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubIssue> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppOpenIssue {
+    type Output = Result<GitHubIssue>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubIssue>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::open_pull_request`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppOpenPullRequest(Call<GitHubPullRequest>);
+
+impl GitHubAppOpenPullRequest {
+    /// `repo`.
+    pub fn repo(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("repo", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubPullRequest> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppOpenPullRequest {
+    type Output = Result<GitHubPullRequest>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubPullRequest>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::edit_issue`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppEditIssue(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppEditIssue {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppEditIssue {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::close`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppClose(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppClose {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppClose {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::reopen`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppReopen(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppReopen {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppReopen {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::label`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppLabel(Call<Value>);
+
+impl GitHubAppLabel {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppLabel {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::unlabel`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppUnlabel(Call<Value>);
+
+impl GitHubAppUnlabel {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppUnlabel {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::assign`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppAssign(Call<Value>);
+
+impl GitHubAppAssign {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppAssign {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::comment`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppComment(Call<GitHubComment>);
+
+impl GitHubAppComment {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppComment {
+    type Output = Result<GitHubComment>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::edit`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppEdit(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppEdit {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppEdit {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::delete`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppDelete(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppDelete {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppDelete {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::react`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppReact(Call<()>);
+
+impl GitHubAppReact {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<()> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppReact {
+    type Output = Result<()>;
+    type IntoFuture = BoxFuture<'static, Result<()>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::minimize`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppMinimize(Call<()>);
+
+impl GitHubAppMinimize {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// `reason`.
+    pub fn reason(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("reason", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<()> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppMinimize {
+    type Output = Result<()>;
+    type IntoFuture = BoxFuture<'static, Result<()>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::review_comment`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppReviewComment(Call<GitHubReviewComment>);
+
+impl GitHubAppReviewComment {
+    /// `pr`.
+    pub fn pr(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("pr", value))
+    }
+    /// `path`.
+    pub fn path(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("path", value))
+    }
+    /// `line`.
+    pub fn line(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("line", value))
+    }
+    /// `side`.
+    pub fn side(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("side", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubReviewComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppReviewComment {
+    type Output = Result<GitHubReviewComment>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubReviewComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppReply(Call<GitHubReviewComment>);
+
+impl GitHubAppReply {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubReviewComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppReply {
+    type Output = Result<GitHubReviewComment>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubReviewComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::resolve`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppResolve(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppResolve {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppResolve {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::unresolve`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppUnresolve(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppUnresolve {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppUnresolve {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::request_review`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppRequestReview(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppRequestReview {
+    /// `pr`.
+    pub fn pr(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("pr", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppRequestReview {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::mark_ready`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppMarkReady(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppMarkReady {
+    /// `pr`.
+    pub fn pr(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("pr", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppMarkReady {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::merge`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppMerge(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppMerge {
+    /// `pr`.
+    pub fn pr(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("pr", value))
+    }
+    /// `method`.
+    pub fn method(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("method", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppMerge {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
     }
 }
 
@@ -13527,7 +17090,7 @@ impl GitHubRepo {
             .unwrap_or(false)
     }
 
-    /// Install the App on this repository. Sends `installation_repositories`. Experimental.
+    /// Install an App on this repository. Sends that App `installation_repositories`. Experimental.
     pub fn install_app(&self, app: impl IntoArg) -> Call<Option<GitHubDelivery>> {
         Call::new(
             &self.ctx,
@@ -13538,7 +17101,7 @@ impl GitHubRepo {
         )
     }
 
-    /// Take the App off this repository. Sends `installation_repositories`. Experimental.
+    /// Take an App off this repository. Sends that App `installation_repositories`. Experimental.
     pub fn uninstall_app(&self, app: impl IntoArg) -> Call<Option<GitHubDelivery>> {
         Call::new(
             &self.ctx,
@@ -14034,6 +17597,13 @@ impl GitHubDelivery {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
+    /// `app`.
+    pub fn app(&self) -> String {
+        self.data
+            .get("app")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
     /// `type`.
     pub fn r#type(&self) -> String {
         self.data
@@ -14519,6 +18089,17 @@ impl GitHubComment {
             as_value,
         )
     }
+
+    /// The `issue_comment` (`created`) delivery this comment caused to this App (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in App's. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<GitHubDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_git_hub_comment_delivery_for,
+            GitHubDelivery::wrap_opt,
+        )
+    }
 }
 
 /// A handle: `GitHubReviewComment`.
@@ -14737,6 +18318,28 @@ impl LinearFixture {
         )
     }
 
+    /// Make another OAuth app in the workspace, installed with `actor=app`: its own app user (mentionable and assignable), access token, client and webhook secret. Or return the one made with this name and settings. Its webhooks go to CHANNELSTACK_LINEAR_APP_<NAME>_WEBHOOK_URL. Experimental.
+    pub fn create_app(&self) -> LinearFixtureCreateApp {
+        LinearFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_linear_fixture_create_app,
+            LinearApp::wrap,
+        ))
+    }
+
+    /// The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_linear_fixture_apps,
+            as_value,
+        )
+    }
+
     /// The teams this session created. Experimental.
     pub fn teams(&self) -> Call<Value> {
         Call::new(
@@ -14849,6 +18452,32 @@ impl IntoFuture for LinearFixtureCreateUser {
     }
 }
 
+/// The options of [`LinearFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct LinearFixtureCreateApp(Call<LinearApp>);
+
+impl LinearFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `events`.
+    pub fn events(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("events", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<LinearApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for LinearFixtureCreateApp {
+    type Output = Result<LinearApp>;
+    type IntoFuture = BoxFuture<'static, Result<LinearApp>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
 /// The options of [`LinearFixture::create_team`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct LinearFixtureCreateTeam(Call<LinearTeam>);
 
@@ -14898,6 +18527,10 @@ impl LinearFixtureDeliveries {
     /// `resource`.
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
@@ -15110,6 +18743,72 @@ impl LinearApp {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
+
+    /// An app a test made comments on an issue, as its own `commentCreate` would. Its mention of another app is refused (to confirm, B6). Experimental.
+    pub fn comment(&self, body: impl IntoArg) -> LinearAppComment {
+        LinearAppComment(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_linear_app_comment,
+            LinearComment::wrap,
+        ))
+    }
+
+    /// An app a test made replies in a comment's thread, as its own `commentCreate` with a `parentId` would. Experimental.
+    pub fn reply(&self, body: impl IntoArg) -> LinearAppReply {
+        LinearAppReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_linear_app_reply,
+            LinearComment::wrap,
+        ))
+    }
+}
+
+/// The options of [`LinearApp::comment`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct LinearAppComment(Call<LinearComment>);
+
+impl LinearAppComment {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<LinearComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for LinearAppComment {
+    type Output = Result<LinearComment>;
+    type IntoFuture = BoxFuture<'static, Result<LinearComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`LinearApp::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct LinearAppReply(Call<LinearComment>);
+
+impl LinearAppReply {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<LinearComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for LinearAppReply {
+    type Output = Result<LinearComment>;
+    type IntoFuture = BoxFuture<'static, Result<LinearComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
 }
 
 /// A handle: `LinearUser`.
@@ -15275,7 +18974,7 @@ impl LinearUser {
         ))
     }
 
-    /// Delegate an issue to the app. Opens an agent session and sends `AgentSessionEvent` (`created`). Experimental.
+    /// Delegate an issue to an app. Opens that app's agent session and sends it `AgentSessionEvent` (`created`); an issue delegated to another app moves. Experimental.
     pub fn delegate(&self, app: impl IntoArg) -> LinearUserDelegate {
         LinearUserDelegate(Call::new(
             &self.ctx,
@@ -15705,15 +19404,15 @@ impl IntoFuture for LinearUserStop {
     }
 }
 
-/// A handle: `LinearTeam`.
+/// A handle: `LinearComment`.
 #[derive(Clone)]
-pub struct LinearTeam {
+pub struct LinearComment {
     ctx: Ctx,
     data: Value,
     seen: Seen,
 }
 
-impl Handle for LinearTeam {
+impl Handle for LinearComment {
     fn data(&self) -> &Value {
         &self.data
     }
@@ -15722,7 +19421,7 @@ impl Handle for LinearTeam {
     }
 }
 
-impl LinearTeam {
+impl LinearComment {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
         Self::from_wire_in(ctx, data, Seen::default())
@@ -15760,29 +19459,82 @@ impl LinearTeam {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `key`.
-    pub fn key(&self) -> String {
+    /// `issue`.
+    pub fn issue(&self) -> LinearIssue {
+        LinearIssue::from_wire_in(
+            &self.ctx,
+            self.data.get("issue").cloned().unwrap_or(Value::Null),
+            self.seen.field("issue"),
+        )
+    }
+    /// `author`.
+    pub fn author(&self) -> &Value {
+        self.data.get("author").unwrap_or(&Value::Null)
+    }
+    /// `body`.
+    pub fn body(&self) -> String {
         self.data
-            .get("key")
+            .get("body")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `name`.
-    pub fn name(&self) -> String {
+    /// `createdAt`.
+    pub fn created_at(&self) -> String {
         self.data
-            .get("name")
+            .get("createdAt")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
+    }
+    /// `url`.
+    pub fn url(&self) -> String {
+        self.data
+            .get("url")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `session`.
+    pub fn session(&self) -> Option<LinearAgentSession> {
+        self.data.get("session").filter(|v| !v.is_null()).map(|v| {
+            LinearAgentSession::from_wire_in(&self.ctx, v.clone(), self.seen.field("session"))
+        })
+    }
+    /// `delivery`.
+    pub fn delivery(&self) -> Option<LinearDelivery> {
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            LinearDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
     }
 
-    /// An issue of this team by its identifier (`ENG-12`). Experimental.
-    pub fn issue(&self, identifier: impl IntoArg) -> Call<LinearIssue> {
+    /// The replies in a comment's thread, once the agent is quiet. Experimental.
+    pub fn replies(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
             &self.data,
-            vec![identifier.into_arg()],
-            run_linear_team_issue,
-            LinearIssue::wrap,
+            vec![],
+            run_linear_comment_replies,
+            as_value,
+        )
+    }
+
+    /// The `Comment` (`create`) delivery this comment caused to this app (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in app's. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<LinearDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_linear_comment_delivery_for,
+            LinearDelivery::wrap_opt,
+        )
+    }
+
+    /// A comment's thread as a person reads it. Experimental.
+    pub fn transcript(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_linear_comment_transcript,
+            as_value,
         )
     }
 }
@@ -16157,15 +19909,15 @@ impl IntoFuture for LinearIssueLatestComment {
     }
 }
 
-/// A handle: `LinearDelivery`.
+/// A handle: `LinearTeam`.
 #[derive(Clone)]
-pub struct LinearDelivery {
+pub struct LinearTeam {
     ctx: Ctx,
     data: Value,
     seen: Seen,
 }
 
-impl Handle for LinearDelivery {
+impl Handle for LinearTeam {
     fn data(&self) -> &Value {
         &self.data
     }
@@ -16174,7 +19926,7 @@ impl Handle for LinearDelivery {
     }
 }
 
-impl LinearDelivery {
+impl LinearTeam {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
         Self::from_wire_in(ctx, data, Seen::default())
@@ -16212,171 +19964,30 @@ impl LinearDelivery {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `channel`.
-    pub fn channel(&self) -> String {
+    /// `key`.
+    pub fn key(&self) -> String {
         self.data
-            .get("channel")
+            .get("key")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `type`.
-    pub fn r#type(&self) -> String {
+    /// `name`.
+    pub fn name(&self) -> String {
         self.data
-            .get("type")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `action`.
-    pub fn action(&self) -> String {
-        self.data
-            .get("action")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `webhookId`.
-    pub fn webhook_id(&self) -> String {
-        self.data
-            .get("webhookId")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `payload`.
-    pub fn payload(&self) -> &Value {
-        self.data.get("payload").unwrap_or(&Value::Null)
-    }
-    /// `attempts`.
-    pub fn attempts(&self) -> &Value {
-        self.data.get("attempts").unwrap_or(&Value::Null)
-    }
-    /// `status`.
-    pub fn status(&self) -> String {
-        self.data
-            .get("status")
+            .get("name")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
 
-    /// Re-read a delivery: its attempts and status. Experimental.
-    pub fn refresh(&self) -> Call<LinearDelivery> {
+    /// An issue of this team by its identifier (`ENG-12`). Experimental.
+    pub fn issue(&self, identifier: impl IntoArg) -> Call<LinearIssue> {
         Call::new(
             &self.ctx,
             &self.data,
-            vec![],
-            run_linear_delivery_refresh,
-            LinearDelivery::wrap,
+            vec![identifier.into_arg()],
+            run_linear_team_issue,
+            LinearIssue::wrap,
         )
-    }
-
-    /// Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental.
-    pub fn redeliver(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_linear_delivery_redeliver,
-            as_value,
-        )
-    }
-
-    /// Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental.
-    pub fn resend(&self) -> LinearDeliveryResend {
-        LinearDeliveryResend(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_linear_delivery_resend,
-            as_value,
-        ))
-    }
-
-    /// Wait for the delivery to settle. Set its options on what this returns, then `.send().await` (or `.await`).
-    pub fn settled(&self) -> LinearDeliverySettled {
-        LinearDeliverySettled {
-            ctx: self.ctx.clone(),
-            me: self.data.clone(),
-            seen: self.seen.clone(),
-            options: Map::new(),
-        }
-    }
-}
-
-/// The options of [`LinearDelivery::resend`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct LinearDeliveryResend(Call<Value>);
-
-impl LinearDeliveryResend {
-    /// `badSignature`.
-    pub fn bad_signature(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("badSignature", value))
-    }
-    /// `stale`.
-    pub fn stale(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("stale", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for LinearDeliveryResend {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
-/// The options of [`LinearDelivery::settled`].
-pub struct LinearDeliverySettled {
-    ctx: Ctx,
-    me: Value,
-    seen: Seen,
-    options: Map<String, Value>,
-}
-
-impl LinearDeliverySettled {
-    /// `timeout`.
-    pub fn timeout(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("timeout".into(), value.into_arg());
-        self
-    }
-    /// Wait.
-    pub async fn send(self) -> Result<LinearDelivery> {
-        let Self {
-            ctx,
-            me,
-            seen,
-            options,
-        } = self;
-        let _ = &seen;
-        let filters: Map<String, Value> = options
-            .iter()
-            .filter(|(name, _)| [].contains(&name.as_str()))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        let timeout = options
-            .get("timeout")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
-        let value = wait_for("the delivery to settle", &timeout, || {
-            let read = run_linear_delivery_refresh(&ctx, &me, vec![], filters.clone());
-            async move {
-                let value = read.await?;
-                Ok((!["pending"]
-                    .contains(&value.get("status").and_then(Value::as_str).unwrap_or("")))
-                .then_some(value))
-            }
-        })
-        .await?;
-        LinearDelivery::wrap(&ctx, value)
-    }
-}
-
-impl IntoFuture for LinearDeliverySettled {
-    type Output = Result<LinearDelivery>;
-    type IntoFuture = BoxFuture<'static, Result<LinearDelivery>>;
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(self.send())
     }
 }
 
@@ -16668,15 +20279,15 @@ impl IntoFuture for LinearAgentSessionWaitForActivity {
     }
 }
 
-/// A handle: `LinearComment`.
+/// A handle: `LinearDelivery`.
 #[derive(Clone)]
-pub struct LinearComment {
+pub struct LinearDelivery {
     ctx: Ctx,
     data: Value,
     seen: Seen,
 }
 
-impl Handle for LinearComment {
+impl Handle for LinearDelivery {
     fn data(&self) -> &Value {
         &self.data
     }
@@ -16685,7 +20296,7 @@ impl Handle for LinearComment {
     }
 }
 
-impl LinearComment {
+impl LinearDelivery {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
         Self::from_wire_in(ctx, data, Seen::default())
@@ -16723,72 +20334,178 @@ impl LinearComment {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `issue`.
-    pub fn issue(&self) -> LinearIssue {
-        LinearIssue::from_wire_in(
-            &self.ctx,
-            self.data.get("issue").cloned().unwrap_or(Value::Null),
-            self.seen.field("issue"),
-        )
-    }
-    /// `author`.
-    pub fn author(&self) -> &Value {
-        self.data.get("author").unwrap_or(&Value::Null)
-    }
-    /// `body`.
-    pub fn body(&self) -> String {
+    /// `channel`.
+    pub fn channel(&self) -> String {
         self.data
-            .get("body")
+            .get("channel")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `createdAt`.
-    pub fn created_at(&self) -> String {
+    /// `app`.
+    pub fn app(&self) -> String {
         self.data
-            .get("createdAt")
+            .get("app")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `url`.
-    pub fn url(&self) -> String {
+    /// `type`.
+    pub fn r#type(&self) -> String {
         self.data
-            .get("url")
+            .get("type")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `session`.
-    pub fn session(&self) -> Option<LinearAgentSession> {
-        self.data.get("session").filter(|v| !v.is_null()).map(|v| {
-            LinearAgentSession::from_wire_in(&self.ctx, v.clone(), self.seen.field("session"))
-        })
+    /// `action`.
+    pub fn action(&self) -> String {
+        self.data
+            .get("action")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
     }
-    /// `delivery`.
-    pub fn delivery(&self) -> Option<LinearDelivery> {
-        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
-            LinearDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
-        })
+    /// `webhookId`.
+    pub fn webhook_id(&self) -> String {
+        self.data
+            .get("webhookId")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `payload`.
+    pub fn payload(&self) -> &Value {
+        self.data.get("payload").unwrap_or(&Value::Null)
+    }
+    /// `attempts`.
+    pub fn attempts(&self) -> &Value {
+        self.data.get("attempts").unwrap_or(&Value::Null)
+    }
+    /// `status`.
+    pub fn status(&self) -> String {
+        self.data
+            .get("status")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
     }
 
-    /// The replies in a comment's thread, once the agent is quiet. Experimental.
-    pub fn replies(&self) -> Call<Value> {
+    /// Re-read a delivery: its attempts and status. Experimental.
+    pub fn refresh(&self) -> Call<LinearDelivery> {
         Call::new(
             &self.ctx,
             &self.data,
             vec![],
-            run_linear_comment_replies,
-            as_value,
+            run_linear_delivery_refresh,
+            LinearDelivery::wrap,
         )
     }
 
-    /// A comment's thread as a person reads it. Experimental.
-    pub fn transcript(&self) -> Call<Value> {
+    /// Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental.
+    pub fn redeliver(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
             &self.data,
             vec![],
-            run_linear_comment_transcript,
+            run_linear_delivery_redeliver,
             as_value,
         )
+    }
+
+    /// Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental.
+    pub fn resend(&self) -> LinearDeliveryResend {
+        LinearDeliveryResend(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_linear_delivery_resend,
+            as_value,
+        ))
+    }
+
+    /// Wait for the delivery to settle. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn settled(&self) -> LinearDeliverySettled {
+        LinearDeliverySettled {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`LinearDelivery::resend`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct LinearDeliveryResend(Call<Value>);
+
+impl LinearDeliveryResend {
+    /// `badSignature`.
+    pub fn bad_signature(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("badSignature", value))
+    }
+    /// `stale`.
+    pub fn stale(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("stale", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for LinearDeliveryResend {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`LinearDelivery::settled`].
+pub struct LinearDeliverySettled {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl LinearDeliverySettled {
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<LinearDelivery> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let value = wait_for("the delivery to settle", &timeout, || {
+            let read = run_linear_delivery_refresh(&ctx, &me, vec![], filters.clone());
+            async move {
+                let value = read.await?;
+                Ok((!["pending"]
+                    .contains(&value.get("status").and_then(Value::as_str).unwrap_or("")))
+                .then_some(value))
+            }
+        })
+        .await?;
+        LinearDelivery::wrap(&ctx, value)
+    }
+}
+
+impl IntoFuture for LinearDeliverySettled {
+    type Output = Result<LinearDelivery>;
+    type IntoFuture = BoxFuture<'static, Result<LinearDelivery>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
     }
 }
 
@@ -16978,6 +20695,28 @@ impl NotionFixture {
         )
     }
 
+    /// Make another internal integration in the workspace, with its own bot user, token and webhook subscription (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_NOTION_APP_<NAME>_WEBHOOK_URL, and it sees only the pages connected to it. Experimental.
+    pub fn create_app(&self) -> NotionFixtureCreateApp {
+        NotionFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_fixture_create_app,
+            NotionIntegration::wrap,
+        ))
+    }
+
+    /// The integrations this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_fixture_apps,
+            as_value,
+        )
+    }
+
     /// The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash. Experimental.
     pub fn pages(&self) -> Call<Value> {
         Call::new(
@@ -17022,15 +20761,15 @@ impl NotionFixture {
         )
     }
 
-    /// Send the subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created. Experimental.
-    pub fn send_verification(&self) -> Call<Option<NotionDelivery>> {
-        Call::new(
+    /// Send a subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created: the built-in integration's, or the one given's. Experimental.
+    pub fn send_verification(&self) -> NotionFixtureSendVerification {
+        NotionFixtureSendVerification(Call::new(
             &self.ctx,
             &self.data,
             vec![],
             run_notion_fixture_send_verification,
             NotionDelivery::wrap_opt,
-        )
+        ))
     }
 
     /// Every webhook channelstack sent the agent for this session, with every attempt. Experimental.
@@ -17099,6 +20838,36 @@ impl NotionFixtureCreateUser {
 impl IntoFuture for NotionFixtureCreateUser {
     type Output = Result<NotionUser>;
     type IntoFuture = BoxFuture<'static, Result<NotionUser>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`NotionFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionFixtureCreateApp(Call<NotionIntegration>);
+
+impl NotionFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `capabilities`.
+    pub fn capabilities(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("capabilities", value))
+    }
+    /// `events`.
+    pub fn events(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("events", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<NotionIntegration> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionFixtureCreateApp {
+    type Output = Result<NotionIntegration>;
+    type IntoFuture = BoxFuture<'static, Result<NotionIntegration>>;
     fn into_future(self) -> Self::IntoFuture {
         self.0.into_future()
     }
@@ -17184,6 +20953,28 @@ impl IntoFuture for NotionFixtureCreateDatabase {
     }
 }
 
+/// The options of [`NotionFixture::send_verification`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionFixtureSendVerification(Call<Option<NotionDelivery>>);
+
+impl NotionFixtureSendVerification {
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<NotionDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionFixtureSendVerification {
+    type Output = Result<Option<NotionDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<NotionDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
 /// The options of [`NotionFixture::deliveries`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct NotionFixtureDeliveries(Call<Value>);
 
@@ -17195,6 +20986,10 @@ impl NotionFixtureDeliveries {
     /// `resource`.
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
@@ -17399,6 +21194,142 @@ impl NotionIntegration {
             .get("webhookSecret")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
+    }
+
+    /// An integration a test made starts a discussion on a page, or anchored to the block with `anchor` in its text, as its own `comments.create` would: on a page connected to it, mentioning people only. Sends `comment.created` to every integration that sees the page. Experimental.
+    pub fn comment(&self, text: impl IntoArg) -> NotionIntegrationComment {
+        NotionIntegrationComment(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![text.into_arg()],
+            run_notion_integration_comment,
+            NotionComment::wrap,
+        ))
+    }
+
+    /// An integration a test made replies in a discussion, as `comments.create` with `discussion_id` would. Sends `comment.created`. Experimental.
+    pub fn reply(&self, text: impl IntoArg) -> NotionIntegrationReply {
+        NotionIntegrationReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![text.into_arg()],
+            run_notion_integration_reply,
+            NotionComment::wrap,
+        ))
+    }
+
+    /// An integration a test made edits a page's body, as its own block calls would: append, or replace it. Sends one `page.content_updated` once Notion's batching delay is over. Experimental.
+    pub fn edit(&self, change: impl IntoArg) -> NotionIntegrationEdit {
+        NotionIntegrationEdit(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![change.into_arg()],
+            run_notion_integration_edit,
+            NotionDelivery::wrap_opt,
+        ))
+    }
+
+    /// An integration a test made changes a page's title, as its own `pages.update` would. Sends `page.properties_updated`. Experimental.
+    pub fn rename(&self, title: impl IntoArg) -> NotionIntegrationRename {
+        NotionIntegrationRename(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![title.into_arg()],
+            run_notion_integration_rename,
+            NotionDelivery::wrap_opt,
+        ))
+    }
+}
+
+/// The options of [`NotionIntegration::comment`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionIntegrationComment(Call<NotionComment>);
+
+impl NotionIntegrationComment {
+    /// `page`.
+    pub fn page(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("page", value))
+    }
+    /// `anchor`.
+    pub fn anchor(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("anchor", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<NotionComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionIntegrationComment {
+    type Output = Result<NotionComment>;
+    type IntoFuture = BoxFuture<'static, Result<NotionComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`NotionIntegration::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionIntegrationReply(Call<NotionComment>);
+
+impl NotionIntegrationReply {
+    /// `discussion`.
+    pub fn discussion(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("discussion", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<NotionComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionIntegrationReply {
+    type Output = Result<NotionComment>;
+    type IntoFuture = BoxFuture<'static, Result<NotionComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`NotionIntegration::edit`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionIntegrationEdit(Call<Option<NotionDelivery>>);
+
+impl NotionIntegrationEdit {
+    /// `page`.
+    pub fn page(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("page", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<NotionDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionIntegrationEdit {
+    type Output = Result<Option<NotionDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<NotionDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`NotionIntegration::rename`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionIntegrationRename(Call<Option<NotionDelivery>>);
+
+impl NotionIntegrationRename {
+    /// `page`.
+    pub fn page(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("page", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<NotionDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionIntegrationRename {
+    type Output = Result<Option<NotionDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<NotionDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
     }
 }
 
@@ -17934,459 +21865,6 @@ impl IntoFuture for NotionUserDisconnect {
     }
 }
 
-/// A handle: `NotionPage`.
-#[derive(Clone)]
-pub struct NotionPage {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for NotionPage {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl NotionPage {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `id`.
-    pub fn id(&self) -> String {
-        self.data
-            .get("id")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> String {
-        self.data
-            .get("channel")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `title`.
-    pub fn title(&self) -> String {
-        self.data
-            .get("title")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `url`.
-    pub fn url(&self) -> String {
-        self.data
-            .get("url")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-
-    /// The page's discussions: on the page itself, and on its blocks. Experimental.
-    pub fn discussions(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_discussions,
-            as_value,
-        )
-    }
-
-    /// The page body as Markdown, once the agent is quiet. Experimental.
-    pub fn markdown(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_markdown,
-            as_value,
-        )
-    }
-
-    /// The page's blocks as the API has them, with nested blocks under `children`. Experimental.
-    pub fn blocks(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_blocks,
-            as_value,
-        )
-    }
-
-    /// A property's value as a person reads it: text, a number, option names, ids. Experimental.
-    pub fn property(&self, name: impl IntoArg) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![name.into_arg()],
-            run_notion_page_property,
-            as_value,
-        )
-    }
-
-    /// The pages directly under this page. Experimental.
-    pub fn children(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_children,
-            as_value,
-        )
-    }
-
-    /// The integrations that can see the page: connected to it or to a page above it. Experimental.
-    pub fn connections(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_connections,
-            as_value,
-        )
-    }
-
-    /// The page and its discussions as a person reads them. Experimental.
-    pub fn transcript(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_transcript,
-            as_value,
-        )
-    }
-}
-
-/// A handle: `NotionDatabase`.
-#[derive(Clone)]
-pub struct NotionDatabase {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for NotionDatabase {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl NotionDatabase {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `id`.
-    pub fn id(&self) -> String {
-        self.data
-            .get("id")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> String {
-        self.data
-            .get("channel")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `title`.
-    pub fn title(&self) -> String {
-        self.data
-            .get("title")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `url`.
-    pub fn url(&self) -> String {
-        self.data
-            .get("url")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-
-    /// The rows of a database, optionally only those whose properties have these values. Experimental.
-    pub fn rows(&self, filter: impl IntoArg) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![filter.into_arg()],
-            run_notion_database_rows,
-            as_value,
-        )
-    }
-}
-
-/// A handle: `NotionDelivery`.
-#[derive(Clone)]
-pub struct NotionDelivery {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for NotionDelivery {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl NotionDelivery {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `id`.
-    pub fn id(&self) -> String {
-        self.data
-            .get("id")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> String {
-        self.data
-            .get("channel")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `type`.
-    pub fn r#type(&self) -> String {
-        self.data
-            .get("type")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `entity`.
-    pub fn entity(&self) -> &Value {
-        self.data.get("entity").unwrap_or(&Value::Null)
-    }
-    /// `payload`.
-    pub fn payload(&self) -> &Value {
-        self.data.get("payload").unwrap_or(&Value::Null)
-    }
-    /// `attempts`.
-    pub fn attempts(&self) -> &Value {
-        self.data.get("attempts").unwrap_or(&Value::Null)
-    }
-    /// `status`.
-    pub fn status(&self) -> String {
-        self.data
-            .get("status")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-
-    /// Re-read a delivery: its attempts and status. Experimental.
-    pub fn refresh(&self) -> Call<NotionDelivery> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_delivery_refresh,
-            NotionDelivery::wrap,
-        )
-    }
-
-    /// Send the same event again, as a retry does: the same body, the next `attempt_number`, signed again. Experimental.
-    pub fn redeliver(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_delivery_redeliver,
-            as_value,
-        )
-    }
-
-    /// Send the delivery again, signed with a token that isn't the subscription's. Experimental.
-    pub fn resend(&self) -> NotionDeliveryResend {
-        NotionDeliveryResend(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_delivery_resend,
-            as_value,
-        ))
-    }
-
-    /// Wait for the delivery to settle. Set its options on what this returns, then `.send().await` (or `.await`).
-    pub fn settled(&self) -> NotionDeliverySettled {
-        NotionDeliverySettled {
-            ctx: self.ctx.clone(),
-            me: self.data.clone(),
-            seen: self.seen.clone(),
-            options: Map::new(),
-        }
-    }
-}
-
-/// The options of [`NotionDelivery::resend`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct NotionDeliveryResend(Call<Value>);
-
-impl NotionDeliveryResend {
-    /// `badSignature`.
-    pub fn bad_signature(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("badSignature", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for NotionDeliveryResend {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
-/// The options of [`NotionDelivery::settled`].
-pub struct NotionDeliverySettled {
-    ctx: Ctx,
-    me: Value,
-    seen: Seen,
-    options: Map<String, Value>,
-}
-
-impl NotionDeliverySettled {
-    /// `timeout`.
-    pub fn timeout(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("timeout".into(), value.into_arg());
-        self
-    }
-    /// Wait.
-    pub async fn send(self) -> Result<NotionDelivery> {
-        let Self {
-            ctx,
-            me,
-            seen,
-            options,
-        } = self;
-        let _ = &seen;
-        let filters: Map<String, Value> = options
-            .iter()
-            .filter(|(name, _)| [].contains(&name.as_str()))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        let timeout = options
-            .get("timeout")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
-        let value = wait_for("the delivery to settle", &timeout, || {
-            let read = run_notion_delivery_refresh(&ctx, &me, vec![], filters.clone());
-            async move {
-                let value = read.await?;
-                Ok((!["pending"]
-                    .contains(&value.get("status").and_then(Value::as_str).unwrap_or("")))
-                .then_some(value))
-            }
-        })
-        .await?;
-        NotionDelivery::wrap(&ctx, value)
-    }
-}
-
-impl IntoFuture for NotionDeliverySettled {
-    type Output = Result<NotionDelivery>;
-    type IntoFuture = BoxFuture<'static, Result<NotionDelivery>>;
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(self.send())
-    }
-}
-
 /// A handle: `NotionComment`.
 #[derive(Clone)]
 pub struct NotionComment {
@@ -18473,6 +21951,17 @@ impl NotionComment {
         self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
             NotionDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
         })
+    }
+
+    /// The `comment.created` delivery this comment caused to this integration (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in integration's. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<NotionDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_notion_comment_delivery_for,
+            NotionDelivery::wrap_opt,
+        )
     }
 }
 
@@ -18744,6 +22233,466 @@ impl IntoFuture for NotionDiscussionLatestComment {
     }
 }
 
+/// A handle: `NotionPage`.
+#[derive(Clone)]
+pub struct NotionPage {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for NotionPage {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl NotionPage {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `title`.
+    pub fn title(&self) -> String {
+        self.data
+            .get("title")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `url`.
+    pub fn url(&self) -> String {
+        self.data
+            .get("url")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// The page's discussions: on the page itself, and on its blocks. Experimental.
+    pub fn discussions(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_discussions,
+            as_value,
+        )
+    }
+
+    /// The page body as Markdown, once the agent is quiet. Experimental.
+    pub fn markdown(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_markdown,
+            as_value,
+        )
+    }
+
+    /// The page's blocks as the API has them, with nested blocks under `children`. Experimental.
+    pub fn blocks(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_blocks,
+            as_value,
+        )
+    }
+
+    /// A property's value as a person reads it: text, a number, option names, ids. Experimental.
+    pub fn property(&self, name: impl IntoArg) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![name.into_arg()],
+            run_notion_page_property,
+            as_value,
+        )
+    }
+
+    /// The pages directly under this page. Experimental.
+    pub fn children(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_children,
+            as_value,
+        )
+    }
+
+    /// The integrations that can see the page: connected to it or to a page above it. Experimental.
+    pub fn connections(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_connections,
+            as_value,
+        )
+    }
+
+    /// The page and its discussions as a person reads them. Experimental.
+    pub fn transcript(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_transcript,
+            as_value,
+        )
+    }
+}
+
+/// A handle: `NotionDelivery`.
+#[derive(Clone)]
+pub struct NotionDelivery {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for NotionDelivery {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl NotionDelivery {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `app`.
+    pub fn app(&self) -> String {
+        self.data
+            .get("app")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `type`.
+    pub fn r#type(&self) -> String {
+        self.data
+            .get("type")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `entity`.
+    pub fn entity(&self) -> &Value {
+        self.data.get("entity").unwrap_or(&Value::Null)
+    }
+    /// `payload`.
+    pub fn payload(&self) -> &Value {
+        self.data.get("payload").unwrap_or(&Value::Null)
+    }
+    /// `attempts`.
+    pub fn attempts(&self) -> &Value {
+        self.data.get("attempts").unwrap_or(&Value::Null)
+    }
+    /// `status`.
+    pub fn status(&self) -> String {
+        self.data
+            .get("status")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// Re-read a delivery: its attempts and status. Experimental.
+    pub fn refresh(&self) -> Call<NotionDelivery> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_delivery_refresh,
+            NotionDelivery::wrap,
+        )
+    }
+
+    /// Send the same event again, as a retry does: the same body, the next `attempt_number`, signed again. Experimental.
+    pub fn redeliver(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_delivery_redeliver,
+            as_value,
+        )
+    }
+
+    /// Send the delivery again, signed with a token that isn't the subscription's. Experimental.
+    pub fn resend(&self) -> NotionDeliveryResend {
+        NotionDeliveryResend(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_delivery_resend,
+            as_value,
+        ))
+    }
+
+    /// Wait for the delivery to settle. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn settled(&self) -> NotionDeliverySettled {
+        NotionDeliverySettled {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`NotionDelivery::resend`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionDeliveryResend(Call<Value>);
+
+impl NotionDeliveryResend {
+    /// `badSignature`.
+    pub fn bad_signature(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("badSignature", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionDeliveryResend {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`NotionDelivery::settled`].
+pub struct NotionDeliverySettled {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl NotionDeliverySettled {
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<NotionDelivery> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let value = wait_for("the delivery to settle", &timeout, || {
+            let read = run_notion_delivery_refresh(&ctx, &me, vec![], filters.clone());
+            async move {
+                let value = read.await?;
+                Ok((!["pending"]
+                    .contains(&value.get("status").and_then(Value::as_str).unwrap_or("")))
+                .then_some(value))
+            }
+        })
+        .await?;
+        NotionDelivery::wrap(&ctx, value)
+    }
+}
+
+impl IntoFuture for NotionDeliverySettled {
+    type Output = Result<NotionDelivery>;
+    type IntoFuture = BoxFuture<'static, Result<NotionDelivery>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// A handle: `NotionDatabase`.
+#[derive(Clone)]
+pub struct NotionDatabase {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for NotionDatabase {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl NotionDatabase {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `title`.
+    pub fn title(&self) -> String {
+        self.data
+            .get("title")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `url`.
+    pub fn url(&self) -> String {
+        self.data
+            .get("url")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// The rows of a database, optionally only those whose properties have these values. Experimental.
+    pub fn rows(&self, filter: impl IntoArg) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![filter.into_arg()],
+            run_notion_database_rows,
+            as_value,
+        )
+    }
+}
+
 /// A handle: `ResendFixture`.
 #[derive(Clone)]
 pub struct ResendFixture {
@@ -18806,6 +22755,28 @@ impl ResendFixture {
             .get("apiUrl")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
+    }
+
+    /// Make another app: a team of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_RESEND_APP_<NAME>_WEBHOOK_URL. Experimental.
+    pub fn create_app(&self) -> ResendFixtureCreateApp {
+        ResendFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_fixture_create_app,
+            ResendApp::wrap,
+        ))
+    }
+
+    /// The teams this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_fixture_apps,
+            as_value,
+        )
     }
 
     /// Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental.
@@ -18874,6 +22845,32 @@ impl ResendFixture {
     }
 }
 
+/// The options of [`ResendFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct ResendFixtureCreateApp(Call<ResendApp>);
+
+impl ResendFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `domain`.
+    pub fn domain(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("domain", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<ResendApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for ResendFixtureCreateApp {
+    type Output = Result<ResendApp>;
+    type IntoFuture = BoxFuture<'static, Result<ResendApp>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
 /// The options of [`ResendFixture::create_user`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct ResendFixtureCreateUser(Call<ResendUser>);
 
@@ -18915,6 +22912,10 @@ impl ResendFixtureDeliveries {
     /// `resource`.
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
@@ -19113,17 +23114,136 @@ impl ResendApp {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
+    /// `domain`.
+    pub fn domain(&self) -> String {
+        self.data
+            .get("domain")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `apiKey`.
+    pub fn api_key(&self) -> String {
+        self.data
+            .get("apiKey")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `webhookSecret`.
+    pub fn webhook_secret(&self) -> String {
+        self.data
+            .get("webhookSecret")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// An app a test made sends an email, through its own team's API, as its own call would. Experimental.
+    pub fn send(&self) -> ResendAppSend {
+        ResendAppSend(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_app_send,
+            ResendEmail::wrap,
+        ))
+    }
+
+    /// An app a test made replies to an email, in its thread, as its own call would. Experimental.
+    pub fn reply(&self, email: impl IntoArg) -> ResendAppReply {
+        ResendAppReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![email.into_arg()],
+            run_resend_app_reply,
+            ResendEmail::wrap,
+        ))
+    }
 }
 
-/// A handle: `ResendUser`.
+/// The options of [`ResendApp::send`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct ResendAppSend(Call<ResendEmail>);
+
+impl ResendAppSend {
+    /// `to`.
+    pub fn to(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("to", value))
+    }
+    /// `cc`.
+    pub fn cc(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("cc", value))
+    }
+    /// `subject`.
+    pub fn subject(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("subject", value))
+    }
+    /// `text`.
+    pub fn text(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("text", value))
+    }
+    /// `html`.
+    pub fn html(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("html", value))
+    }
+    /// `headers`.
+    pub fn headers(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("headers", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<ResendEmail> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for ResendAppSend {
+    type Output = Result<ResendEmail>;
+    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`ResendApp::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct ResendAppReply(Call<ResendEmail>);
+
+impl ResendAppReply {
+    /// `text`.
+    pub fn text(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("text", value))
+    }
+    /// `html`.
+    pub fn html(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("html", value))
+    }
+    /// `all`.
+    pub fn all(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("all", value))
+    }
+    /// `headers`.
+    pub fn headers(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("headers", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<ResendEmail> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for ResendAppReply {
+    type Output = Result<ResendEmail>;
+    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// A handle: `ResendEmail`.
 #[derive(Clone)]
-pub struct ResendUser {
+pub struct ResendEmail {
     ctx: Ctx,
     data: Value,
     seen: Seen,
 }
 
-impl Handle for ResendUser {
+impl Handle for ResendEmail {
     fn data(&self) -> &Value {
         &self.data
     }
@@ -19132,7 +23252,7 @@ impl Handle for ResendUser {
     }
 }
 
-impl ResendUser {
+impl ResendEmail {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
         Self::from_wire_in(ctx, data, Seen::default())
@@ -19177,205 +23297,92 @@ impl ResendUser {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `kind`.
-    pub fn kind(&self) -> String {
-        self.data
-            .get("kind")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `name`.
-    pub fn name(&self) -> String {
-        self.data
-            .get("name")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `address`.
-    pub fn address(&self) -> String {
-        self.data
-            .get("address")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-
-    /// The person emails someone: the agent (`resend.app`), or another person. Experimental.
-    pub fn send(&self) -> ResendUserSend {
-        ResendUserSend(Call::new(
+    /// `thread`.
+    pub fn thread(&self) -> ResendThread {
+        ResendThread::from_wire_in(
             &self.ctx,
-            &self.data,
-            vec![],
-            run_resend_user_send,
-            ResendEmail::wrap,
-        ))
+            self.data.get("thread").cloned().unwrap_or(Value::Null),
+            self.seen.field("thread"),
+        )
+    }
+    /// `author`.
+    pub fn author(&self) -> &Value {
+        self.data.get("author").unwrap_or(&Value::Null)
+    }
+    /// `from`.
+    pub fn from(&self) -> String {
+        self.data
+            .get("from")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `to`.
+    pub fn to(&self) -> &Value {
+        self.data.get("to").unwrap_or(&Value::Null)
+    }
+    /// `cc`.
+    pub fn cc(&self) -> &Value {
+        self.data.get("cc").unwrap_or(&Value::Null)
+    }
+    /// `subject`.
+    pub fn subject(&self) -> String {
+        self.data
+            .get("subject")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `text`.
+    pub fn text(&self) -> String {
+        self.data
+            .get("text")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `at`.
+    pub fn at(&self) -> String {
+        self.data
+            .get("at")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `messageId`.
+    pub fn message_id(&self) -> String {
+        self.data
+            .get("messageId")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `headers`.
+    pub fn headers(&self) -> &Value {
+        self.data.get("headers").unwrap_or(&Value::Null)
+    }
+    /// `delivery`.
+    pub fn delivery(&self) -> Option<ResendDelivery> {
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            ResendDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
     }
 
-    /// The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental.
-    pub fn reply(&self, email: impl IntoArg) -> ResendUserReply {
-        ResendUserReply(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![email.into_arg()],
-            run_resend_user_reply,
-            ResendEmail::wrap,
-        ))
-    }
-
-    /// What reached the person's mailbox, oldest first. Experimental.
-    pub fn inbox(&self) -> Call<Value> {
+    /// Re-read an email. Experimental.
+    pub fn refresh(&self) -> Call<ResendEmail> {
         Call::new(
             &self.ctx,
             &self.data,
             vec![],
-            run_resend_user_inbox,
-            as_value,
+            run_resend_email_refresh,
+            ResendEmail::wrap,
         )
     }
 
-    /// Wait for an email. Set its options on what this returns, then `.send().await` (or `.await`).
-    pub fn wait_for_email(&self) -> ResendUserWaitForEmail {
-        ResendUserWaitForEmail {
-            ctx: self.ctx.clone(),
-            me: self.data.clone(),
-            seen: self.seen.clone(),
-            options: Map::new(),
-        }
-    }
-}
-
-/// The options of [`ResendUser::send`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct ResendUserSend(Call<ResendEmail>);
-
-impl ResendUserSend {
-    /// `to`.
-    pub fn to(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("to", value))
-    }
-    /// `cc`.
-    pub fn cc(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("cc", value))
-    }
-    /// `subject`.
-    pub fn subject(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("subject", value))
-    }
-    /// `text`.
-    pub fn text(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("text", value))
-    }
-    /// `html`.
-    pub fn html(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("html", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<ResendEmail> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for ResendUserSend {
-    type Output = Result<ResendEmail>;
-    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
-/// The options of [`ResendUser::reply`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct ResendUserReply(Call<ResendEmail>);
-
-impl ResendUserReply {
-    /// `text`.
-    pub fn text(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("text", value))
-    }
-    /// `html`.
-    pub fn html(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("html", value))
-    }
-    /// `all`.
-    pub fn all(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("all", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<ResendEmail> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for ResendUserReply {
-    type Output = Result<ResendEmail>;
-    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
-/// The options of [`ResendUser::wait_for_email`].
-pub struct ResendUserWaitForEmail {
-    ctx: Ctx,
-    me: Value,
-    seen: Seen,
-    options: Map<String, Value>,
-}
-
-impl ResendUserWaitForEmail {
-    /// `from`.
-    pub fn from(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("from".into(), value.into_arg());
-        self
-    }
-    /// `timeout`.
-    pub fn timeout(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("timeout".into(), value.into_arg());
-        self
-    }
-    /// Wait.
-    pub async fn send(self) -> Result<ResendEmail> {
-        let Self {
-            ctx,
-            me,
-            seen,
-            options,
-        } = self;
-        let _ = &seen;
-        let filters: Map<String, Value> = options
-            .iter()
-            .filter(|(name, _)| [].contains(&name.as_str()))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        let timeout = options
-            .get("timeout")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
-        let from = options.get("from").cloned().unwrap_or(Value::Null);
-        let item = wait_for_next(
-            &seen.positions,
-            "waitForEmail",
-            || run_resend_user_inbox(&ctx, &me, vec![], filters.clone()),
-            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
-            None,
-            &match &from {
-                Value::Null => "an email".to_owned(),
-                Value::String(name) => format!("{} from {}", "an email", name),
-                other => format!(
-                    "{} from {}",
-                    "an email",
-                    other.get("name").and_then(Value::as_str).unwrap_or("")
-                ),
-            },
-            &timeout,
+    /// The delivery that told this app of the email (decision 0027), or nothing when it wasn't told. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<ResendDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_resend_email_delivery_for,
+            ResendDelivery::wrap_opt,
         )
-        .await?;
-        ResendEmail::wrap(&ctx, item)
-    }
-}
-
-impl IntoFuture for ResendUserWaitForEmail {
-    type Output = Result<ResendEmail>;
-    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(self.send())
     }
 }
 
@@ -19647,142 +23654,6 @@ impl IntoFuture for ResendThreadLatestReply {
     }
 }
 
-/// A handle: `ResendEmail`.
-#[derive(Clone)]
-pub struct ResendEmail {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for ResendEmail {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl ResendEmail {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `id`.
-    pub fn id(&self) -> String {
-        self.data
-            .get("id")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> String {
-        self.data
-            .get("channel")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `thread`.
-    pub fn thread(&self) -> ResendThread {
-        ResendThread::from_wire_in(
-            &self.ctx,
-            self.data.get("thread").cloned().unwrap_or(Value::Null),
-            self.seen.field("thread"),
-        )
-    }
-    /// `author`.
-    pub fn author(&self) -> &Value {
-        self.data.get("author").unwrap_or(&Value::Null)
-    }
-    /// `from`.
-    pub fn from(&self) -> String {
-        self.data
-            .get("from")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `to`.
-    pub fn to(&self) -> &Value {
-        self.data.get("to").unwrap_or(&Value::Null)
-    }
-    /// `cc`.
-    pub fn cc(&self) -> &Value {
-        self.data.get("cc").unwrap_or(&Value::Null)
-    }
-    /// `subject`.
-    pub fn subject(&self) -> String {
-        self.data
-            .get("subject")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `text`.
-    pub fn text(&self) -> String {
-        self.data
-            .get("text")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `at`.
-    pub fn at(&self) -> String {
-        self.data
-            .get("at")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `messageId`.
-    pub fn message_id(&self) -> String {
-        self.data
-            .get("messageId")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `delivery`.
-    pub fn delivery(&self) -> Option<ResendDelivery> {
-        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
-            ResendDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
-        })
-    }
-
-    /// Re-read an email. Experimental.
-    pub fn refresh(&self) -> Call<ResendEmail> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_resend_email_refresh,
-            ResendEmail::wrap,
-        )
-    }
-}
-
 /// A handle: `ResendDelivery`.
 #[derive(Clone)]
 pub struct ResendDelivery {
@@ -19842,6 +23713,13 @@ impl ResendDelivery {
     pub fn channel(&self) -> String {
         self.data
             .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `app`.
+    pub fn app(&self) -> String {
+        self.data
+            .get("app")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
@@ -19999,6 +23877,270 @@ impl IntoFuture for ResendDeliverySettled {
     }
 }
 
+/// A handle: `ResendUser`.
+#[derive(Clone)]
+pub struct ResendUser {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for ResendUser {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl ResendUser {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `kind`.
+    pub fn kind(&self) -> String {
+        self.data
+            .get("kind")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `name`.
+    pub fn name(&self) -> String {
+        self.data
+            .get("name")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `address`.
+    pub fn address(&self) -> String {
+        self.data
+            .get("address")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// The person emails someone: the agent (`resend.app`), another app, or another person. Experimental.
+    pub fn send(&self) -> ResendUserSend {
+        ResendUserSend(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_user_send,
+            ResendEmail::wrap,
+        ))
+    }
+
+    /// The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental.
+    pub fn reply(&self, email: impl IntoArg) -> ResendUserReply {
+        ResendUserReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![email.into_arg()],
+            run_resend_user_reply,
+            ResendEmail::wrap,
+        ))
+    }
+
+    /// What reached the person's mailbox, oldest first. Experimental.
+    pub fn inbox(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_user_inbox,
+            as_value,
+        )
+    }
+
+    /// Wait for an email. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_email(&self) -> ResendUserWaitForEmail {
+        ResendUserWaitForEmail {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`ResendUser::send`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct ResendUserSend(Call<ResendEmail>);
+
+impl ResendUserSend {
+    /// `to`.
+    pub fn to(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("to", value))
+    }
+    /// `cc`.
+    pub fn cc(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("cc", value))
+    }
+    /// `subject`.
+    pub fn subject(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("subject", value))
+    }
+    /// `text`.
+    pub fn text(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("text", value))
+    }
+    /// `html`.
+    pub fn html(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("html", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<ResendEmail> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for ResendUserSend {
+    type Output = Result<ResendEmail>;
+    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`ResendUser::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct ResendUserReply(Call<ResendEmail>);
+
+impl ResendUserReply {
+    /// `text`.
+    pub fn text(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("text", value))
+    }
+    /// `html`.
+    pub fn html(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("html", value))
+    }
+    /// `all`.
+    pub fn all(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("all", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<ResendEmail> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for ResendUserReply {
+    type Output = Result<ResendEmail>;
+    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`ResendUser::wait_for_email`].
+pub struct ResendUserWaitForEmail {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl ResendUserWaitForEmail {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<ResendEmail> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = wait_for_next(
+            &seen.positions,
+            "waitForEmail",
+            || run_resend_user_inbox(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            None,
+            &match &from {
+                Value::Null => "an email".to_owned(),
+                Value::String(name) => format!("{} from {}", "an email", name),
+                other => format!(
+                    "{} from {}",
+                    "an email",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+        )
+        .await?;
+        ResendEmail::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for ResendUserWaitForEmail {
+    type Output = Result<ResendEmail>;
+    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
 /// A handle: `GoogleFixture`.
 #[derive(Clone)]
 pub struct GoogleFixture {
@@ -20061,6 +24203,28 @@ impl GoogleFixture {
             .get("apiUrl")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
+    }
+
+    /// Make another app: a mailbox of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_GOOGLE_APP_<NAME>_WEBHOOK_URL. Experimental.
+    pub fn create_app(&self) -> GoogleFixtureCreateApp {
+        GoogleFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_google_fixture_create_app,
+            GoogleApp::wrap,
+        ))
+    }
+
+    /// The mailboxs this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_google_fixture_apps,
+            as_value,
+        )
     }
 
     /// Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental.
@@ -20129,6 +24293,28 @@ impl GoogleFixture {
     }
 }
 
+/// The options of [`GoogleFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GoogleFixtureCreateApp(Call<GoogleApp>);
+
+impl GoogleFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GoogleApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GoogleFixtureCreateApp {
+    type Output = Result<GoogleApp>;
+    type IntoFuture = BoxFuture<'static, Result<GoogleApp>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
 /// The options of [`GoogleFixture::create_user`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct GoogleFixtureCreateUser(Call<GoogleUser>);
 
@@ -20170,6 +24356,10 @@ impl GoogleFixtureDeliveries {
     /// `resource`.
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
@@ -20368,17 +24558,136 @@ impl GoogleApp {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
+    /// `clientId`.
+    pub fn client_id(&self) -> String {
+        self.data
+            .get("clientId")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `clientSecret`.
+    pub fn client_secret(&self) -> String {
+        self.data
+            .get("clientSecret")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `refreshToken`.
+    pub fn refresh_token(&self) -> String {
+        self.data
+            .get("refreshToken")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// An app a test made sends an email, through its own mailbox's API, as its own call would. Experimental.
+    pub fn send(&self) -> GoogleAppSend {
+        GoogleAppSend(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_google_app_send,
+            GoogleEmail::wrap,
+        ))
+    }
+
+    /// An app a test made replies to an email, in its thread, as its own call would. Experimental.
+    pub fn reply(&self, email: impl IntoArg) -> GoogleAppReply {
+        GoogleAppReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![email.into_arg()],
+            run_google_app_reply,
+            GoogleEmail::wrap,
+        ))
+    }
 }
 
-/// A handle: `GoogleUser`.
+/// The options of [`GoogleApp::send`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GoogleAppSend(Call<GoogleEmail>);
+
+impl GoogleAppSend {
+    /// `to`.
+    pub fn to(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("to", value))
+    }
+    /// `cc`.
+    pub fn cc(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("cc", value))
+    }
+    /// `subject`.
+    pub fn subject(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("subject", value))
+    }
+    /// `text`.
+    pub fn text(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("text", value))
+    }
+    /// `html`.
+    pub fn html(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("html", value))
+    }
+    /// `headers`.
+    pub fn headers(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("headers", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GoogleEmail> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GoogleAppSend {
+    type Output = Result<GoogleEmail>;
+    type IntoFuture = BoxFuture<'static, Result<GoogleEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GoogleApp::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GoogleAppReply(Call<GoogleEmail>);
+
+impl GoogleAppReply {
+    /// `text`.
+    pub fn text(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("text", value))
+    }
+    /// `html`.
+    pub fn html(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("html", value))
+    }
+    /// `all`.
+    pub fn all(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("all", value))
+    }
+    /// `headers`.
+    pub fn headers(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("headers", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GoogleEmail> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GoogleAppReply {
+    type Output = Result<GoogleEmail>;
+    type IntoFuture = BoxFuture<'static, Result<GoogleEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// A handle: `GoogleEmail`.
 #[derive(Clone)]
-pub struct GoogleUser {
+pub struct GoogleEmail {
     ctx: Ctx,
     data: Value,
     seen: Seen,
 }
 
-impl Handle for GoogleUser {
+impl Handle for GoogleEmail {
     fn data(&self) -> &Value {
         &self.data
     }
@@ -20387,7 +24696,7 @@ impl Handle for GoogleUser {
     }
 }
 
-impl GoogleUser {
+impl GoogleEmail {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
         Self::from_wire_in(ctx, data, Seen::default())
@@ -20432,205 +24741,96 @@ impl GoogleUser {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `kind`.
-    pub fn kind(&self) -> String {
-        self.data
-            .get("kind")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `name`.
-    pub fn name(&self) -> String {
-        self.data
-            .get("name")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `address`.
-    pub fn address(&self) -> String {
-        self.data
-            .get("address")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-
-    /// The person emails someone: the agent (`google.app`), or another person. Experimental.
-    pub fn send(&self) -> GoogleUserSend {
-        GoogleUserSend(Call::new(
+    /// `thread`.
+    pub fn thread(&self) -> GoogleThread {
+        GoogleThread::from_wire_in(
             &self.ctx,
-            &self.data,
-            vec![],
-            run_google_user_send,
-            GoogleEmail::wrap,
-        ))
+            self.data.get("thread").cloned().unwrap_or(Value::Null),
+            self.seen.field("thread"),
+        )
+    }
+    /// `author`.
+    pub fn author(&self) -> &Value {
+        self.data.get("author").unwrap_or(&Value::Null)
+    }
+    /// `from`.
+    pub fn from(&self) -> String {
+        self.data
+            .get("from")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `to`.
+    pub fn to(&self) -> &Value {
+        self.data.get("to").unwrap_or(&Value::Null)
+    }
+    /// `cc`.
+    pub fn cc(&self) -> &Value {
+        self.data.get("cc").unwrap_or(&Value::Null)
+    }
+    /// `subject`.
+    pub fn subject(&self) -> String {
+        self.data
+            .get("subject")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `text`.
+    pub fn text(&self) -> String {
+        self.data
+            .get("text")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `at`.
+    pub fn at(&self) -> String {
+        self.data
+            .get("at")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `messageId`.
+    pub fn message_id(&self) -> String {
+        self.data
+            .get("messageId")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `headers`.
+    pub fn headers(&self) -> &Value {
+        self.data.get("headers").unwrap_or(&Value::Null)
+    }
+    /// `labels`.
+    pub fn labels(&self) -> &Value {
+        self.data.get("labels").unwrap_or(&Value::Null)
+    }
+    /// `delivery`.
+    pub fn delivery(&self) -> Option<GoogleDelivery> {
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            GoogleDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
     }
 
-    /// The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental.
-    pub fn reply(&self, email: impl IntoArg) -> GoogleUserReply {
-        GoogleUserReply(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![email.into_arg()],
-            run_google_user_reply,
-            GoogleEmail::wrap,
-        ))
-    }
-
-    /// What reached the person's mailbox, oldest first. Experimental.
-    pub fn inbox(&self) -> Call<Value> {
+    /// Re-read an email. Experimental.
+    pub fn refresh(&self) -> Call<GoogleEmail> {
         Call::new(
             &self.ctx,
             &self.data,
             vec![],
-            run_google_user_inbox,
-            as_value,
+            run_google_email_refresh,
+            GoogleEmail::wrap,
         )
     }
 
-    /// Wait for an email. Set its options on what this returns, then `.send().await` (or `.await`).
-    pub fn wait_for_email(&self) -> GoogleUserWaitForEmail {
-        GoogleUserWaitForEmail {
-            ctx: self.ctx.clone(),
-            me: self.data.clone(),
-            seen: self.seen.clone(),
-            options: Map::new(),
-        }
-    }
-}
-
-/// The options of [`GoogleUser::send`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct GoogleUserSend(Call<GoogleEmail>);
-
-impl GoogleUserSend {
-    /// `to`.
-    pub fn to(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("to", value))
-    }
-    /// `cc`.
-    pub fn cc(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("cc", value))
-    }
-    /// `subject`.
-    pub fn subject(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("subject", value))
-    }
-    /// `text`.
-    pub fn text(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("text", value))
-    }
-    /// `html`.
-    pub fn html(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("html", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<GoogleEmail> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for GoogleUserSend {
-    type Output = Result<GoogleEmail>;
-    type IntoFuture = BoxFuture<'static, Result<GoogleEmail>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
-/// The options of [`GoogleUser::reply`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct GoogleUserReply(Call<GoogleEmail>);
-
-impl GoogleUserReply {
-    /// `text`.
-    pub fn text(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("text", value))
-    }
-    /// `html`.
-    pub fn html(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("html", value))
-    }
-    /// `all`.
-    pub fn all(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("all", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<GoogleEmail> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for GoogleUserReply {
-    type Output = Result<GoogleEmail>;
-    type IntoFuture = BoxFuture<'static, Result<GoogleEmail>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
-/// The options of [`GoogleUser::wait_for_email`].
-pub struct GoogleUserWaitForEmail {
-    ctx: Ctx,
-    me: Value,
-    seen: Seen,
-    options: Map<String, Value>,
-}
-
-impl GoogleUserWaitForEmail {
-    /// `from`.
-    pub fn from(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("from".into(), value.into_arg());
-        self
-    }
-    /// `timeout`.
-    pub fn timeout(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("timeout".into(), value.into_arg());
-        self
-    }
-    /// Wait.
-    pub async fn send(self) -> Result<GoogleEmail> {
-        let Self {
-            ctx,
-            me,
-            seen,
-            options,
-        } = self;
-        let _ = &seen;
-        let filters: Map<String, Value> = options
-            .iter()
-            .filter(|(name, _)| [].contains(&name.as_str()))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        let timeout = options
-            .get("timeout")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
-        let from = options.get("from").cloned().unwrap_or(Value::Null);
-        let item = wait_for_next(
-            &seen.positions,
-            "waitForEmail",
-            || run_google_user_inbox(&ctx, &me, vec![], filters.clone()),
-            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
-            None,
-            &match &from {
-                Value::Null => "an email".to_owned(),
-                Value::String(name) => format!("{} from {}", "an email", name),
-                other => format!(
-                    "{} from {}",
-                    "an email",
-                    other.get("name").and_then(Value::as_str).unwrap_or("")
-                ),
-            },
-            &timeout,
+    /// The delivery that told this app of the email (decision 0027), or nothing when it wasn't told. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<GoogleDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_google_email_delivery_for,
+            GoogleDelivery::wrap_opt,
         )
-        .await?;
-        GoogleEmail::wrap(&ctx, item)
-    }
-}
-
-impl IntoFuture for GoogleUserWaitForEmail {
-    type Output = Result<GoogleEmail>;
-    type IntoFuture = BoxFuture<'static, Result<GoogleEmail>>;
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(self.send())
     }
 }
 
@@ -20902,146 +25102,6 @@ impl IntoFuture for GoogleThreadLatestReply {
     }
 }
 
-/// A handle: `GoogleEmail`.
-#[derive(Clone)]
-pub struct GoogleEmail {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for GoogleEmail {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl GoogleEmail {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `id`.
-    pub fn id(&self) -> String {
-        self.data
-            .get("id")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> String {
-        self.data
-            .get("channel")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `thread`.
-    pub fn thread(&self) -> GoogleThread {
-        GoogleThread::from_wire_in(
-            &self.ctx,
-            self.data.get("thread").cloned().unwrap_or(Value::Null),
-            self.seen.field("thread"),
-        )
-    }
-    /// `author`.
-    pub fn author(&self) -> &Value {
-        self.data.get("author").unwrap_or(&Value::Null)
-    }
-    /// `from`.
-    pub fn from(&self) -> String {
-        self.data
-            .get("from")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `to`.
-    pub fn to(&self) -> &Value {
-        self.data.get("to").unwrap_or(&Value::Null)
-    }
-    /// `cc`.
-    pub fn cc(&self) -> &Value {
-        self.data.get("cc").unwrap_or(&Value::Null)
-    }
-    /// `subject`.
-    pub fn subject(&self) -> String {
-        self.data
-            .get("subject")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `text`.
-    pub fn text(&self) -> String {
-        self.data
-            .get("text")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `at`.
-    pub fn at(&self) -> String {
-        self.data
-            .get("at")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `messageId`.
-    pub fn message_id(&self) -> String {
-        self.data
-            .get("messageId")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `labels`.
-    pub fn labels(&self) -> &Value {
-        self.data.get("labels").unwrap_or(&Value::Null)
-    }
-    /// `delivery`.
-    pub fn delivery(&self) -> Option<GoogleDelivery> {
-        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
-            GoogleDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
-        })
-    }
-
-    /// Re-read an email. Experimental.
-    pub fn refresh(&self) -> Call<GoogleEmail> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_google_email_refresh,
-            GoogleEmail::wrap,
-        )
-    }
-}
-
 /// A handle: `GoogleDelivery`.
 #[derive(Clone)]
 pub struct GoogleDelivery {
@@ -21101,6 +25161,13 @@ impl GoogleDelivery {
     pub fn channel(&self) -> String {
         self.data
             .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `app`.
+    pub fn app(&self) -> String {
+        self.data
+            .get("app")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
@@ -21269,6 +25336,270 @@ impl IntoFuture for GoogleDeliverySettled {
     }
 }
 
+/// A handle: `GoogleUser`.
+#[derive(Clone)]
+pub struct GoogleUser {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for GoogleUser {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl GoogleUser {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `kind`.
+    pub fn kind(&self) -> String {
+        self.data
+            .get("kind")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `name`.
+    pub fn name(&self) -> String {
+        self.data
+            .get("name")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `address`.
+    pub fn address(&self) -> String {
+        self.data
+            .get("address")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// The person emails someone: the agent (`google.app`), another app, or another person. Experimental.
+    pub fn send(&self) -> GoogleUserSend {
+        GoogleUserSend(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_google_user_send,
+            GoogleEmail::wrap,
+        ))
+    }
+
+    /// The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental.
+    pub fn reply(&self, email: impl IntoArg) -> GoogleUserReply {
+        GoogleUserReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![email.into_arg()],
+            run_google_user_reply,
+            GoogleEmail::wrap,
+        ))
+    }
+
+    /// What reached the person's mailbox, oldest first. Experimental.
+    pub fn inbox(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_google_user_inbox,
+            as_value,
+        )
+    }
+
+    /// Wait for an email. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_email(&self) -> GoogleUserWaitForEmail {
+        GoogleUserWaitForEmail {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`GoogleUser::send`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GoogleUserSend(Call<GoogleEmail>);
+
+impl GoogleUserSend {
+    /// `to`.
+    pub fn to(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("to", value))
+    }
+    /// `cc`.
+    pub fn cc(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("cc", value))
+    }
+    /// `subject`.
+    pub fn subject(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("subject", value))
+    }
+    /// `text`.
+    pub fn text(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("text", value))
+    }
+    /// `html`.
+    pub fn html(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("html", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GoogleEmail> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GoogleUserSend {
+    type Output = Result<GoogleEmail>;
+    type IntoFuture = BoxFuture<'static, Result<GoogleEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GoogleUser::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GoogleUserReply(Call<GoogleEmail>);
+
+impl GoogleUserReply {
+    /// `text`.
+    pub fn text(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("text", value))
+    }
+    /// `html`.
+    pub fn html(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("html", value))
+    }
+    /// `all`.
+    pub fn all(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("all", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GoogleEmail> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GoogleUserReply {
+    type Output = Result<GoogleEmail>;
+    type IntoFuture = BoxFuture<'static, Result<GoogleEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GoogleUser::wait_for_email`].
+pub struct GoogleUserWaitForEmail {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl GoogleUserWaitForEmail {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<GoogleEmail> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = wait_for_next(
+            &seen.positions,
+            "waitForEmail",
+            || run_google_user_inbox(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            None,
+            &match &from {
+                Value::Null => "an email".to_owned(),
+                Value::String(name) => format!("{} from {}", "an email", name),
+                other => format!(
+                    "{} from {}",
+                    "an email",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+        )
+        .await?;
+        GoogleEmail::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for GoogleUserWaitForEmail {
+    type Output = Result<GoogleEmail>;
+    type IntoFuture = BoxFuture<'static, Result<GoogleEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
 /// A handle: `DiscordFixture`.
 #[derive(Clone)]
 pub struct DiscordFixture {
@@ -21362,6 +25693,28 @@ impl DiscordFixture {
             &self.data,
             vec![],
             run_discord_fixture_users,
+            as_value,
+        )
+    }
+
+    /// Make another app in the guild, with its own application, bot user, token and Ed25519 key (decision 0027), or return the one made with this name and settings. Its bot connects to the Gateway with its own token; its interactions go to CHANNELSTACK_DISCORD_APP_<NAME>_WEBHOOK_URL, or over its Gateway connection. Experimental.
+    pub fn create_app(&self) -> DiscordFixtureCreateApp {
+        DiscordFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_fixture_create_app,
+            DiscordApp::wrap,
+        ))
+    }
+
+    /// The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_fixture_apps,
             as_value,
         )
     }
@@ -21481,6 +25834,32 @@ impl IntoFuture for DiscordFixtureCreateUser {
     }
 }
 
+/// The options of [`DiscordFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordFixtureCreateApp(Call<DiscordApp>);
+
+impl DiscordFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `privilegedIntents`.
+    pub fn privileged_intents(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("privilegedIntents", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<DiscordApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordFixtureCreateApp {
+    type Output = Result<DiscordApp>;
+    type IntoFuture = BoxFuture<'static, Result<DiscordApp>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
 /// The options of [`DiscordFixture::create_channel`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct DiscordFixtureCreateChannel(Call<DiscordChannel>);
 
@@ -21526,6 +25905,10 @@ impl DiscordFixtureDeliveries {
     /// `resource`.
     pub fn resource(self, value: impl IntoArg) -> Self {
         Self(self.0.option("resource", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<Value> {
@@ -21586,6 +25969,10 @@ impl DiscordFixtureFault {
     /// `times`.
     pub fn times(self, value: impl IntoArg) -> Self {
         Self(self.0.option("times", value))
+    }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<DiscordFault> {
@@ -21771,6 +26158,142 @@ impl DiscordApp {
             .get("guildId")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
+    }
+
+    /// An app a test made writes, as its own `POST /channels/{id}/messages` would: in a channel or thread its bot sees, or in a DM with the person in `to`. No bot writes to another bot in a DM (50007). Experimental.
+    pub fn say(&self, text: impl IntoArg) -> DiscordAppSay {
+        DiscordAppSay(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![text.into_arg()],
+            run_discord_app_say,
+            DiscordMessage::wrap,
+        ))
+    }
+
+    /// An app a test made replies to a message: Discord's reply, in the message's channel, which quotes it. Experimental.
+    pub fn reply(&self, text: impl IntoArg) -> DiscordAppReply {
+        DiscordAppReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![text.into_arg()],
+            run_discord_app_reply,
+            DiscordMessage::wrap,
+        ))
+    }
+
+    /// An app a test made reacts to a message. Experimental.
+    pub fn react(&self, emoji: impl IntoArg) -> DiscordAppReact {
+        DiscordAppReact(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![emoji.into_arg()],
+            run_discord_app_react,
+            DiscordDelivery::wrap_opt,
+        ))
+    }
+
+    /// An app a test made takes its reaction back. Experimental.
+    pub fn unreact(&self, emoji: impl IntoArg) -> DiscordAppUnreact {
+        DiscordAppUnreact(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![emoji.into_arg()],
+            run_discord_app_unreact,
+            DiscordDelivery::wrap_opt,
+        ))
+    }
+}
+
+/// The options of [`DiscordApp::say`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordAppSay(Call<DiscordMessage>);
+
+impl DiscordAppSay {
+    /// `channel`.
+    pub fn channel(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("channel", value))
+    }
+    /// `to`.
+    pub fn to(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("to", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<DiscordMessage> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordAppSay {
+    type Output = Result<DiscordMessage>;
+    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`DiscordApp::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordAppReply(Call<DiscordMessage>);
+
+impl DiscordAppReply {
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<DiscordMessage> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordAppReply {
+    type Output = Result<DiscordMessage>;
+    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`DiscordApp::react`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordAppReact(Call<Option<DiscordDelivery>>);
+
+impl DiscordAppReact {
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<DiscordDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordAppReact {
+    type Output = Result<Option<DiscordDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<DiscordDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`DiscordApp::unreact`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordAppUnreact(Call<Option<DiscordDelivery>>);
+
+impl DiscordAppUnreact {
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<DiscordDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordAppUnreact {
+    type Output = Result<Option<DiscordDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<DiscordDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
     }
 }
 
@@ -21971,7 +26494,7 @@ impl DiscordUser {
         ))
     }
 
-    /// Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`. Experimental.
+    /// Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it. Experimental.
     pub fn run_command(&self, command: impl IntoArg) -> DiscordUserRunCommand {
         DiscordUserRunCommand(Call::new(
             &self.ctx,
@@ -22197,6 +26720,10 @@ impl DiscordUserRunCommand {
     pub fn channel(self, value: impl IntoArg) -> Self {
         Self(self.0.option("channel", value))
     }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
     /// Send the request.
     pub async fn send(self) -> Result<Option<DiscordDelivery>> {
         self.0.send().await
@@ -22234,6 +26761,396 @@ impl IntoFuture for DiscordUserClick {
     type IntoFuture = BoxFuture<'static, Result<Option<DiscordDelivery>>>;
     fn into_future(self) -> Self::IntoFuture {
         self.0.into_future()
+    }
+}
+
+/// A handle: `DiscordMessage`.
+#[derive(Clone)]
+pub struct DiscordMessage {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for DiscordMessage {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl DiscordMessage {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channelId`.
+    pub fn channel_id(&self) -> String {
+        self.data
+            .get("channelId")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> DiscordChannel {
+        DiscordChannel::from_wire_in(
+            &self.ctx,
+            self.data.get("channel").cloned().unwrap_or(Value::Null),
+            self.seen.field("channel"),
+        )
+    }
+    /// `author`.
+    pub fn author(&self) -> &Value {
+        self.data.get("author").unwrap_or(&Value::Null)
+    }
+    /// `text`.
+    pub fn text(&self) -> String {
+        self.data
+            .get("text")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `content`.
+    pub fn content(&self) -> String {
+        self.data
+            .get("content")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `embeds`.
+    pub fn embeds(&self) -> &Value {
+        self.data.get("embeds").unwrap_or(&Value::Null)
+    }
+    /// `components`.
+    pub fn components(&self) -> &Value {
+        self.data.get("components").unwrap_or(&Value::Null)
+    }
+    /// `postedAt`.
+    pub fn posted_at(&self) -> String {
+        self.data
+            .get("postedAt")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `edited`.
+    pub fn edited(&self) -> bool {
+        self.data
+            .get("edited")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+    /// `replyTo`.
+    pub fn reply_to(&self) -> Option<String> {
+        self.data
+            .get("replyTo")
+            .and_then(|v| v.as_str().map(str::to_owned))
+    }
+    /// `thread`.
+    pub fn thread(&self) -> Option<DiscordChannel> {
+        self.data
+            .get("thread")
+            .filter(|v| !v.is_null())
+            .map(|v| DiscordChannel::from_wire_in(&self.ctx, v.clone(), self.seen.field("thread")))
+    }
+    /// `visibleTo`.
+    pub fn visible_to(&self) -> Option<DiscordUser> {
+        self.data
+            .get("visibleTo")
+            .filter(|v| !v.is_null())
+            .map(|v| DiscordUser::from_wire_in(&self.ctx, v.clone(), self.seen.field("visibleTo")))
+    }
+    /// `delivery`.
+    pub fn delivery(&self) -> Option<DiscordDelivery> {
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            DiscordDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
+    }
+
+    /// Re-read a message: its latest text, edits and thread. Experimental.
+    pub fn refresh(&self) -> Call<DiscordMessage> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_message_refresh,
+            DiscordMessage::wrap,
+        )
+    }
+
+    /// What answers a message, oldest first: Discord's replies to it, and the messages of the thread started from it. Experimental.
+    pub fn replies(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_message_replies,
+            as_value,
+        )
+    }
+
+    /// A message and what answers it, as a person reads them. Experimental.
+    pub fn transcript(&self) -> DiscordMessageTranscript {
+        DiscordMessageTranscript(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_message_transcript,
+            as_value,
+        ))
+    }
+
+    /// The reactions on a message, and who added each. Experimental.
+    pub fn reactions(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_message_reactions,
+            as_value,
+        )
+    }
+
+    /// The first Gateway dispatch this message caused to this app's bot (decision 0027), or nothing when it wasn't told. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<DiscordDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_discord_message_delivery_for,
+            DiscordDelivery::wrap_opt,
+        )
+    }
+
+    /// Every Gateway dispatch this message caused to the apps' bots. Experimental.
+    pub fn deliveries(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_message_deliveries,
+            as_value,
+        )
+    }
+
+    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_reply(&self) -> DiscordMessageWaitForReply {
+        DiscordMessageWaitForReply {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+
+    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn latest_reply(&self) -> DiscordMessageLatestReply {
+        DiscordMessageLatestReply {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`DiscordMessage::transcript`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordMessageTranscript(Call<Value>);
+
+impl DiscordMessageTranscript {
+    /// `as`.
+    pub fn r#as(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("as", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordMessageTranscript {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`DiscordMessage::wait_for_reply`].
+pub struct DiscordMessageWaitForReply {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl DiscordMessageWaitForReply {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<DiscordMessage> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = wait_for_next(
+            &seen.positions,
+            "waitForReply",
+            || run_discord_message_replies(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            None,
+            &match &from {
+                Value::Null => "a reply".to_owned(),
+                Value::String(name) => format!("{} from {}", "a reply", name),
+                other => format!(
+                    "{} from {}",
+                    "a reply",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+        )
+        .await?;
+        DiscordMessage::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for DiscordMessageWaitForReply {
+    type Output = Result<DiscordMessage>;
+    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// The options of [`DiscordMessage::latest_reply`].
+pub struct DiscordMessageLatestReply {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl DiscordMessageLatestReply {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// `quietFor`.
+    pub fn quiet_for(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("quietFor".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<DiscordMessage> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let quiet_for = options
+            .get("quietFor")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = latest_once_quiet(
+            || run_discord_message_replies(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            || ctx.quiet(),
+            &match &from {
+                Value::Null => "a reply".to_owned(),
+                Value::String(name) => format!("{} from {}", "a reply", name),
+                other => format!(
+                    "{} from {}",
+                    "a reply",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+            &quiet_for,
+        )
+        .await?;
+        DiscordMessage::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for DiscordMessageLatestReply {
+    type Output = Result<DiscordMessage>;
+    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
     }
 }
 
@@ -22470,385 +27387,6 @@ impl IntoFuture for DiscordChannelWaitForMessage {
     }
 }
 
-/// A handle: `DiscordMessage`.
-#[derive(Clone)]
-pub struct DiscordMessage {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for DiscordMessage {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl DiscordMessage {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `id`.
-    pub fn id(&self) -> String {
-        self.data
-            .get("id")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channelId`.
-    pub fn channel_id(&self) -> String {
-        self.data
-            .get("channelId")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> DiscordChannel {
-        DiscordChannel::from_wire_in(
-            &self.ctx,
-            self.data.get("channel").cloned().unwrap_or(Value::Null),
-            self.seen.field("channel"),
-        )
-    }
-    /// `author`.
-    pub fn author(&self) -> &Value {
-        self.data.get("author").unwrap_or(&Value::Null)
-    }
-    /// `text`.
-    pub fn text(&self) -> String {
-        self.data
-            .get("text")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `content`.
-    pub fn content(&self) -> String {
-        self.data
-            .get("content")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `embeds`.
-    pub fn embeds(&self) -> &Value {
-        self.data.get("embeds").unwrap_or(&Value::Null)
-    }
-    /// `components`.
-    pub fn components(&self) -> &Value {
-        self.data.get("components").unwrap_or(&Value::Null)
-    }
-    /// `postedAt`.
-    pub fn posted_at(&self) -> String {
-        self.data
-            .get("postedAt")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `edited`.
-    pub fn edited(&self) -> bool {
-        self.data
-            .get("edited")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-    }
-    /// `replyTo`.
-    pub fn reply_to(&self) -> Option<String> {
-        self.data
-            .get("replyTo")
-            .and_then(|v| v.as_str().map(str::to_owned))
-    }
-    /// `thread`.
-    pub fn thread(&self) -> Option<DiscordChannel> {
-        self.data
-            .get("thread")
-            .filter(|v| !v.is_null())
-            .map(|v| DiscordChannel::from_wire_in(&self.ctx, v.clone(), self.seen.field("thread")))
-    }
-    /// `visibleTo`.
-    pub fn visible_to(&self) -> Option<DiscordUser> {
-        self.data
-            .get("visibleTo")
-            .filter(|v| !v.is_null())
-            .map(|v| DiscordUser::from_wire_in(&self.ctx, v.clone(), self.seen.field("visibleTo")))
-    }
-    /// `delivery`.
-    pub fn delivery(&self) -> Option<DiscordDelivery> {
-        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
-            DiscordDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
-        })
-    }
-
-    /// Re-read a message: its latest text, edits and thread. Experimental.
-    pub fn refresh(&self) -> Call<DiscordMessage> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_discord_message_refresh,
-            DiscordMessage::wrap,
-        )
-    }
-
-    /// What answers a message, oldest first: Discord's replies to it, and the messages of the thread started from it. Experimental.
-    pub fn replies(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_discord_message_replies,
-            as_value,
-        )
-    }
-
-    /// A message and what answers it, as a person reads them. Experimental.
-    pub fn transcript(&self) -> DiscordMessageTranscript {
-        DiscordMessageTranscript(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_discord_message_transcript,
-            as_value,
-        ))
-    }
-
-    /// The reactions on a message, and who added each. Experimental.
-    pub fn reactions(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_discord_message_reactions,
-            as_value,
-        )
-    }
-
-    /// Every Gateway dispatch this message caused to the bot. Experimental.
-    pub fn deliveries(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_discord_message_deliveries,
-            as_value,
-        )
-    }
-
-    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
-    pub fn wait_for_reply(&self) -> DiscordMessageWaitForReply {
-        DiscordMessageWaitForReply {
-            ctx: self.ctx.clone(),
-            me: self.data.clone(),
-            seen: self.seen.clone(),
-            options: Map::new(),
-        }
-    }
-
-    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
-    pub fn latest_reply(&self) -> DiscordMessageLatestReply {
-        DiscordMessageLatestReply {
-            ctx: self.ctx.clone(),
-            me: self.data.clone(),
-            seen: self.seen.clone(),
-            options: Map::new(),
-        }
-    }
-}
-
-/// The options of [`DiscordMessage::transcript`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct DiscordMessageTranscript(Call<Value>);
-
-impl DiscordMessageTranscript {
-    /// `as`.
-    pub fn r#as(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("as", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for DiscordMessageTranscript {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
-/// The options of [`DiscordMessage::wait_for_reply`].
-pub struct DiscordMessageWaitForReply {
-    ctx: Ctx,
-    me: Value,
-    seen: Seen,
-    options: Map<String, Value>,
-}
-
-impl DiscordMessageWaitForReply {
-    /// `from`.
-    pub fn from(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("from".into(), value.into_arg());
-        self
-    }
-    /// `timeout`.
-    pub fn timeout(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("timeout".into(), value.into_arg());
-        self
-    }
-    /// Wait.
-    pub async fn send(self) -> Result<DiscordMessage> {
-        let Self {
-            ctx,
-            me,
-            seen,
-            options,
-        } = self;
-        let _ = &seen;
-        let filters: Map<String, Value> = options
-            .iter()
-            .filter(|(name, _)| [].contains(&name.as_str()))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        let timeout = options
-            .get("timeout")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
-        let from = options.get("from").cloned().unwrap_or(Value::Null);
-        let item = wait_for_next(
-            &seen.positions,
-            "waitForReply",
-            || run_discord_message_replies(&ctx, &me, vec![], filters.clone()),
-            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
-            None,
-            &match &from {
-                Value::Null => "a reply".to_owned(),
-                Value::String(name) => format!("{} from {}", "a reply", name),
-                other => format!(
-                    "{} from {}",
-                    "a reply",
-                    other.get("name").and_then(Value::as_str).unwrap_or("")
-                ),
-            },
-            &timeout,
-        )
-        .await?;
-        DiscordMessage::wrap(&ctx, item)
-    }
-}
-
-impl IntoFuture for DiscordMessageWaitForReply {
-    type Output = Result<DiscordMessage>;
-    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(self.send())
-    }
-}
-
-/// The options of [`DiscordMessage::latest_reply`].
-pub struct DiscordMessageLatestReply {
-    ctx: Ctx,
-    me: Value,
-    seen: Seen,
-    options: Map<String, Value>,
-}
-
-impl DiscordMessageLatestReply {
-    /// `from`.
-    pub fn from(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("from".into(), value.into_arg());
-        self
-    }
-    /// `timeout`.
-    pub fn timeout(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("timeout".into(), value.into_arg());
-        self
-    }
-    /// `quietFor`.
-    pub fn quiet_for(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("quietFor".into(), value.into_arg());
-        self
-    }
-    /// Wait.
-    pub async fn send(self) -> Result<DiscordMessage> {
-        let Self {
-            ctx,
-            me,
-            seen,
-            options,
-        } = self;
-        let _ = &seen;
-        let filters: Map<String, Value> = options
-            .iter()
-            .filter(|(name, _)| [].contains(&name.as_str()))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        let timeout = options
-            .get("timeout")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
-        let quiet_for = options
-            .get("quietFor")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
-        let from = options.get("from").cloned().unwrap_or(Value::Null);
-        let item = latest_once_quiet(
-            || run_discord_message_replies(&ctx, &me, vec![], filters.clone()),
-            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
-            || ctx.quiet(),
-            &match &from {
-                Value::Null => "a reply".to_owned(),
-                Value::String(name) => format!("{} from {}", "a reply", name),
-                other => format!(
-                    "{} from {}",
-                    "a reply",
-                    other.get("name").and_then(Value::as_str).unwrap_or("")
-                ),
-            },
-            &timeout,
-            &quiet_for,
-        )
-        .await?;
-        DiscordMessage::wrap(&ctx, item)
-    }
-}
-
-impl IntoFuture for DiscordMessageLatestReply {
-    type Output = Result<DiscordMessage>;
-    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(self.send())
-    }
-}
-
 /// A handle: `DiscordDelivery`.
 #[derive(Clone)]
 pub struct DiscordDelivery {
@@ -22908,6 +27446,13 @@ impl DiscordDelivery {
     pub fn channel(&self) -> String {
         self.data
             .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `app`.
+    pub fn app(&self) -> String {
+        self.data
+            .get("app")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
@@ -24806,12 +29351,19 @@ pub async fn call_by_name(
         ("EchoFixture", "createUser") => {
             run_echo_fixture_create_user(&target.ctx, &target.data, args, options).await?
         }
+        ("EchoFixture", "createApp") => {
+            run_echo_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("EchoFixture", "apps") => {
+            run_echo_fixture_apps(&target.ctx, &target.data, args, options).await?
+        }
         ("EchoFixture", "createRoom") => {
             run_echo_fixture_create_room(&target.ctx, &target.data, args, options).await?
         }
         ("EchoFixture", "capabilities") => {
             run_echo_fixture_capabilities(&target.ctx, &target.data, args, options).await?
         }
+        ("EchoApp", "say") => run_echo_app_say(&target.ctx, &target.data, args, options).await?,
         ("EchoUser", "say") => run_echo_user_say(&target.ctx, &target.data, args, options).await?,
         ("EchoRoom", "messages") => {
             run_echo_room_messages(&target.ctx, &target.data, args, options).await?
@@ -24824,6 +29376,12 @@ pub async fn call_by_name(
         }
         ("SlackFixture", "users") => {
             run_slack_fixture_users(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackFixture", "createApp") => {
+            run_slack_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackFixture", "apps") => {
+            run_slack_fixture_apps(&target.ctx, &target.data, args, options).await?
         }
         ("SlackFixture", "conversations") => {
             run_slack_fixture_conversations(&target.ctx, &target.data, args, options).await?
@@ -24842,6 +29400,16 @@ pub async fn call_by_name(
         }
         ("SlackFixture", "fault") => {
             run_slack_fixture_fault(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackApp", "say") => run_slack_app_say(&target.ctx, &target.data, args, options).await?,
+        ("SlackApp", "reply") => {
+            run_slack_app_reply(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackApp", "react") => {
+            run_slack_app_react(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackApp", "unreact") => {
+            run_slack_app_unreact(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "say") => {
             run_slack_user_say(&target.ctx, &target.data, args, options).await?
@@ -24900,6 +29468,21 @@ pub async fn call_by_name(
         ("SlackUser", "ephemeral") => {
             run_slack_user_ephemeral(&target.ctx, &target.data, args, options).await?
         }
+        ("SlackMessage", "refresh") => {
+            run_slack_message_refresh(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackMessage", "reactions") => {
+            run_slack_message_reactions(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackMessage", "transcript") => {
+            run_slack_message_transcript(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackMessage", "deliveryFor") => {
+            run_slack_message_delivery_for(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackMessage", "deliveries") => {
+            run_slack_message_deliveries(&target.ctx, &target.data, args, options).await?
+        }
         ("SlackConversation", "latestMessage") => {
             run_slack_conversation_latest_message(&target.ctx, &target.data, args, options).await?
         }
@@ -24911,18 +29494,6 @@ pub async fn call_by_name(
         }
         ("SlackConversation", "transcript") => {
             run_slack_conversation_transcript(&target.ctx, &target.data, args, options).await?
-        }
-        ("SlackMessage", "refresh") => {
-            run_slack_message_refresh(&target.ctx, &target.data, args, options).await?
-        }
-        ("SlackMessage", "reactions") => {
-            run_slack_message_reactions(&target.ctx, &target.data, args, options).await?
-        }
-        ("SlackMessage", "transcript") => {
-            run_slack_message_transcript(&target.ctx, &target.data, args, options).await?
-        }
-        ("SlackMessage", "deliveries") => {
-            run_slack_message_deliveries(&target.ctx, &target.data, args, options).await?
         }
         ("SlackThread", "suggestedPrompts") => {
             run_slack_thread_suggested_prompts(&target.ctx, &target.data, args, options).await?
@@ -24978,6 +29549,15 @@ pub async fn call_by_name(
         ("GitHubFixture", "issues") => {
             run_git_hub_fixture_issues(&target.ctx, &target.data, args, options).await?
         }
+        ("GitHubFixture", "installationId") => {
+            run_git_hub_fixture_installation_id(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubFixture", "createApp") => {
+            run_git_hub_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubFixture", "apps") => {
+            run_git_hub_fixture_apps(&target.ctx, &target.data, args, options).await?
+        }
         ("GitHubFixture", "deliveries") => {
             run_git_hub_fixture_deliveries(&target.ctx, &target.data, args, options).await?
         }
@@ -24989,6 +29569,72 @@ pub async fn call_by_name(
         }
         ("GitHubApp", "installationId") => {
             run_git_hub_app_installation_id(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "push") => {
+            run_git_hub_app_push(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "openIssue") => {
+            run_git_hub_app_open_issue(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "openPullRequest") => {
+            run_git_hub_app_open_pull_request(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "editIssue") => {
+            run_git_hub_app_edit_issue(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "close") => {
+            run_git_hub_app_close(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "reopen") => {
+            run_git_hub_app_reopen(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "label") => {
+            run_git_hub_app_label(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "unlabel") => {
+            run_git_hub_app_unlabel(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "assign") => {
+            run_git_hub_app_assign(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "comment") => {
+            run_git_hub_app_comment(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "edit") => {
+            run_git_hub_app_edit(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "delete") => {
+            run_git_hub_app_delete(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "react") => {
+            run_git_hub_app_react(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "minimize") => {
+            run_git_hub_app_minimize(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "review") => {
+            run_git_hub_app_review(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "reviewComment") => {
+            run_git_hub_app_review_comment(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "reply") => {
+            run_git_hub_app_reply(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "resolve") => {
+            run_git_hub_app_resolve(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "unresolve") => {
+            run_git_hub_app_unresolve(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "requestReview") => {
+            run_git_hub_app_request_review(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "markReady") => {
+            run_git_hub_app_mark_ready(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "merge") => {
+            run_git_hub_app_merge(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "push") => {
             run_git_hub_user_push(&target.ctx, &target.data, args, options).await?
@@ -25122,6 +29768,9 @@ pub async fn call_by_name(
         ("GitHubComment", "reactions") => {
             run_git_hub_comment_reactions(&target.ctx, &target.data, args, options).await?
         }
+        ("GitHubComment", "deliveryFor") => {
+            run_git_hub_comment_delivery_for(&target.ctx, &target.data, args, options).await?
+        }
         ("GitHubReviewComment", "replies") => {
             run_git_hub_review_comment_replies(&target.ctx, &target.data, args, options).await?
         }
@@ -25137,6 +29786,12 @@ pub async fn call_by_name(
         ("LinearFixture", "users") => {
             run_linear_fixture_users(&target.ctx, &target.data, args, options).await?
         }
+        ("LinearFixture", "createApp") => {
+            run_linear_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearFixture", "apps") => {
+            run_linear_fixture_apps(&target.ctx, &target.data, args, options).await?
+        }
         ("LinearFixture", "teams") => {
             run_linear_fixture_teams(&target.ctx, &target.data, args, options).await?
         }
@@ -25151,6 +29806,12 @@ pub async fn call_by_name(
         }
         ("LinearFixture", "calls") => {
             run_linear_fixture_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearApp", "comment") => {
+            run_linear_app_comment(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearApp", "reply") => {
+            run_linear_app_reply(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "createIssue") => {
             run_linear_user_create_issue(&target.ctx, &target.data, args, options).await?
@@ -25197,8 +29858,14 @@ pub async fn call_by_name(
         ("LinearUser", "stop") => {
             run_linear_user_stop(&target.ctx, &target.data, args, options).await?
         }
-        ("LinearTeam", "issue") => {
-            run_linear_team_issue(&target.ctx, &target.data, args, options).await?
+        ("LinearComment", "replies") => {
+            run_linear_comment_replies(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearComment", "deliveryFor") => {
+            run_linear_comment_delivery_for(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearComment", "transcript") => {
+            run_linear_comment_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "refresh") => {
             run_linear_issue_refresh(&target.ctx, &target.data, args, options).await?
@@ -25230,14 +29897,8 @@ pub async fn call_by_name(
         ("LinearIssue", "transcript") => {
             run_linear_issue_transcript(&target.ctx, &target.data, args, options).await?
         }
-        ("LinearDelivery", "refresh") => {
-            run_linear_delivery_refresh(&target.ctx, &target.data, args, options).await?
-        }
-        ("LinearDelivery", "redeliver") => {
-            run_linear_delivery_redeliver(&target.ctx, &target.data, args, options).await?
-        }
-        ("LinearDelivery", "resend") => {
-            run_linear_delivery_resend(&target.ctx, &target.data, args, options).await?
+        ("LinearTeam", "issue") => {
+            run_linear_team_issue(&target.ctx, &target.data, args, options).await?
         }
         ("LinearAgentSession", "state") => {
             run_linear_agent_session_state(&target.ctx, &target.data, args, options).await?
@@ -25254,17 +29915,26 @@ pub async fn call_by_name(
         ("LinearAgentSession", "transcript") => {
             run_linear_agent_session_transcript(&target.ctx, &target.data, args, options).await?
         }
-        ("LinearComment", "replies") => {
-            run_linear_comment_replies(&target.ctx, &target.data, args, options).await?
+        ("LinearDelivery", "refresh") => {
+            run_linear_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
-        ("LinearComment", "transcript") => {
-            run_linear_comment_transcript(&target.ctx, &target.data, args, options).await?
+        ("LinearDelivery", "redeliver") => {
+            run_linear_delivery_redeliver(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearDelivery", "resend") => {
+            run_linear_delivery_resend(&target.ctx, &target.data, args, options).await?
         }
         ("NotionFixture", "createUser") => {
             run_notion_fixture_create_user(&target.ctx, &target.data, args, options).await?
         }
         ("NotionFixture", "users") => {
             run_notion_fixture_users(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionFixture", "createApp") => {
+            run_notion_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionFixture", "apps") => {
+            run_notion_fixture_apps(&target.ctx, &target.data, args, options).await?
         }
         ("NotionFixture", "pages") => {
             run_notion_fixture_pages(&target.ctx, &target.data, args, options).await?
@@ -25287,6 +29957,18 @@ pub async fn call_by_name(
         }
         ("NotionFixture", "calls") => {
             run_notion_fixture_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionIntegration", "comment") => {
+            run_notion_integration_comment(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionIntegration", "reply") => {
+            run_notion_integration_reply(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionIntegration", "edit") => {
+            run_notion_integration_edit(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionIntegration", "rename") => {
+            run_notion_integration_rename(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "comment") => {
             run_notion_user_comment(&target.ctx, &target.data, args, options).await?
@@ -25330,6 +30012,18 @@ pub async fn call_by_name(
         ("NotionUser", "disconnect") => {
             run_notion_user_disconnect(&target.ctx, &target.data, args, options).await?
         }
+        ("NotionComment", "deliveryFor") => {
+            run_notion_comment_delivery_for(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionDiscussion", "comments") => {
+            run_notion_discussion_comments(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionDiscussion", "resolved") => {
+            run_notion_discussion_resolved(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionDiscussion", "transcript") => {
+            run_notion_discussion_transcript(&target.ctx, &target.data, args, options).await?
+        }
         ("NotionPage", "discussions") => {
             run_notion_page_discussions(&target.ctx, &target.data, args, options).await?
         }
@@ -25351,9 +30045,6 @@ pub async fn call_by_name(
         ("NotionPage", "transcript") => {
             run_notion_page_transcript(&target.ctx, &target.data, args, options).await?
         }
-        ("NotionDatabase", "rows") => {
-            run_notion_database_rows(&target.ctx, &target.data, args, options).await?
-        }
         ("NotionDelivery", "refresh") => {
             run_notion_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
@@ -25363,14 +30054,14 @@ pub async fn call_by_name(
         ("NotionDelivery", "resend") => {
             run_notion_delivery_resend(&target.ctx, &target.data, args, options).await?
         }
-        ("NotionDiscussion", "comments") => {
-            run_notion_discussion_comments(&target.ctx, &target.data, args, options).await?
+        ("NotionDatabase", "rows") => {
+            run_notion_database_rows(&target.ctx, &target.data, args, options).await?
         }
-        ("NotionDiscussion", "resolved") => {
-            run_notion_discussion_resolved(&target.ctx, &target.data, args, options).await?
+        ("ResendFixture", "createApp") => {
+            run_resend_fixture_create_app(&target.ctx, &target.data, args, options).await?
         }
-        ("NotionDiscussion", "transcript") => {
-            run_notion_discussion_transcript(&target.ctx, &target.data, args, options).await?
+        ("ResendFixture", "apps") => {
+            run_resend_fixture_apps(&target.ctx, &target.data, args, options).await?
         }
         ("ResendFixture", "createUser") => {
             run_resend_fixture_create_user(&target.ctx, &target.data, args, options).await?
@@ -25387,14 +30078,17 @@ pub async fn call_by_name(
         ("ResendFixture", "calls") => {
             run_resend_fixture_calls(&target.ctx, &target.data, args, options).await?
         }
-        ("ResendUser", "send") => {
-            run_resend_user_send(&target.ctx, &target.data, args, options).await?
+        ("ResendApp", "send") => {
+            run_resend_app_send(&target.ctx, &target.data, args, options).await?
         }
-        ("ResendUser", "reply") => {
-            run_resend_user_reply(&target.ctx, &target.data, args, options).await?
+        ("ResendApp", "reply") => {
+            run_resend_app_reply(&target.ctx, &target.data, args, options).await?
         }
-        ("ResendUser", "inbox") => {
-            run_resend_user_inbox(&target.ctx, &target.data, args, options).await?
+        ("ResendEmail", "refresh") => {
+            run_resend_email_refresh(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendEmail", "deliveryFor") => {
+            run_resend_email_delivery_for(&target.ctx, &target.data, args, options).await?
         }
         ("ResendThread", "messages") => {
             run_resend_thread_messages(&target.ctx, &target.data, args, options).await?
@@ -25405,9 +30099,6 @@ pub async fn call_by_name(
         ("ResendThread", "transcript") => {
             run_resend_thread_transcript(&target.ctx, &target.data, args, options).await?
         }
-        ("ResendEmail", "refresh") => {
-            run_resend_email_refresh(&target.ctx, &target.data, args, options).await?
-        }
         ("ResendDelivery", "refresh") => {
             run_resend_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
@@ -25416,6 +30107,21 @@ pub async fn call_by_name(
         }
         ("ResendDelivery", "resend") => {
             run_resend_delivery_resend(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendUser", "send") => {
+            run_resend_user_send(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendUser", "reply") => {
+            run_resend_user_reply(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendUser", "inbox") => {
+            run_resend_user_inbox(&target.ctx, &target.data, args, options).await?
+        }
+        ("GoogleFixture", "createApp") => {
+            run_google_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("GoogleFixture", "apps") => {
+            run_google_fixture_apps(&target.ctx, &target.data, args, options).await?
         }
         ("GoogleFixture", "createUser") => {
             run_google_fixture_create_user(&target.ctx, &target.data, args, options).await?
@@ -25432,14 +30138,17 @@ pub async fn call_by_name(
         ("GoogleFixture", "calls") => {
             run_google_fixture_calls(&target.ctx, &target.data, args, options).await?
         }
-        ("GoogleUser", "send") => {
-            run_google_user_send(&target.ctx, &target.data, args, options).await?
+        ("GoogleApp", "send") => {
+            run_google_app_send(&target.ctx, &target.data, args, options).await?
         }
-        ("GoogleUser", "reply") => {
-            run_google_user_reply(&target.ctx, &target.data, args, options).await?
+        ("GoogleApp", "reply") => {
+            run_google_app_reply(&target.ctx, &target.data, args, options).await?
         }
-        ("GoogleUser", "inbox") => {
-            run_google_user_inbox(&target.ctx, &target.data, args, options).await?
+        ("GoogleEmail", "refresh") => {
+            run_google_email_refresh(&target.ctx, &target.data, args, options).await?
+        }
+        ("GoogleEmail", "deliveryFor") => {
+            run_google_email_delivery_for(&target.ctx, &target.data, args, options).await?
         }
         ("GoogleThread", "messages") => {
             run_google_thread_messages(&target.ctx, &target.data, args, options).await?
@@ -25450,9 +30159,6 @@ pub async fn call_by_name(
         ("GoogleThread", "transcript") => {
             run_google_thread_transcript(&target.ctx, &target.data, args, options).await?
         }
-        ("GoogleEmail", "refresh") => {
-            run_google_email_refresh(&target.ctx, &target.data, args, options).await?
-        }
         ("GoogleDelivery", "refresh") => {
             run_google_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
@@ -25462,11 +30168,26 @@ pub async fn call_by_name(
         ("GoogleDelivery", "resend") => {
             run_google_delivery_resend(&target.ctx, &target.data, args, options).await?
         }
+        ("GoogleUser", "send") => {
+            run_google_user_send(&target.ctx, &target.data, args, options).await?
+        }
+        ("GoogleUser", "reply") => {
+            run_google_user_reply(&target.ctx, &target.data, args, options).await?
+        }
+        ("GoogleUser", "inbox") => {
+            run_google_user_inbox(&target.ctx, &target.data, args, options).await?
+        }
         ("DiscordFixture", "createUser") => {
             run_discord_fixture_create_user(&target.ctx, &target.data, args, options).await?
         }
         ("DiscordFixture", "users") => {
             run_discord_fixture_users(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordFixture", "createApp") => {
+            run_discord_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordFixture", "apps") => {
+            run_discord_fixture_apps(&target.ctx, &target.data, args, options).await?
         }
         ("DiscordFixture", "createChannel") => {
             run_discord_fixture_create_channel(&target.ctx, &target.data, args, options).await?
@@ -25485,6 +30206,18 @@ pub async fn call_by_name(
         }
         ("DiscordFixture", "fault") => {
             run_discord_fixture_fault(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordApp", "say") => {
+            run_discord_app_say(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordApp", "reply") => {
+            run_discord_app_reply(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordApp", "react") => {
+            run_discord_app_react(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordApp", "unreact") => {
+            run_discord_app_unreact(&target.ctx, &target.data, args, options).await?
         }
         ("DiscordUser", "say") => {
             run_discord_user_say(&target.ctx, &target.data, args, options).await?
@@ -25522,18 +30255,6 @@ pub async fn call_by_name(
         ("DiscordUser", "ephemeral") => {
             run_discord_user_ephemeral(&target.ctx, &target.data, args, options).await?
         }
-        ("DiscordChannel", "messages") => {
-            run_discord_channel_messages(&target.ctx, &target.data, args, options).await?
-        }
-        ("DiscordChannel", "members") => {
-            run_discord_channel_members(&target.ctx, &target.data, args, options).await?
-        }
-        ("DiscordChannel", "threads") => {
-            run_discord_channel_threads(&target.ctx, &target.data, args, options).await?
-        }
-        ("DiscordChannel", "transcript") => {
-            run_discord_channel_transcript(&target.ctx, &target.data, args, options).await?
-        }
         ("DiscordMessage", "refresh") => {
             run_discord_message_refresh(&target.ctx, &target.data, args, options).await?
         }
@@ -25546,8 +30267,23 @@ pub async fn call_by_name(
         ("DiscordMessage", "reactions") => {
             run_discord_message_reactions(&target.ctx, &target.data, args, options).await?
         }
+        ("DiscordMessage", "deliveryFor") => {
+            run_discord_message_delivery_for(&target.ctx, &target.data, args, options).await?
+        }
         ("DiscordMessage", "deliveries") => {
             run_discord_message_deliveries(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordChannel", "messages") => {
+            run_discord_channel_messages(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordChannel", "members") => {
+            run_discord_channel_members(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordChannel", "threads") => {
+            run_discord_channel_threads(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordChannel", "transcript") => {
+            run_discord_channel_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("DiscordDelivery", "refresh") => {
             run_discord_delivery_refresh(&target.ctx, &target.data, args, options).await?
@@ -25721,6 +30457,11 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("EchoFixture", "createApp") => Dyn {
+            resource: Some("EchoApp"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("EchoFixture", "createRoom") => Dyn {
             resource: Some("EchoRoom"),
             ctx: target.ctx.clone(),
@@ -25731,6 +30472,11 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("SlackFixture", "createApp") => Dyn {
+            resource: Some("SlackApp"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("SlackFixture", "createChannel") => Dyn {
             resource: Some("SlackConversation"),
             ctx: target.ctx.clone(),
@@ -25738,6 +30484,16 @@ pub async fn call_by_name(
         },
         ("SlackFixture", "fault") => Dyn {
             resource: Some("SlackFault"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("SlackApp", "say") => Dyn {
+            resource: Some("SlackMessage"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("SlackApp", "reply") => Dyn {
+            resource: Some("SlackMessage"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -25796,12 +30552,12 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
-        ("SlackConversation", "latestMessage") => Dyn {
+        ("SlackMessage", "refresh") => Dyn {
             resource: Some("SlackMessage"),
             ctx: target.ctx.clone(),
             data,
         },
-        ("SlackMessage", "refresh") => Dyn {
+        ("SlackConversation", "latestMessage") => Dyn {
             resource: Some("SlackMessage"),
             ctx: target.ctx.clone(),
             data,
@@ -25833,6 +30589,41 @@ pub async fn call_by_name(
         },
         ("GitHubFixture", "createRepo") => Dyn {
             resource: Some("GitHubRepo"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubFixture", "createApp") => Dyn {
+            resource: Some("GitHubApp"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "push") => Dyn {
+            resource: Some("GitHubCommit"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "openIssue") => Dyn {
+            resource: Some("GitHubIssue"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "openPullRequest") => Dyn {
+            resource: Some("GitHubPullRequest"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "comment") => Dyn {
+            resource: Some("GitHubComment"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "reviewComment") => Dyn {
+            resource: Some("GitHubReviewComment"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "reply") => Dyn {
+            resource: Some("GitHubReviewComment"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -25896,8 +30687,23 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("LinearFixture", "createApp") => Dyn {
+            resource: Some("LinearApp"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("LinearFixture", "createTeam") => Dyn {
             resource: Some("LinearTeam"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("LinearApp", "comment") => Dyn {
+            resource: Some("LinearComment"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("LinearApp", "reply") => Dyn {
+            resource: Some("LinearComment"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -25926,11 +30732,6 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
-        ("LinearTeam", "issue") => Dyn {
-            resource: Some("LinearIssue"),
-            ctx: target.ctx.clone(),
-            data,
-        },
         ("LinearIssue", "refresh") => Dyn {
             resource: Some("LinearIssue"),
             ctx: target.ctx.clone(),
@@ -25938,6 +30739,11 @@ pub async fn call_by_name(
         },
         ("LinearIssue", "session") => Dyn {
             resource: Some("LinearAgentSession"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("LinearTeam", "issue") => Dyn {
+            resource: Some("LinearIssue"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -25951,6 +30757,11 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("NotionFixture", "createApp") => Dyn {
+            resource: Some("NotionIntegration"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("NotionFixture", "createPage") => Dyn {
             resource: Some("NotionPage"),
             ctx: target.ctx.clone(),
@@ -25958,6 +30769,16 @@ pub async fn call_by_name(
         },
         ("NotionFixture", "createDatabase") => Dyn {
             resource: Some("NotionDatabase"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("NotionIntegration", "comment") => Dyn {
+            resource: Some("NotionComment"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("NotionIntegration", "reply") => Dyn {
+            resource: Some("NotionComment"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -25986,17 +30807,22 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("ResendFixture", "createApp") => Dyn {
+            resource: Some("ResendApp"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("ResendFixture", "createUser") => Dyn {
             resource: Some("ResendUser"),
             ctx: target.ctx.clone(),
             data,
         },
-        ("ResendUser", "send") => Dyn {
+        ("ResendApp", "send") => Dyn {
             resource: Some("ResendEmail"),
             ctx: target.ctx.clone(),
             data,
         },
-        ("ResendUser", "reply") => Dyn {
+        ("ResendApp", "reply") => Dyn {
             resource: Some("ResendEmail"),
             ctx: target.ctx.clone(),
             data,
@@ -26011,17 +30837,32 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("ResendUser", "send") => Dyn {
+            resource: Some("ResendEmail"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("ResendUser", "reply") => Dyn {
+            resource: Some("ResendEmail"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GoogleFixture", "createApp") => Dyn {
+            resource: Some("GoogleApp"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("GoogleFixture", "createUser") => Dyn {
             resource: Some("GoogleUser"),
             ctx: target.ctx.clone(),
             data,
         },
-        ("GoogleUser", "send") => Dyn {
+        ("GoogleApp", "send") => Dyn {
             resource: Some("GoogleEmail"),
             ctx: target.ctx.clone(),
             data,
         },
-        ("GoogleUser", "reply") => Dyn {
+        ("GoogleApp", "reply") => Dyn {
             resource: Some("GoogleEmail"),
             ctx: target.ctx.clone(),
             data,
@@ -26036,8 +30877,23 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("GoogleUser", "send") => Dyn {
+            resource: Some("GoogleEmail"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GoogleUser", "reply") => Dyn {
+            resource: Some("GoogleEmail"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("DiscordFixture", "createUser") => Dyn {
             resource: Some("DiscordUser"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("DiscordFixture", "createApp") => Dyn {
+            resource: Some("DiscordApp"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -26048,6 +30904,16 @@ pub async fn call_by_name(
         },
         ("DiscordFixture", "fault") => Dyn {
             resource: Some("DiscordFault"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("DiscordApp", "say") => Dyn {
+            resource: Some("DiscordMessage"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("DiscordApp", "reply") => Dyn {
+            resource: Some("DiscordMessage"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -26148,14 +31014,14 @@ pub fn field_resource(resource: &str, field: &str) -> Option<&'static str> {
         ("GitHubReviewComment", "pr") => Some("GitHubPullRequest"),
         ("GitHubReviewComment", "delivery") => Some("GitHubDelivery"),
         ("LinearFixture", "app") => Some("LinearApp"),
+        ("LinearComment", "issue") => Some("LinearIssue"),
+        ("LinearComment", "session") => Some("LinearAgentSession"),
+        ("LinearComment", "delivery") => Some("LinearDelivery"),
         ("LinearIssue", "team") => Some("LinearTeam"),
         ("LinearAgentSession", "issue") => Some("LinearIssue"),
         ("LinearAgentSession", "app") => Some("LinearApp"),
         ("LinearAgentSession", "startedBy") => Some("LinearUser"),
         ("LinearAgentSession", "delivery") => Some("LinearDelivery"),
-        ("LinearComment", "issue") => Some("LinearIssue"),
-        ("LinearComment", "session") => Some("LinearAgentSession"),
-        ("LinearComment", "delivery") => Some("LinearDelivery"),
         ("LinearAgentActivity", "session") => Some("LinearAgentSession"),
         ("NotionFixture", "app") => Some("NotionIntegration"),
         ("NotionComment", "discussion") => Some("NotionDiscussion"),

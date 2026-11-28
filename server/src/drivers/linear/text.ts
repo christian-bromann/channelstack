@@ -27,10 +27,13 @@ export function linearText(
         .map((piece) => ("text" in piece ? piece.text : links.profile(userOf(piece.mention))))
         .join(""),
 
-    /** The people and apps a Markdown text mentions. */
-    mentioned: (body: string): string[] => {
+    /** The people and apps a Markdown text in a session mentions: its people, and the apps it used (decision 0027). */
+    mentioned: (session: string, body: string): string[] => {
       const handles = [...body.matchAll(links.profilePattern())].map((match) => match[1]);
-      const everyone = [store.appUser, ...store.all(store.users)];
+      const everyone = [
+        ...store.apps.of(session).map((app) => store.appUserOf(app)),
+        ...store.list(store.users, session),
+      ];
       return everyone.filter((user) => handles.includes(user.displayName)).map((user) => user.id);
     },
 

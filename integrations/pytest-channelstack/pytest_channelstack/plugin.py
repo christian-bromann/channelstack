@@ -96,6 +96,7 @@ async def channelstack_session(channelstack: Channelstack, request: pytest.Fixtu
     set_files_root(request.path.parent)
     async with session:
         yield session
+        await _fail_on_loops(session)
         # What went wrong with the model fails the test even if it asserted nothing about it
         # (decision 0029): read while the session is still open.
         try:
@@ -105,6 +106,20 @@ async def channelstack_session(channelstack: Channelstack, request: pytest.Fixtu
     if problems:
         lines = "\n".join(f"  {problem}" for problem in problems)
         pytest.fail(f"The model calls of this test went wrong:\n{lines}", pytrace=False)
+
+
+async def _fail_on_loops(session: Session) -> None:
+    """A test fails when the fake had to stop a bot loop in its session (decision 0027).
+
+    Apps that answer each other without end are a bug, whether or not the test checked anything.
+    Where the server can't tell (live, without proxy mode), there is nothing to report.
+    """
+    try:
+        loops = (await session.quiet()).loops
+    except ChannelstackError:
+        return
+    if loops:
+        pytest.fail(f"The fake stopped {'; '.join(loops)}")
 
 
 def _channel_fixture(name: str) -> object:

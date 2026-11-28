@@ -1,3 +1,4 @@
+import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { linearDev } from "./dev.ts";
 import { createLinearFake } from "./fake/index.ts";
@@ -64,7 +65,7 @@ export const linear: DriverDefinition = {
           live,
           events: context.events,
           apiUrl: context.apiUrl,
-          secret: context.secret,
+          secret: (name, app) => context.apps.secret(app ?? BUILT_IN_APP, name),
         }),
       capabilities: () => ({}),
       // A session the agent hasn't finished is work in progress: it waits for the agent, or the agent is working.
@@ -77,13 +78,19 @@ export const linear: DriverDefinition = {
               `an agent session on ${fake.store.issue(record.issue).identifier} that is still ${record.status}`,
           ),
       // Live, `channelstack env` prints nothing for Linear (app.ts): the agent talks to it with its own configuration.
-      env: () => ({
-        LINEAR_API_URL: `${context.apiUrl()}/graphql`,
-        LINEAR_ACCESS_TOKEN: context.secret("oauthToken"),
-        LINEAR_WEBHOOK_SECRET: context.secret("webhookSecret"),
-        LINEAR_CLIENT_ID: context.secret("clientId"),
-        LINEAR_CLIENT_SECRET: context.secret("clientSecret"),
-      }),
+      env: (app) => {
+        // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same
+        // shape; asking for them makes the app, so its agent can start before any test has.
+        const { apps } = fake.store;
+        const name = apps.keyOf(apps.forEnv(app, (wanted) => fake.world.createApp(undefined, { name: wanted })));
+        return {
+          LINEAR_API_URL: `${context.apiUrl()}/graphql`,
+          LINEAR_ACCESS_TOKEN: context.apps.secret(name, "oauthToken"),
+          LINEAR_WEBHOOK_SECRET: context.apps.secret(name, "webhookSecret"),
+          LINEAR_CLIENT_ID: context.apps.secret(name, "clientId"),
+          LINEAR_CLIENT_SECRET: context.apps.secret(name, "clientSecret"),
+        };
+      },
     };
   },
 };

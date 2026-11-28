@@ -16,6 +16,7 @@ export interface ResendFake extends FakeBackend {
 /** The Resend fake: the REST API over an in-memory team and the people's mailboxes, wired to core. */
 export function createResendFake(context: DriverContext): ResendFake {
   const store = new ResendStore(context.registry);
+  store.loops = context.loops;
   const world = createFakeWorld(context, store);
   // Who the team is is drawn once: the agent holds its address from `channelstack env`, and a reset keeps it.
   const identity = {

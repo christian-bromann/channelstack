@@ -18,7 +18,7 @@ from ..runtime.responder import respond_with
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotEditOthersMessageError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DiscordApiCall", "DiscordApiCalls", "DiscordApp", "DiscordButtonRef", "DiscordChannel", "DiscordChannels", "DiscordDeliveries", "DiscordDelivery", "DiscordEndpointCheck", "DiscordEphemeralMessages", "DiscordFault", "DiscordFixture", "DiscordGuild", "DiscordMembers", "DiscordMessage", "DiscordMessageDeliveries", "DiscordMessageInput", "DiscordMessages", "DiscordPrincipal", "DiscordReaction", "DiscordReactions", "DiscordReplies", "DiscordThreads", "DiscordTranscript", "DiscordTranscriptEntry", "DiscordUser", "DiscordUsers", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "EmptyMessageError", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "InvalidFormBodyError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MethodNotSupportedForChannelTypeError", "MissingAccessError", "MissingPermissionsError", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "OpenAICall", "OpenAICalls", "OpenAIComputerAction", "OpenAIContext", "OpenAIEndpoint", "OpenAIFixture", "OpenAIHeldCall", "OpenAIHeldPage", "OpenAIMatch", "OpenAIMediaSource", "OpenAIMessage", "OpenAIPart", "OpenAIPatchOperation", "OpenAIPausedCalls", "OpenAIProblems", "OpenAIRateLimit", "OpenAIRef", "OpenAIRequest", "OpenAIScript", "OpenAISentSecret", "OpenAISentSecrets", "OpenAISessionCalls", "OpenAISessionToolCalls", "OpenAITiming", "OpenAITool", "OpenAIToolCall", "OpenAIToolCallSpec", "OpenAIToolCalls", "OpenAITurn", "OpenAITurnInput", "OpenAIUnattributedCall", "OpenAIUnattributedCalls", "PROVIDER_NAMES", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "ThreadAlreadyCreatedError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CannotEditOthersMessageError", "CannotMessageUserError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DiscordApiCall", "DiscordApiCalls", "DiscordApp", "DiscordApps", "DiscordButtonRef", "DiscordChannel", "DiscordChannels", "DiscordDeliveries", "DiscordDelivery", "DiscordEndpointCheck", "DiscordEphemeralMessages", "DiscordFault", "DiscordFixture", "DiscordGuild", "DiscordMembers", "DiscordMessage", "DiscordMessageDeliveries", "DiscordMessageInput", "DiscordMessages", "DiscordPrincipal", "DiscordReaction", "DiscordReactions", "DiscordReplies", "DiscordThreads", "DiscordTranscript", "DiscordTranscriptEntry", "DiscordUser", "DiscordUsers", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "EmptyMessageError", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleApps", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "InvalidFormBodyError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MethodNotSupportedForChannelTypeError", "MissingAccessError", "MissingPermissionsError", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "ObjectNotFoundError", "OpenAICall", "OpenAICalls", "OpenAIComputerAction", "OpenAIContext", "OpenAIEndpoint", "OpenAIFixture", "OpenAIHeldCall", "OpenAIHeldPage", "OpenAIMatch", "OpenAIMediaSource", "OpenAIMessage", "OpenAIPart", "OpenAIPatchOperation", "OpenAIPausedCalls", "OpenAIProblems", "OpenAIRateLimit", "OpenAIRef", "OpenAIRequest", "OpenAIScript", "OpenAISentSecret", "OpenAISentSecrets", "OpenAISessionCalls", "OpenAISessionToolCalls", "OpenAITiming", "OpenAITool", "OpenAIToolCall", "OpenAIToolCallSpec", "OpenAIToolCalls", "OpenAITurn", "OpenAITurnInput", "OpenAIUnattributedCall", "OpenAIUnattributedCalls", "PROVIDER_NAMES", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendApps", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "ThreadAlreadyCreatedError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
 
 VERSION = "0.1.1"
 
@@ -39,7 +39,15 @@ class AlreadyReactedError(ChannelstackError):
     pass
 
 
+class CannotDmBotError(ChannelstackError):
+    pass
+
+
 class CannotEditOthersMessageError(ChannelstackError):
+    pass
+
+
+class CannotMessageUserError(ChannelstackError):
     pass
 
 
@@ -139,6 +147,14 @@ class NotInRoomError(ChannelstackError):
     pass
 
 
+class ObjectNotFoundError(ChannelstackError):
+    pass
+
+
+class RestrictedResourceError(ChannelstackError):
+    pass
+
+
 class SessionNotFoundError(ChannelstackError):
     pass
 
@@ -167,6 +183,10 @@ class UnsupportedInLiveError(ChannelstackError):
     pass
 
 
+class ValidationErrorError(ChannelstackError):
+    pass
+
+
 class ValidationFailedError(ChannelstackError):
     pass
 
@@ -176,7 +196,9 @@ _ERRORS: dict[str, type[ChannelstackError]] = {
     "action_requires": ActionRequiresError,
     "already_in_channel": AlreadyInChannelError,
     "already_reacted": AlreadyReactedError,
+    "cannot_dm_bot": CannotDmBotError,
     "cannot_edit_others_message": CannotEditOthersMessageError,
+    "cannot_message_user": CannotMessageUserError,
     "cant_delete_message": CantDeleteMessageError,
     "cant_update_message": CantUpdateMessageError,
     "cross_workspace_credential": CrossWorkspaceCredentialError,
@@ -201,6 +223,8 @@ _ERRORS: dict[str, type[ChannelstackError]] = {
     "not_found": NotFoundError,
     "not_in_channel": NotInChannelError,
     "not_in_room": NotInRoomError,
+    "object_not_found": ObjectNotFoundError,
+    "restricted_resource": RestrictedResourceError,
     "session_not_found": SessionNotFoundError,
     "split_view_unavailable": SplitViewUnavailableError,
     "stop_unavailable": StopUnavailableError,
@@ -208,6 +232,7 @@ _ERRORS: dict[str, type[ChannelstackError]] = {
     "unauthorized": UnauthorizedError,
     "unsupported_in_fake": UnsupportedInFakeError,
     "unsupported_in_live": UnsupportedInLiveError,
+    "validation_error": ValidationErrorError,
     "validation_failed": ValidationFailedError,
 }
 
@@ -244,7 +269,7 @@ class EventPage:
 class LogEvent:
     at: str
     driver: str
-    kind: Literal["action", "delivery", "delivery_attempt", "api_call"]
+    kind: Literal["action", "delivery", "delivery_attempt", "api_call", "bot_loop"]
     data: dict[str, Any]
     summary: dict[str, Any] | None = None
 
@@ -265,6 +290,7 @@ class Quiet:
     quiet_for_ms: float
     open: list[str]
     problems: list[str]
+    loops: list[str] | None = None
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> Quiet:
@@ -273,10 +299,14 @@ class Quiet:
             quiet_for_ms=data["quietForMs"],
             open=data["open"],
             problems=data["problems"],
+            loops=data.get("loops"),
         )
 
 
 type Env = dict[str, str]
+
+
+type EchoApps = list[EchoApp]
 
 
 @dataclass(frozen=True)
@@ -393,10 +423,7 @@ class SlackTeam:
         )
 
 
-type SlackUsers = list[SlackUser]
-
-
-type SlackConversations = list[SlackConversation]
+type SlackApps = list[SlackApp]
 
 
 @dataclass(frozen=True)
@@ -462,6 +489,12 @@ class SlackMessageMetadata:
     def _to_wire(self) -> dict[str, Any]:
         wire = {"event_type": self.event_type, "event_payload": self.event_payload}
         return wire
+
+
+type SlackUsers = list[SlackUser]
+
+
+type SlackConversations = list[SlackConversation]
 
 
 @dataclass(frozen=True)
@@ -681,6 +714,9 @@ class GitHubIssueListing:
         )
 
 
+type GitHubApps = list[GitHubApp]
+
+
 type GitHubCommits = list[GitHubCommit]
 
 
@@ -845,6 +881,9 @@ class GitHubApiCall:
 type GitHubAppCalls = list[GitHubApiCall]
 
 
+type LinearApps = list[LinearApp]
+
+
 type LinearUsers = list[LinearUser]
 
 
@@ -989,6 +1028,12 @@ class LinearApiCall:
         )
 
 
+type NotionCapability = Literal["read_content", "update_content", "insert_content", "read_comments", "insert_comments", "read_user_info"]
+
+
+type NotionIntegrations = list[NotionIntegration]
+
+
 type NotionUsers = list[NotionUser]
 
 
@@ -1110,10 +1155,7 @@ class NotionApiCall:
         )
 
 
-type ResendUsers = list[ResendUser]
-
-
-type ResendThreads = list[ResendThread]
+type ResendApps = list[ResendApp]
 
 
 @dataclass(frozen=True)
@@ -1129,6 +1171,12 @@ class ResendPrincipal:
             name=data["name"],
             kind=data["kind"],
         )
+
+
+type ResendUsers = list[ResendUser]
+
+
+type ResendThreads = list[ResendThread]
 
 
 type ResendInbox = list[ResendEmail]
@@ -1216,10 +1264,7 @@ class ResendApiCall:
         )
 
 
-type GoogleUsers = list[GoogleUser]
-
-
-type GoogleThreads = list[GoogleThread]
+type GoogleApps = list[GoogleApp]
 
 
 @dataclass(frozen=True)
@@ -1235,6 +1280,12 @@ class GooglePrincipal:
             name=data["name"],
             kind=data["kind"],
         )
+
+
+type GoogleUsers = list[GoogleUser]
+
+
+type GoogleThreads = list[GoogleThread]
 
 
 type GoogleInbox = list[GoogleEmail]
@@ -1335,10 +1386,7 @@ class DiscordGuild:
         )
 
 
-type DiscordUsers = list[DiscordUser]
-
-
-type DiscordChannels = list[DiscordChannel]
+type DiscordApps = list[DiscordApp]
 
 
 @dataclass(frozen=True)
@@ -1356,6 +1404,12 @@ class DiscordMessageInput:
     def _to_wire(self) -> dict[str, Any]:
         wire = {"content": self.content, "embeds": self.embeds}
         return {key: value for key, value in wire.items() if value is not None}
+
+
+type DiscordUsers = list[DiscordUser]
+
+
+type DiscordChannels = list[DiscordChannel]
 
 
 @dataclass(frozen=True)
@@ -2043,10 +2097,10 @@ class Channelstack(ClientBase):
         ctx = self._ctx
         await ctx.transport.request("POST", f"/reset")
 
-    async def env(self, *, proxy: bool | None = None) -> Env:
+    async def env(self, *, proxy: bool | None = None, app: str | None = None, channel: str | None = None) -> Env:
         """Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints). With `proxy`, the proxy and the CA instead of the API URLs."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/env", query={"proxy": proxy})
+        data = await ctx.transport.request("GET", f"/env", query={"proxy": proxy, "app": app, "channel": channel})
         return data
 
     async def ui_login_link(self) -> UiLoginLink:
@@ -2158,6 +2212,18 @@ class EchoFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/echo/users", body={"name": name})
         return EchoUser(ctx, data)
 
+    async def create_app(self, *, name: str) -> EchoApp:
+        """Make another app (decision 0027), or return the one with this name. Its events go to CHANNELSTACK_ECHO_APP_<NAME>_WEBHOOK_URL. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/echo/apps", body={"name": name})
+        return EchoApp(ctx, data)
+
+    async def apps(self) -> EchoApps:
+        """The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/echo/apps")
+        return [EchoApp(ctx, item) for item in data]
+
     async def create_room(self, *, name: str | None = None, participants: list[EchoUser | EchoApp] | None = None) -> EchoRoom:
         """Create a room. Only the listed participants are members; include the app for it to receive events. Experimental."""
         ctx = self._ctx
@@ -2177,6 +2243,12 @@ class EchoApp:
         self.id: str = data["id"]
         self.name: str = data["name"]
         self.kind: Literal["app"] = data["kind"]
+
+    async def say(self, text: str, *, room: EchoRoom) -> EchoMessage:
+        """An app a test made posts in a room it is a member of, as its own call would. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/echo/apps/{quote(str(self.id), safe='')}/say", body={"text": text, "room": room.id})
+        return EchoMessage._from_wire(ctx, data)
 
 
 class EchoUser:
@@ -2234,6 +2306,18 @@ class SlackFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users")
         return [SlackUser(ctx, item) for item in data]
 
+    async def create_app(self, *, name: str, scopes: list[str] | None = None, bot_events: list[str] | None = None) -> SlackApp:
+        """Make another app in the workspace, with its own bot user, tokens and signing secret (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_SLACK_APP_<NAME>_WEBHOOK_URL, or over its own Socket Mode connection. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps", body={"name": name, "scopes": scopes, "botEvents": bot_events})
+        return SlackApp(ctx, data)
+
+    async def apps(self) -> SlackApps:
+        """The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps")
+        return [SlackApp(ctx, item) for item in data]
+
     async def conversations(self) -> SlackConversations:
         """The session's conversations, the one with the newest message last. Experimental."""
         ctx = self._ctx
@@ -2246,10 +2330,10 @@ class SlackFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/channels", body={"name": name, "private": private, "participants": None if participants is None else [item.id for item in participants], "topic": topic, "purpose": purpose, "shared": shared})
         return SlackConversation(ctx, data)
 
-    async def deliveries(self) -> SlackDeliveries:
+    async def deliveries(self, *, app: SlackApp | None = None) -> SlackDeliveries:
         """Every event channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries")
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries", query={"app": None if app is None else app.id})
         return [SlackDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> SlackApiCalls:
@@ -2258,16 +2342,16 @@ class SlackFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/calls", query={"operation": operation, "error": error})
         return [SlackApiCall._from_wire(ctx, item) for item in data]
 
-    async def uninstall_app(self) -> SlackUninstallDeliveries:
-        """The workspace uninstalls the app. Undone when this session closes; run such tests on their own. Experimental."""
+    async def uninstall_app(self, *, app: SlackApp | None = None) -> SlackUninstallDeliveries:
+        """The workspace uninstalls an app: the built-in one, or the one given. Undone when this session closes; run such tests on their own. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/uninstall")
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/uninstall", body={"app": None if app is None else app.id})
         return [SlackDelivery(ctx, item) for item in data]
 
-    async def fault(self, *, type: Literal["rate_limit", "latency", "error", "drop_socket"], operation: str | None = None, retry_after: Duration | None = None, delay: Duration | None = None, after: Duration | None = None, error: str | None = None, times: int | None = None) -> SlackFault:
+    async def fault(self, *, type: Literal["rate_limit", "latency", "error", "drop_socket"], operation: str | None = None, retry_after: Duration | None = None, delay: Duration | None = None, after: Duration | None = None, error: str | None = None, times: int | None = None, app: SlackApp | None = None) -> SlackFault:
         """Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults", body={"type": type, "operation": operation, "retryAfter": None if retry_after is None else parse_duration(retry_after), "delay": None if delay is None else parse_duration(delay), "after": None if after is None else parse_duration(after), "error": error, "times": times})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults", body={"type": type, "operation": operation, "retryAfter": None if retry_after is None else parse_duration(retry_after), "delay": None if delay is None else parse_duration(delay), "after": None if after is None else parse_duration(after), "error": error, "times": times, "app": None if app is None else app.id})
         return SlackFault(ctx, data)
 
     async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> SlackApiCall:
@@ -2287,6 +2371,30 @@ class SlackApp:
         self.app_token: str = data["appToken"]
         self.signing_secret: str = data["signingSecret"]
         self.scopes: list[str] = data["scopes"]
+
+    async def say(self, message: str | SlackMessageInput, *, channel: SlackConversation | None = None, to: SlackUser | SlackApp | list[SlackUser | SlackApp] | None = None) -> SlackMessage:
+        """An app a test made writes a top-level message, as its own chat.postMessage would: in a conversation it is a member of, or in a DM with the people in `to`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps/{quote(str(self.id), safe='')}/say", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "channel": None if channel is None else channel.id, "to": None if to is None else [item.id for item in (to if isinstance(to, list) else [to])]})
+        return SlackMessage(ctx, data)
+
+    async def reply(self, message: str | SlackMessageInput, *, thread: SlackThread | SlackMessage) -> SlackMessage:
+        """An app a test made replies in a thread: pass the message that starts it, or any reply in it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps/{quote(str(self.id), safe='')}/reply", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "thread": {"channel": thread.channel, "ts": thread.ts}})
+        return SlackMessage(ctx, data)
+
+    async def react(self, emoji: str, *, message: SlackMessage) -> SlackDelivery | None:
+        """An app a test made reacts to a message. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps/{quote(str(self.id), safe='')}/react", body={"emoji": emoji, "message": {"channel": message.channel, "ts": message.ts}})
+        return (None if data is None else SlackDelivery(ctx, data))
+
+    async def unreact(self, emoji: str, *, message: SlackMessage) -> SlackDelivery | None:
+        """An app a test made takes its reaction back. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/apps/{quote(str(self.id), safe='')}/unreact", body={"emoji": emoji, "message": {"channel": message.channel, "ts": message.ts}})
+        return (None if data is None else SlackDelivery(ctx, data))
 
 
 class SlackUser:
@@ -2337,16 +2445,16 @@ class SlackUser:
         data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/select", body={"option": (option if isinstance(option, list) else [option]), "menu": {"label": menu} if isinstance(menu, str) else menu._to_wire(), "message": {"channel": message.channel, "ts": message.ts}}))
         return SlackDelivery(ctx, data)
 
-    async def shortcut(self, callback_id: str, *, message: SlackMessage) -> SlackDelivery:
-        """Run a message shortcut on a message. Experimental."""
+    async def shortcut(self, callback_id: str, *, message: SlackMessage, app: SlackApp | None = None) -> SlackDelivery:
+        """Run an app's message shortcut on a message: it goes to that app alone. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/shortcut", body={"callbackId": callback_id, "message": {"channel": message.channel, "ts": message.ts}})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/shortcut", body={"callbackId": callback_id, "message": {"channel": message.channel, "ts": message.ts}, "app": None if app is None else app.id})
         return SlackDelivery(ctx, data)
 
-    async def run_command(self, command: str, *, channel: SlackConversation) -> SlackDelivery:
-        """Run a slash command in a conversation, e.g. `/deploy web staging`. Experimental."""
+    async def run_command(self, command: str, *, channel: SlackConversation, app: SlackApp | None = None) -> SlackDelivery:
+        """Run an app's slash command in a conversation, e.g. `/deploy web staging`: it goes to that app alone. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/commands", body={"command": command, "channel": channel.id})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/commands", body={"command": command, "channel": channel.id, "app": None if app is None else app.id})
         return SlackDelivery(ctx, data)
 
     async def stop(self, *, thread: SlackThread | SlackMessage) -> SlackDelivery:
@@ -2355,10 +2463,10 @@ class SlackUser:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/stop", body={"thread": {"channel": thread.channel, "ts": thread.ts}})
         return SlackDelivery(ctx, data)
 
-    async def open_agent_thread(self, *, from_: SlackConversation | None = None) -> SlackThread:
-        """Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at. Experimental."""
+    async def open_agent_thread(self, *, from_: SlackConversation | None = None, app: SlackApp | None = None) -> SlackThread:
+        """Open an app's split view: a new thread in this person's DM with that app, started from the channel they are looking at. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/agent-threads", body={"from": None if from_ is None else from_.id})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/agent-threads", body={"from": None if from_ is None else from_.id, "app": None if app is None else app.id})
         return SlackThread(ctx, data)
 
     async def pick_prompt(self, title: str, *, thread: SlackThread | SlackMessage) -> SlackMessage:
@@ -2419,43 +2527,6 @@ class SlackUser:
         return await wait_for_next(self._seen, "waitForModal", self.modals, lambda item: text_matches(item.title, title) and item.open is True, "an open modal from the agent", timeout=timeout)
 
 
-class SlackConversation:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self._seen: dict[str, int] = {}
-        self.id: str = data["id"]
-        self.kind: Literal["channel", "private_channel", "im", "mpim"] = data["kind"]
-        self.name: str | None = data.get("name")
-
-    async def latest_message(self) -> SlackMessage:
-        """The newest message of a conversation, replies included. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/latest")
-        return SlackMessage(ctx, data)
-
-    async def messages(self) -> SlackMessages:
-        """Top-level messages of a conversation, oldest first. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/messages")
-        return [SlackMessage(ctx, item) for item in data]
-
-    async def members(self) -> SlackMembers:
-        """The people and apps in a conversation. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/members")
-        return [SlackUser(ctx, item) if item["kind"] == "user" else SlackApp(ctx, item) for item in data]
-
-    async def transcript(self, *, as_: SlackUser | SlackApp | None = None) -> SlackTranscript:
-        """The conversation as a person would read it, threads included. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
-        return SlackTranscript._from_wire(ctx, data)
-
-    async def wait_for_message(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration | None = None) -> SlackMessage:
-        """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
-
-
 class SlackMessage:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
@@ -2492,11 +2563,54 @@ class SlackMessage:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.channel), safe='')}/messages/{quote(str(self.ts), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
         return SlackTranscript._from_wire(ctx, data)
 
+    async def delivery_for(self, app: SlackApp) -> SlackDelivery | None:
+        """The first delivery this message caused to this app (decision 0027), or nothing when it wasn't told. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.channel), safe='')}/messages/{quote(str(self.ts), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else SlackDelivery(ctx, data))
+
     async def deliveries(self) -> SlackMessageDeliveries:
         """Every delivery this message caused to the agent. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.channel), safe='')}/messages/{quote(str(self.ts), safe='')}/deliveries")
         return [SlackDelivery(ctx, item) for item in data]
+
+
+class SlackConversation:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.kind: Literal["channel", "private_channel", "im", "mpim"] = data["kind"]
+        self.name: str | None = data.get("name")
+
+    async def latest_message(self) -> SlackMessage:
+        """The newest message of a conversation, replies included. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/latest")
+        return SlackMessage(ctx, data)
+
+    async def messages(self) -> SlackMessages:
+        """Top-level messages of a conversation, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/messages")
+        return [SlackMessage(ctx, item) for item in data]
+
+    async def members(self) -> SlackMembers:
+        """The people and apps in a conversation. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/members")
+        return [SlackUser(ctx, item) if item["kind"] == "user" else SlackApp(ctx, item) for item in data]
+
+    async def transcript(self, *, as_: SlackUser | SlackApp | None = None) -> SlackTranscript:
+        """The conversation as a person would read it, threads included. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
+        return SlackTranscript._from_wire(ctx, data)
+
+    async def wait_for_message(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration | None = None) -> SlackMessage:
+        """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
 
 
 class SlackThread:
@@ -2552,6 +2666,7 @@ class SlackDelivery:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["slack"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.event_type: str | None = data.get("eventType")
         self.event_id: str | None = data.get("eventId")
@@ -2697,10 +2812,28 @@ class GitHubFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/issues")
         return [GitHubIssueListing._from_wire(ctx, item) for item in data]
 
-    async def deliveries(self, *, type: str | None = None, resource: GitHubRepo | None = None) -> GitHubDeliveries:
+    async def installation_id(self, repo: GitHubRepo) -> int:
+        """The id of the built-in App's installation, for a repository it is installed on. The same as `github.app.installationId(repo)`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/installation-id", body={"repo": repo.id})
+        return data
+
+    async def create_app(self, *, name: str, permissions: dict[str, Literal["read", "write"]] | None = None, events: list[str] | None = None) -> GitHubApp:
+        """Make another GitHub App on the org, with its own App id, bot user, installation, private key and webhook secret (decision 0027), or return the one made with this name and settings. It reaches no repository until it is installed on one; its webhooks go to CHANNELSTACK_GITHUB_APP_<NAME>_WEBHOOK_URL. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps", body={"name": name, "permissions": permissions, "events": events})
+        return GitHubApp(ctx, data)
+
+    async def apps(self) -> GitHubApps:
+        """The Apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps")
+        return [GitHubApp(ctx, item) for item in data]
+
+    async def deliveries(self, *, type: str | None = None, resource: GitHubRepo | None = None, app: GitHubApp | None = None) -> GitHubDeliveries:
         """Every webhook channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [GitHubDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> GitHubApiCalls:
@@ -2734,10 +2867,140 @@ class GitHubApp:
         self.webhook_secret: str = data["webhookSecret"]
 
     async def installation_id(self, repo: GitHubRepo) -> int:
-        """The id of the App's installation, for a repository it is installed on. Experimental."""
+        """The id of this App's installation, for a repository it is installed on. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/installation-id", body={"repo": repo.id})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/installation-id", body={"repo": repo.id})
         return data
+
+    async def push(self, changes: ChangesInput, *, repo: GitHubRepo, branch: str, message: str | None = None) -> GitHubCommit:
+        """Push a commit to a branch (created from the default branch if it isn't there). Sends `push`, and `pull_request` `synchronize` for open pull requests from it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/push", body={"changes": read_changes(changes), "repo": repo.id, "branch": branch, "message": message})
+        return GitHubCommit(ctx, data)
+
+    async def open_issue(self, issue: dict[str, Any], *, repo: GitHubRepo) -> GitHubIssue:
+        """Open an issue. Sends `issues` (action `opened`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/issues", body={"issue": {key: value for key, value in {**issue, "assignees": None if issue.get("assignees") is None else [item.id for item in issue["assignees"]]}.items() if value is not None}, "repo": repo.id})
+        return GitHubIssue(ctx, data)
+
+    async def open_pull_request(self, pr: dict[str, Any], *, repo: GitHubRepo) -> GitHubPullRequest:
+        """Open a pull request. With `changes`, they are pushed to `from` first; without, `from` is an existing branch. Sends `pull_request` (action `opened`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/pulls", body={"pr": {key: value for key, value in {**pr, "changes": None if pr.get("changes") is None else read_changes(pr["changes"]), "reviewers": None if pr.get("reviewers") is None else [item.id for item in pr["reviewers"]]}.items() if value is not None}, "repo": repo.id})
+        return GitHubPullRequest(ctx, data)
+
+    async def edit_issue(self, changes: dict[str, Any], *, issue: GitHubIssue) -> GitHubDelivery | None:
+        """Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/edit-issue", body={"changes": changes, "issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def close(self, *, issue: GitHubIssue) -> GitHubDelivery | None:
+        """Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/close", body={"issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def reopen(self, *, issue: GitHubIssue) -> GitHubDelivery | None:
+        """Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/reopen", body={"issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def label(self, labels: str | list[str], *, issue: GitHubIssue) -> GitHubLabelDeliveries:
+        """Put labels on an issue or a pull request. Sends one `labeled` event per label. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/label", body={"labels": (labels if isinstance(labels, list) else [labels]), "issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return [GitHubDelivery(ctx, item) for item in data]
+
+    async def unlabel(self, labels: str | list[str], *, issue: GitHubIssue) -> GitHubUnlabelDeliveries:
+        """Take labels off an issue or a pull request. Sends one `unlabeled` event per label. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/unlabel", body={"labels": (labels if isinstance(labels, list) else [labels]), "issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return [GitHubDelivery(ctx, item) for item in data]
+
+    async def assign(self, assignees: GitHubUser | GitHubApp | list[GitHubUser | GitHubApp], *, issue: GitHubIssue) -> GitHubAssignDeliveries:
+        """Assign people or the App's bot. Sends one `assigned` event per assignee. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/assign", body={"assignees": [item.id for item in (assignees if isinstance(assignees, list) else [assignees])], "issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return [GitHubDelivery(ctx, item) for item in data]
+
+    async def comment(self, body: str, *, issue: GitHubIssue) -> GitHubComment:
+        """Comment on an issue or a pull request's conversation. Sends `issue_comment` (action `created`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/comment", body={"body": body, "issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return GitHubComment(ctx, data)
+
+    async def edit(self, body: str, *, comment: GitHubComment | GitHubReviewComment) -> GitHubDelivery | None:
+        """Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/edit", body={"body": body, "comment": comment.id})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def delete(self, *, comment: GitHubComment | GitHubReviewComment) -> GitHubDelivery | None:
+        """Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/delete", body={"comment": comment.id})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def react(self, content: Literal["+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes"], *, issue: GitHubIssue | None = None, comment: GitHubComment | GitHubReviewComment | None = None) -> None:
+        """React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/react", body={"content": content, "issue": None if issue is None else {"repoId": issue.repo_id, "number": issue.number}, "comment": None if comment is None else comment.id})
+
+    async def minimize(self, *, comment: GitHubComment, reason: Literal["OUTDATED", "SPAM", "OFF_TOPIC", "RESOLVED"] | None = None) -> None:
+        """Hide a comment as outdated, spam, off-topic or resolved. GitHub sends no webhook for it. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/minimize", body={"comment": comment.id, "reason": reason})
+
+    async def review(self, review: dict[str, Any]) -> GitHubReview:
+        """Submit a review, with comments on the diff if any. Sends `pull_request_review`, and one `pull_request_review_comment` per comment. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/review", body={"review": {key: value for key, value in {**review, "pr": None if review.get("pr") is None else {"repoId": review["pr"].repo_id, "number": review["pr"].number}}.items() if value is not None}})
+        return GitHubReview._from_wire(ctx, data)
+
+    async def review_comment(self, body: str, *, pr: GitHubPullRequest, path: str, line: int, side: Literal["LEFT", "RIGHT"] | None = None) -> GitHubReviewComment:
+        """One comment on the diff, outside a review. Sends `pull_request_review_comment`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/review-comment", body={"body": body, "pr": {"repoId": pr.repo_id, "number": pr.number}, "path": path, "line": line, "side": side})
+        return GitHubReviewComment(ctx, data)
+
+    async def reply(self, body: str, *, comment: GitHubReviewComment) -> GitHubReviewComment:
+        """Reply in a thread on the diff. Sends `pull_request_review_comment`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/reply", body={"body": body, "comment": comment.id})
+        return GitHubReviewComment(ctx, data)
+
+    async def resolve(self, *, comment: GitHubReviewComment) -> GitHubDelivery | None:
+        """Resolve a thread on the diff. Sends `pull_request_review_thread`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/resolve", body={"comment": comment.id})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def unresolve(self, *, comment: GitHubReviewComment) -> GitHubDelivery | None:
+        """Reopen a thread on the diff. Sends `pull_request_review_thread`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/unresolve", body={"comment": comment.id})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def request_review(self, reviewers: GitHubUser | GitHubApp | list[GitHubUser | GitHubApp], *, pr: GitHubPullRequest) -> GitHubDelivery | None:
+        """Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/request-review", body={"reviewers": [item.id for item in (reviewers if isinstance(reviewers, list) else [reviewers])], "pr": {"repoId": pr.repo_id, "number": pr.number}})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def mark_ready(self, *, pr: GitHubPullRequest) -> GitHubDelivery | None:
+        """Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/mark-ready", body={"pr": {"repoId": pr.repo_id, "number": pr.number}})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def merge(self, *, pr: GitHubPullRequest, method: Literal["merge", "squash", "rebase"] | None = None) -> GitHubDelivery | None:
+        """Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/merge", body={"pr": {"repoId": pr.repo_id, "number": pr.number}, "method": method})
+        return (None if data is None else GitHubDelivery(ctx, data))
 
 
 class GitHubUser:
@@ -2906,13 +3169,13 @@ class GitHubRepo:
         self.private: bool = data["private"]
 
     async def install_app(self, app: GitHubApp) -> GitHubDelivery | None:
-        """Install the App on this repository. Sends `installation_repositories`. Experimental."""
+        """Install an App on this repository. Sends that App `installation_repositories`. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/repos/{quote(str(self.id), safe='')}/install", body={"app": app.id})
         return (None if data is None else GitHubDelivery(ctx, data))
 
     async def uninstall_app(self, app: GitHubApp) -> GitHubDelivery | None:
-        """Take the App off this repository. Sends `installation_repositories`. Experimental."""
+        """Take an App off this repository. Sends that App `installation_repositories`. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/repos/{quote(str(self.id), safe='')}/uninstall", body={"app": app.id})
         return (None if data is None else GitHubDelivery(ctx, data))
@@ -3010,6 +3273,7 @@ class GitHubDelivery:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["github"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.action: str | None = data.get("action")
         self.guid: str = data["guid"]
@@ -3106,6 +3370,12 @@ class GitHubComment:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/comments/{quote(str(self.id), safe='')}/reactions")
         return [GitHubReaction._from_wire(ctx, item) for item in data]
 
+    async def delivery_for(self, app: GitHubApp) -> GitHubDelivery | None:
+        """The `issue_comment` (`created`) delivery this comment caused to this App (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in App's. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/comments/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
 
 class GitHubReviewComment:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
@@ -3158,6 +3428,18 @@ class LinearFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users")
         return [LinearUser(ctx, item) for item in data]
 
+    async def create_app(self, *, name: str, events: list[str] | None = None) -> LinearApp:
+        """Make another OAuth app in the workspace, installed with `actor=app`: its own app user (mentionable and assignable), access token, client and webhook secret. Or return the one made with this name and settings. Its webhooks go to CHANNELSTACK_LINEAR_APP_<NAME>_WEBHOOK_URL. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/apps", body={"name": name, "events": events})
+        return LinearApp(ctx, data)
+
+    async def apps(self) -> LinearApps:
+        """The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/apps")
+        return [LinearApp(ctx, item) for item in data]
+
     async def teams(self) -> LinearTeams:
         """The teams this session created. Experimental."""
         ctx = self._ctx
@@ -3176,10 +3458,10 @@ class LinearFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues")
         return [LinearIssueListing._from_wire(ctx, item) for item in data]
 
-    async def deliveries(self, *, type: str | None = None, resource: LinearIssue | None = None) -> LinearDeliveries:
+    async def deliveries(self, *, type: str | None = None, resource: LinearIssue | None = None, app: LinearApp | None = None) -> LinearDeliveries:
         """Every webhook channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [LinearDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> LinearApiCalls:
@@ -3204,6 +3486,18 @@ class LinearApp:
         self.webhook_secret: str = data["webhookSecret"]
         self.client_id: str = data["clientId"]
         self.client_secret: str = data["clientSecret"]
+
+    async def comment(self, body: str, *, issue: LinearIssue) -> LinearComment:
+        """An app a test made comments on an issue, as its own `commentCreate` would. Its mention of another app is refused (to confirm, B6). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/apps/{quote(str(self.id), safe='')}/comment", body={"body": body, "issue": issue.id})
+        return LinearComment(ctx, data)
+
+    async def reply(self, body: str, *, comment: LinearComment) -> LinearComment:
+        """An app a test made replies in a comment's thread, as its own `commentCreate` with a `parentId` would. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/apps/{quote(str(self.id), safe='')}/reply", body={"body": body, "comment": comment.id})
+        return LinearComment(ctx, data)
 
 
 class LinearUser:
@@ -3254,7 +3548,7 @@ class LinearUser:
         return (None if data is None else LinearDelivery(ctx, data))
 
     async def delegate(self, app: LinearApp, *, issue: LinearIssue) -> LinearAgentSession:
-        """Delegate an issue to the app. Opens an agent session and sends `AgentSessionEvent` (`created`). Experimental."""
+        """Delegate an issue to an app. Opens that app's agent session and sends it `AgentSessionEvent` (`created`); an issue delegated to another app moves. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/delegate", body={"app": app.id, "issue": issue.id})
         return LinearAgentSession(ctx, data)
@@ -3307,18 +3601,36 @@ class LinearUser:
         return LinearDelivery(ctx, data)
 
 
-class LinearTeam:
+class LinearComment:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
-        self.key: str = data["key"]
-        self.name: str = data["name"]
+        self.issue: LinearIssue = LinearIssue(ctx, data["issue"])
+        self.author: LinearUser | LinearApp = LinearUser(ctx, data["author"]) if data["author"]["kind"] == "user" else LinearApp(ctx, data["author"])
+        self.body: str = data["body"]
+        self.created_at: str = data["createdAt"]
+        self.url: str = data["url"]
+        self.session: LinearAgentSession | None = None if data.get("session") is None else LinearAgentSession(ctx, data["session"])
+        self.delivery: LinearDelivery | None = None if data.get("delivery") is None else LinearDelivery(ctx, data["delivery"])
 
-    async def issue(self, identifier: str) -> LinearIssue:
-        """An issue of this team by its identifier (`ENG-12`). Experimental."""
+    async def replies(self) -> LinearCommentReplies:
+        """The replies in a comment's thread, once the agent is quiet. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/teams/{quote(str(self.id), safe='')}/issue", query={"identifier": identifier})
-        return LinearIssue(ctx, data)
+        await until_quiet(lambda: quiet_of(ctx))
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/replies")
+        return [LinearComment(ctx, item) for item in data]
+
+    async def delivery_for(self, app: LinearApp) -> LinearDelivery | None:
+        """The `Comment` (`create`) delivery this comment caused to this app (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in app's. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else LinearDelivery(ctx, data))
+
+    async def transcript(self) -> LinearTranscript:
+        """A comment's thread as a person reads it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/transcript")
+        return LinearTranscript._from_wire(ctx, data)
 
 
 class LinearIssue:
@@ -3400,44 +3712,18 @@ class LinearIssue:
         return await latest_once_quiet(self.comments, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a comment", from_), timeout=timeout, quiet_for=quiet_for)
 
 
-class LinearDelivery:
+class LinearTeam:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
-        self.channel: Literal["linear"] = data["channel"]
-        self.type: str = data["type"]
-        self.action: str = data["action"]
-        self.webhook_id: str = data["webhookId"]
-        self.payload: Any | None = data.get("payload")
-        self.attempts: list[DeliveryAttempt] = [DeliveryAttempt._from_wire(ctx, item) for item in data["attempts"]]
-        self.status: Literal["pending", "acknowledged", "failed", "timed_out", "unreachable"] = data["status"]
+        self.key: str = data["key"]
+        self.name: str = data["name"]
 
-    async def refresh(self) -> LinearDelivery:
-        """Re-read a delivery: its attempts and status. Experimental."""
+    async def issue(self, identifier: str) -> LinearIssue:
+        """An issue of this team by its identifier (`ENG-12`). Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}")
-        return LinearDelivery(ctx, data)
-
-    async def redeliver(self) -> DeliveryAttempt:
-        """Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}/redeliver")
-        return DeliveryAttempt._from_wire(ctx, data)
-
-    async def resend(self, *, bad_signature: bool | None = None, stale: bool | None = None) -> DeliveryAttempt:
-        """Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature, "stale": stale})
-        return DeliveryAttempt._from_wire(ctx, data)
-
-    async def settled(self, *, timeout: Duration | None = None) -> LinearDelivery:
-        """Wait for the delivery to settle, and resolve with the value as it is then."""
-
-        async def settled() -> LinearDelivery | None:
-            value = await self.refresh()
-            return None if value.status in ("pending",) else value
-
-        return await wait_for("the delivery to settle", settled, timeout=timeout)
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/teams/{quote(str(self.id), safe='')}/issue", query={"identifier": identifier})
+        return LinearIssue(ctx, data)
 
 
 class LinearAgentSession:
@@ -3495,30 +3781,45 @@ class LinearAgentSession:
         return await wait_for_next(self._seen, "waitForActivity", self.activities, lambda item: text_matches(item.type, type), "an activity", timeout=timeout, starts_turn=lambda item: item.type == "prompt")
 
 
-class LinearComment:
+class LinearDelivery:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
-        self.issue: LinearIssue = LinearIssue(ctx, data["issue"])
-        self.author: LinearUser | LinearApp = LinearUser(ctx, data["author"]) if data["author"]["kind"] == "user" else LinearApp(ctx, data["author"])
-        self.body: str = data["body"]
-        self.created_at: str = data["createdAt"]
-        self.url: str = data["url"]
-        self.session: LinearAgentSession | None = None if data.get("session") is None else LinearAgentSession(ctx, data["session"])
-        self.delivery: LinearDelivery | None = None if data.get("delivery") is None else LinearDelivery(ctx, data["delivery"])
+        self.channel: Literal["linear"] = data["channel"]
+        self.app: str = data["app"]
+        self.type: str = data["type"]
+        self.action: str = data["action"]
+        self.webhook_id: str = data["webhookId"]
+        self.payload: Any | None = data.get("payload")
+        self.attempts: list[DeliveryAttempt] = [DeliveryAttempt._from_wire(ctx, item) for item in data["attempts"]]
+        self.status: Literal["pending", "acknowledged", "failed", "timed_out", "unreachable"] = data["status"]
 
-    async def replies(self) -> LinearCommentReplies:
-        """The replies in a comment's thread, once the agent is quiet. Experimental."""
+    async def refresh(self) -> LinearDelivery:
+        """Re-read a delivery: its attempts and status. Experimental."""
         ctx = self._ctx
-        await until_quiet(lambda: quiet_of(ctx))
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/replies")
-        return [LinearComment(ctx, item) for item in data]
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}")
+        return LinearDelivery(ctx, data)
 
-    async def transcript(self) -> LinearTranscript:
-        """A comment's thread as a person reads it. Experimental."""
+    async def redeliver(self) -> DeliveryAttempt:
+        """Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/transcript")
-        return LinearTranscript._from_wire(ctx, data)
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}/redeliver")
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def resend(self, *, bad_signature: bool | None = None, stale: bool | None = None) -> DeliveryAttempt:
+        """Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature, "stale": stale})
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def settled(self, *, timeout: Duration | None = None) -> LinearDelivery:
+        """Wait for the delivery to settle, and resolve with the value as it is then."""
+
+        async def settled() -> LinearDelivery | None:
+            value = await self.refresh()
+            return None if value.status in ("pending",) else value
+
+        return await wait_for("the delivery to settle", settled, timeout=timeout)
 
 
 class LinearAgentActivity:
@@ -3553,6 +3854,18 @@ class NotionFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users")
         return [NotionUser(ctx, item) for item in data]
 
+    async def create_app(self, *, name: str, capabilities: list[NotionCapability] | None = None, events: list[str] | None = None) -> NotionIntegration:
+        """Make another internal integration in the workspace, with its own bot user, token and webhook subscription (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_NOTION_APP_<NAME>_WEBHOOK_URL, and it sees only the pages connected to it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps", body={"name": name, "capabilities": capabilities, "events": events})
+        return NotionIntegration(ctx, data)
+
+    async def apps(self) -> NotionIntegrations:
+        """The integrations this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps")
+        return [NotionIntegration(ctx, item) for item in data]
+
     async def pages(self) -> NotionPages:
         """The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash. Experimental."""
         ctx = self._ctx
@@ -3576,16 +3889,16 @@ class NotionFixture:
         ctx = self._ctx
         await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/content-delay", body={"delay": parse_duration(delay)})
 
-    async def send_verification(self) -> NotionDelivery | None:
-        """Send the subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created. Experimental."""
+    async def send_verification(self, *, app: NotionIntegration | None = None) -> NotionDelivery | None:
+        """Send a subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created: the built-in integration's, or the one given's. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/verification")
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/verification", body={"app": None if app is None else app.id})
         return (None if data is None else NotionDelivery(ctx, data))
 
-    async def deliveries(self, *, type: str | None = None, resource: NotionPage | None = None) -> NotionDeliveries:
+    async def deliveries(self, *, type: str | None = None, resource: NotionPage | None = None, app: NotionIntegration | None = None) -> NotionDeliveries:
         """Every webhook channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [NotionDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> NotionApiCalls:
@@ -3609,6 +3922,30 @@ class NotionIntegration:
         self.bot_user_id: str = data["botUserId"]
         self.token: str = data["token"]
         self.webhook_secret: str = data["webhookSecret"]
+
+    async def comment(self, text: str, *, page: NotionPage, anchor: str | re.Pattern[str] | None = None) -> NotionComment:
+        """An integration a test made starts a discussion on a page, or anchored to the block with `anchor` in its text, as its own `comments.create` would: on a page connected to it, mentioning people only. Sends `comment.created` to every integration that sees the page. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps/{quote(str(self.id), safe='')}/comment", body={"text": text, "page": page.id, "anchor": None if anchor is None else pattern_on_wire(anchor)})
+        return NotionComment(ctx, data)
+
+    async def reply(self, text: str, *, discussion: NotionDiscussion) -> NotionComment:
+        """An integration a test made replies in a discussion, as `comments.create` with `discussion_id` would. Sends `comment.created`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps/{quote(str(self.id), safe='')}/reply", body={"text": text, "discussion": discussion.id})
+        return NotionComment(ctx, data)
+
+    async def edit(self, change: dict[str, Any], *, page: NotionPage) -> NotionDelivery | None:
+        """An integration a test made edits a page's body, as its own block calls would: append, or replace it. Sends one `page.content_updated` once Notion's batching delay is over. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps/{quote(str(self.id), safe='')}/edit", body={"change": {key: value for key, value in {**change, "append": None if change.get("append") is None else read_document(change["append"]), "replace": None if change.get("replace") is None else read_document(change["replace"])}.items() if value is not None}, "page": page.id})
+        return (None if data is None else NotionDelivery(ctx, data))
+
+    async def rename(self, title: str, *, page: NotionPage) -> NotionDelivery | None:
+        """An integration a test made changes a page's title, as its own `pages.update` would. Sends `page.properties_updated`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps/{quote(str(self.id), safe='')}/rename", body={"title": title, "page": page.id})
+        return (None if data is None else NotionDelivery(ctx, data))
 
 
 class NotionUser:
@@ -3703,6 +4040,58 @@ class NotionUser:
         await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users/{quote(str(self.id), safe='')}/disconnect", body={"integration": integration.id, "page": page.id})
 
 
+class NotionComment:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.discussion: NotionDiscussion = NotionDiscussion(ctx, data["discussion"])
+        self.author: NotionUser | NotionIntegration = NotionUser(ctx, data["author"]) if data["author"]["kind"] == "user" else NotionIntegration(ctx, data["author"])
+        self.text: str = data["text"]
+        self.created_at: str = data["createdAt"]
+        self.delivery: NotionDelivery | None = None if data.get("delivery") is None else NotionDelivery(ctx, data["delivery"])
+
+    async def delivery_for(self, app: NotionIntegration) -> NotionDelivery | None:
+        """The `comment.created` delivery this comment caused to this integration (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in integration's. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/comments/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else NotionDelivery(ctx, data))
+
+
+class NotionDiscussion:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.page: NotionPage = NotionPage(ctx, data["page"])
+        self.anchor: str | None = data.get("anchor")
+
+    async def comments(self) -> NotionComments:
+        """The discussion's comments, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/comments")
+        return [NotionComment(ctx, item) for item in data]
+
+    async def resolved(self) -> bool:
+        """Whether the discussion is resolved. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/resolved")
+        return data
+
+    async def transcript(self) -> NotionTranscript:
+        """The discussion as a person reads it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/transcript")
+        return NotionTranscript._from_wire(ctx, data)
+
+    async def wait_for_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration | None = None) -> NotionComment:
+        """Wait for the next new comment matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForComment", self.comments, lambda item: from_matches(item.author, from_), describe_wait("a comment", from_), timeout=timeout)
+
+    async def latest_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> NotionComment:
+        """The latest comment matching `from_`, once the agent is quiet. Waits for at least one."""
+        return await latest_once_quiet(self.comments, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a comment", from_), timeout=timeout, quiet_for=quiet_for)
+
+
 class NotionPage:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
@@ -3755,26 +4144,12 @@ class NotionPage:
         return NotionTranscript._from_wire(ctx, data)
 
 
-class NotionDatabase:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self.id: str = data["id"]
-        self.channel: Literal["notion"] = data["channel"]
-        self.title: str = data["title"]
-        self.url: str = data["url"]
-
-    async def rows(self, filter: dict[str, NotionPropertyValue] | None = None) -> NotionRows:
-        """The rows of a database, optionally only those whose properties have these values. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/databases/{quote(str(self.id), safe='')}/rows", body={"filter": filter})
-        return [NotionPage(ctx, item) for item in data]
-
-
 class NotionDelivery:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["notion"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.entity: dict[str, Any] = data["entity"]
         self.payload: Any | None = data.get("payload")
@@ -3809,50 +4184,19 @@ class NotionDelivery:
         return await wait_for("the delivery to settle", settled, timeout=timeout)
 
 
-class NotionComment:
+class NotionDatabase:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
-        self.discussion: NotionDiscussion = NotionDiscussion(ctx, data["discussion"])
-        self.author: NotionUser | NotionIntegration = NotionUser(ctx, data["author"]) if data["author"]["kind"] == "user" else NotionIntegration(ctx, data["author"])
-        self.text: str = data["text"]
-        self.created_at: str = data["createdAt"]
-        self.delivery: NotionDelivery | None = None if data.get("delivery") is None else NotionDelivery(ctx, data["delivery"])
+        self.channel: Literal["notion"] = data["channel"]
+        self.title: str = data["title"]
+        self.url: str = data["url"]
 
-
-class NotionDiscussion:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self._seen: dict[str, int] = {}
-        self.id: str = data["id"]
-        self.page: NotionPage = NotionPage(ctx, data["page"])
-        self.anchor: str | None = data.get("anchor")
-
-    async def comments(self) -> NotionComments:
-        """The discussion's comments, oldest first. Experimental."""
+    async def rows(self, filter: dict[str, NotionPropertyValue] | None = None) -> NotionRows:
+        """The rows of a database, optionally only those whose properties have these values. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/comments")
-        return [NotionComment(ctx, item) for item in data]
-
-    async def resolved(self) -> bool:
-        """Whether the discussion is resolved. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/resolved")
-        return data
-
-    async def transcript(self) -> NotionTranscript:
-        """The discussion as a person reads it. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/transcript")
-        return NotionTranscript._from_wire(ctx, data)
-
-    async def wait_for_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration | None = None) -> NotionComment:
-        """Wait for the next new comment matching `from_` (anyone if omitted), after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForComment", self.comments, lambda item: from_matches(item.author, from_), describe_wait("a comment", from_), timeout=timeout)
-
-    async def latest_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> NotionComment:
-        """The latest comment matching `from_`, once the agent is quiet. Waits for at least one."""
-        return await latest_once_quiet(self.comments, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a comment", from_), timeout=timeout, quiet_for=quiet_for)
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/databases/{quote(str(self.id), safe='')}/rows", body={"filter": filter})
+        return [NotionPage(ctx, item) for item in data]
 
 
 class ResendFixture:
@@ -3861,6 +4205,18 @@ class ResendFixture:
         self._seen: dict[str, int] = {}
         self.app: ResendApp = ResendApp(ctx, data["app"])
         self.api_url: str = data["apiUrl"]
+
+    async def create_app(self, *, name: str, domain: str | None = None) -> ResendApp:
+        """Make another app: a team of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_RESEND_APP_<NAME>_WEBHOOK_URL. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/apps", body={"name": name, "domain": domain})
+        return ResendApp(ctx, data)
+
+    async def apps(self) -> ResendApps:
+        """The teams this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/apps")
+        return [ResendApp(ctx, item) for item in data]
 
     async def create_user(self, *, name: str, address: str | None = None, token: str | None = None) -> ResendUser:
         """Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental."""
@@ -3880,10 +4236,10 @@ class ResendFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/threads")
         return [ResendThread(ctx, item) for item in data]
 
-    async def deliveries(self, *, type: str | None = None, resource: ResendThread | None = None) -> ResendDeliveries:
+    async def deliveries(self, *, type: str | None = None, resource: ResendThread | None = None, app: ResendApp | None = None) -> ResendDeliveries:
         """Every webhook channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [ResendDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> ResendApiCalls:
@@ -3906,39 +4262,51 @@ class ResendApp:
         self.name: str = data["name"]
         self.bot_user_id: str = data["botUserId"]
         self.address: str = data["address"]
+        self.domain: str = data["domain"]
+        self.api_key: str = data["apiKey"]
+        self.webhook_secret: str = data["webhookSecret"]
+
+    async def send(self, *, to: list[ResendUser | ResendApp], cc: list[ResendUser | ResendApp] | None = None, subject: str, text: str | None = None, html: str | None = None, headers: dict[str, str] | None = None) -> ResendEmail:
+        """An app a test made sends an email, through its own team's API, as its own call would. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/apps/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html, "headers": headers})
+        return ResendEmail(ctx, data)
+
+    async def reply(self, email: ResendEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None, headers: dict[str, str] | None = None) -> ResendEmail:
+        """An app a test made replies to an email, in its thread, as its own call would. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/apps/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all, "headers": headers})
+        return ResendEmail(ctx, data)
 
 
-class ResendUser:
+class ResendEmail:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
-        self._seen: dict[str, int] = {}
         self.id: str = data["id"]
         self.channel: Literal["resend"] = data["channel"]
-        self.kind: Literal["user"] = data["kind"]
-        self.name: str = data["name"]
-        self.address: str = data["address"]
+        self.thread: ResendThread = ResendThread(ctx, data["thread"])
+        self.author: ResendPrincipal = ResendPrincipal._from_wire(ctx, data["author"])
+        self.from_: str = data["from"]
+        self.to: list[str] = data["to"]
+        self.cc: list[str] = data["cc"]
+        self.subject: str = data["subject"]
+        self.text: str = data["text"]
+        self.at: str = data["at"]
+        self.message_id: str = data["messageId"]
+        self.headers: dict[str, str] = data["headers"]
+        self.delivery: ResendDelivery | None = None if data.get("delivery") is None else ResendDelivery(ctx, data["delivery"])
 
-    async def send(self, *, to: list[ResendUser | ResendApp], cc: list[ResendUser | ResendApp] | None = None, subject: str, text: str | None = None, html: str | None = None) -> ResendEmail:
-        """The person emails someone: the agent (`resend.app`), or another person. Experimental."""
+    async def refresh(self) -> ResendEmail:
+        """Re-read an email. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/emails/{quote(str(self.id), safe='')}")
         return ResendEmail(ctx, data)
 
-    async def reply(self, email: ResendEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None) -> ResendEmail:
-        """The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental."""
+    async def delivery_for(self, app: ResendApp) -> ResendDelivery | None:
+        """The delivery that told this app of the email (decision 0027), or nothing when it wasn't told. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all})
-        return ResendEmail(ctx, data)
-
-    async def inbox(self) -> ResendInbox:
-        """What reached the person's mailbox, oldest first. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/inbox")
-        return [ResendEmail(ctx, item) for item in data]
-
-    async def wait_for_email(self, *, from_: ResendPrincipal | ResendUser | ResendApp | str | None = None, timeout: Duration | None = None) -> ResendEmail:
-        """Wait for the next new email matching `from_` (anyone if omitted), after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/emails/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else ResendDelivery(ctx, data))
 
 
 class ResendThread:
@@ -3976,34 +4344,12 @@ class ResendThread:
         return await latest_once_quiet(self.replies, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a reply", from_), timeout=timeout, quiet_for=quiet_for)
 
 
-class ResendEmail:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self.id: str = data["id"]
-        self.channel: Literal["resend"] = data["channel"]
-        self.thread: ResendThread = ResendThread(ctx, data["thread"])
-        self.author: ResendPrincipal = ResendPrincipal._from_wire(ctx, data["author"])
-        self.from_: str = data["from"]
-        self.to: list[str] = data["to"]
-        self.cc: list[str] = data["cc"]
-        self.subject: str = data["subject"]
-        self.text: str = data["text"]
-        self.at: str = data["at"]
-        self.message_id: str = data["messageId"]
-        self.delivery: ResendDelivery | None = None if data.get("delivery") is None else ResendDelivery(ctx, data["delivery"])
-
-    async def refresh(self) -> ResendEmail:
-        """Re-read an email. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/emails/{quote(str(self.id), safe='')}")
-        return ResendEmail(ctx, data)
-
-
 class ResendDelivery:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["resend"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.email: str = data["email"]
         self.payload: Any | None = data.get("payload")
@@ -4038,12 +4384,57 @@ class ResendDelivery:
         return await wait_for("the delivery to settle", settled, timeout=timeout)
 
 
+class ResendUser:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.channel: Literal["resend"] = data["channel"]
+        self.kind: Literal["user"] = data["kind"]
+        self.name: str = data["name"]
+        self.address: str = data["address"]
+
+    async def send(self, *, to: list[ResendUser | ResendApp], cc: list[ResendUser | ResendApp] | None = None, subject: str, text: str | None = None, html: str | None = None) -> ResendEmail:
+        """The person emails someone: the agent (`resend.app`), another app, or another person. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html})
+        return ResendEmail(ctx, data)
+
+    async def reply(self, email: ResendEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None) -> ResendEmail:
+        """The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all})
+        return ResendEmail(ctx, data)
+
+    async def inbox(self) -> ResendInbox:
+        """What reached the person's mailbox, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/inbox")
+        return [ResendEmail(ctx, item) for item in data]
+
+    async def wait_for_email(self, *, from_: ResendPrincipal | ResendUser | ResendApp | str | None = None, timeout: Duration | None = None) -> ResendEmail:
+        """Wait for the next new email matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
+
+
 class GoogleFixture:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self._seen: dict[str, int] = {}
         self.app: GoogleApp = GoogleApp(ctx, data["app"])
         self.api_url: str = data["apiUrl"]
+
+    async def create_app(self, *, name: str) -> GoogleApp:
+        """Make another app: a mailbox of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_GOOGLE_APP_<NAME>_WEBHOOK_URL. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/apps", body={"name": name})
+        return GoogleApp(ctx, data)
+
+    async def apps(self) -> GoogleApps:
+        """The mailboxs this session used: the agent's first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/apps")
+        return [GoogleApp(ctx, item) for item in data]
 
     async def create_user(self, *, name: str, address: str | None = None, token: str | None = None) -> GoogleUser:
         """Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental."""
@@ -4063,10 +4454,10 @@ class GoogleFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/threads")
         return [GoogleThread(ctx, item) for item in data]
 
-    async def deliveries(self, *, type: str | None = None, resource: GoogleThread | None = None) -> GoogleDeliveries:
+    async def deliveries(self, *, type: str | None = None, resource: GoogleThread | None = None, app: GoogleApp | None = None) -> GoogleDeliveries:
         """Every push channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [GoogleDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> GoogleApiCalls:
@@ -4089,39 +4480,52 @@ class GoogleApp:
         self.name: str = data["name"]
         self.bot_user_id: str = data["botUserId"]
         self.address: str = data["address"]
+        self.client_id: str = data["clientId"]
+        self.client_secret: str = data["clientSecret"]
+        self.refresh_token: str = data["refreshToken"]
+
+    async def send(self, *, to: list[GoogleUser | GoogleApp], cc: list[GoogleUser | GoogleApp] | None = None, subject: str, text: str | None = None, html: str | None = None, headers: dict[str, str] | None = None) -> GoogleEmail:
+        """An app a test made sends an email, through its own mailbox's API, as its own call would. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/apps/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html, "headers": headers})
+        return GoogleEmail(ctx, data)
+
+    async def reply(self, email: GoogleEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None, headers: dict[str, str] | None = None) -> GoogleEmail:
+        """An app a test made replies to an email, in its thread, as its own call would. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/apps/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all, "headers": headers})
+        return GoogleEmail(ctx, data)
 
 
-class GoogleUser:
+class GoogleEmail:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
-        self._seen: dict[str, int] = {}
         self.id: str = data["id"]
         self.channel: Literal["google"] = data["channel"]
-        self.kind: Literal["user"] = data["kind"]
-        self.name: str = data["name"]
-        self.address: str = data["address"]
+        self.thread: GoogleThread = GoogleThread(ctx, data["thread"])
+        self.author: GooglePrincipal = GooglePrincipal._from_wire(ctx, data["author"])
+        self.from_: str = data["from"]
+        self.to: list[str] = data["to"]
+        self.cc: list[str] = data["cc"]
+        self.subject: str = data["subject"]
+        self.text: str = data["text"]
+        self.at: str = data["at"]
+        self.message_id: str = data["messageId"]
+        self.headers: dict[str, str] = data["headers"]
+        self.labels: list[str] = data["labels"]
+        self.delivery: GoogleDelivery | None = None if data.get("delivery") is None else GoogleDelivery(ctx, data["delivery"])
 
-    async def send(self, *, to: list[GoogleUser | GoogleApp], cc: list[GoogleUser | GoogleApp] | None = None, subject: str, text: str | None = None, html: str | None = None) -> GoogleEmail:
-        """The person emails someone: the agent (`google.app`), or another person. Experimental."""
+    async def refresh(self) -> GoogleEmail:
+        """Re-read an email. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/emails/{quote(str(self.id), safe='')}")
         return GoogleEmail(ctx, data)
 
-    async def reply(self, email: GoogleEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None) -> GoogleEmail:
-        """The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental."""
+    async def delivery_for(self, app: GoogleApp) -> GoogleDelivery | None:
+        """The delivery that told this app of the email (decision 0027), or nothing when it wasn't told. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all})
-        return GoogleEmail(ctx, data)
-
-    async def inbox(self) -> GoogleInbox:
-        """What reached the person's mailbox, oldest first. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/inbox")
-        return [GoogleEmail(ctx, item) for item in data]
-
-    async def wait_for_email(self, *, from_: GooglePrincipal | GoogleUser | GoogleApp | str | None = None, timeout: Duration | None = None) -> GoogleEmail:
-        """Wait for the next new email matching `from_` (anyone if omitted), after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/emails/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else GoogleDelivery(ctx, data))
 
 
 class GoogleThread:
@@ -4159,35 +4563,12 @@ class GoogleThread:
         return await latest_once_quiet(self.replies, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a reply", from_), timeout=timeout, quiet_for=quiet_for)
 
 
-class GoogleEmail:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self.id: str = data["id"]
-        self.channel: Literal["google"] = data["channel"]
-        self.thread: GoogleThread = GoogleThread(ctx, data["thread"])
-        self.author: GooglePrincipal = GooglePrincipal._from_wire(ctx, data["author"])
-        self.from_: str = data["from"]
-        self.to: list[str] = data["to"]
-        self.cc: list[str] = data["cc"]
-        self.subject: str = data["subject"]
-        self.text: str = data["text"]
-        self.at: str = data["at"]
-        self.message_id: str = data["messageId"]
-        self.labels: list[str] = data["labels"]
-        self.delivery: GoogleDelivery | None = None if data.get("delivery") is None else GoogleDelivery(ctx, data["delivery"])
-
-    async def refresh(self) -> GoogleEmail:
-        """Re-read an email. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/emails/{quote(str(self.id), safe='')}")
-        return GoogleEmail(ctx, data)
-
-
 class GoogleDelivery:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["google"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.email_address: str = data["emailAddress"]
         self.history_id: str = data["historyId"]
@@ -4223,6 +4604,39 @@ class GoogleDelivery:
         return await wait_for("the delivery to settle", settled, timeout=timeout)
 
 
+class GoogleUser:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.channel: Literal["google"] = data["channel"]
+        self.kind: Literal["user"] = data["kind"]
+        self.name: str = data["name"]
+        self.address: str = data["address"]
+
+    async def send(self, *, to: list[GoogleUser | GoogleApp], cc: list[GoogleUser | GoogleApp] | None = None, subject: str, text: str | None = None, html: str | None = None) -> GoogleEmail:
+        """The person emails someone: the agent (`google.app`), another app, or another person. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html})
+        return GoogleEmail(ctx, data)
+
+    async def reply(self, email: GoogleEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None) -> GoogleEmail:
+        """The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all})
+        return GoogleEmail(ctx, data)
+
+    async def inbox(self) -> GoogleInbox:
+        """What reached the person's mailbox, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/inbox")
+        return [GoogleEmail(ctx, item) for item in data]
+
+    async def wait_for_email(self, *, from_: GooglePrincipal | GoogleUser | GoogleApp | str | None = None, timeout: Duration | None = None) -> GoogleEmail:
+        """Wait for the next new email matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
+
+
 class DiscordFixture:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
@@ -4244,6 +4658,18 @@ class DiscordFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users")
         return [DiscordUser(ctx, item) for item in data]
 
+    async def create_app(self, *, name: str, privileged_intents: list[Literal["GUILD_MEMBERS", "GUILD_PRESENCES", "MESSAGE_CONTENT"]] | None = None) -> DiscordApp:
+        """Make another app in the guild, with its own application, bot user, token and Ed25519 key (decision 0027), or return the one made with this name and settings. Its bot connects to the Gateway with its own token; its interactions go to CHANNELSTACK_DISCORD_APP_<NAME>_WEBHOOK_URL, or over its Gateway connection. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps", body={"name": name, "privilegedIntents": privileged_intents})
+        return DiscordApp(ctx, data)
+
+    async def apps(self) -> DiscordApps:
+        """The apps this session used: the built-in one first, then each it got from `createApp`, in the order it first did. Another session's are `not_found` here. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps")
+        return [DiscordApp(ctx, item) for item in data]
+
     async def create_channel(self, *, name: str | None = None, participants: list[DiscordUser | DiscordApp] | None = None, read_only: bool | None = None, topic: str | None = None) -> DiscordChannel:
         """Create a text channel. Only the listed participants see it (a private channel); include the app for the bot to hear it. Experimental."""
         ctx = self._ctx
@@ -4262,10 +4688,10 @@ class DiscordFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/verify-endpoint")
         return DiscordEndpointCheck._from_wire(ctx, data)
 
-    async def deliveries(self, *, type: str | None = None, resource: DiscordChannel | None = None) -> DiscordDeliveries:
+    async def deliveries(self, *, type: str | None = None, resource: DiscordChannel | None = None, app: DiscordApp | None = None) -> DiscordDeliveries:
         """Every Gateway dispatch and interaction channelstack sent the bot for this session, with every attempt. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/deliveries", query={"type": type, "resource": None if resource is None else resource.id, "app": None if app is None else app.id})
         return [DiscordDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> DiscordApiCalls:
@@ -4274,10 +4700,10 @@ class DiscordFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/calls", query={"operation": operation, "error": error})
         return [DiscordApiCall._from_wire(ctx, item) for item in data]
 
-    async def fault(self, *, type: Literal["rate_limit", "drop_gateway"], route: str | None = None, retry_after: Duration | None = None, times: int | None = None) -> DiscordFault:
+    async def fault(self, *, type: Literal["rate_limit", "drop_gateway"], route: str | None = None, retry_after: Duration | None = None, times: int | None = None, app: DiscordApp | None = None) -> DiscordFault:
         """Inject a fault: rate-limit the bot's calls of a route (removed when this session closes), or drop its Gateway connection just before the next dispatch. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/faults", body={"type": type, "route": route, "retryAfter": None if retry_after is None else parse_duration(retry_after), "times": times})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/faults", body={"type": type, "route": route, "retryAfter": None if retry_after is None else parse_duration(retry_after), "times": times, "app": None if app is None else app.id})
         return DiscordFault(ctx, data)
 
     async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> DiscordApiCall:
@@ -4296,6 +4722,30 @@ class DiscordApp:
         self.bot_token: str = data["botToken"]
         self.public_key: str = data["publicKey"]
         self.guild_id: str = data["guildId"]
+
+    async def say(self, text: str | DiscordMessageInput, *, channel: DiscordChannel | None = None, to: DiscordUser | DiscordApp | list[DiscordUser | DiscordApp] | None = None) -> DiscordMessage:
+        """An app a test made writes, as its own `POST /channels/{id}/messages` would: in a channel or thread its bot sees, or in a DM with the person in `to`. No bot writes to another bot in a DM (50007). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps/{quote(str(self.id), safe='')}/say", body={"text": {"content": text} if isinstance(text, str) else text._to_wire(), "channel": None if channel is None else channel.id, "to": None if to is None else [item.id for item in (to if isinstance(to, list) else [to])]})
+        return DiscordMessage(ctx, data)
+
+    async def reply(self, text: str | DiscordMessageInput, *, message: DiscordMessage) -> DiscordMessage:
+        """An app a test made replies to a message: Discord's reply, in the message's channel, which quotes it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps/{quote(str(self.id), safe='')}/reply", body={"text": {"content": text} if isinstance(text, str) else text._to_wire(), "message": {"channelId": message.channel_id, "id": message.id}})
+        return DiscordMessage(ctx, data)
+
+    async def react(self, emoji: str, *, message: DiscordMessage) -> DiscordDelivery | None:
+        """An app a test made reacts to a message. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps/{quote(str(self.id), safe='')}/react", body={"emoji": emoji, "message": {"channelId": message.channel_id, "id": message.id}})
+        return (None if data is None else DiscordDelivery(ctx, data))
+
+    async def unreact(self, emoji: str, *, message: DiscordMessage) -> DiscordDelivery | None:
+        """An app a test made takes its reaction back. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps/{quote(str(self.id), safe='')}/unreact", body={"emoji": emoji, "message": {"channelId": message.channel_id, "id": message.id}})
+        return (None if data is None else DiscordDelivery(ctx, data))
 
 
 class DiscordUser:
@@ -4361,10 +4811,10 @@ class DiscordUser:
         ctx = self._ctx
         await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/invite", body={"participants": [item.id for item in (participants if isinstance(participants, list) else [participants])], "channel": channel.id})
 
-    async def run_command(self, command: str, *, channel: DiscordChannel) -> DiscordDelivery | None:
-        """Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`. Experimental."""
+    async def run_command(self, command: str, *, channel: DiscordChannel, app: DiscordApp | None = None) -> DiscordDelivery | None:
+        """Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it. Experimental."""
         ctx = self._ctx
-        data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/commands", body={"command": command, "channel": channel.id}))
+        data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/commands", body={"command": command, "channel": channel.id, "app": None if app is None else app.id}))
         return (None if data is None else DiscordDelivery(ctx, data))
 
     async def click(self, button: str | DiscordButtonRef, *, message: DiscordMessage | None = None, channel: DiscordChannel | None = None) -> DiscordDelivery | None:
@@ -4379,46 +4829,6 @@ class DiscordUser:
         await until_quiet(lambda: quiet_of(ctx))
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/ephemeral")
         return [DiscordMessage(ctx, item) for item in data]
-
-
-class DiscordChannel:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self._seen: dict[str, int] = {}
-        self.id: str = data["id"]
-        self.kind: Literal["text", "dm", "public_thread"] = data["kind"]
-        self.channel: Literal["discord"] = data["channel"]
-        self.name: str | None = data.get("name")
-        self.parent_id: str | None = data.get("parentId")
-        self.starter_id: str | None = data.get("starterId")
-
-    async def messages(self) -> DiscordMessages:
-        """A channel's or thread's messages, oldest first. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/messages")
-        return [DiscordMessage(ctx, item) for item in data]
-
-    async def members(self) -> DiscordMembers:
-        """Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/members")
-        return [DiscordUser(ctx, item) if item["kind"] == "user" else DiscordApp(ctx, item) for item in data]
-
-    async def threads(self) -> DiscordThreads:
-        """The threads in a channel. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/threads")
-        return [DiscordChannel(ctx, item) for item in data]
-
-    async def transcript(self, *, as_: DiscordUser | DiscordApp | None = None) -> DiscordTranscript:
-        """A channel or thread as a person reads it, each thread under the message that starts it. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
-        return DiscordTranscript._from_wire(ctx, data)
-
-    async def wait_for_message(self, *, from_: DiscordUser | DiscordApp | str | None = None, timeout: Duration | None = None) -> DiscordMessage:
-        """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
 
 
 class DiscordMessage:
@@ -4464,8 +4874,14 @@ class DiscordMessage:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.channel_id), safe='')}/messages/{quote(str(self.id), safe='')}/reactions")
         return [DiscordReaction._from_wire(ctx, item) for item in data]
 
+    async def delivery_for(self, app: DiscordApp) -> DiscordDelivery | None:
+        """The first Gateway dispatch this message caused to this app's bot (decision 0027), or nothing when it wasn't told. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.channel_id), safe='')}/messages/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else DiscordDelivery(ctx, data))
+
     async def deliveries(self) -> DiscordMessageDeliveries:
-        """Every Gateway dispatch this message caused to the bot. Experimental."""
+        """Every Gateway dispatch this message caused to the apps' bots. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.channel_id), safe='')}/messages/{quote(str(self.id), safe='')}/deliveries")
         return [DiscordDelivery(ctx, item) for item in data]
@@ -4479,11 +4895,52 @@ class DiscordMessage:
         return await latest_once_quiet(self.replies, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a reply", from_), timeout=timeout, quiet_for=quiet_for)
 
 
+class DiscordChannel:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.kind: Literal["text", "dm", "public_thread"] = data["kind"]
+        self.channel: Literal["discord"] = data["channel"]
+        self.name: str | None = data.get("name")
+        self.parent_id: str | None = data.get("parentId")
+        self.starter_id: str | None = data.get("starterId")
+
+    async def messages(self) -> DiscordMessages:
+        """A channel's or thread's messages, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/messages")
+        return [DiscordMessage(ctx, item) for item in data]
+
+    async def members(self) -> DiscordMembers:
+        """Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/members")
+        return [DiscordUser(ctx, item) if item["kind"] == "user" else DiscordApp(ctx, item) for item in data]
+
+    async def threads(self) -> DiscordThreads:
+        """The threads in a channel. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/threads")
+        return [DiscordChannel(ctx, item) for item in data]
+
+    async def transcript(self, *, as_: DiscordUser | DiscordApp | None = None) -> DiscordTranscript:
+        """A channel or thread as a person reads it, each thread under the message that starts it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
+        return DiscordTranscript._from_wire(ctx, data)
+
+    async def wait_for_message(self, *, from_: DiscordUser | DiscordApp | str | None = None, timeout: Duration | None = None) -> DiscordMessage:
+        """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
+
+
 class DiscordDelivery:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["discord"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.payload: Any | None = data.get("payload")
         self.attempts: list[DeliveryAttempt] = [DeliveryAttempt._from_wire(ctx, item) for item in data["attempts"]]

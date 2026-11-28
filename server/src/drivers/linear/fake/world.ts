@@ -9,6 +9,7 @@ import { linearText } from "../text.ts";
 import type {
   LinearActivityRecord,
   LinearActivityType,
+  LinearAppRecord,
   LinearCommentRecord,
   LinearIssueChanges,
   LinearIssueInput,
@@ -71,14 +72,17 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       "user-agent": "Linear-Webhook",
       ...signLinearWebhook(secret, body, atMs),
     }),
-    secret: () => context.secret("webhookSecret"),
+    secret: (app) => context.apps.secret(app, "webhookSecret"),
     // Linear's receivers refuse a timestamp more than a minute away from now.
     staleMs: 120_000,
   });
   const links = linearLinks(context.apiUrl, () => store.org);
+  // A name means one of the apps the session used (whose user's display name is the app's), or one of its people.
   const { userOf, markdown, mentioned, readable, rootOf, stateOf } = linearText(store, links, (session, name) => {
-    if (name.toLowerCase() === store.appUser.displayName.toLowerCase()) return store.appUser.id;
-    return store.list(store.users, session).find((user) => user.displayName.toLowerCase() === name.toLowerCase())?.id;
+    const app = store.apps.namedIn(session, name);
+    if (app) return app.userId;
+    const wanted = name.toLowerCase();
+    return store.list(store.users, session).find((user) => user.displayName.toLowerCase() === wanted)?.id;
   });
   const payloads = linearPayloads({
     links,
@@ -90,27 +94,34 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
   });
 
   /**
-   * Send a webhook to the app, if it is subscribed to this resource type and has a URL. The body
-   * carries `webhookTimestamp`, which every attempt stamps and signs again.
+   * Send a webhook to one app, if it is subscribed to this resource type and has a URL. The body
+   * carries `webhookTimestamp`, which every attempt stamps and signs again with that app's secret.
    */
-  const emit = (session: string, type: string, payload: Record<string, unknown>): string | undefined => {
-    if (!store.app.events.includes(type)) return undefined;
+  const emit = (
+    app: LinearAppRecord,
+    session: string,
+    type: string,
+    payload: Record<string, unknown>,
+  ): string | undefined => {
+    if (!app.events.includes(type)) return undefined;
+    const url = context.apps.webhookUrl(app.name);
     // An agent session is always announced: an agent's webhook is part of its app, so a session has a
     // delivery even where nothing listens (it is then unreachable). Other events need a URL to go to.
-    if (context.webhookUrl === undefined && type !== "AgentSessionEvent") return undefined;
+    if (url === undefined && type !== "AgentSessionEvent") return undefined;
     const id = ids.next(LINEAR_IDS.uuid);
     const full = {
       ...payload,
       type,
       organizationId: store.org.id,
-      webhookId: store.app.webhookId,
+      webhookId: app.webhookId,
       webhookTimestamp: clock(),
     };
     deliveries.send({
       id,
       session,
+      app: app.name,
       type,
-      url: context.webhookUrl ?? "",
+      url: url ?? "",
       body: JSON.stringify(full),
       meta: {
         eventType: typeof payload.action === "string" ? `${type}.${payload.action}` : type,
@@ -127,6 +138,12 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     return data?.issueId ?? (type === "Issue" ? data?.id : undefined);
   };
 
+  /**
+   * An `Issue` or `Comment` event goes to every app subscribed to it, whoever made the change: each
+   * app is installed workspace-wide and hears the others' changes (decision 0027), as a delivery of
+   * its own. An app user's change has that app user as its `actor` (its shape is to confirm, B5).
+   * What comes back is the built-in app's delivery, the one a test reads on the comment or issue.
+   */
   const entityEvent = (
     session: string,
     type: "Issue" | "Comment",
@@ -135,15 +152,41 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     data: Record<string, unknown>,
     url: string,
     updatedFrom?: Record<string, unknown>,
-  ) =>
-    emit(session, type, {
+  ) => {
+    const payload = {
       action,
       actor: payloads.actor(userOf(actor)),
       createdAt: new Date(clock()).toISOString(),
       data,
       url,
       ...(updatedFrom ? { updatedFrom } : {}),
-    });
+    };
+    let builtIn: string | undefined;
+    for (const app of store.apps.all()) {
+      const sent = emit(app, session, type, payload);
+      if (app === store.app) builtIn = sent;
+    }
+    return builtIn;
+  };
+
+  /** The app whose session this is. */
+  const appOfSession = (record: LinearSessionRecord): LinearAppRecord => {
+    const app = store.appByUser(record.appUser);
+    if (!app) throw new Error(`Agent session ${record.id} belongs to no app`);
+    return app;
+  };
+
+  /**
+   * What only a person may do among apps, until Linear says otherwise (B6): an app's comment that
+   * mentions another app, or an app delegating to another app. Refused as a person-only action is.
+   */
+  const personOnly = (actor: string, others: readonly string[], what: string) => {
+    const app = store.appByUser(actor);
+    if (!app) return;
+    if (others.some((id) => id !== app.userId && store.appByUser(id) !== undefined)) {
+      throw new LinearError(`Only a user can ${what}`);
+    }
+  };
 
   // --- Text -------------------------------------------------------------------------------------
 
@@ -194,12 +237,17 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
    * The comment Linear writes to open a delegated session's thread. It is Linear's, not a
    * person's or the app's, so it sends no `Comment` event and prompts nothing.
    */
-  const openThread = (session: string, issue: LinearIssueRecord, now: number): LinearCommentRecord =>
+  const openThread = (
+    session: string,
+    issue: LinearIssueRecord,
+    app: LinearAppRecord,
+    now: number,
+  ): LinearCommentRecord =>
     store.add(store.comments, session, {
       id: ids.next(LINEAR_IDS.uuid),
       issue: issue.id,
-      user: store.appUser.id,
-      body: `This thread is for an agent session with ${store.appUser.displayName}.`,
+      user: app.userId,
+      body: `This thread is for an agent session with ${store.appUserOf(app).displayName}.`,
       parent: null,
       reactions: [],
       createdAt: now,
@@ -211,17 +259,25 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       byLinear: true,
     } satisfies LinearCommentRecord);
 
-  /** Open an agent session on an issue for the app, and tell it. */
-  const startSession = (issue: LinearIssueRecord, creator: string, comment: LinearCommentRecord | undefined) => {
+  /**
+   * Open an agent session on an issue for an app, and tell that app alone: a session is its
+   * app's, and its `AgentSessionEvent`s go to no other (decision 0027).
+   */
+  const startSession = (
+    issue: LinearIssueRecord,
+    creator: string,
+    comment: LinearCommentRecord | undefined,
+    app: LinearAppRecord = store.app,
+  ) => {
     const session = store.sessionOf(issue);
     const now = clock();
     // A delegated session gets a thread of its own: Linear opens it with a comment of its own,
     // which is the session's comment and the opening prompt's source (the differential run saw both).
-    const root = comment ? rootOf(comment) : openThread(session, issue, now);
+    const root = comment ? rootOf(comment) : openThread(session, issue, app, now);
     const record = store.add(store.sessions, session, {
       id: ids.next(LINEAR_IDS.uuid),
       issue: issue.id,
-      appUser: store.appUser.id,
+      appUser: app.userId,
       creator,
       comment: root.id,
       thread: root.id,
@@ -236,7 +292,8 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       endedAt: null,
       delivery: undefined,
     } satisfies LinearSessionRecord);
-    (comment ?? root).session = record.id;
+    // A comment that mentions two apps opens a session for each; it names the first.
+    (comment ?? root).session ??= record.id;
     // Delegating is the person's first turn: Linear records it as a prompt, "Work on [ENG-1](url)",
     // before the agent says anything (the differential run found it against the real workspace).
     const opening = comment
@@ -250,11 +307,11 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
           thread.findIndex((other) => other.id === comment.id),
         )
       : [];
-    record.delivery = emit(session, "AgentSessionEvent", {
+    record.delivery = emit(app, session, "AgentSessionEvent", {
       action: "created",
       createdAt: new Date(now).toISOString(),
-      appUserId: store.appUser.id,
-      oauthClientId: context.secret("clientId"),
+      appUserId: app.userId,
+      oauthClientId: context.apps.secret(app.name, "clientId"),
       agentSession: payloads.session(record, store.org.id),
       promptContext: promptContext(issue, comment),
       // Real Linear sends the delegation's prompt as the event's activity. Earlier comments come
@@ -294,11 +351,12 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     const activity = addPrompt(session, record, user, body, options);
     // A new turn makes the session wait for the agent again; Stop asks it to stop.
     moveTo(record, options.signal === "stop" ? "stopping" : "pending");
-    return emit(session, "AgentSessionEvent", {
+    const app = appOfSession(record);
+    return emit(app, session, "AgentSessionEvent", {
       action: "prompted",
       createdAt: new Date(clock()).toISOString(),
-      appUserId: store.appUser.id,
-      oauthClientId: context.secret("clientId"),
+      appUserId: app.userId,
+      oauthClientId: context.apps.secret(app.name, "clientId"),
       agentSession: payloads.session(record, store.org.id),
       agentActivity: payloads.activity(activity),
     });
@@ -357,9 +415,11 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     for (const label of changes.labelIds ?? [])
       if (!team.labels.some((candidate) => candidate.id === label)) throw notFound("IssueLabel");
     for (const id of [changes.assigneeId, changes.delegateId]) if (id && !store.user(id)) throw notFound("User");
-    if (changes.delegateId && changes.delegateId !== store.appUser.id) {
+    const delegate = changes.delegateId ? store.appByUser(changes.delegateId) : undefined;
+    if (changes.delegateId && !delegate) {
       throw new LinearError("Only an agent can be delegated an issue", "INPUT_ERROR", "invalid input");
     }
+    if (changes.delegateId) personOnly(actor, [changes.delegateId], "delegate an issue to another agent");
     if (
       changes.priority !== undefined &&
       (changes.priority < 0 || changes.priority > 4 || !Number.isInteger(changes.priority))
@@ -380,7 +440,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       changes.delegateId !== undefined && changes.delegateId !== issue.delegate && changes.delegateId !== null;
     // A person delegating an issue nobody has keeps it: Linear makes them its assignee (the
     // differential run saw it before the agent did anything).
-    const keeper = delegated && issue.assignee === null && actor !== store.appUser.id ? actor : undefined;
+    const keeper = delegated && issue.assignee === null && !store.appByUser(actor) ? actor : undefined;
     set("assignee", "assigneeId", changes.assigneeId === undefined ? keeper : changes.assigneeId);
     set("delegate", "delegateId", changes.delegateId);
     if (state && state.id !== issue.state) {
@@ -392,19 +452,23 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     updatedFrom.updatedAt = new Date(issue.updatedAt).toISOString();
     const session = store.sessionOf(issue);
     const sent = entityEvent(session, "Issue", "update", actor, payloads.issue(issue), links.issue(issue), updatedFrom);
-    if (delegated) startSession(issue, actor, undefined);
+    // An issue has one delegate: delegating it to another app moves it, and opens that app's session.
+    if (delegated && delegate) startSession(issue, actor, undefined, delegate);
     return sent;
   };
 
   // --- Comments ---------------------------------------------------------------------------------
 
   /**
-   * Write a comment, as a person or the app. A person mentioning the app opens a session; a
-   * person replying in a session's thread prompts that session.
+   * Write a comment, as a person or an app. A person mentioning an app opens a session for it; a
+   * person replying in a session's thread prompts that session. An app mentioning another app is
+   * refused until B6 is answered.
    */
   const comment = (issue: LinearIssueRecord, user: string, body: string, parent?: LinearCommentRecord) => {
     if (body.trim() === "") throw new LinearError("body must not be empty");
     const session = store.sessionOf(issue);
+    const mentions = mentioned(session, body);
+    personOnly(user, mentions, "mention another agent");
     const root = parent ? rootOf(parent) : undefined;
     const now = clock();
     const record = store.add(store.comments, session, {
@@ -422,6 +486,10 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       prompted: undefined,
     } satisfies LinearCommentRecord);
     issue.updatedAt = now;
+    // The loop guard counts what apps write on an issue where no person writes in between (decision 0027).
+    const writer = store.appByUser(user);
+    if (!context.loops.wrote(session, issue.id, writer ? { kind: "app", name: writer.name } : { kind: "person" }))
+      return record;
     record.delivery = entityEvent(
       session,
       "Comment",
@@ -430,13 +498,19 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       payloads.comment(record),
       links.comment(issue, record.id),
     );
-    if (user === store.appUser.id) return record;
-    const thread = root ? store.sessionsOn(issue).find((candidate) => candidate.thread === root.id) : undefined;
-    if (thread) {
-      record.session = thread.id;
-      record.prompted = promptSession(thread, user, body, { comment: record });
-    } else if (mentioned(body).includes(store.appUser.id)) {
-      startSession(issue, user, record);
+    if (writer) return record;
+    // A reply in a session's thread prompts each app's session there; an app it mentions that has
+    // none there gets one. The built-in app comes first, so its session is the comment's.
+    const sessions = root ? store.sessionsOn(issue).filter((candidate) => candidate.thread === root.id) : [];
+    for (const app of store.apps.all()) {
+      const thread = sessions.find((candidate) => candidate.appUser === app.userId);
+      if (thread) {
+        record.session ??= thread.id;
+        const prompted = promptSession(thread, user, body, { comment: record });
+        record.prompted ??= prompted;
+      } else if (mentions.includes(app.userId)) {
+        startSession(issue, user, record, app);
+      }
     }
     return record;
   };
@@ -496,12 +570,15 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     if ((signal === "auth" || signal === "select") && type !== "elicitation")
       throw new LinearError(`Use ${signal} only with an elicitation`);
     if (record.status === "stale") throw new LinearError("The session is stale");
+    // What becomes a comment is checked as one before anything is kept.
+    const writes = type === "response" || type === "elicitation" || type === "error";
     const session = store.sessions.owner(record.id);
     if (session === undefined) throw new Error("A session belongs to a test session");
+    if (writes) personOnly(record.appUser, mentioned(session, text("body") ?? ""), "mention another agent");
     const activity = store.add(store.activities, session, {
       id: input.id ? claimId(input.id) : ids.next(LINEAR_IDS.uuid),
       session: record.id,
-      user: store.appUser.id,
+      user: record.appUser,
       content:
         type === "action"
           ? { type, action: text("action") ?? "", parameter: text("parameter") ?? "", result: text("result") ?? null }
@@ -526,11 +603,11 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     if (!(record.status === "stopping" && status === "active")) moveTo(record, status);
     // What the person has to read (an answer, a question, a failure) Linear also writes as a
     // comment of the app in the session's thread; the activity's source comment is that comment.
-    if (type === "response" || type === "elicitation" || type === "error") {
+    if (writes) {
       const issue = store.issue(record.issue);
       // Every session in the fake has its thread: its mention, or the one Linear opened for it.
       const parent = store.comments.find(record.thread as string);
-      const written = comment(issue, store.appUser.id, activity.content.body ?? "", parent);
+      const written = comment(issue, record.appUser, activity.content.body ?? "", parent);
       written.session = record.id;
       activity.sourceComment = written.id;
     }
@@ -630,6 +707,8 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       },
     ) {
       const displayName = input.displayName ?? input.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "");
+      // A mention or a matcher's name means one author: a person can't take an app's name.
+      store.apps.checkPerson(session, input.name, displayName);
       if (
         store.list(store.users, session).some((user) => user.displayName.toLowerCase() === displayName.toLowerCase())
       ) {
@@ -647,6 +726,49 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
         fixedId: input.id !== undefined,
         createdAt: clock(),
       } satisfies LinearUserRecord);
+    },
+
+    /** The app an access token is the token of: each app's answers as that app (decision 0027). */
+    appWithToken: (token: string) => store.apps.withSecret(token, (app) => context.apps.secret(app, "oauthToken")),
+
+    /**
+     * Make an OAuth app installed with `actor=app` by name, or return the one made with the same
+     * settings (decision 0027): its own app user, token, client and webhook, ids drawn from its name.
+     */
+    createApp(session: string | undefined, options: { name: string; events?: readonly string[] | undefined }) {
+      const events = [...(options.events ?? store.app.events)];
+      const by =
+        session === undefined
+          ? undefined
+          : { session, people: store.list(store.users, session).flatMap((user) => [user.name, user.displayName]) };
+      return store.apps.make(
+        options.name,
+        { events },
+        () => {
+          const appIds = context.apps.ids(options.name);
+          const now = clock();
+          const user: LinearUserRecord = {
+            id: appIds.next(LINEAR_IDS.uuid),
+            name: options.name,
+            displayName: options.name,
+            email: `${options.name}@oauthapp.linear.app`,
+            admin: false,
+            guest: false,
+            app: true,
+            fixedId: false,
+            createdAt: now,
+          };
+          store.addAppUser(user);
+          return {
+            userId: user.id,
+            name: options.name,
+            events,
+            webhookId: appIds.next(LINEAR_IDS.uuid),
+            createdAt: now,
+          };
+        },
+        by,
+      );
     },
 
     createTeam(
@@ -700,8 +822,10 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       if (input.title.trim() === "") throw new LinearError("title must not be empty");
       const state = input.state ? stateNamed(team, input.state) : defaultStateOf(team);
       const labels = labelsNamed(team, input.labels ?? []);
-      if (input.delegate !== undefined && input.delegate !== store.appUser.id)
-        throw new LinearError("Only an agent can be delegated an issue");
+      const delegate = input.delegate === undefined ? undefined : store.appByUser(input.delegate);
+      if (input.delegate !== undefined && !delegate) throw new LinearError("Only an agent can be delegated an issue");
+      if (input.delegate !== undefined) personOnly(creator, [input.delegate], "delegate an issue to another agent");
+      const byApp = store.appByUser(creator) !== undefined;
       const number = ids.sequence(`linear.identifier:${team.key}`);
       const now = clock();
       const issue = store.add(store.issues, session, {
@@ -716,7 +840,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
         labels: labels.map((label) => label.id),
         // Created delegated is delegating: the person is the assignee unless they named one (inferred
         // from delegating an existing issue, which the differential run saw).
-        assignee: input.assignee ?? (input.delegate !== undefined && creator !== store.appUser.id ? creator : null),
+        assignee: input.assignee ?? (input.delegate !== undefined && !byApp ? creator : null),
         delegate: input.delegate ?? null,
         creator,
         parent: input.parent ?? null,
@@ -728,7 +852,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       } satisfies LinearIssueRecord);
       enterState(issue, state);
       entityEvent(session, "Issue", "create", creator, payloads.issue(issue), links.issue(issue));
-      if (issue.delegate) startSession(issue, creator, undefined);
+      if (delegate) startSession(issue, creator, undefined, delegate);
       return issue;
     },
 

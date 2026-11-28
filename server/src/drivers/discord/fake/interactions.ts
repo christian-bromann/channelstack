@@ -16,7 +16,7 @@ import {
   DiscordRefusal,
   INTERACTION_WINDOW_MS,
 } from "../world.ts";
-import type { Gateway, Intent } from "./gateway.ts";
+import type { Intent } from "./gateway.ts";
 import type { DiscordCommandRecord, DiscordInteractionRecord, DiscordStore } from "./store.ts";
 
 /** An interaction's token works for followups and its original for 15 minutes. */
@@ -43,14 +43,20 @@ const INTERACTION_FAILED = "This interaction failed";
 export interface InteractionDeps {
   store: DiscordStore;
   kit: DeliveryKit;
-  gateway: Gateway;
-  dispatch(session: string | undefined, type: string, payload: unknown, intent: Intent | undefined): string | undefined;
+  dispatchTo(
+    app: DiscordAppRecord,
+    session: string | undefined,
+    type: string,
+    payload: unknown,
+    intent: Intent | undefined,
+  ): string | undefined;
+  /** The built-in app. */
   app(): DiscordAppRecord;
   guild(): DiscordGuildRecord;
   authorOf(id: string): Author | undefined;
   userWire(id: string): Record<string, unknown>;
-  channelWire(channel: DiscordChannelRecord): Record<string, unknown>;
-  messageWire(message: DiscordMessageRecord): Record<string, unknown>;
+  channelWire(channel: DiscordChannelRecord, reader?: DiscordAppRecord): Record<string, unknown>;
+  messageWire(message: DiscordMessageRecord, reader?: DiscordAppRecord): Record<string, unknown>;
   permissionsOf(id: string, channel: DiscordChannelRecord): bigint;
   rolesOf(id: string): string[];
   checkContent(input: MessageFields, within?: "data"): void;
@@ -64,6 +70,7 @@ export interface InteractionDeps {
       ephemeralFor?: string | undefined;
       interaction?: DiscordMessageRecord["interaction"];
     },
+    app?: DiscordAppRecord,
   ): DiscordMessageRecord;
   newMessage(
     channel: DiscordChannelRecord,
@@ -92,17 +99,26 @@ interface MessageFields {
 }
 
 export interface Interactions {
-  /** A person runs one of the app's slash commands. Returns the delivery. */
-  command(session: string, user: string, text: string, channel: DiscordChannelRecord): Promise<string | undefined>;
-  /** A person presses a button on a message. Returns the delivery. */
+  /**
+   * A person runs one of an app's slash commands: the named app's, or the built-in app's when it
+   * has one of that name, or another app's (decision 0027). Returns the delivery.
+   */
+  command(
+    session: string,
+    user: string,
+    text: string,
+    channel: DiscordChannelRecord,
+    app?: DiscordAppRecord,
+  ): Promise<string | undefined>;
+  /** A person presses a button on a message: the interaction goes to the app whose message it is. Returns the delivery. */
   click(session: string, user: string, button: DiscordButtonRef, message: DiscordMessageRecord): string | undefined;
-  /** The app's newest message in a channel that has this button. */
+  /** An app's newest message in a channel that has this button. */
   latestWith(user: string, channel: DiscordChannelRecord, button: DiscordButtonRef): DiscordMessageRecord;
   /** Discord's check of a new interactions endpoint: a PING answered with a PONG, and a forged one refused. */
   verifyEndpoint(session: string): Promise<{ valid: boolean; problems: string[]; deliveries: string[] }>;
   /** `POST /interactions/{id}/{token}/callback`: the app's response. */
   callback(id: string, token: string, body: Record<string, unknown>): { message: DiscordMessageRecord | undefined };
-  /** The interaction a token belongs to, for the app's followups: refused when it is unknown or expired. */
+  /** The interaction a token belongs to, for its app's followups: refused when it is unknown, another app's or expired. */
   byToken(applicationId: string, token: string): DiscordInteractionRecord;
   /** `@original`: the message the response made, or the component's message. */
   original(interaction: DiscordInteractionRecord): DiscordMessageRecord;
@@ -115,13 +131,14 @@ export interface Interactions {
     body: MessageFields,
   ): DiscordMessageRecord;
   commandWire(command: DiscordCommandRecord): Record<string, unknown>;
-  /** Register commands: one (`POST`), or every one, replacing what was there (`PUT`). */
+  /** Register an app's commands: one (`POST`), or every one, replacing what it had there (`PUT`). */
   saveCommands(
+    app: DiscordAppRecord,
     guildId: string | undefined,
     commands: readonly Record<string, unknown>[],
     replace: boolean,
   ): DiscordCommandRecord[];
-  commands(guildId: string | undefined): DiscordCommandRecord[];
+  commands(app: DiscordAppRecord, guildId: string | undefined): DiscordCommandRecord[];
   /** What the app left open: a deferred response it hasn't finished. */
   openWork(session: string): string[];
 }
@@ -143,8 +160,10 @@ function buttonsOf(components: readonly unknown[]): Array<Record<string, unknown
 }
 
 export function createInteractions(context: DriverContext, deps: InteractionDeps): Interactions {
-  const { clock, timers, webhookUrl } = context;
+  const { clock, timers } = context;
   const { store } = deps;
+  /** The app an interaction or a command is for. */
+  const appNamed = (name: string): DiscordAppRecord => store.apps.named(name) ?? deps.app();
 
   const memberWire = (user: string, channel: DiscordChannelRecord) => ({
     ...memberObject(deps.rolesOf(user), JOINED_AT),
@@ -155,12 +174,13 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
   /** What every interaction carries: who, where, its token. */
   const envelope = (record: DiscordInteractionRecord, channel: DiscordChannelRecord) => {
     const inGuild = channel.kind !== "dm";
+    const app = appNamed(record.app);
     return {
-      app_permissions: deps.permissionsOf(deps.app().botUserId, channel).toString(),
-      application_id: deps.app().id,
+      app_permissions: deps.permissionsOf(app.botUserId, channel).toString(),
+      application_id: app.id,
       attachment_size_limit: 10_485_760,
       authorizing_integration_owners: { 0: deps.guild().id },
-      channel: deps.channelWire(channel),
+      channel: deps.channelWire(channel, app),
       channel_id: channel.id,
       context: inGuild ? 0 : 1,
       entitlement_sku_ids: [],
@@ -189,7 +209,7 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
     if (!channel) return;
     deps.newMessage(
       channel,
-      deps.app().botUserId,
+      appNamed(record.app).botUserId,
       { content: INTERACTION_FAILED, embeds: [], components: [] },
       { flags: MESSAGE_FLAGS.EPHEMERAL, ephemeralFor: record.userId, system: true },
     );
@@ -226,17 +246,23 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
       return undefined;
     }
     if (!channel) throw new DiscordRefusal(10003);
+    const app = appNamed(record.app);
     let message: DiscordMessageRecord | undefined;
     switch (type) {
       case RESPONSE.CHANNEL_MESSAGE_WITH_SOURCE: {
         const fields = contentOf(data);
         deps.checkContent(fields, "data");
-        message = deps.postAsBot(channel, fields, {
-          type: record.type === INTERACTION.APPLICATION_COMMAND ? 20 : 0,
-          flags: ephemeral ? MESSAGE_FLAGS.EPHEMERAL : 0,
-          ephemeralFor: ephemeral ? record.userId : undefined,
-          interaction: metadata,
-        });
+        message = deps.postAsBot(
+          channel,
+          fields,
+          {
+            type: record.type === INTERACTION.APPLICATION_COMMAND ? 20 : 0,
+            flags: ephemeral ? MESSAGE_FLAGS.EPHEMERAL : 0,
+            ephemeralFor: ephemeral ? record.userId : undefined,
+            interaction: metadata,
+          },
+          app,
+        );
         record.original = message.id;
         break;
       }
@@ -251,6 +277,7 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
             ephemeralFor: ephemeral ? record.userId : undefined,
             interaction: metadata,
           },
+          app,
         );
         record.original = message.id;
         break;
@@ -288,16 +315,22 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
     return deps.update(message, { ...next, flags: message.flags & ~MESSAGE_FLAGS.LOADING });
   };
 
-  /** Hand an interaction to the app: its endpoint over HTTP when it has one, its Gateway connection otherwise. */
+  /**
+   * Hand an interaction to the one app it belongs to: its endpoint over HTTP when it has one, its
+   * Gateway connection otherwise. Signed with that app's own key.
+   */
   const deliver = (record: DiscordInteractionRecord, payload: Record<string, unknown>, eventType: string) => {
     timers.after(INTERACTION_WINDOW_MS, () => fail(record));
+    const app = appNamed(record.app);
+    const webhookUrl = context.apps.webhookUrl(app.name);
     if (webhookUrl === undefined) {
-      record.delivery = deps.dispatch(record.session, "INTERACTION_CREATE", payload, undefined);
+      record.delivery = deps.dispatchTo(app, record.session, "INTERACTION_CREATE", payload, undefined);
       return record.delivery;
     }
     deps.kit.send({
       id: record.id,
       session: record.session,
+      app: app.name,
       type: eventType,
       url: webhookUrl,
       body: JSON.stringify(payload),
@@ -325,9 +358,11 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
     user: string,
     channel: DiscordChannelRecord,
     extra: { messageId?: string | undefined; name?: string | undefined },
+    app: DiscordAppRecord,
   ): DiscordInteractionRecord => {
     const record: DiscordInteractionRecord = {
       id: discordSnowflake(context.ids),
+      app: app.name,
       token: DISCORD_SECRETS.interactionToken.generate(),
       session,
       type,
@@ -344,12 +379,20 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
     return record;
   };
 
-  const findCommand = (name: string) => {
+  /**
+   * The command of that name a person picks: the named app's, or else the built-in app's, then
+   * the others' in the order they were made. A guild's command before a global one of an app.
+   */
+  const findCommand = (name: string, only: DiscordAppRecord | undefined) => {
     const all = [...store.commands.values()];
-    return (
-      all.find((command) => command.name === name && command.guildId === deps.guild().id) ??
-      all.find((command) => command.name === name && command.guildId === undefined)
-    );
+    for (const app of only ? [only] : store.apps.all()) {
+      const found =
+        all.find(
+          (command) => command.app === app.name && command.name === name && command.guildId === deps.guild().id,
+        ) ?? all.find((command) => command.app === app.name && command.name === name && command.guildId === undefined);
+      if (found) return found;
+    }
+    return undefined;
   };
 
   /** A command's options from what a person typed after it: `name:value`, or in the order the command lists them. */
@@ -377,11 +420,10 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
       if (option.type === OPTION.USER) {
         const wanted = text.replace(/^@/, "").toLowerCase();
         const found =
-          wanted === deps.app().name.toLowerCase()
-            ? deps.app().botUserId
-            : store
-                .usersOf(session)
-                .find((user) => user.name.toLowerCase() === wanted || user.username === wanted || user.id === text)?.id;
+          store.apps.namedIn(session, wanted)?.botUserId ??
+          store
+            .usersOf(session)
+            .find((user) => user.name.toLowerCase() === wanted || user.username === wanted || user.id === text)?.id;
         if (found === undefined) throw refuse(option.name, text);
         resolved.users[found] = deps.userWire(found);
         if (channel.kind !== "dm") {
@@ -417,7 +459,7 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
   const commandWire = (command: DiscordCommandRecord): Record<string, unknown> => ({
     id: command.id,
     type: command.type,
-    application_id: deps.app().id,
+    application_id: appNamed(command.app).id,
     ...(command.guildId === undefined ? {} : { guild_id: command.guildId }),
     name: command.name,
     name_localizations: null,
@@ -433,12 +475,12 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
   });
 
   return {
-    async command(session, user, text, channel) {
-      const { command, words } = await typedCommand(text, findCommand);
+    async command(session, user, text, channel, only) {
+      const { command, words } = await typedCommand(text, (name) => findCommand(name, only));
       const name = command.name;
       if (!has(deps.permissionsOf(user, channel), "USE_APPLICATION_COMMANDS")) throw new DiscordRefusal(50013);
       const { options, resolved } = optionsOf(command, words, session, channel);
-      const record = start(session, INTERACTION.APPLICATION_COMMAND, user, channel, { name });
+      const record = start(session, INTERACTION.APPLICATION_COMMAND, user, channel, { name }, appNamed(command.app));
       const payload = {
         ...envelope(record, channel),
         data: {
@@ -473,11 +515,13 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
       }
       const channel = store.channels.find(message.channelId);
       if (!channel) throw new DiscordRefusal(10003);
-      const record = start(session, INTERACTION.MESSAGE_COMPONENT, user, channel, { messageId: message.id });
+      // A button is on one app's message, and its interaction goes to that app alone (decision 0027).
+      const app = store.appOf(message.authorId) ?? deps.app();
+      const record = start(session, INTERACTION.MESSAGE_COMPONENT, user, channel, { messageId: message.id }, app);
       const payload = {
         ...envelope(record, channel),
         data: { custom_id: found.custom_id, component_type: 2 },
-        message: deps.messageWire(message),
+        message: deps.messageWire(message, app),
       };
       return deliver(record, payload, "INTERACTION_CREATE");
     },
@@ -487,7 +531,7 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
         .messagesIn(channel.id)
         .filter(
           (message) =>
-            message.authorId === deps.app().botUserId &&
+            store.appOf(message.authorId) !== undefined &&
             (message.ephemeralFor === undefined || message.ephemeralFor === user),
         )
         .reverse()
@@ -511,6 +555,7 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
     },
 
     async verifyEndpoint(session) {
+      const webhookUrl = context.apps.webhookUrl(deps.app().name);
       if (webhookUrl === undefined) {
         return {
           valid: false,
@@ -521,6 +566,7 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
       const channel = store.channelsOf(session)[0];
       const record: DiscordInteractionRecord = {
         id: discordSnowflake(context.ids),
+        app: deps.app().name,
         token: DISCORD_SECRETS.interactionToken.generate(),
         session,
         type: INTERACTION.PING,
@@ -591,10 +637,10 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
     },
 
     byToken(applicationId, token) {
-      const found =
-        applicationId === deps.app().id
-          ? [...store.interactions.values()].find((record) => constantTimeEqual(record.token, token))
-          : undefined;
+      // An interaction's token is its app's: another application's id in the path finds nothing.
+      const found = [...store.interactions.values()].find(
+        (record) => constantTimeEqual(record.token, token) && appNamed(record.app).id === applicationId,
+      );
       if (!found || clock() - found.createdAt > TOKEN_LIFETIME_MS || found.state !== "responded") {
         throw new DiscordRefusal(10015);
       }
@@ -610,24 +656,29 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
       deps.checkContent(fields);
       const flags = typeof body.flags === "number" ? body.flags : 0;
       const ephemeral = (flags & MESSAGE_FLAGS.EPHEMERAL) !== 0;
-      return deps.postAsBot(channel, fields, {
-        flags: ephemeral ? MESSAGE_FLAGS.EPHEMERAL : 0,
-        ephemeralFor: ephemeral ? record.userId : undefined,
-        interaction: {
-          id: record.id,
-          type: record.type,
-          name: record.name,
-          userId: record.userId,
-          messageId: record.messageId,
+      return deps.postAsBot(
+        channel,
+        fields,
+        {
+          flags: ephemeral ? MESSAGE_FLAGS.EPHEMERAL : 0,
+          ephemeralFor: ephemeral ? record.userId : undefined,
+          interaction: {
+            id: record.id,
+            type: record.type,
+            name: record.name,
+            userId: record.userId,
+            messageId: record.messageId,
+          },
         },
-      });
+        appNamed(record.app),
+      );
     },
 
     editResponse: (_record, message, body) => edit(message, body),
 
     commandWire,
 
-    saveCommands(guildId, list, replace) {
+    saveCommands(app, guildId, list, replace) {
       const saved = list.map((raw) => {
         const name = typeof raw.name === "string" ? raw.name : "";
         if (!/^[-_\p{L}\p{N}]{1,32}$/u.test(name) || name !== name.toLowerCase()) {
@@ -638,10 +689,11 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
           });
         }
         const existing = [...store.commands.values()].find(
-          (command) => command.name === name && command.guildId === guildId,
+          (command) => command.app === app.name && command.name === name && command.guildId === guildId,
         );
         const record: DiscordCommandRecord = {
           id: existing?.id ?? discordSnowflake(context.ids),
+          app: app.name,
           name,
           description: typeof raw.description === "string" ? raw.description : "",
           type: typeof raw.type === "number" ? raw.type : 1,
@@ -652,12 +704,14 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
         return record;
       });
       if (replace)
-        for (const [id, command] of store.commands) if (command.guildId === guildId) store.commands.delete(id);
+        for (const [id, command] of store.commands)
+          if (command.app === app.name && command.guildId === guildId) store.commands.delete(id);
       for (const record of saved) store.commands.set(record.id, record);
       return saved;
     },
 
-    commands: (guildId) => [...store.commands.values()].filter((command) => command.guildId === guildId),
+    commands: (app, guildId) =>
+      [...store.commands.values()].filter((command) => command.app === app.name && command.guildId === guildId),
 
     openWork(session) {
       return [...store.interactions.values()].flatMap((record) => {
@@ -665,7 +719,8 @@ export function createInteractions(context: DriverContext, deps: InteractionDeps
         const message = store.findMessage(record.channelId, record.original);
         if (!message || (message.flags & MESSAGE_FLAGS.LOADING) === 0) return [];
         const what = record.name ? `/${record.name}` : "a button";
-        return [`a deferred response to ${what} the app never finished (still "${deps.app().name} is thinking…")`];
+        const app = appNamed(record.app).name;
+        return [`a deferred response to ${what} ${app} never finished (still "${app} is thinking…")`];
       });
     },
   };

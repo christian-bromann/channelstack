@@ -15,7 +15,7 @@ This page shows how to test a GitHub App: how to point it at the fake, which peo
 
 ## What the fake covers
 
-The fake GitHub is one organization (`acme`) with one GitHub App in it, `my-agent`, installed on the repositories you choose. It serves GitHub's REST API and sends the App's webhooks. Repositories hold real git objects, so commits have real SHAs and diffs are real diffs.
+The fake GitHub is one organization (`acme`) with one GitHub App in it, `my-agent`, installed on the repositories you choose, and any other App a test adds ([several Apps](#several-apps)). It serves GitHub's REST API and sends the App's webhooks. Repositories hold real git objects, so commits have real SHAs and diffs are real diffs.
 
 | Area          | What's there                                                                                                                                                                                                          |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -259,6 +259,31 @@ GitHub drops, without a word, an assignee who can't be assigned, the App's bot a
 
 > [!NOTE]
 > The test API lets a person assign the App's bot or request its review (`ana.assign(github.app, …)`, `ana.requestReview(github.app, …)`), and the fake sends the event. Real GitHub likely refuses both for an ordinary App; this is checked in the first live run, and the fake will follow.
+
+## Several Apps
+
+A test adds another GitHub App to the org with `github.createApp({ name })`: its own App id, slug, `<name>[bot]` bot user, private key, webhook secret and installation, with `my-agent`'s permissions and events unless `permissions` and `events` say otherwise. It hears about a repository once it is installed there: `createRepo({ apps: [github.app, reviewer] })` or `repo.installApp(reviewer)`, which tells that App alone. Its webhooks go to `CHANNELSTACK_GITHUB_APP_<NAME>_WEBHOOK_URL`; `channelstack env --app reviewer --channel github` prints its `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY` and the rest. See [several apps](/docs/guide/several-apps).
+
+```ts
+const coder = await github.createApp({ name: "coder" });
+const ana = await github.createUser({ login: "ana" });
+const repo = await github.createRepo({ collaborators: [ana], apps: [github.app, coder] });
+const issue = await ana.openIssue({ title: "Login fails on Safari" }, { repo });
+
+await ana.comment("@coder can you triage this?", { issue });
+
+await expect(issue).toHaveCommentFrom(coder, { text: /triage/i });
+await expect(issue).not.toHaveCommentFrom(github.app);
+```
+
+As GitHub does it:
+
+- An event two Apps hear is two deliveries, each with its own `X-GitHub-Delivery`, its own App's `installation.id` and `X-GitHub-Hook-Installation-Target-ID`, signed with its own secret. Each delivery says which App it went to (`delivery.app`).
+- Another App's comment, issue, label, pull request, review or push arrives with `sender: { login: "<slug>[bot]", type: "Bot" }`, and an App's own actions come back to it: nothing stops two Apps from answering each other.
+- Each App's JWT and installation token answer as that App, and reach only what its installation covers.
+- `check_run` `created` and `completed` go to every subscribed App; `rerequested` and `requested_action` only to the App that made the run.
+
+A test can act as an App it made, through the fake's REST API with its installation token: `reviewer.comment`, `openIssue`, `openPullRequest`, `review`, `reviewComment`, `label`, `push` and the rest. Acting as `my-agent` is refused, because your agent is that App.
 
 ## Live
 

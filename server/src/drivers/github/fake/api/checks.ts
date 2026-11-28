@@ -67,14 +67,14 @@ export function registerChecks(register: Register): void {
   };
 
   register("post", "/check-runs", write, async (call) => {
-    const { c, world, repo, body } = call;
+    const { c, world, repo, body, app } = call;
     const given = input(body);
     if (given.name === undefined) throw invalid("CheckRun", "name");
     if (given.headSha === undefined) throw invalid("CheckRun", "head_sha");
     if (!(await world.kit.git.readCommit(world.kit.dir(repo), given.headSha))) {
       throw new GitHubRefusal(422, `No commit found for SHA: ${given.headSha}`);
     }
-    const run = world.checks.create(repo, { ...given, name: given.name, headSha: given.headSha });
+    const run = world.checks.create(repo, { ...given, name: given.name, headSha: given.headSha }, app);
     return c.json(world.kit.objects.checkRun(run), 201);
   });
 
@@ -82,9 +82,18 @@ export function registerChecks(register: Register): void {
     call.c.json(call.world.kit.objects.checkRun(runOf(call))),
   );
 
-  register("patch", "/check-runs/:run{[0-9]+}", write, (call) =>
-    call.c.json(call.world.kit.objects.checkRun(call.world.checks.update(runOf(call), input(call.body)))),
-  );
+  register("patch", "/check-runs/:run{[0-9]+}", write, (call) => {
+    const run = runOf(call);
+    // Only the App that made a check run may change it; another App reads it, and is refused this
+    // with GitHub's answer (its code to confirm live with B10).
+    if (run.app !== call.app.name) {
+      throw new GitHubRefusal(
+        403,
+        `Invalid app_id \`${call.app.id}\` - check run can only be modified by the GitHub App that created it.`,
+      );
+    }
+    return call.c.json(call.world.kit.objects.checkRun(call.world.checks.update(run, input(call.body))));
+  });
 
   register("get", "/check-runs/:run{[0-9]+}/annotations", read, (call) => {
     const run = runOf(call);

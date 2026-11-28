@@ -35,7 +35,8 @@ if (!SLACK_BOT_TOKEN || !SLACK_SIGNING_SECRET || !PORT) {
 // Agent messaging: every message a person sends in the DM starts its own thread, and the answer goes there.
 const slack = createSlackAdapter({ agentView: true });
 const bot = new Chat({
-  userName: "my-agent",
+  // The app it runs as: the stack names another one in AGENT_NAME (decision 0027).
+  userName: process.env.AGENT_NAME ?? "my-agent",
   adapters: { slack },
   state: createMemoryState(),
   logger: "warn",
