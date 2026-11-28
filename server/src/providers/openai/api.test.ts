@@ -253,6 +253,50 @@ describe("a tool result without its call", () => {
     expect(error.param).toBe("input");
     expect(error.type).toBe("invalid_request_error");
   });
+
+  test("Chat Completions refuses tool calls the conversation goes on without answering, as OpenAI does", async () => {
+    const { client, respond, prompt } = await setup();
+    await respond({ turns: ["ok"], times: -1 });
+    const called = {
+      role: "assistant" as const,
+      content: null,
+      tool_calls: [
+        { id: "call_answered", type: "function" as const, function: { name: "lookup", arguments: "{}" } },
+        { id: "call_dropped", type: "function" as const, function: { name: "lookup", arguments: "{}" } },
+      ],
+    };
+    const refusal = (messages: Parameters<typeof client.chat.completions.create>[0]["messages"]) =>
+      client.chat.completions
+        .create({ model: "gpt-5", messages }, { maxRetries: 0 })
+        .catch((caught: unknown) => caught) as Promise<APIError>;
+
+    for (const messages of [
+      // The conversation goes on past the call.
+      [...ask(prompt), called, { role: "tool" as const, tool_call_id: "call_answered", content: "1" }, ...ask("and?")],
+      // It ends on the call.
+      [...ask(prompt), called],
+    ]) {
+      const error = await refusal(messages);
+      expect(error.status).toBe(400);
+      expect(error.message).toMatch(
+        /An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'\. The following tool_call_ids did not have response messages: (call_answered, )?call_dropped$/,
+      );
+      expect(error.param).toBe("messages[1].role");
+      expect(error.type).toBe("invalid_request_error");
+    }
+
+    // Both answered, the call goes through.
+    const answered = await client.chat.completions.create({
+      model: "gpt-5",
+      messages: [
+        ...ask(prompt),
+        called,
+        { role: "tool", tool_call_id: "call_answered", content: "1" },
+        { role: "tool", tool_call_id: "call_dropped", content: "2" },
+      ],
+    });
+    expect(answered.choices[0]?.message.content).toBe("ok");
+  });
 });
 
 describe("Chat Completions' obfuscation", () => {

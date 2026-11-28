@@ -185,10 +185,21 @@ export function chatRequest(body: Json, headers: Headers): ModelRequest {
   const messages: ModelMessage[] = [];
   const toolCallIds = new Set<string>();
   const refs: string[] = [];
+  // The newest assistant message's tool calls no `tool` message has answered yet: OpenAI refuses a
+  // conversation that goes on, or ends, before each one has its answer.
+  let unanswered: { at: number; ids: Set<string> } | undefined;
+  const answerFirst = () => {
+    if (unanswered === undefined || unanswered.ids.size === 0) return;
+    throw invalidRequest(
+      `An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'. The following tool_call_ids did not have response messages: ${[...unanswered.ids].join(", ")}`,
+      `messages[${unanswered.at}].role`,
+    );
+  };
   for (const [at, raw] of body.messages.entries()) {
     const where = `messages[${at}]`;
     if (!isObject(raw)) throw invalidRequest(`Invalid type for '${where}': expected an object.`, where);
     const { text, parts } = contentOf(raw.content, `${where}.content`);
+    if (raw.role !== "tool") answerFirst();
     switch (raw.role) {
       case "system":
       case "developer":
@@ -206,6 +217,7 @@ export function chatRequest(body: Json, headers: Headers): ModelRequest {
           refs.push(id);
           return { id, name: str(fn.name) ?? "", arguments: parseArguments(fn.arguments ?? fn.input) };
         });
+        unanswered = { at, ids: new Set(toolCalls.map((call) => call.id)) };
         messages.push({ role: "assistant", text, toolCalls });
         break;
       }
@@ -224,6 +236,7 @@ export function chatRequest(body: Json, headers: Headers): ModelRequest {
             `${where}.role`,
           );
         }
+        unanswered?.ids.delete(callId);
         messages.push({ role: "tool", callId, text });
         break;
       }
@@ -235,6 +248,7 @@ export function chatRequest(body: Json, headers: Headers): ModelRequest {
         );
     }
   }
+  answerFirst();
   const tools = toolsOf(body.tools, "chat");
   const named = nameResults(messages);
   const streamOptions = isObject(body.stream_options) ? body.stream_options : {};
