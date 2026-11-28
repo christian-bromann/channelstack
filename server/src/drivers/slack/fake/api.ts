@@ -466,10 +466,10 @@ export function createSlackApi(
     "apps.connections.open": () => ({ url: socket.of(app()).ticket() }),
 
     // Modals: opened with the trigger_id of an interaction, for the person who caused it.
-    "views.open": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), false) }),
-    "views.push": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), true) }),
+    "views.open": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), false, app()) }),
+    "views.push": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), true, app()) }),
     "views.update": (args) => ({
-      view: world.updateView(required(args, "view_id"), string(args, "hash"), json(args, "view")),
+      view: world.updateView(required(args, "view_id"), string(args, "hash"), json(args, "view"), app()),
     }),
 
     // Files upload v2: ask where to upload, send the bytes there, then share the file.

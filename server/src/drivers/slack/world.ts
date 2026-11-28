@@ -137,6 +137,8 @@ export interface SlackViewRecord {
   readonly session: string;
   /** Who sees it. */
   readonly user: string;
+  /** The app that opened it, by name: its submission, its close and its updates are that app's alone. */
+  readonly app: string;
   /** The view as the app defined it, with every `block_id` and `action_id` filled in. */
   definition: Record<string, unknown> & { blocks: unknown[] };
   /** What is filled in: `values[block_id][action_id]`. */

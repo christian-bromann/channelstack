@@ -52,11 +52,14 @@ export class SlackStore {
   readonly files = new Map<string, SlackFileRecord>();
   /** What an interaction handed the app to answer with: its `response_url`s, by the key in the URL. */
   readonly responseUrls = new Map<string, SlackResponseUrl>();
-  /** `trigger_id`s the app may open a modal with, and until when. */
-  readonly triggers = new Map<string, { session: string; user: string; expiresAt: number; used: boolean }>();
+  /** `trigger_id`s an app may open a modal with, and until when: each is the app's it was handed to, by name. */
+  readonly triggers = new Map<
+    string,
+    { session: string; user: string; app: string; expiresAt: number; used: boolean }
+  >();
   /** `drop_socket` faults that haven't fired yet, by fault id. */
   readonly pendingDrops = new Map<string, { session: string; cancel(): void }>();
-  /** Every modal the app opened, by view id. A submitted or closed one stays, marked `closed`. */
+  /** Every modal an app opened, by view id. A submitted or closed one stays, marked `closed`. */
   readonly views = new Map<string, SlackViewRecord>();
   /** Conversation ids in creation order: the registry has no listing, and Slack lists conversations. */
   readonly #known: string[] = [];

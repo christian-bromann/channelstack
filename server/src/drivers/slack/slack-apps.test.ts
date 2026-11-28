@@ -199,6 +199,82 @@ describe("exit check 12.3: Slack apps", () => {
     expect(payload.token).toBe(h.secrets.forApp("slack", "coder", "verificationToken"));
   });
 
+  test("a modal another app opens is that app's: its trigger_id, updates, view_submission and view_closed are its alone", async () => {
+    const { h, mine, theirs, post, get, app, coder, web } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id] });
+    const blocks = [
+      {
+        type: "actions",
+        elements: [{ type: "button", action_id: "form", text: { type: "plain_text", text: "Open form" } }],
+      },
+    ];
+    await web("chat.postMessage", { channel: channel.id, text: "File a bug?", blocks }, coder.botToken);
+    await h.app.settled();
+    const view = {
+      type: "modal",
+      callback_id: "bug",
+      notify_on_close: true,
+      title: { type: "plain_text", text: "Bug" },
+      submit: { type: "plain_text", text: "File" },
+      blocks: [{ type: "section", text: { type: "mrkdwn", text: "File it?" } }],
+    };
+    /** Ana clicks coder's button: the trigger_id coder is handed. */
+    const click = async () => {
+      await post(`/users/${ana.id}/click`, { button: { label: "Open form" }, channel: channel.id });
+      await h.app.settled();
+      return JSON.parse(new URLSearchParams(theirs.received.at(-1)?.body).get("payload") ?? "{}").trigger_id as string;
+    };
+    const payloadOf = (agent: RecordingAgent) =>
+      JSON.parse(new URLSearchParams(agent.received.at(-1)?.body).get("payload") ?? "{}");
+    const signedFor = (agent: RecordingAgent, secret: string) => {
+      const delivery = agent.received.at(-1);
+      const timestamp = String(delivery?.headers["x-slack-request-timestamp"]);
+      const signature = createHmac("sha256", secret).update(`v0:${timestamp}:${delivery?.body}`).digest("hex");
+      return delivery?.headers["x-slack-signature"] === `v0=${signature}`;
+    };
+    const before = mine.received.length;
+
+    // my-agent can't open a modal on the trigger_id coder was handed; coder can.
+    const trigger = await click();
+    expect(await web("views.open", { trigger_id: trigger, view }, app.botToken)).toMatchObject({
+      ok: false,
+      error: "invalid_trigger_id",
+    });
+    const opened = await web("views.open", { trigger_id: trigger, view }, coder.botToken);
+    expect(opened).toMatchObject({ ok: true, view: { app_id: coder.id, bot_id: coder.botId } });
+
+    // Only coder may update it.
+    const update = { view_id: opened.view.id, view: { ...view, title: { type: "plain_text", text: "Bug!" } } };
+    expect(await web("views.update", update, app.botToken)).toMatchObject({ ok: false, error: "not_found" });
+    expect(await web("views.update", update, coder.botToken)).toMatchObject({ ok: true, view: { app_id: coder.id } });
+
+    // Its submission goes to coder, signed with coder's secret, with coder's verification token.
+    const submitted = await post(`/modals/${opened.view.id}/submit`);
+    await h.app.settled();
+    expect(submitted).toMatchObject({ type: "view_submission", app: "coder" });
+    expect(payloadOf(theirs)).toMatchObject({
+      type: "view_submission",
+      api_app_id: coder.id,
+      token: h.secrets.forApp("slack", "coder", "verificationToken"),
+      view: { id: opened.view.id, app_id: coder.id },
+    });
+    expect(signedFor(theirs, coder.signingSecret)).toBe(true);
+
+    // And its close.
+    const again = await web("views.open", { trigger_id: await click(), view }, coder.botToken);
+    const closed = await post(`/modals/${again.view.id}/close`);
+    await h.app.settled();
+    expect(closed).toMatchObject({ type: "view_closed", app: "coder" });
+    expect(payloadOf(theirs)).toMatchObject({ type: "view_closed", api_app_id: coder.id });
+    expect(signedFor(theirs, coder.signingSecret)).toBe(true);
+    expect(mine.received.length).toBe(before);
+    expect((await get(`/users/${ana.id}/modals`)).map((modal: { viewId: string }) => modal.viewId)).toEqual([
+      opened.view.id,
+      again.view.id,
+    ]);
+  });
+
   test("exit check 12.6: two apps answering each other are stopped at the guard's limit, and the session says so", async () => {
     const { h, mine, post, app, coder, sessionId } = await twoApps();
     const reviewer = await post("/apps", { name: "reviewer" });

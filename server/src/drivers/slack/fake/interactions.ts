@@ -78,7 +78,7 @@ export interface InteractionKit {
 
 /** Sending an interaction to the app, for the parts of the fake that have their own (modals). */
 export interface InteractionDispatch {
-  issueTrigger(session: string, user: SlackUserRecord): string;
+  issueTrigger(session: string, user: SlackUserRecord, app: SlackAppRecord): string;
   /** Refuses with `dispatch_failed` when Slack has nowhere to send an interaction. Asked before anything changes. */
   reachable(app?: SlackAppRecord): void;
   send(
@@ -116,10 +116,16 @@ export function createInteractions(kit: InteractionKit): Interactions {
   const { context, store, refuse, member, requireMessage } = kit;
   const { ids, clock } = context;
 
-  /** A `trigger_id` the app may open one modal with, for three seconds. */
-  const issueTrigger = (session: string, user: SlackUserRecord): string => {
+  /** A `trigger_id` the app it is handed to may open one modal with, for three seconds: no other app may. */
+  const issueTrigger = (session: string, user: SlackUserRecord, app: SlackAppRecord): string => {
     const triggerId = ids.next(SLACK_IDS.trigger);
-    store.triggers.set(triggerId, { session, user: user.id, expiresAt: clock() + ACK_WINDOW_MS, used: false });
+    store.triggers.set(triggerId, {
+      session,
+      user: user.id,
+      app: app.name,
+      expiresAt: clock() + ACK_WINDOW_MS,
+      used: false,
+    });
     return triggerId;
   };
 
@@ -132,7 +138,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
     source?: SlackMessageRecord,
     app: SlackAppRecord = store.app,
   ): InteractionContext => {
-    const triggerId = issueTrigger(session, user);
+    const triggerId = issueTrigger(session, user, app);
     // The URL is the credential, as with Slack's: whoever has it may answer.
     const key = `${store.team.id}/${triggerId.split(".")[0]}/${randomToken(18)}`;
     store.responseUrls.set(key, {

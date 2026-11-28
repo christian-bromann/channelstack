@@ -92,9 +92,9 @@ export interface FakeSlackWorld extends Immediate<SlackWorld> {
     direction: "add" | "remove",
   ): string | undefined;
   /** `views.open` / `views.push`: open a modal for the person whose `trigger_id` this is. Answers with the view. */
-  openView(triggerId: string, view: unknown, onTop: boolean): Record<string, unknown>;
+  openView(triggerId: string, view: unknown, onTop: boolean, app: SlackAppRecord): Record<string, unknown>;
   /** `views.update`: replace an open modal's definition. */
-  updateView(viewId: string, hash: string | undefined, view: unknown): Record<string, unknown>;
+  updateView(viewId: string, hash: string | undefined, view: unknown, app: SlackAppRecord): Record<string, unknown>;
   /** The app answers an interaction through its `response_url`. False when the URL is unknown, used up or expired. */
   respond(key: string, body: Record<string, unknown>): boolean;
   /** Send an event about a conversation to every app that is subscribed, installed and a member. */

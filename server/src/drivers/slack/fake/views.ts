@@ -9,23 +9,28 @@ import {
   viewSubmissionPayload,
 } from "../interaction-payloads.ts";
 import { filledEntry, initialEntry, isEmpty, type ViewInput, viewInputs } from "../views.ts";
-import type { SlackViewRecord, SlackWorld } from "../world.ts";
+import type { SlackAppRecord, SlackViewRecord, SlackWorld } from "../world.ts";
 import type { InteractionDispatch, InteractionKit } from "./interactions.ts";
 
 type Views = Pick<SlackWorld, "modals" | "modal" | "submitModal" | "closeModal"> & {
-  /** `views.open` / `views.push`: open a modal for the person whose `trigger_id` this is. Answers with the view. */
-  openView(triggerId: string, view: unknown, onTop: boolean): Record<string, unknown>;
-  /** `views.update`: replace an open modal's definition. `hash` guards against updating an older version. */
-  updateView(viewId: string, hash: string | undefined, view: unknown): Record<string, unknown>;
+  /** `views.open` / `views.push`: open a modal for the person whose `trigger_id` this is, as the app it was handed to. Answers with the view. */
+  openView(triggerId: string, view: unknown, onTop: boolean, app: SlackAppRecord): Record<string, unknown>;
+  /** `views.update`: replace an open modal of the calling app's. `hash` guards against updating an older version. */
+  updateView(viewId: string, hash: string | undefined, view: unknown, app: SlackAppRecord): Record<string, unknown>;
 };
 
-/** Modals: the app opens and updates them, a person fills them in, submits or closes them. */
+/**
+ * Modals: an app opens and updates them, a person fills them in, submits or closes them. A modal
+ * is the app's that opened it (decision 0027): what happens to it goes to that app, signed for it.
+ */
 export function createViews(kit: InteractionKit, dispatch: InteractionDispatch): Views {
   const { context, store, refuse } = kit;
   const { ids, clock } = context;
 
   const nextHash = () => `${Math.floor(clock() / 1000)}.${ids.next(SLACK_IDS.block)}`;
-  const described = (view: SlackViewRecord) => viewObject(view, store.team, store.app);
+  /** The app a modal belongs to. */
+  const appOf = (view: SlackViewRecord): SlackAppRecord => store.apps.named(view.app) ?? store.app;
+  const described = (view: SlackViewRecord) => viewObject(view, store.team, appOf(view));
 
   /** A view definition as Slack keeps it, or a refusal when it isn't one. */
   const definitionOf = (view: unknown): SlackViewRecord["definition"] => {
@@ -57,8 +62,8 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
   const viewContext = (view: SlackViewRecord): ViewContext => ({
     user: store.users.get(view.session, view.user),
     team: store.team,
-    app: store.app,
-    verificationToken: context.secret("verificationToken"),
+    app: appOf(view),
+    verificationToken: context.apps.secret(view.app, "verificationToken"),
   });
 
   /** Close a modal and everything stacked on it or under it, as the client does when a flow ends. */
@@ -105,6 +110,7 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
           id,
           session: view.session,
           user: view.user,
+          app: view.app,
           definition,
           values: valuesFor(definition),
           hash: nextHash(),
@@ -123,22 +129,27 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
   };
 
   return {
-    openView(triggerId, view, onTop) {
+    openView(triggerId, view, onTop, app) {
       if (view === undefined) throw refuse("invalid_arguments", "views.open needs a view");
       const trigger = store.triggers.get(triggerId);
-      if (!trigger) throw refuse("invalid_trigger_id", "Slack didn't issue this trigger_id");
+      // A trigger_id is the app's it was handed to: another app's token can't open a modal with it.
+      if (!trigger || trigger.app !== app.name)
+        throw refuse("invalid_trigger_id", "Slack didn't issue this trigger_id");
       if (trigger.used) throw refuse("exchanged_trigger_id", "This trigger_id was already used");
       if (trigger.expiresAt < clock()) throw refuse("expired_trigger_id", "A trigger_id is good for three seconds");
       const definition = definitionOf(view);
       trigger.used = true;
       const under = onTop
-        ? [...store.views.values()].findLast((open) => open.user === trigger.user && !open.closed)
+        ? [...store.views.values()].findLast(
+            (open) => open.user === trigger.user && open.app === app.name && !open.closed,
+          )
         : undefined;
       const id = ids.next(SLACK_IDS.view);
       const record: SlackViewRecord = {
         id,
         session: trigger.session,
         user: trigger.user,
+        app: app.name,
         definition,
         values: valuesFor(definition),
         hash: nextHash(),
@@ -151,9 +162,10 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
       return described(record);
     },
 
-    updateView(viewId, hash, view) {
+    updateView(viewId, hash, view, app) {
       const record = store.views.get(viewId);
-      if (!record || record.closed) throw refuse("not_found", "No such open view");
+      // Another app's modal isn't there for this app to change.
+      if (!record || record.closed || record.app !== app.name) throw refuse("not_found", "No such open view");
       if (hash !== undefined && hash !== record.hash) throw refuse("hash_conflict", "The view changed since this hash");
       record.definition = definitionOf(view);
       record.values = valuesFor(record.definition, record.values);
@@ -194,27 +206,32 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
           `The form can't be submitted yet. Still empty: ${missing.map((input) => input.label).join(", ")}`,
         );
       }
-      dispatch.reachable();
+      dispatch.reachable(appOf(view));
       view.errors = {};
       const user = store.users.get(session, view.user);
       kit.action(session, "submit", { user: user.id, view: view.id });
       const payload = viewSubmissionPayload(viewContext(view), {
         view: described(view),
-        triggerId: dispatch.issueTrigger(session, user),
+        triggerId: dispatch.issueTrigger(session, user, appOf(view)),
       });
-      return dispatch.send(session, "view_submission", payloadForm(payload), payload, (answer) =>
-        afterSubmission(view, answer),
+      return dispatch.send(
+        session,
+        "view_submission",
+        payloadForm(payload),
+        payload,
+        (answer) => afterSubmission(view, answer),
+        appOf(view),
       );
     },
 
     closeModal(session, id) {
       const view = owned(session, id);
-      if (view.definition.notify_on_close === true) dispatch.reachable();
+      if (view.definition.notify_on_close === true) dispatch.reachable(appOf(view));
       kit.action(session, "close", { user: view.user, view: view.id });
       view.closed = true;
       if (view.definition.notify_on_close !== true) return undefined;
       const payload = viewClosedPayload(viewContext(view), described(view));
-      return dispatch.send(session, "view_closed", payloadForm(payload), payload);
+      return dispatch.send(session, "view_closed", payloadForm(payload), payload, undefined, appOf(view));
     },
   };
 }
