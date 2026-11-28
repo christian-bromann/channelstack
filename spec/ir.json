@@ -3316,6 +3316,16 @@
           "optional": false
         },
         {
+          "name": "files",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        },
+        {
           "name": "postedAt",
           "type": {
             "kind": "string"

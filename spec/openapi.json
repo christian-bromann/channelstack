@@ -755,6 +755,13 @@
             "type": "array",
             "items": {}
           },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names of the files shared with the message."
+          },
           "postedAt": {
             "type": "string"
           },
@@ -784,6 +791,7 @@
           "author",
           "text",
           "blocks",
+          "files",
           "postedAt",
           "edited",
           "thread"

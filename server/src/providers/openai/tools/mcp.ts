@@ -68,8 +68,8 @@ export const mcp: BuiltInTool<"mcp"> = {
         id,
         type: "mcp_list_tools",
         server_label: spec.server,
-        tools: allowed.map((name) => ({ name, input_schema: { type: "object", properties: {} }, annotations: null })),
-        error: null,
+        // No `annotations` and no `error` when there are none: the description has both optional, and the AI SDK refuses `null`.
+        tools: allowed.map((name) => ({ name, input_schema: { type: "object", properties: {} } })),
       };
       items.push({
         item,
