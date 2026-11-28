@@ -4,8 +4,7 @@
  * Slack sends it: their messages with `bot_id`, `app_id` and `bot_profile`, their mentions,
  * their reactions. What Slack refuses between bots, the fake refuses.
  */
-import { createHmac } from "node:crypto";
-
+import { isValidSlackRequest } from "@slack/bolt";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
@@ -116,17 +115,23 @@ describe("exit check 12.3: Slack apps", () => {
     const message = await post(`/users/${ana.id}/say`, { message: { text: "@coder fix it" }, channel: channel.id });
     await h.app.settled();
 
-    const verifies = (agent: RecordingAgent, secret: string) =>
-      agent.received.every((delivery) => {
-        const timestamp = String(delivery.headers["x-slack-request-timestamp"]);
-        const signature = createHmac("sha256", secret).update(`v0:${timestamp}:${delivery.body}`).digest("hex");
-        return delivery.headers["x-slack-signature"] === `v0=${signature}`;
+    // Bolt's own check, the one its receivers run on every request.
+    const verifies = (secret: string) => (delivery: RecordingAgent["received"][number]) =>
+      isValidSlackRequest({
+        signingSecret: secret,
+        body: delivery.body,
+        headers: {
+          "x-slack-signature": String(delivery.headers["x-slack-signature"]),
+          "x-slack-request-timestamp": Number(delivery.headers["x-slack-request-timestamp"]),
+        },
       });
     expect(mine.received.length).toBeGreaterThan(0);
     expect(theirs.received.length).toBeGreaterThan(0);
-    expect(verifies(mine, app.signingSecret)).toBe(true);
-    expect(verifies(theirs, coder.signingSecret)).toBe(true);
-    expect(verifies(theirs, app.signingSecret)).toBe(false);
+    expect(mine.received.every(verifies(app.signingSecret))).toBe(true);
+    expect(theirs.received.every(verifies(coder.signingSecret))).toBe(true);
+    // Each delivery fails against the other app's secret, not only one of them.
+    expect(theirs.received.some(verifies(app.signingSecret))).toBe(false);
+    expect(mine.received.some(verifies(coder.signingSecret))).toBe(false);
     expect(events(theirs).map((one) => one.event.type)).toEqual(["app_mention", "message"]);
     expect(events(mine).map((one) => one.event.type)).toEqual(["message"]);
     // The message's delivery is the built-in app's; another app's is asked for by app.
