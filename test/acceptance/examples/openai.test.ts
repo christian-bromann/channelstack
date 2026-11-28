@@ -111,6 +111,30 @@ describe("several calls at once", () => {
   });
 });
 
+describe("a missing script fails the test", () => {
+  // The agent calls the model, but the test scripted nothing for "status?". The agent gets a 400
+  // (channelstack_no_script) and the matcher fails at once with the missing respond(…) in its message.
+  test.fails("an unscripted model call is an error, not a made-up answer", async ({ slack, openai }) => {
+    const ana = await slack.createUser({ name: "Ana" });
+    await openai.respond("Deploying.", { when: { text: "deploy" } });
+
+    const msg = await ana.say("status?", { to: slack.app });
+
+    await expect(msg.thread).toHaveReplyFrom("my-agent");
+  });
+
+  test("plan limits: the agent tells the person, once, and stops retrying", async ({ slack, openai }) => {
+    const ana = await slack.createUser({ name: "Ana" });
+    await openai.respond({ error: "project_spend_limit_exceeded" }, { times: -1 });
+
+    const msg = await ana.say("summarize #support", { to: slack.app });
+
+    await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
+    await expect(msg.thread).toHaveStatus("idle");
+    await expect(openai).toHaveReceivedCall(/chat\.completions|responses/, { times: 1 }); // insufficient_quota isn't worth a retry
+  });
+});
+
 describe("what the agent sends the model", () => {
   test("thread history, no private-channel text, no secrets", async ({ slack, openai }) => {
     const ana = await slack.createUser({ name: "Ana" });
@@ -118,6 +142,8 @@ describe("what the agent sends the model", () => {
     const secret = await slack.createChannel({ private: true, participants: [ben, slack.app] });
     const leak = await ben.say("the acquisition closes on Friday", { channel: secret });
     const channel = await slack.createChannel({ participants: [ana, slack.app] });
+    // The agent answers the follow-up too (it is in the thread), so the script answers every call,
+    // and the test waits for that second answer: its call carries both messages.
     await openai.respond("Noted.", { times: -1 });
 
     const first = await ana.say("@my-agent the deploy failed", { channel });
@@ -129,17 +155,5 @@ describe("what the agent sends the model", () => {
     await expect(call).toHaveSent([first, second], { ordered: true });
     await expect(openai).not.toHaveSent(leak);
     await expect(openai).not.toHaveSentSecrets();
-  });
-});
-
-describe("a missing script fails the test", () => {
-  test("plan limits: the agent tells the person, once", async ({ slack, openai }) => {
-    const ana = await slack.createUser({ name: "Ana" });
-    await openai.respond({ error: "project_spend_limit_exceeded", shouldRetry: false }, { times: -1 });
-
-    const msg = await ana.say("summarize #support", { to: slack.app });
-
-    await expect(msg.thread).toHaveReplyFrom("my-agent", { text: /isn't answering/ });
-    await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
   });
 });

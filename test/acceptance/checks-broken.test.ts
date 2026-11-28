@@ -1,5 +1,6 @@
-import { spawnSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 import { describe, expect, test } from "vitest";
 
@@ -41,18 +42,28 @@ async function checks(
       webhook: { driver: suite.driver, path },
       agentEnv: { ...agentEnv, ...(fault ? { BROKEN: fault } : {}) },
     },
-    ({ env }) => {
+    async ({ env }) => {
       const { file } = suite;
-      const result = spawnSync(
+      // Without blocking this worker: a synchronous run would stall the tests beside it, and their
+      // waits for their own agents would time out on this run's time.
+      const result = await promisify(execFile)(
         "pnpm",
         ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts", file],
         {
           cwd: ROOT,
           env: { ...env, NO_COLOR: "1", ...(only ? { CHANNELSTACK_CHECKS_ONLY: only } : {}) },
           encoding: "utf8",
+          maxBuffer: 64 * 1024 * 1024,
+        },
+      ).then(
+        ({ stdout, stderr }) => ({ code: 0 as number | null, stdout, stderr }),
+        (error: { code?: number | string | null; stdout?: string; stderr?: string }) => {
+          // A run that couldn't start at all (no pnpm, ENOENT) is an error, not a failed check.
+          if (typeof error.code === "string") throw error;
+          return { code: error.code ?? null, stdout: error.stdout ?? "", stderr: error.stderr ?? "" };
         },
       );
-      run = { status: result.status, output: `${result.stdout}\n${result.stderr}` };
+      run = { status: result.code, output: `${result.stdout}\n${result.stderr}` };
     },
   );
   return run;
@@ -81,10 +92,12 @@ describe.for(channels)("the standard %s checks catch what they are for", ([name,
 });
 
 // Exit check 13.9: each model check fails against the agent on the fake OpenAI with that fault.
+// One after another: the model checks time the agent (a slow model against Slack's 3s retry, a
+// paused stream), and how many stacks run beside one is no part of what they check.
 const providers = Object.entries(PROVIDERS).filter(([name]) => only === undefined || only.includes(name));
 describe.for(providers)("the model checks of %s catch what they are for", ([name, { broken }]) => {
   const suite = { ...broken, file: `test/acceptance/checks/${name}-checks.test.ts`, driver: broken.channel };
-  test.concurrent.for([...checkIds.SLACK_MODEL_CHECKS])(
+  test.for([...checkIds.SLACK_MODEL_CHECKS])(
     "%s fails against the agent with that fault",
     { timeout: 120_000 },
     async (id) => {
