@@ -109,10 +109,11 @@ export function createSlackApi(
   let caller: SlackAppRecord | undefined;
   const app = (): SlackAppRecord => caller ?? store.app;
   const bot = () => app().botUserId;
-  /** The bot sees its own files, and those shared where it is a member. */
-  const botSees = (file: SlackFileRecord) =>
-    file.user === bot() ||
-    (file.conversation !== undefined && store.conversations.find(file.conversation)?.members.has(bot()) === true);
+  /** An app's bot sees its own files, and those shared where it is a member: judged as the app whose token asks. */
+  const botSees = (file: SlackFileRecord, reader: SlackAppRecord) =>
+    file.user === reader.botUserId ||
+    (file.conversation !== undefined &&
+      store.conversations.find(file.conversation)?.members.has(reader.botUserId) === true);
 
   const userObject = (user: SlackUserRecord) => ({
     id: user.id,
@@ -521,7 +522,7 @@ export function createSlackApi(
 
     "files.info": (args) => {
       const file = store.files.get(required(args, "file"));
-      if (!file || !botSees(file)) throw new SlackApiError("file_not_found");
+      if (!file || !botSees(file, app())) throw new SlackApiError("file_not_found");
       return { file: fileObject(file) };
     },
 
@@ -845,7 +846,7 @@ export function createSlackApi(
     if (!file || team !== store.team.id || (rest !== name && !download) || file.bytes === undefined) {
       return c.text("Not Found", 404);
     }
-    if (!botSees(file)) return c.text("Not Found", 404);
+    if (!botSees(file, reader)) return c.text("Not Found", 404);
     return c.body(Buffer.from(file.bytes), 200, {
       "content-type": String(fileObject(file).mimetype),
       "content-length": String(file.bytes.length),

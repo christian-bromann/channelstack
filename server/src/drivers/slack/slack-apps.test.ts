@@ -275,6 +275,44 @@ describe("exit check 12.3: Slack apps", () => {
     ]);
   });
 
+  test("a file is read as the app whose token asks: where its bot is a member, never where only another's is", async () => {
+    const { h, theirs, post, app, coder, web } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const withCoder = await post("/channels", { participants: [ana.id, coder.id] });
+    const withMine = await post("/channels", { participants: [ana.id, app.id] });
+    const log = "Error: disk full\n";
+    const share = (channel: string, path: string) =>
+      post(`/users/${ana.id}/say`, {
+        message: { text: "why does it crash?" },
+        channel,
+        files: [{ path, content: Buffer.from(log).toString("base64") }],
+      });
+    await share(withCoder.id, "coder.log");
+    await share(withMine.id, "mine.log");
+    await h.app.settled();
+    const fileOf = (name: string) =>
+      events(theirs)
+        .flatMap((one) => (one.event.files as Array<{ id: string; name: string; url_private: string }>) ?? [])
+        .find((file) => file.name === name);
+    const theirsFile = fileOf("coder.log");
+    if (!theirsFile) throw new Error("coder was told of the file in its channel");
+    const download = async (url: string, token: string) =>
+      (await h.app.fetch(new Request(url, { headers: { authorization: `Bearer ${token}` } }))).status;
+
+    expect(await download(theirsFile.url_private, coder.botToken)).toBe(200);
+    expect(await download(theirsFile.url_private, app.botToken)).toBe(404);
+    expect(await web("files.info", { file: theirsFile.id }, coder.botToken)).toMatchObject({ ok: true });
+    expect(await web("files.info", { file: theirsFile.id }, app.botToken)).toMatchObject({
+      ok: false,
+      error: "file_not_found",
+    });
+
+    // my-agent's file, in a channel coder isn't in, is my-agent's to read alone.
+    const mine = (await web("conversations.history", { channel: withMine.id }, app.botToken)).messages[0].files[0];
+    expect(await download(mine.url_private, app.botToken)).toBe(200);
+    expect(await download(mine.url_private, coder.botToken)).toBe(404);
+  });
+
   test("exit check 12.6: two apps answering each other are stopped at the guard's limit, and the session says so", async () => {
     const { h, mine, post, app, coder, sessionId } = await twoApps();
     const reviewer = await post("/apps", { name: "reviewer" });
