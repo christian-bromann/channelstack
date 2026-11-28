@@ -382,13 +382,12 @@ export class OpenAIWorld {
       endpoint: request.endpoint === "chat.completions" ? "chat.completions" : "responses",
       ids,
       media: this.media,
-      containers: built.calls.flatMap((tool) =>
-        tool.type === "code_interpreter" ? [String(tool.items[0]?.item.container_id)] : [],
-      ),
+      written: built.calls.flatMap((tool) => tool.files ?? []),
       script: script.id,
     });
     const problems = [...built.problems, ...media.problems, ...cited.problems];
     if (problems.length > 0) return { problems };
+    for (const file of built.calls.flatMap((tool) => tool.files ?? [])) this.media.keepContainerFile(file);
     const toolCalls = specs
       .filter((spec) => builtInKindOf(spec) === undefined)
       .map((spec) => {

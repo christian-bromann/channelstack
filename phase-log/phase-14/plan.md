@@ -31,6 +31,12 @@ Phase 14 of [docs/phases.md](../../docs/phases.md): the fake OpenAI's images, au
 | Hashes | `node:crypto` (`createHash("sha256")`) |
 | Schema checks of answers | `server/test/schemas/openai.ts`, with the media endpoints' and files' schemas |
 
+## Changes beside the plan
+
+- **A Slack message lists its files' names** (`files` on `SlackMessage`): the example `expect(reply.files).toHaveLength(1)` needs it, so the route changed, not the example.
+- **A string tree (`files: "./fixtures/error.png"`) may be one file**, not only a directory, in all three SDKs (`readTree`, `read_tree`): the example shares one file.
+- **The Rust SDK encodes a union holding files or handles** (`enc::union`): a turn's media, and `when`'s `from`/`in` sent as ids, as TypeScript sends them.
+
 ## New dependencies
 
 | Package | Version | Why a library and not our code | License | Maintained |

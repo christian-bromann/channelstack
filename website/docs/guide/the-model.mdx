@@ -102,7 +102,7 @@ await openai.respond("The deploy fails at the migration step.", { when: { endpoi
 await openai.respond({ text: "Two incidents.", audio: { placeholder: { seconds: 1 } } }); // Chat Completions' audio output
 ```
 
-The Images API answers in base64 or with a URL, as the request asks; speech in the requested format, streamed with `stream_format: "sse"`; transcriptions and translations as JSON, text, SRT or VTT, and transcriptions streamed with `stream: true`. Media is a path, which your test's SDK reads and uploads, bytes, or a placeholder the fake makes: a PNG of a size, or WAV or PCM silence of a length. Other formats (JPEG, WebP, MP3, Opus) need a file. A placeholder in one of them is a problem of the script, never an answer with the wrong media type.
+The Images API answers in base64 (the retired DALL·E models with a URL, when the request asks); speech in the requested format, streamed with `stream_format: "sse"`; transcriptions and translations as JSON, text, SRT or VTT, and transcriptions streamed with `stream: true`. Media is a path, which your test's SDK reads and uploads, bytes, or a placeholder the fake makes: a PNG of a size, or WAV or PCM silence of a length. Other formats (JPEG, WebP, MP3, Opus) need a file. A placeholder in one of them is a problem of the script, never an answer with the wrong media type.
 
 ## OpenAI's built-in tools
 

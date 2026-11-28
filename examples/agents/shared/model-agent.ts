@@ -84,10 +84,6 @@ export const runTool = (name: string, args: unknown): string =>
 const INSTRUCTIONS =
   "You are my-agent, the team's assistant in Slack. Answer briefly. Use the tools for incidents and paging.";
 
-/**
- * Wire a model into a Bolt app. `faults` switches on bugs by the id of the standard check that
- * catches each (`slack.model-error`): only the agent with one fault per check (`broken-openai`) has any.
- */
 /** Where an answer goes: the conversation and thread, who asked, and who the agent is. */
 interface Where {
   readonly channel: string;
@@ -97,6 +93,10 @@ interface Where {
   readonly self: string | undefined;
 }
 
+/**
+ * Wire a model into a Bolt app. `faults` switches on bugs by the id of the standard check that
+ * catches each (`slack.model-error`): only the agent with one fault per check (`broken-openai`) has any.
+ */
 export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> = new Set()): void {
   const broken = (check: string) => faults.has(check);
   /** Events Slack delivers more than once (a retry after a slow ack) are handled once. */
@@ -159,6 +159,8 @@ export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> =
   };
 
   /** Tools waiting for a person's approval, by the button's value: how the answer goes on, and where. */
+  /** How many approvals the agent asked for: each button's key is its own, even while others are pending. */
+  let approvalsAsked = 0;
   const approvals = new Map<
     string,
     { resume: (approved: boolean, streaming: Streaming) => Promise<void>; where: Where }
@@ -195,7 +197,8 @@ export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> =
           });
         },
         onApproval: async (request) => {
-          const key = `${channel}:${thread}:${approvals.size + 1}`;
+          approvalsAsked += 1;
+          const key = `${channel}:${thread}:${approvalsAsked}`;
           approvals.set(key, { resume: request.resume, where });
           await client.chat.postMessage({
             channel,

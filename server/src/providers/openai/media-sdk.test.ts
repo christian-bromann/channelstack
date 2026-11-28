@@ -27,6 +27,7 @@ const FILES = {
   aac: new Uint8Array([0xff, 0xf1, 0x50, 0x80, 0, 0x1f, 0xfc]),
   flac: new Uint8Array([...Buffer.from("fLaC"), 0, 0, 0, 0x22]),
   jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, ...Buffer.from("JFIF")]),
+  webp: new Uint8Array([...Buffer.from("RIFF"), 4, 0, 0, 0, ...Buffer.from("WEBP")]),
 } as const;
 
 /** A PNG as a decoder reads it: its chunks with their CRCs, its size, and pixel data that inflates to that size. */
@@ -79,7 +80,7 @@ describe("the Images API", () => {
       when: { endpoint: "images.generations" },
     });
 
-    const answer = await client.images.generate({ model: "gpt-image-1", prompt: PROMPT });
+    const answer = await client.images.generate({ model: "gpt-image-2", prompt: PROMPT });
 
     expect(answer.data).toHaveLength(1);
     expect(decodePng(Buffer.from(answer.data?.[0]?.b64_json ?? "", "base64"))).toEqual({ width: 64, height: 32 });
@@ -103,7 +104,7 @@ describe("the Images API", () => {
     const { client, respond } = await setup(PROMPT);
     await respond({ turns: [{ image: [content(FILES.jpeg, "chart.jpg")] }] });
 
-    const answer = await client.images.generate({ model: "gpt-image-1", prompt: PROMPT, output_format: "jpeg" });
+    const answer = await client.images.generate({ model: "gpt-image-2", prompt: PROMPT, output_format: "jpeg" });
 
     expect(Buffer.from(answer.data?.[0]?.b64_json ?? "", "base64")).toEqual(Buffer.from(FILES.jpeg));
     expect(answer.output_format).toBe("jpeg");
@@ -114,7 +115,7 @@ describe("the Images API", () => {
     await respond({ turns: [{ image: [{ placeholder: {} }] }] });
 
     const error = await client.images
-      .generate({ model: "gpt-image-1", prompt: PROMPT, output_format: "webp" })
+      .generate({ model: "gpt-image-2", prompt: PROMPT, output_format: "webp" })
       .catch((caught: unknown) => caught);
 
     expect((error as APIError).code).toBe("channelstack_no_script");
@@ -131,7 +132,7 @@ describe("the Images API", () => {
     });
     const image = Buffer.from(CHART);
 
-    await client.images.edit({ model: "gpt-image-1", prompt: PROMPT, image: await toFile(image, "chart.png") });
+    await client.images.edit({ model: "gpt-image-2", prompt: PROMPT, image: await toFile(image, "chart.png") });
 
     const [call] = await control("GET", "/calls");
     expect(call.request.file).toEqual(
@@ -139,6 +140,50 @@ describe("the Images API", () => {
     );
     expect(call.request.file.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(call.request.prompt).toBe(PROMPT);
+  });
+});
+
+describe("the Images API refuses what OpenAI refuses", () => {
+  test("a WebP file for `output_format: webp`", async () => {
+    const { client, respond } = await setup(PROMPT);
+    await respond({ turns: [{ image: [content(FILES.webp, "chart.webp")] }] });
+
+    const answer = await client.images.generate({ model: "gpt-image-2", prompt: PROMPT, output_format: "webp" });
+
+    expect(Buffer.from(answer.data?.[0]?.b64_json ?? "", "base64")).toEqual(Buffer.from(FILES.webp));
+  });
+
+  test("no model, and `response_format: url` for a GPT image model, are refused", async () => {
+    const { client } = await setup(PROMPT);
+
+    const noModel = await client.images.generate({ prompt: PROMPT } as never).catch((caught: unknown) => caught);
+    const url = await client.images
+      .generate({ model: "gpt-image-2", prompt: PROMPT, response_format: "url" })
+      .catch((caught: unknown) => caught);
+
+    expect([(noModel as APIError).status, (noModel as APIError).code]).toEqual([400, "missing_required_parameter"]);
+    expect([(url as APIError).status, (url as APIError).param]).toEqual([400, "response_format"]);
+  });
+
+  test("edits: every image and the mask are parts of the request", async () => {
+    const { client, respond, control } = await setup(PROMPT);
+    await respond({ turns: [{ image: [{ placeholder: {} }] }] });
+    const [first, second, mask] = [placeholderPng(2, 2), placeholderPng(3, 3), placeholderPng(4, 4)];
+
+    await client.images.edit({
+      model: "gpt-image-2",
+      prompt: PROMPT,
+      image: [await toFile(Buffer.from(first), "a.png"), await toFile(Buffer.from(second), "b.png")],
+      mask: await toFile(Buffer.from(mask), "mask.png"),
+    });
+
+    const [call] = await control("GET", "/calls");
+    expect(call.request.messages[0].parts.map((part: { filename: string }) => part.filename)).toEqual([
+      "a.png",
+      "b.png",
+      "mask.png",
+    ]);
+    expect(call.request.file.filename).toBe("a.png");
   });
 });
 
@@ -271,30 +316,37 @@ describe("transcriptions and translations", () => {
     expect(events.map((event) => event.delta ?? event.text)).toEqual(["The deploy", " fails.", "The deploy fails."]);
   });
 
-  test("whisper-1 doesn't stream, as OpenAI refuses it", async () => {
-    const { client } = await setup();
+  test("whisper-1 ignores `stream`, as OpenAI does, and answers whole", async () => {
+    const { client, respond } = await setup();
+    await respond({ turns: [TRANSCRIPT] });
 
-    const error = await client.audio.transcriptions
+    // The SDK reads a call made with `stream: true` as a stream: the answer, as sent, is JSON.
+    const response = await client.audio.transcriptions
       .create({ model: "whisper-1", file: await voiceNote(), prompt: NOTE, stream: true })
-      .catch((caught: unknown) => caught);
+      .asResponse();
 
-    expect((error as APIError).status).toBe(400);
+    expect(response.headers.get("content-type")).toMatch(/^application\/json/);
+    expect(((await response.json()) as { text: string }).text).toBe(TRANSCRIPT);
   });
 
-  test("translations, in JSON and text", async () => {
+  test.each([
+    ["json", (answer: unknown) => (answer as { text: string }).text, "Roll back the deploy."],
+    ["text", (answer: unknown) => answer, "Roll back the deploy.\n"],
+    ["srt", (answer: unknown) => answer, "1\n00:00:00,000 --> 00:00:02,000\nRoll back the deploy.\n"],
+    ["vtt", (answer: unknown) => answer, "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nRoll back the deploy.\n"],
+    ["verbose_json", (answer: unknown) => (answer as { task: string }).task, "translate"],
+  ] as const)("translations, in %s", async (format, read, expected) => {
     const { client, respond } = await setup();
-    await respond({ turns: ["Roll back the deploy."], times: 2, when: { endpoint: "audio.translations" } });
+    await respond({ turns: ["Roll back the deploy."], when: { endpoint: "audio.translations" } });
 
-    const json = await client.audio.translations.create({ model: "whisper-1", file: await voiceNote(), prompt: NOTE });
-    const text = await client.audio.translations.create({
+    const answer = await client.audio.translations.create({
       model: "whisper-1",
       file: await voiceNote(),
       prompt: NOTE,
-      response_format: "text",
+      response_format: format,
     });
 
-    expect(json.text).toBe("Roll back the deploy.");
-    expect(text).toBe("Roll back the deploy.\n");
+    expect(read(answer)).toBe(expected);
   });
 });
 

@@ -6,12 +6,13 @@ import { type BuiltInTool, type ToolEvent } from "./shared.ts";
 /**
  * `code_interpreter`, run by OpenAI in a container: a `code_interpreter_call` with its code and,
  * when `include` asks for them, its outputs (logs, and an image per image file). The files the
- * code wrote are the container's, downloadable from `/v1/containers/{container}/files/{file}/content`.
+ * code wrote are the container's, downloadable from `/v1/containers/{container}/files/{file}/content`
+ * once the answer is sent (`files`).
  */
 export const codeInterpreter: BuiltInTool<"codeInterpreter"> = {
   kind: "codeInterpreter",
   types: TOOL_TYPES.codeInterpreter,
-  build(spec, { ids, clock, request, tool, media }) {
+  build(spec, { ids, clock, request, tool }) {
     const id = ids.next(OPENAI_IDS.codeInterpreter);
     // `container` is a container's id, or `{ type: "auto" }`: a new one.
     const given = tool.settings?.container;
@@ -19,14 +20,14 @@ export const codeInterpreter: BuiltInTool<"codeInterpreter"> = {
     const files = (spec.files ?? []).map((source, at) => {
       const file = anyMedia(source);
       const filename = file.filename ?? `output_${at + 1}.${file.mediaType.split("/")[1] ?? "bin"}`;
-      return media.keepContainerFile({
+      return {
         ...file,
         id: ids.next(OPENAI_IDS.containerFile),
         container,
         path: `/mnt/data/${filename}`,
         filename,
         createdAt: Math.floor(clock() / 1000),
-      });
+      };
     });
     const outputs = [
       ...(spec.logs === undefined ? [] : [{ type: "logs", logs: spec.logs }]),
@@ -69,6 +70,7 @@ export const codeInterpreter: BuiltInTool<"codeInterpreter"> = {
         },
       ],
       ids: [id, container, ...files.map((file) => file.id)],
+      files,
       text: spec.code,
     };
   },

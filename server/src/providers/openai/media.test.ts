@@ -128,6 +128,83 @@ describe("the parts of a request, by their hash", () => {
   });
 });
 
+describe("more parts, and what OpenAI refuses", () => {
+  test("Chat Completions: a file by its file_id; Responses: a file's data, and a file URL elsewhere", async () => {
+    const { client, respond, control, prompt } = await setup();
+    await respond({ turns: ["Read them."], times: 2 });
+    const report = await client.files.create({ file: await toFile(PDF, "report.pdf"), purpose: "user_data" });
+
+    await client.chat.completions.create({
+      model: "gpt-5",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "file", file: { file_id: report.id } },
+          ],
+        },
+      ],
+    });
+    await client.responses.create({
+      model: "gpt-5",
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: prompt },
+            { type: "input_file", file_data: dataUrl("application/pdf", PDF), filename: "report.pdf" },
+            { type: "input_file", file_url: "https://files.example/report.pdf" },
+          ],
+        },
+      ],
+    });
+
+    const [chat, responses] = await control("GET", "/calls");
+    const parts = (call: any) => call.request.messages.findLast((message: any) => message.role === "user").parts;
+    expect(parts(chat)).toEqual([
+      expect.objectContaining({ type: "file", from: "file_id", fileId: report.id, sha256: hash(PDF) }),
+    ]);
+    expect(parts(responses)).toEqual([
+      {
+        type: "file",
+        from: "data",
+        mediaType: "application/pdf",
+        bytes: PDF.length,
+        sha256: hash(PDF),
+        filename: "report.pdf",
+      },
+      { type: "file", from: "url", url: "https://files.example/report.pdf" },
+    ]);
+  });
+
+  test("an image that isn't one is refused with invalid_image_format; a broken data URL with a 400, not a 500", async () => {
+    const { client, respond, prompt } = await setup();
+    await respond({ turns: ["Hm."], times: 2 });
+    const ask = (url: string) =>
+      client.chat.completions
+        .create({
+          model: "gpt-5",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                { type: "image_url", image_url: { url } },
+              ],
+            },
+          ],
+        })
+        .catch((caught: unknown) => caught);
+
+    const text = await ask("data:text/plain,hello");
+    const broken = await ask("data:image/png,%E0%A4%A");
+
+    expect([(text as APIError).status, (text as APIError).code]).toEqual([400, "invalid_image_format"]);
+    expect([(broken as APIError).status, (broken as APIError).code]).toEqual([400, "invalid_image_url"]);
+  });
+});
+
 describe("URLs", () => {
   test("Slack's url_private, handed to the model, is refused as OpenAI refuses it: there's no bot token", async () => {
     const { client, respond, h, agent, ana, channel, post } = await setup();
@@ -160,6 +237,23 @@ describe("URLs", () => {
     expect((error as APIError).status).toBe(400);
     expect((error as APIError).code).toBe("invalid_image_url");
     expect((error as APIError).message).toBe(`400 Error while downloading ${url_private}.`);
+
+    // The same on Responses, where the URL is an `input_image`'s.
+    const responses = await client.responses
+      .create({
+        model: "gpt-5",
+        input: [
+          {
+            role: "user",
+            content: [
+              { type: "input_text", text: "what's wrong here?" },
+              { type: "input_image", image_url: url_private, detail: "auto" },
+            ],
+          },
+        ],
+      })
+      .catch((caught: unknown) => caught);
+    expect([(responses as APIError).status, (responses as APIError).code]).toEqual([400, "invalid_image_url"]);
   });
 
   test("a public URL on a fake host is fetched, and recorded by its hash", async () => {

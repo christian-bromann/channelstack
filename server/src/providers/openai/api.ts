@@ -21,12 +21,12 @@ import { OPENAI_IDS } from "./ids.ts";
 import {
   containerFileWire,
   fileWire,
-  FORMAT_TYPES,
   type Media,
+  mediaTypeOf,
   type ModelPart,
+  partOf,
   readPart,
   sha256,
-  sniff,
 } from "./media.ts";
 import { defaultRateHeaders } from "./rate-limit.ts";
 import {
@@ -182,21 +182,9 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
         message.role === "user" ? { ...message, parts: await Promise.all(message.parts.map(read)) } : message,
       ),
     );
-    const { media } = request;
-    return {
-      ...request,
-      messages,
-      ...(request.file === undefined ? {} : { file: await read(request.file) }),
-      ...(media === undefined
-        ? {}
-        : {
-            media: {
-              ...media,
-              images: await Promise.all(media.images.map(read)),
-              ...(media.mask === undefined ? {} : { mask: await read(media.mask) }),
-            },
-          }),
-    };
+    // A media endpoint's file is its message's first part: read once, with the others.
+    const first = messages[0]?.role === "user" ? messages[0].parts[0] : undefined;
+    return { ...request, messages, ...(request.file === undefined || first === undefined ? {} : { file: first }) };
   };
 
   /** The files of a multipart body, by field: the body a call records names each by its hash instead. */
@@ -225,8 +213,7 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
           continue;
         }
         const bytes = new Uint8Array(await entry.arrayBuffer());
-        const extension = entry.name.split(".").at(-1)?.toLowerCase() ?? "";
-        const mediaType = sniff(bytes) ?? (entry.type || FORMAT_TYPES[extension] || "application/octet-stream");
+        const mediaType = mediaTypeOf(bytes, entry.type === "" ? undefined : entry.type, entry.name);
         const list = files[name] ?? [];
         list.push({ bytes, mediaType, filename: entry.name });
         files[name] = list;
@@ -241,14 +228,8 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
   /** An uploaded file as a part of the request, its bytes already read. */
   const uploaded =
     (type: ModelPart["type"]) =>
-    (media: Media): ModelPart => ({
-      type,
-      from: "data",
-      mediaType: media.mediaType,
-      bytes: media.bytes.length,
-      sha256: sha256(media.bytes),
-      ...(media.filename === undefined ? {} : { filename: media.filename }),
-    });
+    (media: Media): ModelPart =>
+      partOf({ type, from: "data" }, media);
 
   /** An image a JSON body names: `{ image_url }` (a URL or a data URL) or `{ file_id }`. */
   const namedImage = (value: unknown): ModelPart | undefined => {

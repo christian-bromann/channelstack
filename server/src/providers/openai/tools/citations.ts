@@ -1,6 +1,6 @@
 import type { IdGenerator } from "../../../core/ids/index.ts";
 import { OPENAI_IDS } from "../ids.ts";
-import type { MediaStore } from "../media.ts";
+import type { ContainerFile, MediaStore } from "../media.ts";
 import type { Turn } from "../turns.ts";
 import type { Json } from "./shared.ts";
 
@@ -19,8 +19,8 @@ export function annotationsOf(
     readonly endpoint: "chat.completions" | "responses";
     readonly ids: IdGenerator;
     readonly media: MediaStore;
-    /** The containers this answer's code interpreter calls used. */
-    readonly containers: readonly string[];
+    /** The files this answer's code interpreter calls wrote. */
+    readonly written: readonly ContainerFile[];
     readonly script: string;
   },
 ): { annotations: Json[]; problems: string[] } {
@@ -52,9 +52,9 @@ export function annotationsOf(
       continue;
     }
     const file = citation.file;
-    const written = context.containers
-      .flatMap((container) => [...(context.media.containers.get(container)?.values() ?? [])])
-      .find((candidate) => candidate.filename === file || candidate.id === file || candidate.path === file);
+    const written = context.written.find(
+      (candidate) => candidate.filename === file || candidate.id === file || candidate.path === file,
+    );
     if (written) {
       annotations.push({
         type: "container_file_citation",
@@ -66,7 +66,7 @@ export function annotationsOf(
       });
       continue;
     }
-    const stored = context.media.files.get(file) ?? [...context.media.files.values()].find((f) => f.filename === file);
+    const stored = context.media.file(file);
     annotations.push({
       type: "file_citation",
       file_id: stored?.id ?? (file.startsWith("file-") ? file : context.ids.next(OPENAI_IDS.file)),

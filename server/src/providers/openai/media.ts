@@ -29,7 +29,7 @@ export const sha256 = (bytes: Uint8Array): string => createHash("sha256").update
 export const base64Of = (bytes: Uint8Array): string => Buffer.from(bytes).toString("base64");
 
 /** The media type of a format a request asks for: an image's `output_format`, audio's `response_format`. */
-export const FORMAT_TYPES: Readonly<Record<string, string>> = {
+const FORMAT_TYPES: Readonly<Record<string, string>> = {
   png: "image/png",
   jpeg: "image/jpeg",
   jpg: "image/jpeg",
@@ -46,7 +46,7 @@ export const FORMAT_TYPES: Readonly<Record<string, string>> = {
 };
 
 /** What bytes are, from their first bytes: the formats OpenAI serves and takes. */
-export function sniff(bytes: Uint8Array): string | undefined {
+function sniff(bytes: Uint8Array): string | undefined {
   const at = (offset: number, ...values: number[]) => values.every((value, index) => bytes[offset + index] === value);
   const ascii = (offset: number, text: string) => at(offset, ...[...text].map((char) => char.charCodeAt(0)));
   if (at(0, 0x89, 0x50, 0x4e, 0x47)) return "image/png";
@@ -71,7 +71,14 @@ function decodeData(data: string): { mediaType?: string; bytes: Uint8Array } | u
   if (!match)
     return /^[A-Za-z0-9+/=\s]*$/.test(data) ? { bytes: new Uint8Array(Buffer.from(data, "base64")) } : undefined;
   const [, type, base64, rest = ""] = match;
-  const bytes = base64 ? Buffer.from(rest, "base64") : Buffer.from(decodeURIComponent(rest), "utf8");
+  let text: string;
+  try {
+    text = base64 ? "" : decodeURIComponent(rest);
+  } catch {
+    // A percent sign that starts no escape: not a data URL OpenAI can read.
+    return undefined;
+  }
+  const bytes = base64 ? Buffer.from(rest, "base64") : Buffer.from(text, "utf8");
   return { ...(type ? { mediaType: type } : {}), bytes: new Uint8Array(bytes) };
 }
 
@@ -172,7 +179,7 @@ export function anyMedia(source: MediaSource): Media {
   const bytes = new Uint8Array(Buffer.from(source.content, "base64"));
   return {
     bytes,
-    mediaType: sniff(bytes) ?? byExtension(source.name) ?? "application/octet-stream",
+    mediaType: mediaTypeOf(bytes, undefined, source.name),
     ...(source.name === undefined ? {} : { filename: source.name }),
   };
 }
@@ -206,6 +213,11 @@ export class MediaStore {
   readonly containers = new Map<string, Map<string, ContainerFile>>();
   /** What the Images API answered with as a URL (`response_format: "url"`): served without a key, as OpenAI's are. */
   readonly generated = new Map<string, Media>();
+
+  /** A file in `/v1/files` by its id, or by its name: what a citation or a file search names. */
+  file(idOrName: string): StoredFile | undefined {
+    return this.files.get(idOrName) ?? [...this.files.values()].find((file) => file.filename === idOrName);
+  }
 
   keepFile(file: StoredFile): StoredFile {
     this.files.set(file.id, file);
@@ -269,13 +281,6 @@ export async function readPart(part: ModelPart, store: MediaStore, fetchFake: Fe
   // An upload's part was read with its body.
   if (part.sha256 !== undefined) return part;
   const { pending, ...rest } = part;
-  const known = (media: Media) => ({
-    ...rest,
-    mediaType: media.mediaType,
-    bytes: media.bytes.length,
-    sha256: sha256(media.bytes),
-    ...((rest.filename ?? media.filename) ? { filename: rest.filename ?? media.filename } : {}),
-  });
   if (part.from === "data") {
     const decoded = decodeData(pending?.data ?? "");
     if (!decoded) {
@@ -288,15 +293,17 @@ export async function readPart(part: ModelPart, store: MediaStore, fetchFake: Fe
       );
     }
     const format = pending?.format === undefined ? undefined : FORMAT_TYPES[pending.format];
-    const mediaType = decoded.mediaType ?? format ?? sniff(decoded.bytes) ?? byExtension(part.filename);
-    return known({ bytes: decoded.bytes, mediaType: mediaType ?? "application/octet-stream" });
+    return partOf(rest, {
+      bytes: decoded.bytes,
+      mediaType: mediaTypeOf(decoded.bytes, decoded.mediaType ?? format, part.filename),
+    });
   }
   if (part.from === "file_id") {
     const file = part.fileId === undefined ? undefined : store.files.get(part.fileId);
     if (!file) {
       throw invalidRequest(`The file '${part.fileId ?? ""}' was not found.`, null, "file_not_found");
     }
-    return known(file);
+    return partOf(rest, file);
   }
   const url = part.url ?? "";
   const fetched = fetchFake(url);
@@ -312,8 +319,34 @@ export async function readPart(part: ModelPart, store: MediaStore, fetchFake: Fe
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
   const header = response.headers.get("content-type")?.split(";")[0]?.trim();
-  return known({
-    bytes,
-    mediaType: sniff(bytes) ?? (header === undefined || header === "" ? "application/octet-stream" : header),
-  });
+  return partOf(rest, { bytes, mediaType: mediaTypeOf(bytes, header === "" ? undefined : header) });
+}
+
+/** What a file is: by its first bytes, then what it was declared as, then its name's extension. */
+export const mediaTypeOf = (bytes: Uint8Array, declared?: string, filename?: string): string =>
+  sniff(bytes) ?? declared ?? byExtension(filename) ?? "application/octet-stream";
+
+/** The image formats OpenAI reads, as it lists them when it refuses another. */
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+
+/**
+ * A part with what its bytes are: media type, size, SHA-256. An image part that isn't a PNG,
+ * JPEG, GIF or WebP is refused as OpenAI refuses it (`invalid_image_format`).
+ */
+export function partOf(part: Omit<ModelPart, "pending">, media: Media): ModelPart {
+  if (part.type === "image" && !IMAGE_TYPES.includes(media.mediaType)) {
+    throw invalidRequest(
+      "You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].",
+      null,
+      "invalid_image_format",
+    );
+  }
+  const filename = part.filename ?? media.filename;
+  return {
+    ...part,
+    mediaType: media.mediaType,
+    bytes: media.bytes.length,
+    sha256: sha256(media.bytes),
+    ...(filename === undefined ? {} : { filename }),
+  };
 }

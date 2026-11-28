@@ -126,11 +126,7 @@ export function chatFrames(answer: Answer, meta: ChatMeta, includeUsage: boolean
         content: true,
       });
     });
-    for (const piece of textChunks(base64Of(audio.bytes)).reduce<string[]>((pieces, part, at) => {
-      if (at % 2048 === 0) pieces.push(part);
-      else pieces[pieces.length - 1] += part;
-      return pieces;
-    }, [])) {
+    for (const piece of base64Of(audio.bytes).match(/[\s\S]{1,8192}/g) ?? []) {
       frames.push({ data: data({ audio: { id: audio.id, data: piece } }), content: true });
     }
     frames.push({ data: data({ audio: { id: audio.id, expires_at: meta.created + AUDIO_LIFETIME_S } }) });

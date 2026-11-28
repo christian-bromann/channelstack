@@ -40,9 +40,6 @@ interface MediaOptions {
   /** Speech: `audio` or `sse`. */
   readonly streamFormat?: string;
   readonly language?: string;
-  /** Images to edit beyond the first, and an edit's mask. */
-  readonly images: readonly ModelPart[];
-  readonly mask?: ModelPart;
 }
 
 type ResponseFormat =
@@ -63,7 +60,7 @@ export interface ModelRequest {
   readonly media?: MediaOptions;
   /** Chat Completions' audio output: `modalities: ["text", "audio"]` and its `audio` settings. */
   readonly audioOutput?: { readonly format: string; readonly voice: string };
-  /** The MCP approval responses in the request, by the approval request they answer, with its server and tool. */
+  /** The MCP approval responses in the request's own input (not its history), by the approval request they answer, with its server and tool. */
   readonly approvals: readonly {
     readonly requestId: string;
     readonly approve: boolean;
@@ -537,7 +534,8 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
         refs.push(requestId);
         const approve = item.approve === true;
         const request = asked.get(requestId);
-        approvals.push({ requestId, approve, ...(request ?? {}) });
+        // An approval answers the call that follows it: one from an earlier turn of the conversation was used there.
+        if (at >= history.length) approvals.push({ requestId, approve, ...(request ?? {}) });
         // The agent's answer to the approval request, as a tool result is an answer to a call.
         messages.push({
           role: "tool",
@@ -675,9 +673,12 @@ type MediaEndpoint = keyof typeof MEDIA_FORMATS;
 
 const IMAGE_FORMATS = ["png", "jpeg", "webp"];
 
+/** The image model an edit without one gets, as the description gives its default. */
+const DEFAULT_IMAGE_MODEL = "gpt-image-2.6-sunburst";
+
 /** The fields every media endpoint needs, refused as OpenAI refuses a request without them. */
 const REQUIRED: Readonly<Record<MediaEndpoint, readonly string[]>> = {
-  "images.generations": ["prompt"],
+  "images.generations": ["model", "prompt"],
   "images.edits": ["prompt"],
   "audio.speech": ["model", "input", "voice"],
   "audio.transcriptions": ["model"],
@@ -725,18 +726,34 @@ export function mediaRequest(
       "invalid_value",
     );
   }
-  const model = str(fields.model) ?? (endpoint.startsWith("images") ? "gpt-image-1" : "");
-  const stream = fields.stream === true || fields.stream === "true";
-  if (stream && model === "whisper-1") {
-    throw invalidRequest("Streaming is not supported for the whisper-1 model.", "stream", "unsupported_value");
+  // An edit's JSON body (`images`) may leave the model out: it is then OpenAI's default image model.
+  const model = str(fields.model) ?? (Array.isArray(fields.images) ? DEFAULT_IMAGE_MODEL : undefined);
+  if (model === undefined) {
+    throw invalidRequest("Missing required parameter: 'model'.", "model", "missing_required_parameter");
   }
+  // OpenAI ignores `stream` for whisper-1, which answers whole.
+  const stream = (fields.stream === true || fields.stream === "true") && model !== "whisper-1";
   if (stream && endpoint.startsWith("images")) throw unsupportedInFake("streamed images (`stream: true`)", "stream");
+  // Only the retired DALL·E models took `response_format`; GPT image models always answer in base64.
+  if (endpoint.startsWith("images") && fields.response_format === "url" && !/^dall-e/.test(model)) {
+    throw invalidRequest(
+      `The 'response_format' parameter isn't supported for ${model}: GPT image models always return base64-encoded images.`,
+      "response_format",
+      "unsupported_parameter",
+    );
+  }
   const n = Number(fields.n ?? 1);
   if (!Number.isInteger(n) || n < 1 || n > 10) {
     throw invalidRequest(`Invalid value for 'n': ${String(fields.n)}. It must be between 1 and 10.`, "n");
   }
   const prompt = str(fields.prompt) ?? str(fields.input);
-  const message: ModelMessage = { role: "user", text: prompt ?? "", parts: file === undefined ? [] : [file] };
+  // Every file the request sends is a part of its message: the image to edit, the others, and the mask.
+  const parts = [
+    ...(file === undefined ? [] : [file]),
+    ...(files.file === undefined ? more : []),
+    ...(files.mask ? [files.mask] : []),
+  ];
+  const message: ModelMessage = { role: "user", text: prompt ?? "", parts };
   const instructions = str(fields.instructions);
   return {
     endpoint,
@@ -754,8 +771,6 @@ export function mediaRequest(
       ...withOptional("voice", str(isObject(fields.voice) ? fields.voice.id : fields.voice)),
       ...withOptional("streamFormat", str(fields.stream_format)),
       ...withOptional("language", str(fields.language)),
-      images: more,
-      ...withOptional("mask", files.mask),
     },
     ...(instructions === undefined ? {} : { instructions }),
     approvals: [],

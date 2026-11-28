@@ -13,8 +13,7 @@ export const fileSearch: BuiltInTool<"fileSearch"> = {
   build(spec, { ids, request, media }) {
     const id = ids.next(OPENAI_IDS.fileSearch);
     const results = (spec.results ?? []).map((result) => {
-      const stored =
-        media.files.get(result.file) ?? [...media.files.values()].find((file) => file.filename === result.file);
+      const stored = media.file(result.file);
       return {
         file_id: stored?.id ?? (result.file.startsWith("file-") ? result.file : ids.next(OPENAI_IDS.file)),
         filename: stored?.filename ?? result.file,

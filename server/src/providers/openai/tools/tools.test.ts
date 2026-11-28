@@ -170,6 +170,29 @@ describe("hosted tools: OpenAI runs them, the script says what they found", () =
     );
   });
 
+  test("a turn the fake refuses leaves no files in the container", async () => {
+    const { client, respond, prompt } = await setup();
+    const container = `cntr_${"a".repeat(48)}`;
+    await respond({
+      turns: [
+        {
+          toolCalls: [{ codeInterpreter: { code: "plot()", files: [{ placeholder: {} }] } }],
+          text: "Done.",
+          citations: [{ quote: "not in the text", url: "https://x.example" }],
+        },
+      ],
+    });
+
+    const refused = await ask(client, {
+      input: prompt,
+      tools: [{ type: "code_interpreter", container }],
+    }).catch((caught: unknown) => caught);
+    const files = await client.containers.files.list(container).catch((caught: unknown) => caught);
+
+    expect((refused as APIError).code).toBe("channelstack_no_script");
+    expect((files as APIError).status).toBe(404);
+  });
+
   test("image_generation: the base64 image, with partial images when asked", async () => {
     const { client, respond, prompt } = await setup();
     await respond({
@@ -306,14 +329,104 @@ describe("remote MCP: approval, then the call", () => {
     expect(await control("GET", "/problems")).toContainEqual(expect.stringMatching(/without approval/));
   });
 
-  test("a server the request doesn't name, or a tool it doesn't allow, is a script problem", async () => {
+  test("a server the request doesn't name is a script problem", async () => {
     const { client, respond, prompt, control } = await setup();
     await respond({ turns: [{ toolCalls: [{ mcp: { ...deploy, server: "billing", approval: true } }] }] });
-    await respond({ turns: [{ toolCalls: [{ mcp: { ...deploy, approval: true } }] }], when: { text: "allowed" } });
 
     await ask(client, { input: prompt, tools: [mcpTool] }).catch(() => undefined);
 
     expect(await control("GET", "/problems")).toContainEqual(expect.stringMatching(/the MCP server `billing`/));
+  });
+
+  test("a tool the request's allowed_tools leaves out is a script problem", async () => {
+    const { client, respond, prompt, control } = await setup();
+    await respond({ turns: [{ toolCalls: [{ mcp: { ...deploy, approval: true } }] }] });
+
+    await ask(client, { input: prompt, tools: [{ ...mcpTool, allowed_tools: ["status"] }] }).catch(() => undefined);
+
+    expect(await control("GET", "/problems")).toContainEqual(
+      expect.stringMatching(/called `deploy` on the MCP server `deploys`, but the request allows only `status`/),
+    );
+  });
+
+  test("an approval counts for the call right after it: a later call needs a new one", async () => {
+    const { client, respond, prompt, control } = await setup();
+    await respond({
+      turns: [
+        { toolCalls: [{ mcp: { ...deploy, approval: true } }] },
+        { toolCalls: [{ mcp: { ...deploy, output: "started" } }], text: "Deploying." },
+        { toolCalls: [{ mcp: { ...deploy, output: "started again" } }] },
+      ],
+    });
+    const first = await ask(client, { input: prompt, tools: [mcpTool] });
+    const request = first.output[1] as Item;
+    const second = await ask(client, {
+      previous_response_id: first.id,
+      input: [{ type: "mcp_approval_response", approval_request_id: request.id, approve: true }],
+      tools: [mcpTool],
+    });
+
+    const third = await ask(client, {
+      previous_response_id: second.id,
+      input: [{ role: "user", content: "and again" }],
+      tools: [mcpTool],
+    }).catch((caught: unknown) => caught);
+
+    expect((third as APIError).code).toBe("channelstack_no_script");
+    expect(await control("GET", "/problems")).toContainEqual(expect.stringMatching(/without approval/));
+  });
+
+  test("a decline earlier in the conversation doesn't block a call approved now", async () => {
+    const { client, respond, prompt } = await setup();
+    await respond({
+      turns: [
+        { toolCalls: [{ mcp: { ...deploy, approval: true } }] },
+        { toolCalls: [{ mcp: { ...deploy, approval: true } }], text: "Asking again." },
+        { toolCalls: [{ mcp: { ...deploy, output: "started" } }] },
+      ],
+    });
+    const first = await ask(client, { input: prompt, tools: [mcpTool] });
+    const declined = first.output[1] as Item;
+    const second = await ask(client, {
+      previous_response_id: first.id,
+      input: [{ type: "mcp_approval_response", approval_request_id: declined.id, approve: false }],
+      tools: [mcpTool],
+    });
+    const asked = second.output.find((item) => item.type === "mcp_approval_request") as Item;
+
+    const third = await ask(client, {
+      previous_response_id: second.id,
+      input: [{ type: "mcp_approval_response", approval_request_id: asked.id, approve: true }],
+      tools: [mcpTool],
+    });
+
+    expect(third.output[0]).toEqual(expect.objectContaining({ type: "mcp_call", approval_request_id: asked.id }));
+  });
+
+  test("`when: { approval }` matches the call that carries the approval, and no later one", async () => {
+    const { client, respond, prompt, control } = await setup();
+    await respond({ turns: [{ toolCalls: [{ mcp: { ...deploy, approval: true } }] }] });
+    const approved = await respond({
+      turns: [{ toolCalls: [{ mcp: { ...deploy, output: "started" } }] }],
+      when: { approval: true },
+      // It could answer every call: only `when` keeps it from the later one.
+      times: -1,
+    });
+    await respond({ turns: ["Done."] });
+    const first = await ask(client, { input: prompt, tools: [mcpTool] });
+    const second = await ask(client, {
+      previous_response_id: first.id,
+      input: [{ type: "mcp_approval_response", approval_request_id: (first.output[1] as Item).id, approve: true }],
+      tools: [mcpTool],
+    });
+
+    await ask(client, {
+      previous_response_id: second.id,
+      input: [{ role: "user", content: "thanks" }],
+      tools: [mcpTool],
+    });
+
+    expect((await control("GET", `/scripts/${approved.id}`)).used).toBe(1);
   });
 });
 

@@ -40,7 +40,7 @@ export const mcp: BuiltInTool<"mcp"> = {
       ];
     }
     const required = needsApproval(tool, spec.tool);
-    const answered = request.approvals.find(
+    const answered = request.approvals.findLast(
       (approval) => approval.server === spec.server && approval.tool === spec.tool,
     );
     if (spec.approval === true) {
@@ -96,7 +96,7 @@ export const mcp: BuiltInTool<"mcp"> = {
     }
     const id = ids.next(OPENAI_IDS.mcpCall);
     minted.push(id);
-    const approval = request.approvals.find((answer) => answer.server === spec.server && answer.tool === spec.tool);
+    const approval = request.approvals.findLast((answer) => answer.server === spec.server && answer.tool === spec.tool);
     const failed = spec.error !== undefined;
     const item = {
       id,

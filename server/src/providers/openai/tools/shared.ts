@@ -1,6 +1,6 @@
 import type { Clock } from "../../../core/clock/index.ts";
 import type { IdGenerator } from "../../../core/ids/index.ts";
-import type { MediaStore } from "../media.ts";
+import type { ContainerFile, MediaStore } from "../media.ts";
 import type { ModelRequest, ModelTool } from "../request.ts";
 import type { BuiltInKind, ToolCallInput } from "../turns.ts";
 
@@ -42,6 +42,8 @@ export interface BuiltInCall {
   readonly ids: readonly string[];
   /** What it produced, for the usage count. */
   readonly text: string;
+  /** Files it wrote in a container: kept once the answer is sent, so a turn the fake refuses leaves none. */
+  readonly files?: readonly ContainerFile[];
 }
 
 /** What a tool has to build its items: the request, the tool it offered, ids, and where files go. */

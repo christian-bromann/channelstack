@@ -316,7 +316,9 @@ export function createApp(options: AppOptions): App {
     }
     return DRIVERS.some((definition) => {
       const base = options.urls().driver(definition.name);
-      return parsed.hostname === `${definition.name}.localhost` || url === base || url.startsWith(`${base}/`);
+      // The parsed URL, as `fetch` will send it: never the text, which a fake's prefix could hide inside.
+      const { href } = parsed;
+      return parsed.hostname === `${definition.name}.localhost` || href === base || href.startsWith(`${base}/`);
     });
   };
   /** The app as it serves requests, once it is built: what `fetchFake` sends a URL on a fake's address to. */
